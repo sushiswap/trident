@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity =0.8.2;
+pragma solidity >=0.8.2;
 
-import "./mixins/ERC721.sol";
+import "./ERC721.sol";
 
 /**
- * @dev Originally DeriswapV1OptionContracts
+ * @dev Originally DeriswapV1LoanContracts
  * @author Andre Cronje, LevX
  */
-contract MirinOptionContracts is ERC721 {
+contract MirinLoanContracts is ERC721 {
     address public immutable RESERVE;
 
-    constructor() ERC721("MirinOptions", "MIRINO") {
+    constructor() ERC721("MirinLoans", "MIRINL") {
         RESERVE = msg.sender;
     }
 

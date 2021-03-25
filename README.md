@@ -35,31 +35,36 @@ A franchised pool is technically separate, however, and we will give the reigns 
 * 1-Click Migrate from Uniswap
 * 1-Click Migrate from Balancer `Work in progress`
 
-### K3PR-Powered Yield Rebalancing
-> Work in progress.
-
-MIRIN provides you an automatic yield rebalancing tool, powered by K3PR technology. This can benefit you, since you can add a dedicated job to seek out the best LP yields for you. Keepers do the dirty work of all the calculations and comparisons needed to find the highest returns and automatically switches into those optimal pairs.
-
 ### New LP Curve Options
 For liquidity pool creators, two types of new curves are added so that they can maximize the capital efficiency when providing a new pool to the ecosystem. The constant product curve from SushiSwapV2 will still be available, however, the two new proposed options will be:
 
 #### Arbitrary Weighted Constant Product
-> Work in progress
  
-Just like Balancer protocol, this curve option can utilize more than just two assets with distinct weights. For instance, for three assets in a pool (Z being the third), the equation would look like this:
-```
-(X*Y*Z)^(1/3) = K
-```
+Unlike v2, MIRIN supports each token on a pool can have different weights.
+We can define the equation for the invariant like this:
+
+<img src="https://latex.codecogs.com/gif.latex?k=r_0^{w_0}\cdot%20r_1^{w_1}" />
+
+where <img src="https://latex.codecogs.com/gif.latex?r_0" />,
+<img src="https://latex.codecogs.com/gif.latex?r_1" />,
+<img src="https://latex.codecogs.com/gif.latex?w_0" /> and
+<img src="https://latex.codecogs.com/gif.latex?w_1" />, are reserve for first asset, reserve for second asset, weight for first asset and weight for second asset, respectively.
+
 #### Mix of Constant Product + Sum Model
 > Work in progress
 
 Fine-tuned for stable coins. (ex: Curve protocol)
 
+### K3PR-Powered Yield Rebalancing
+> Work in progress.
+
+MIRIN provides you an automatic yield rebalancing tool, powered by K3PR technology. This can benefit you, since you can add a dedicated job to seek out the best LP yields for you. Keepers do the dirty work of all the calculations and comparisons needed to find the highest returns and automatically switches into those optimal pairs.
+
 ## RoadMap
 - [x] Franchised Pool
-- [x] Capital Efficiency
-- [ ] K3PR-Powered Yield Rebalancing (ETA: late-March)
-- [ ] New Curve Options (ETA: mid-April)
+- [x] Capital Efficiency (Deriswap)
+- [ ] New Curve Options (ETA: late-March)
+- [ ] K3PR-Powered Yield Rebalancing (ETA: mid-April)
 - [ ] Test Coverage (ETA: late-April)
 - [ ] Gas Optimization & Internal Audit (ETA: mid-May)
 - [ ] Formal Verification (ETA: late-May)

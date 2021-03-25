@@ -9,19 +9,17 @@ contract MirinLiquidityManager is MirinHelpers {
         address tokenA;
         address tokenB;
         uint256 pid;
-        uint256 amountADesired;
-        uint256 amountBDesired;
-        uint256 amountAMin;
-        uint256 amountBMin;
+        uint256 amountA;
+        uint256 amountB;
+        uint256 liquidityMin;
     }
 
     struct AddLiquidityETHParams {
         address token;
         uint256 pid;
-        uint256 amountTokenDesired;
-        uint256 amountETHDesired;
-        uint256 amountTokenMin;
-        uint256 amountETHMin;
+        uint256 amountToken;
+        uint256 amountETH;
+        uint256 liquidityMin;
     }
 
     struct RemoveLiquidityParams {
@@ -61,10 +59,9 @@ contract MirinLiquidityManager is MirinHelpers {
                 params[i].tokenA,
                 params[i].tokenB,
                 params[i].pid,
-                params[i].amountADesired,
-                params[i].amountBDesired,
-                params[i].amountAMin,
-                params[i].amountBMin,
+                params[i].amountA,
+                params[i].amountB,
+                params[i].liquidityMin,
                 to
             );
         }
@@ -74,22 +71,13 @@ contract MirinLiquidityManager is MirinHelpers {
         address tokenA,
         address tokenB,
         uint256 pid,
-        uint256 amountADesired,
-        uint256 amountBDesired,
-        uint256 amountAMin,
-        uint256 amountBMin,
+        uint256 amountA,
+        uint256 amountB,
+        uint256 liquidityMin,
         address to,
         uint256 deadline
-    )
-        external
-        ensure(deadline)
-        returns (
-            uint256 amountA,
-            uint256 amountB,
-            uint256 liquidity
-        )
-    {
-        return _addLiquidity(tokenA, tokenB, pid, amountADesired, amountBDesired, amountAMin, amountBMin, to);
+    ) external ensure(deadline) returns (uint256 liquidity) {
+        return _addLiquidity(tokenA, tokenB, pid, amountA, amountB, liquidityMin, to);
     }
 
     function addLiquidityETHMultiple(
@@ -101,10 +89,9 @@ contract MirinLiquidityManager is MirinHelpers {
             _addLiquidityETH(
                 params[i].token,
                 params[i].pid,
-                params[i].amountTokenDesired,
-                params[i].amountETHDesired,
-                params[i].amountTokenMin,
-                params[i].amountETHMin,
+                params[i].amountToken,
+                params[i].amountETH,
+                params[i].liquidityMin,
                 to
             );
         }
@@ -113,22 +100,12 @@ contract MirinLiquidityManager is MirinHelpers {
     function addLiquidityETH(
         address token,
         uint256 pid,
-        uint256 amountTokenDesired,
-        uint256 amountTokenMin,
-        uint256 amountETHMin,
+        uint256 amountToken,
+        uint256 liquidityMin,
         address to,
         uint256 deadline
-    )
-        external
-        payable
-        ensure(deadline)
-        returns (
-            uint256 amountToken,
-            uint256 amountETH,
-            uint256 liquidity
-        )
-    {
-        return _addLiquidityETH(token, pid, amountTokenDesired, msg.value, amountTokenMin, amountETHMin, to);
+    ) external payable ensure(deadline) returns (uint256 liquidity) {
+        return _addLiquidityETH(token, pid, amountToken, msg.value, liquidityMin, to);
     }
 
     function removeLiquidityMultiple(

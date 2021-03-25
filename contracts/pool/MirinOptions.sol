@@ -2,7 +2,7 @@
 
 pragma solidity =0.8.2;
 
-import "./MirinERC20.sol";
+import "./MirinOracle.sol";
 import "./MirinLoanContracts.sol";
 import "./MirinOptionContracts.sol";
 
@@ -10,10 +10,9 @@ import "./MirinOptionContracts.sol";
  * @dev Originally DeriswapV1Pair
  * @author Andre Cronje, LevX
  */
-contract MirinOptions is MirinERC20 {
+contract MirinOptions is MirinOracle {
     using FixedPoint for *;
     using SafeERC20 for IERC20;
-    using UQ112x112 for uint224;
 
     MirinLoanContracts public immutable loansnft;
     MirinOptionContracts public immutable optionsnft;
@@ -21,10 +20,9 @@ contract MirinOptions is MirinERC20 {
     constructor(
         address _token0,
         address _token1,
-        address _operator,
-        uint8 _swapFee,
-        address _swapFeeTo
-    ) MirinERC20(_token0, _token1, _operator, _swapFee, _swapFeeTo) {
+        uint8 _weight0,
+        uint8 _weight1
+    ) MirinOracle(_token0, _token1, _weight0, _weight1) {
         loansnft = new MirinLoanContracts();
         optionsnft = new MirinOptionContracts();
     }
@@ -228,7 +226,7 @@ contract MirinOptions is MirinERC20 {
             ? (_t0 == token ? calls0 = calls0 + amount : calls1 = calls1 + amount)
             : (_t0 == token ? puts0 = puts0 + amount : puts1 = puts1 + amount);
         uint256 _fee = fee(token, amount, st, t, optionType);
-        require(_fee <= maxFee, "maxFee");
+        require(_fee <= maxFee, "MIRIN: FEE_TOO_HIGH");
         IERC20(_t0 == token ? TOKEN1 : _t0).safeTransferFrom(msg.sender, address(this), _fee);
         emit Created(ostores.length, msg.sender, token, amount, st, block.timestamp, block.timestamp + period(t));
         optionsnft.mint(msg.sender, ostores.length);
@@ -236,20 +234,20 @@ contract MirinOptions is MirinERC20 {
     }
 
     function exerciseOptionProfitOnly(uint256 id) external {
-        require(optionsnft.isApprovedOrOwner(msg.sender, id));
+        require(optionsnft.isApprovedOrOwner(msg.sender, id), "MIRIN: FORBIDDEN");
         ostore storage _pos = ostores[id];
         opt memory _o = store2opt(_pos);
-        require(_o.expire > block.timestamp);
+        require(_o.expire > block.timestamp, "MIRIN: EXPIRED");
         _pos.expire = uint48(block.timestamp);
 
         uint256 _sp = price(_o.asset);
 
         uint256 profit;
         if (_o.optionType == 0) {
-            require(_o.strike <= _sp, "Current price is too low");
+            require(_o.strike <= _sp, "MIRIN: CURRENT_PRICE_TOO_LOW");
             profit = (_sp - _o.strike) * _o.amount;
         } else if (_o.optionType == 1) {
-            require(_o.strike >= _sp, "Current price is too high");
+            require(_o.strike >= _sp, "MIRIN: CURRENT_PRICE_TOO_HIGH");
             profit = (_o.strike - _sp) * _o.amount;
         }
         IERC20(TOKEN0 == _o.asset ? TOKEN1 : TOKEN0).transfer(msg.sender, profit);
@@ -258,17 +256,17 @@ contract MirinOptions is MirinERC20 {
     }
 
     function excerciseOption(uint256 id) external {
-        require(optionsnft.isApprovedOrOwner(msg.sender, id));
+        require(optionsnft.isApprovedOrOwner(msg.sender, id), "MIRIN: FORBIDDEN");
         ostore storage _pos = ostores[id];
         opt memory _o = store2opt(_pos);
-        require(_o.expire > block.timestamp);
+        require(_o.expire > block.timestamp, "MIRIN: EXPIRED");
         _pos.expire = uint48(block.timestamp);
 
         uint256 _sp = price(_o.asset);
 
         if (_o.optionType == 0) {
             // call asset
-            require(_o.strike <= _sp, "Current price is too low");
+            require(_o.strike <= _sp, "MIRIN: CURRENT_PRICE_TOO_LOW");
             IERC20(TOKEN0 == _o.asset ? TOKEN1 : TOKEN0).safeTransferFrom(
                 msg.sender,
                 address(this),
@@ -277,7 +275,7 @@ contract MirinOptions is MirinERC20 {
             IERC20(_o.asset).safeTransfer(msg.sender, _o.amount);
         } else if (_o.optionType == 1) {
             // put asset
-            require(_o.strike >= _sp, "Current price is too high");
+            require(_o.strike >= _sp, "MIRIN: CURRENT_PRICE_TOO_HIGH");
             IERC20(_o.asset).safeTransferFrom(msg.sender, address(this), _o.amount);
             IERC20(TOKEN0 == _o.asset ? TOKEN1 : TOKEN0).safeTransfer(
                 msg.sender,

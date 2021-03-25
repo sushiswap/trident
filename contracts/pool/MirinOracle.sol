@@ -2,25 +2,23 @@
 
 pragma solidity =0.8.2;
 
-import "./libraries/FixedPoint.sol";
-import "./libraries/SafeERC20.sol";
-import "./libraries/UQ112x112.sol";
-import "./libraries/MirinMath.sol";
-import "./MirinGovernance.sol";
+import "../libraries/MirinMath.sol";
+import "../libraries/SafeERC20.sol";
 
 /**
  * @dev Originally DeriswapV1Oracle
  * @author Andre Cronje, LevX
  */
-contract MirinOracle is MirinGovernance {
+contract MirinOracle {
     using FixedPoint for *;
     using SafeERC20 for IERC20;
-    using UQ112x112 for uint224;
 
     event Sync(uint112 reserve0, uint112 reserve1);
 
     address public immutable TOKEN0;
     address public immutable TOKEN1;
+    uint8 public immutable WEIGHT0;
+    uint8 public immutable WEIGHT1;
 
     uint112 internal reserve0;
     uint112 internal reserve1;
@@ -28,17 +26,17 @@ contract MirinOracle is MirinGovernance {
 
     uint256 public price0CumulativeLast;
     uint256 public price1CumulativeLast;
-    uint256 public kLast; // reserve0 * reserve1, as of immediately after the most recent liquidity event
 
     constructor(
         address _token0,
         address _token1,
-        address _operator,
-        uint8 _swapFee,
-        address _swapFeeTo
-    ) MirinGovernance(_operator, _swapFee, _swapFeeTo) {
+        uint8 _weight0,
+        uint8 _weight1
+    ) {
         TOKEN0 = _token0;
         TOKEN1 = _token1;
+        WEIGHT0 = _weight0;
+        WEIGHT1 = _weight1;
     }
 
     struct point {
@@ -51,6 +49,11 @@ contract MirinOracle is MirinGovernance {
 
     function pointsLength() external view returns (uint256) {
         return points.length;
+    }
+
+    function getWeights() public view returns (uint8 weight0, uint8 weight1) {
+        weight0 = WEIGHT0;
+        weight1 = WEIGHT1;
     }
 
     function getReserves()
@@ -79,14 +82,18 @@ contract MirinOracle is MirinGovernance {
         uint32 timeElapsed = blockTimestamp - blockTimestampLast; // overflow is desired
         if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
             // * never overflows, and + overflow is desired
-            price0CumulativeLast += uint256(UQ112x112.encode(_reserve1).uqdiv(_reserve0)) * timeElapsed;
-            price1CumulativeLast += uint256(UQ112x112.encode(_reserve0).uqdiv(_reserve1)) * timeElapsed;
+            price0CumulativeLast +=
+                FixedPoint.encode(_reserve1).mul(WEIGHT0).div(_reserve0).div(WEIGHT1)._x *
+                timeElapsed;
+            price1CumulativeLast +=
+                FixedPoint.encode(_reserve0).mul(WEIGHT1).div(_reserve1).div(WEIGHT0)._x *
+                timeElapsed;
             points.push(point(block.timestamp, price0CumulativeLast, price1CumulativeLast));
         }
         reserve0 = uint112(balance0);
         reserve1 = uint112(balance1);
         blockTimestampLast = blockTimestamp;
-        emit Sync(reserve0, reserve1);
+        emit Sync(uint112(balance0), uint112(balance1));
     }
 
     function price(address token) public view returns (uint256) {

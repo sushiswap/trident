@@ -21,8 +21,7 @@ contract MirinUniswapMigrator is MirinHelpers {
         address tokenB,
         uint256 pid,
         uint256 liquidity,
-        uint256 amountAInMin,
-        uint256 amountBInMin,
+        uint256 liquidityMin,
         address to,
         uint256 deadline,
         uint8 v,
@@ -31,7 +30,7 @@ contract MirinUniswapMigrator is MirinHelpers {
     ) external {
         IUniswapV2Pair pair = IUniswapV2Pair(_pairFor(tokenA, tokenB));
         pair.permit(msg.sender, address(this), liquidity, deadline, v, r, s);
-        migrateFromUniswap(tokenA, tokenB, pid, liquidity, amountAInMin, amountBInMin, to, deadline);
+        migrateFromUniswap(tokenA, tokenB, pid, liquidity, liquidityMin, to, deadline);
     }
 
     function _pairFor(address tokenA, address tokenB) internal view returns (address pair) {
@@ -57,16 +56,12 @@ contract MirinUniswapMigrator is MirinHelpers {
         address tokenB,
         uint256 pid,
         uint256 liquidity,
-        uint256 amountAInMin,
-        uint256 amountBInMin,
+        uint256 liquidityMin,
         address to,
         uint256 deadline
     ) public ensure(deadline) {
-        (uint256 amountAOut, uint256 amountBOut) = _removeLiquidityFromUniswap(tokenA, tokenB, liquidity);
-        (uint256 amountAIn, uint256 amountBIn, ) =
-            _addLiquidity(tokenA, tokenB, pid, amountAOut, amountBOut, amountAInMin, amountBInMin, to);
-        if (amountAOut > amountAIn) _safeTransfer(tokenA, to, amountAOut - amountAIn);
-        if (amountBOut > amountBIn) _safeTransfer(tokenB, to, amountBOut - amountBIn);
+        (uint256 amountA, uint256 amountB) = _removeLiquidityFromUniswap(tokenA, tokenB, liquidity);
+        _addLiquidity(tokenA, tokenB, pid, amountA, amountB, liquidityMin, to);
     }
 
     function _removeLiquidityFromUniswap(

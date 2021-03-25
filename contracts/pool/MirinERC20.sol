@@ -2,16 +2,16 @@
 
 pragma solidity =0.8.2;
 
-import "./MirinOracle.sol";
+import "../libraries/FixedPoint.sol";
+import "../libraries/SafeERC20.sol";
 
 /**
  * @dev Originally DeriswapV1ERC20
  * @author Andre Cronje, LevX
  */
-contract MirinERC20 is MirinOracle {
+contract MirinERC20 {
     using FixedPoint for *;
     using SafeERC20 for IERC20;
-    using UQ112x112 for uint224;
 
     string public constant name = "Mirin";
     string public constant symbol = "MIRIN";
@@ -26,13 +26,7 @@ contract MirinERC20 is MirinOracle {
     bytes32 public constant PERMIT_TYPEHASH = 0x6e71edae12b1b97f4d1f60370fef10105fa2faae0126114a169c64845d6126c9;
     mapping(address => uint256) public nonces;
 
-    constructor(
-        address _token0,
-        address _token1,
-        address _operator,
-        uint8 _swapFee,
-        address _swapFeeTo
-    ) MirinOracle(_token0, _token1, _operator, _swapFee, _swapFeeTo) {
+    constructor() {
         uint256 chainId;
         assembly {
             chainId := chainid()

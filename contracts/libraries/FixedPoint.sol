@@ -32,37 +32,36 @@ library FixedPoint {
     }
 
     // divide a UQ112x112 by a uint112, returning a UQ112x112
-    function div(uq112x112 memory self, uint112 x)
-        internal
-        pure
-        returns (uq112x112 memory)
-    {
+    function div(uq112x112 memory self, uint112 x) internal pure returns (uq112x112 memory) {
         require(x != 0, "FixedPoint: DIV_BY_ZERO");
         return uq112x112(self._x / uint224(x));
     }
 
     // multiply a UQ112x112 by a uint, returning a UQ144x112
     // reverts on overflow
-    function mul(uq112x112 memory self, uint256 y)
-        internal
-        pure
-        returns (uq144x112 memory)
-    {
+    function mul(uq112x112 memory self, uint256 y) internal pure returns (uq144x112 memory) {
         uint256 z;
-        require(
-            y == 0 || (z = uint256(self._x) * y) / y == uint256(self._x),
-            "FixedPoint: MULTIPLICATION_OVERFLOW"
-        );
+        require(y == 0 || (z = uint256(self._x) * y) / y == uint256(self._x), "FixedPoint: MULTIPLICATION_OVERFLOW");
+        return uq144x112(z);
+    }
+
+    // divide a UQ144x112 by a uint112, returning a UQ144x112
+    function div(uq144x112 memory self, uint112 x) internal pure returns (uq144x112 memory) {
+        require(x != 0, "FixedPoint: DIV_BY_ZERO");
+        return uq144x112(self._x / uint256(x));
+    }
+
+    // multiply a UQ144x112 by a uint, returning a UQ144x112
+    // reverts on overflow
+    function mul(uq144x112 memory self, uint256 y) internal pure returns (uq144x112 memory) {
+        uint256 z;
+        require(y == 0 || (z = self._x * y) / y == self._x, "FixedPoint: MULTIPLICATION_OVERFLOW");
         return uq144x112(z);
     }
 
     // returns a UQ112x112 which represents the ratio of the numerator to the denominator
     // equivalent to encode(numerator).div(denominator)
-    function fraction(uint112 numerator, uint112 denominator)
-        internal
-        pure
-        returns (uq112x112 memory)
-    {
+    function fraction(uint112 numerator, uint112 denominator) internal pure returns (uq112x112 memory) {
         require(denominator > 0, "FixedPoint: DIV_BY_ZERO");
         return uq112x112((uint224(numerator) << RESOLUTION) / denominator);
     }

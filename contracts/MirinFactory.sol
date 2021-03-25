@@ -2,7 +2,7 @@
 
 pragma solidity =0.8.2;
 
-import "./MirinPool.sol";
+import "./pool/MirinPool.sol";
 
 contract MirinFactory {
     uint256 public constant SUSHI_DEPOSIT = 10000;
@@ -45,6 +45,8 @@ contract MirinFactory {
     function createPool(
         address tokenA,
         address tokenB,
+        uint8 weight0,
+        uint8 weight1,
         address operator,
         uint8 swapFee,
         address swapFeeTo
@@ -52,14 +54,15 @@ contract MirinFactory {
         require(tokenA != tokenB, "MIRIN: IDENTICAL_ADDRESSES");
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         require(token0 != address(0), "MIRIN: ZERO_ADDRESS");
+        require(weight0 > 0 && weight1 > 0 && MirinMath.isPow2(weight0 + weight1), "MIRIN: INVALID_WEIGHTS");
         uint256 length = getPool[token0][token1].length;
         if (operator == address(0)) {
-            require(length == 0, "MIRIN: INVALID_FIRST_POOL");
+            require(length == 0, "MIRIN: MUST_BE_FIRST_POOL");
         } else {
-            require(length > 0, "MIRIN: NO_FIRST_POOL");
+            require(length > 0, "MIRIN: MUST_NOT_BE_FIRST_POOL");
         }
 
-        pool = new MirinPool(token0, token1, operator, swapFee, swapFeeTo);
+        pool = new MirinPool(token0, token1, weight0, weight1, operator, swapFee, swapFeeTo);
         getPool[token0][token1].push(address(pool));
         getPool[token1][token0].push(address(pool));
         isPool[address(pool)] = true;

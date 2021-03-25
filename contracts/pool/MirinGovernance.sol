@@ -2,7 +2,7 @@
 
 pragma solidity =0.8.2;
 
-import "./interfaces/IERC20.sol";
+import "../interfaces/IERC20.sol";
 
 interface IMirinFactory {
     function feeTo() external view returns (address);

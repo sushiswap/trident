@@ -87,82 +87,32 @@ contract MirinHelpers {
         address tokenA,
         address tokenB,
         uint256 pid,
-        uint256 amountADesired,
-        uint256 amountBDesired,
-        uint256 amountAMin,
-        uint256 amountBMin,
+        uint256 amountA,
+        uint256 amountB,
+        uint256 liquidityMin,
         address to
-    )
-        internal
-        returns (
-            uint256 amountA,
-            uint256 amountB,
-            uint256 liquidity
-        )
-    {
+    ) internal returns (uint256 liquidity) {
         address pool = _getPool(tokenA, tokenB, pid);
-        (amountA, amountB) = _getAmounts(pool, tokenA, amountADesired, amountBDesired, amountAMin, amountBMin);
         _safeTransferFrom(tokenA, msg.sender, pool, amountA);
         _safeTransferFrom(tokenB, msg.sender, pool, amountB);
         liquidity = MirinPool(pool).mint(to);
+        require(liquidity >= liquidityMin, "MIRIN: INSUFFICIENT_LIQUIDITY");
     }
 
     function _addLiquidityETH(
         address token,
         uint256 pid,
-        uint256 amountTokenDesired,
-        uint256 amountETHDesired,
-        uint256 amountTokenMin,
-        uint256 amountETHMin,
+        uint256 amountToken,
+        uint256 amountETH,
+        uint256 liquidityMin,
         address to
-    )
-        internal
-        returns (
-            uint256 amountToken,
-            uint256 amountETH,
-            uint256 liquidity
-        )
-    {
+    ) internal returns (uint256 liquidity) {
         address pool = _getPool(token, WETH, pid);
-        (amountToken, amountETH) = _getAmounts(
-            pool,
-            token,
-            amountTokenDesired,
-            amountETHDesired,
-            amountTokenMin,
-            amountETHMin
-        );
         _safeTransferFrom(token, msg.sender, pool, amountToken);
         IWETH(WETH).deposit{value: amountETH}();
         assert(IWETH(WETH).transfer(pool, amountETH));
         liquidity = MirinPool(pool).mint(to);
-        // refund dust eth, if any
-        if (amountETHDesired > amountETH) _safeTransferETH(msg.sender, amountETHDesired - amountETH);
-    }
-
-    function _getAmounts(
-        address pool,
-        address tokenA,
-        uint256 amountADesired,
-        uint256 amountBDesired,
-        uint256 amountAMin,
-        uint256 amountBMin
-    ) internal view returns (uint256 amountA, uint256 amountB) {
-        (uint256 reserveA, uint256 reserveB) = _getReserves(pool, tokenA);
-        if (reserveA == 0 && reserveB == 0) {
-            (amountA, amountB) = (amountADesired, amountBDesired);
-        } else {
-            uint256 amountBOptimal = _quote(amountADesired, reserveA, reserveB);
-            if (amountBOptimal <= amountBDesired) {
-                require(amountBOptimal >= amountBMin, "MIRIN: INSUFFICIENT_B_AMOUNT");
-                (amountA, amountB) = (amountADesired, amountBOptimal);
-            } else {
-                uint256 amountAOptimal = _quote(amountBDesired, reserveB, reserveA);
-                assert(amountAOptimal <= amountADesired);
-                require(amountAOptimal >= amountAMin, "MIRIN: INSUFFICIENT_A_AMOUNT");
-                (amountA, amountB) = (amountAOptimal, amountBDesired);
-            }
-        }
+        require(liquidity >= liquidityMin, "MIRIN: INSUFFICIENT_LIQUIDITY");
     }
 
     function _removeLiquidity(
@@ -176,7 +126,7 @@ contract MirinHelpers {
     ) internal returns (uint256 amountA, uint256 amountB) {
         address pool = _getPool(tokenA, tokenB, pid);
         MirinPool(pool).transferFrom(msg.sender, pool, liquidity);
-        (uint256 amount0, uint256 amount1) = MirinPool(pool).burn(to);
+        (uint256 amount0, uint256 amount1) = MirinPool(pool).burn(0, 0, to);
         (address token0, ) = _sortTokens(tokenA, tokenB);
         (amountA, amountB) = tokenA == token0 ? (amount0, amount1) : (amount1, amount0);
         require(amountA >= amountAMin, "MIRIN: INSUFFICIENT_A_AMOUNT");
@@ -213,19 +163,22 @@ contract MirinHelpers {
         pool = MirinFactory(FACTORY).getPool(tokenA, tokenB, pid);
     }
 
-    function _getReserves(address pool, address tokenA) internal view returns (uint256 reserveA, uint256 reserveB) {
+    function _getPoolInfo(address pool, address tokenA)
+        internal
+        view
+        returns (
+            uint256 reserveA,
+            uint256 reserveB,
+            uint8 weightA,
+            uint8 weightB
+        )
+    {
+        address token0 = MirinPool(pool).TOKEN0();
         (uint256 reserve0, uint256 reserve1, ) = MirinPool(pool).getReserves();
-        (reserveA, reserveB) = tokenA == MirinPool(pool).TOKEN0() ? (reserve0, reserve1) : (reserve1, reserve0);
-    }
-
-    function _quote(
-        uint256 amountA,
-        uint256 reserveA,
-        uint256 reserveB
-    ) internal pure returns (uint256 amountB) {
-        require(amountA > 0, "MIRIN: INSUFFICIENT_AMOUNT");
-        require(reserveA > 0 && reserveB > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
-        amountB = (amountA * reserveB) / reserveA;
+        (uint8 weight0, uint8 weight1) = MirinPool(pool).getWeights();
+        (reserveA, reserveB, weightA, weightB) = tokenA == token0
+            ? (reserve0, reserve1, weight0, weight1)
+            : (reserve1, reserve0, weight1, weight0);
     }
 
     function _getAmountsOut(
@@ -239,8 +192,15 @@ contract MirinHelpers {
         for (uint256 i; i < path.length - 1; i++) {
             address tokenA = path[i];
             address pool = _getPool(tokenA, path[i + 1], pids[i]);
-            (uint256 reserveIn, uint256 reserveOut) = _getReserves(pool, tokenA);
-            amounts[i + 1] = _getAmountOut(pool, amounts[i], reserveIn, reserveOut);
+            (uint256 reserveIn, uint256 reserveOut, uint8 weightIn, uint8 weightOut) = _getPoolInfo(pool, tokenA);
+            amounts[i + 1] = _getAmountOut(
+                amounts[i],
+                reserveIn,
+                reserveOut,
+                weightIn,
+                weightOut,
+                MirinPool(pool).swapFee()
+            );
         }
     }
 
@@ -255,35 +215,46 @@ contract MirinHelpers {
         for (uint256 i = path.length - 1; i > 0; i--) {
             address tokenA = path[i - 1];
             address pool = _getPool(tokenA, path[i], pids[i - 1]);
-            (uint256 reserveIn, uint256 reserveOut) = _getReserves(pool, tokenA);
-            amounts[i - 1] = _getAmountIn(pool, amounts[i], reserveIn, reserveOut);
+            (uint256 reserveIn, uint256 reserveOut, uint8 weightIn, uint8 weightOut) = _getPoolInfo(pool, tokenA);
+            amounts[i - 1] = _getAmountIn(
+                amounts[i],
+                reserveIn,
+                reserveOut,
+                weightIn,
+                weightOut,
+                MirinPool(pool).swapFee()
+            );
         }
     }
 
     function _getAmountOut(
-        address pool,
         uint256 amountIn,
         uint256 reserveIn,
-        uint256 reserveOut
-    ) internal view returns (uint256 amountOut) {
+        uint256 reserveOut,
+        uint8 weightIn,
+        uint8 weightOut,
+        uint8 swapFee
+    ) internal pure returns (uint256 amountOut) {
         require(amountIn > 0, "MIRIN: INSUFFICIENT_INPUT_AMOUNT");
         require(reserveIn > 0 && reserveOut > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
-        uint256 amountInWithFee = amountIn * (1000 - MirinPool(pool).swapFee());
-        uint256 numerator = amountInWithFee * reserveOut;
-        uint256 denominator = reserveIn * 1000 + amountInWithFee;
+        uint256 amountInWithFee = amountIn * (1000 - swapFee);
+        uint256 numerator = amountInWithFee * reserveOut * weightIn;
+        uint256 denominator = reserveIn * weightOut * 1000 + amountInWithFee;
         amountOut = numerator / denominator;
     }
 
     function _getAmountIn(
-        address pool,
         uint256 amountOut,
         uint256 reserveIn,
-        uint256 reserveOut
-    ) internal view returns (uint256 amountIn) {
+        uint256 reserveOut,
+        uint8 weightIn,
+        uint8 weightOut,
+        uint8 swapFee
+    ) internal pure returns (uint256 amountIn) {
         require(amountOut > 0, "MIRIN: INSUFFICIENT_OUTPUT_AMOUNT");
         require(reserveIn > 0 && reserveOut > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
-        uint256 numerator = reserveIn * amountOut * 1000;
-        uint256 denominator = (reserveOut - amountOut) * (1000 - MirinPool(pool).swapFee());
+        uint256 numerator = reserveIn * weightOut * amountOut * 1000;
+        uint256 denominator = (reserveOut - amountOut) * weightIn * (1000 - swapFee);
         amountIn = (numerator / denominator) + 1;
     }
 

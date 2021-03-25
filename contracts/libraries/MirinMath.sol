@@ -3,7 +3,6 @@
 pragma solidity =0.8.2;
 
 import "./FixedPoint.sol";
-import "./UQ112x112.sol";
 
 /**
  * @dev Originally DeriswapV1Math
@@ -11,7 +10,6 @@ import "./UQ112x112.sol";
  */
 library MirinMath {
     using FixedPoint for *;
-    using UQ112x112 for uint224;
 
     uint256 private constant FIXED_1 = 0x080000000000000000000000000000000;
     uint256 private constant FIXED_2 = 0x100000000000000000000000000000000;
@@ -260,6 +258,33 @@ library MirinMath {
         } else if (y != 0) {
             z = 1;
         }
+    }
+
+    /**
+     * @dev computes x ^ (1 / y) where y = 2 ^ c and c >= 0
+     */
+    function root(uint256 x, uint256 y) internal pure returns (uint256 z) {
+        require(y != 0, "MIRIN: DIV_BY_ZERO");
+        if (y == 1) return x;
+        z = sqrt(x);
+        while (y > 2) {
+            require(y % 2 == 0, "MIRIN: INVALID_BASE");
+            z = sqrt(z);
+            y = y >> 1;
+        }
+        return z;
+    }
+
+    /**
+     * @dev determines if x = 2 ^ c where c >= 1
+     */
+    function isPow2(uint256 x) internal pure returns (bool) {
+        if (x == 1) return false;
+        while (x > 2) {
+            if (x % 2 != 0) return false;
+            x = x >> 1;
+        }
+        return true;
     }
 
     /**
