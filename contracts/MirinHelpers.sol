@@ -7,6 +7,8 @@ import "./interfaces/IWETH.sol";
 import "./interfaces/IMirinPool.sol";
 
 contract MirinHelpers {
+    uint256 public constant LEGACY_POOL_INDEX = type(uint256).max;
+
     address public immutable factory;
     address public immutable legacyFactory;
     address public immutable weth;
@@ -167,10 +169,32 @@ contract MirinHelpers {
         address tokenB,
         uint256 pid
     ) internal view returns (address pool) {
-        pool = MirinFactory(factory).getPool(tokenA, tokenB, pid);
+        if (pid == LEGACY_POOL_INDEX) {
+            (address token0, address token1) = _sortTokens(tokenA, tokenB);
+            pool = address(
+                uint160(
+                    uint256(
+                        keccak256(
+                            abi.encodePacked(
+                                hex"ff",
+                                legacyFactory,
+                                keccak256(abi.encodePacked(token0, token1)),
+                                hex"e18a34eb0e04b04f7a0ac29a6e80748dca96319b42c54d679cb821dca90c6303" // init code hash
+                            )
+                        )
+                    )
+                )
+            );
+        } else {
+            pool = MirinFactory(factory).getPool(tokenA, tokenB, pid);
+        }
     }
 
-    function _getPoolInfo(address pool, address tokenA)
+    function _getPoolInfo(
+        address pool,
+        address tokenA,
+        bool legacy
+    )
         internal
         view
         returns (
@@ -180,12 +204,18 @@ contract MirinHelpers {
             uint8 weightB
         )
     {
-        address token0 = MirinPool(pool).token0();
-        (uint256 reserve0, uint256 reserve1, ) = MirinPool(pool).getReserves();
-        (uint8 weight0, uint8 weight1) = MirinPool(pool).getWeights();
-        (reserveA, reserveB, weightA, weightB) = tokenA == token0
-            ? (reserve0, reserve1, weight0, weight1)
-            : (reserve1, reserve0, weight1, weight0);
+        address token0 = IMirinPool(pool).token0();
+        (uint256 reserve0, uint256 reserve1, ) = IMirinPool(pool).getReserves();
+        if (legacy) {
+            (reserveA, reserveB, weightA, weightB) = tokenA == token0
+                ? (reserve0, reserve1, 1, 1)
+                : (reserve1, reserve0, 1, 1);
+        } else {
+            (uint8 weight0, uint8 weight1) = IMirinPool(pool).getWeights();
+            (reserveA, reserveB, weightA, weightB) = tokenA == token0
+                ? (reserve0, reserve1, weight0, weight1)
+                : (reserve1, reserve0, weight1, weight0);
+        }
     }
 
     function _getAmountsOut(
@@ -198,15 +228,18 @@ contract MirinHelpers {
         amounts[0] = amountIn;
         for (uint256 i; i < path.length - 1; i++) {
             address tokenA = path[i];
-            address pool = _getPool(tokenA, path[i + 1], pids[i]);
-            (uint256 reserveIn, uint256 reserveOut, uint8 weightIn, uint8 weightOut) = _getPoolInfo(pool, tokenA);
+            uint256 pid = pids[i];
+            bool legacy = pid == LEGACY_POOL_INDEX;
+            address pool = _getPool(tokenA, path[i + 1], pid);
+            (uint256 reserveIn, uint256 reserveOut, uint8 weightIn, uint8 weightOut) =
+                _getPoolInfo(pool, tokenA, legacy);
             amounts[i + 1] = _getAmountOut(
                 amounts[i],
                 reserveIn,
                 reserveOut,
                 weightIn,
                 weightOut,
-                MirinPool(pool).swapFee()
+                legacy ? 3 : IMirinPool(pool).swapFee()
             );
         }
     }
@@ -221,15 +254,18 @@ contract MirinHelpers {
         amounts[amounts.length - 1] = amountOut;
         for (uint256 i = path.length - 1; i > 0; i--) {
             address tokenA = path[i - 1];
-            address pool = _getPool(tokenA, path[i], pids[i - 1]);
-            (uint256 reserveIn, uint256 reserveOut, uint8 weightIn, uint8 weightOut) = _getPoolInfo(pool, tokenA);
+            uint256 pid = pids[i - 1];
+            bool legacy = pid == LEGACY_POOL_INDEX;
+            address pool = _getPool(tokenA, path[i], pid);
+            (uint256 reserveIn, uint256 reserveOut, uint8 weightIn, uint8 weightOut) =
+                _getPoolInfo(pool, tokenA, pid == LEGACY_POOL_INDEX);
             amounts[i - 1] = _getAmountIn(
                 amounts[i],
                 reserveIn,
                 reserveOut,
                 weightIn,
                 weightOut,
-                MirinPool(pool).swapFee()
+                legacy ? 3 : IMirinPool(pool).swapFee()
             );
         }
     }
