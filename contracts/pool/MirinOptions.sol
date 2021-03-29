@@ -14,21 +14,8 @@ contract MirinOptions is MirinOracle {
     using FixedPoint for *;
     using SafeERC20 for IERC20;
 
-    MirinLoanContracts public immutable loansnft;
-    MirinOptionContracts public immutable optionsnft;
-
-    constructor(
-        address _token0,
-        address _token1,
-        uint8 _weight0,
-        uint8 _weight1
-    ) MirinOracle(_token0, _token1, _weight0, _weight1) {
-        loansnft = new MirinLoanContracts();
-        optionsnft = new MirinOptionContracts();
-    }
-
     /// @notice The create option event
-    event Created(
+    event OptionCreated(
         uint256 id,
         address indexed owner,
         address indexed token,
@@ -39,7 +26,7 @@ contract MirinOptions is MirinOracle {
     );
 
     /// @notice swap the position event when processing options
-    event Exercised(
+    event OptionExercised(
         uint256 id,
         address indexed owner,
         address indexed token,
@@ -49,11 +36,41 @@ contract MirinOptions is MirinOracle {
         uint256 expire
     );
 
-    uint256 private calls0;
-    uint256 private calls1;
+    struct Option {
+        address asset;
+        uint256 amount;
+        uint256 strike;
+        uint256 expire;
+        uint256 optionType;
+    }
 
-    uint256 private puts0;
-    uint256 private puts1;
+    struct OptionInternal {
+        address asset; // 20 bytes
+        uint48 expire; // 5 bytes
+        uint8 call; // 1 byte
+        uint256 amount;
+        uint256 strike;
+    }
+
+    MirinLoanContracts public immutable loanContracts;
+    MirinOptionContracts public immutable optionContracts;
+    OptionInternal[] private _options;
+
+    constructor(
+        address _token0,
+        address _token1,
+        uint8 _weight0,
+        uint8 _weight1
+    ) MirinOracle(_token0, _token1, _weight0, _weight1) {
+        loanContracts = new MirinLoanContracts();
+        optionContracts = new MirinOptionContracts();
+    }
+
+    uint256 private _calls0;
+    uint256 private _calls1;
+
+    uint256 private _puts0;
+    uint256 private _puts1;
 
     function quoteOption(address tokenIn, uint256 t) public view returns (uint256 call, uint256 put) {
         uint256 price = price(tokenIn);
@@ -70,16 +87,8 @@ contract MirinOptions is MirinOracle {
         return MirinMath.quoteOptionAll(t, v, sp, st);
     }
 
-    struct ostore {
-        address asset; // 20 bytes
-        uint48 expire; // 5 bytes
-        uint8 call; // 1 byte
-        uint256 amount;
-        uint256 strike;
-    }
-
-    function options(uint256 _id) public view returns (opt memory _option) {
-        ostore memory _ostore = ostores[_id];
+    function options(uint256 _id) external view returns (Option memory _option) {
+        OptionInternal memory _ostore = _options[_id];
         _option.asset = _ostore.asset;
         _option.amount = _ostore.amount;
         _option.strike = _ostore.strike;
@@ -87,44 +96,19 @@ contract MirinOptions is MirinOracle {
         _option.optionType = uint256(_ostore.call);
     }
 
-    function store2opt(ostore memory _ostore) public pure returns (opt memory _option) {
-        _option.asset = _ostore.asset;
-        _option.amount = _ostore.amount;
-        _option.strike = _ostore.strike;
-        _option.expire = uint256(_ostore.expire);
-        _option.optionType = uint256(_ostore.call);
+    function optionsLength() external view returns (uint256) {
+        return _options.length;
     }
 
-    struct opt {
-        address asset;
-        uint256 amount;
-        uint256 strike;
-        uint256 expire;
-        uint256 optionType;
+    function _unpackOption(OptionInternal memory stored) private pure returns (Option memory _option) {
+        _option.asset = stored.asset;
+        _option.amount = stored.amount;
+        _option.strike = stored.strike;
+        _option.expire = uint256(stored.expire);
+        _option.optionType = uint256(stored.call);
     }
 
-    ostore[] public ostores;
-
-    function count() public view returns (uint256) {
-        return ostores.length;
-    }
-
-    function option(uint256 _id)
-        external
-        view
-        returns (
-            address asset,
-            uint256 amount,
-            uint256 strike,
-            uint256 expire,
-            uint256 optionType
-        )
-    {
-        opt memory _o = options(_id);
-        return (_o.asset, _o.amount, _o.strike, _o.expire, _o.optionType);
-    }
-
-    function period(uint256 t) public pure returns (uint256) {
+    function _period(uint256 t) private pure returns (uint256) {
         return t * 1 days;
     }
 
@@ -202,14 +186,14 @@ contract MirinOptions is MirinOracle {
         uint256 optionType,
         uint256 amount
     ) public view returns (uint256) {
-        if (token == TOKEN0) {
-            if (calls0 == 0 || puts0 == 0) return amount;
-            if (optionType == 0) return (amount * calls0) / puts0;
-            else return (amount * puts0) / calls0;
+        if (token == token0) {
+            if (_calls0 == 0 || _puts0 == 0) return amount;
+            if (optionType == 0) return (amount * _calls0) / _puts0;
+            else return (amount * _puts0) / _calls0;
         } else {
-            if (calls1 == 0 || puts1 == 0) return amount;
-            if (optionType == 0) return (amount * calls1) / puts1;
-            else return (amount * puts1) / calls1;
+            if (_calls1 == 0 || _puts1 == 0) return amount;
+            if (optionType == 0) return (amount * _calls1) / _puts1;
+            else return (amount * _puts1) / _calls1;
         }
     }
 
@@ -221,22 +205,30 @@ contract MirinOptions is MirinOracle {
         uint256 optionType,
         uint256 maxFee
     ) public {
-        address _t0 = TOKEN0;
+        address _t0 = token0;
         optionType == 0
-            ? (_t0 == token ? calls0 = calls0 + amount : calls1 = calls1 + amount)
-            : (_t0 == token ? puts0 = puts0 + amount : puts1 = puts1 + amount);
+            ? (_t0 == token ? _calls0 = _calls0 + amount : _calls1 = _calls1 + amount)
+            : (_t0 == token ? _puts0 = _puts0 + amount : _puts1 = _puts1 + amount);
         uint256 _fee = fee(token, amount, st, t, optionType);
         require(_fee <= maxFee, "MIRIN: FEE_TOO_HIGH");
-        IERC20(_t0 == token ? TOKEN1 : _t0).safeTransferFrom(msg.sender, address(this), _fee);
-        emit Created(ostores.length, msg.sender, token, amount, st, block.timestamp, block.timestamp + period(t));
-        optionsnft.mint(msg.sender, ostores.length);
-        ostores.push(ostore(token, uint48(block.timestamp + period(t)), uint8(optionType), amount, st));
+        IERC20(_t0 == token ? token1 : _t0).safeTransferFrom(msg.sender, address(this), _fee);
+        emit OptionCreated(
+            _options.length,
+            msg.sender,
+            token,
+            amount,
+            st,
+            block.timestamp,
+            block.timestamp + _period(t)
+        );
+        optionContracts.mint(msg.sender, _options.length);
+        _options.push(OptionInternal(token, uint48(block.timestamp + _period(t)), uint8(optionType), amount, st));
     }
 
     function exerciseOptionProfitOnly(uint256 id) external {
-        require(optionsnft.isApprovedOrOwner(msg.sender, id), "MIRIN: FORBIDDEN");
-        ostore storage _pos = ostores[id];
-        opt memory _o = store2opt(_pos);
+        require(optionContracts.isApprovedOrOwner(msg.sender, id), "MIRIN: FORBIDDEN");
+        OptionInternal storage _pos = _options[id];
+        Option memory _o = _unpackOption(_pos);
         require(_o.expire > block.timestamp, "MIRIN: EXPIRED");
         _pos.expire = uint48(block.timestamp);
 
@@ -250,15 +242,15 @@ contract MirinOptions is MirinOracle {
             require(_o.strike >= _sp, "MIRIN: CURRENT_PRICE_TOO_HIGH");
             profit = (_o.strike - _sp) * _o.amount;
         }
-        IERC20(TOKEN0 == _o.asset ? TOKEN1 : TOKEN0).transfer(msg.sender, profit);
+        IERC20(token0 == _o.asset ? token1 : token0).transfer(msg.sender, profit);
 
-        emit Exercised(id, msg.sender, _o.asset, _o.amount, _o.strike, block.timestamp, _o.expire);
+        emit OptionExercised(id, msg.sender, _o.asset, _o.amount, _o.strike, block.timestamp, _o.expire);
     }
 
     function excerciseOption(uint256 id) external {
-        require(optionsnft.isApprovedOrOwner(msg.sender, id), "MIRIN: FORBIDDEN");
-        ostore storage _pos = ostores[id];
-        opt memory _o = store2opt(_pos);
+        require(optionContracts.isApprovedOrOwner(msg.sender, id), "MIRIN: FORBIDDEN");
+        OptionInternal storage _pos = _options[id];
+        Option memory _o = _unpackOption(_pos);
         require(_o.expire > block.timestamp, "MIRIN: EXPIRED");
         _pos.expire = uint48(block.timestamp);
 
@@ -267,7 +259,7 @@ contract MirinOptions is MirinOracle {
         if (_o.optionType == 0) {
             // call asset
             require(_o.strike <= _sp, "MIRIN: CURRENT_PRICE_TOO_LOW");
-            IERC20(TOKEN0 == _o.asset ? TOKEN1 : TOKEN0).safeTransferFrom(
+            IERC20(token0 == _o.asset ? token1 : token0).safeTransferFrom(
                 msg.sender,
                 address(this),
                 (_o.strike * _o.amount) / IERC20(_o.asset).decimals()
@@ -277,11 +269,11 @@ contract MirinOptions is MirinOracle {
             // put asset
             require(_o.strike >= _sp, "MIRIN: CURRENT_PRICE_TOO_HIGH");
             IERC20(_o.asset).safeTransferFrom(msg.sender, address(this), _o.amount);
-            IERC20(TOKEN0 == _o.asset ? TOKEN1 : TOKEN0).safeTransfer(
+            IERC20(token0 == _o.asset ? token1 : token0).safeTransfer(
                 msg.sender,
                 (_o.strike * _o.amount) / (IERC20(_o.asset).decimals())
             );
         }
-        emit Exercised(id, msg.sender, _o.asset, _o.amount, _o.strike, block.timestamp, _o.expire);
+        emit OptionExercised(id, msg.sender, _o.asset, _o.amount, _o.strike, block.timestamp, _o.expire);
     }
 }

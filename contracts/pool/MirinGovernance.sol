@@ -21,7 +21,7 @@ contract MirinGovernance {
     uint8 public constant MIN_SWAP_FEE = 1;
     uint8 public constant MAX_SWAP_FEE = 100;
 
-    address public immutable FACTORY;
+    address public immutable factory;
 
     /**
      * @dev If empty, this is a public pool.
@@ -64,7 +64,7 @@ contract MirinGovernance {
         uint8 _fee,
         address _feeTo
     ) {
-        FACTORY = msg.sender;
+        factory = msg.sender;
         operator = _operator;
 
         if (_operator == address(0)) {
@@ -97,7 +97,7 @@ contract MirinGovernance {
     }
 
     function disable(address to) external onlyOperator {
-        IMirinFactory(FACTORY).disablePool(to);
+        IMirinFactory(factory).disablePool(to);
     }
 
     function addToBlacklist(address[] calldata accounts) external onlyOperator {

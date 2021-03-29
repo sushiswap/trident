@@ -3,17 +3,17 @@
 pragma solidity =0.8.2;
 
 import "./MirinHelpers.sol";
-import "./interfaces/IUniswapV2Pair.sol";
 
 contract MirinUniswapMigrator is MirinHelpers {
-    address public immutable UNISWAP_FACTORY;
+    address public immutable uniswapFactory;
 
     constructor(
-        address _FACTORY,
-        address _WETH,
-        address _UNISWAP_FACTORY
-    ) MirinHelpers(_FACTORY, _WETH) {
-        UNISWAP_FACTORY = _UNISWAP_FACTORY;
+        address _factory,
+        address _legacyFactory,
+        address _uniswapFactory,
+        address _weth
+    ) MirinHelpers(_factory, _legacyFactory, _weth) {
+        uniswapFactory = _uniswapFactory;
     }
 
     function migrateFromUniswapWithPermit(
@@ -41,7 +41,7 @@ contract MirinUniswapMigrator is MirinHelpers {
                     keccak256(
                         abi.encodePacked(
                             hex"ff",
-                            UNISWAP_FACTORY,
+                            uniswapFactory,
                             keccak256(abi.encodePacked(token0, token1)),
                             hex"96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f" // init code hash
                         )

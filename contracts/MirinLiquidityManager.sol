@@ -47,7 +47,11 @@ contract MirinLiquidityManager is MirinHelpers {
         _;
     }
 
-    constructor(address _FACTORY, address _WETH) MirinHelpers(_FACTORY, _WETH) {}
+    constructor(
+        address _factory,
+        address _legacyFactory,
+        address _weth
+    ) MirinHelpers(_factory, _legacyFactory, _weth) {}
 
     function addLiquidityMultiple(
         AddLiquidityParams[] calldata params,
@@ -207,7 +211,7 @@ contract MirinLiquidityManager is MirinHelpers {
         bytes32 r,
         bytes32 s
     ) external returns (uint256 amountToken, uint256 amountETH) {
-        MirinPool(_getPool(token, WETH, pid)).permit(
+        MirinPool(_getPool(token, weth, pid)).permit(
             msg.sender,
             address(this),
             approveMax ? type(uint256).max : liquidity,

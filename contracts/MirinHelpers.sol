@@ -4,23 +4,30 @@ pragma solidity =0.8.2;
 
 import "./MirinFactory.sol";
 import "./interfaces/IWETH.sol";
+import "./interfaces/IMirinPool.sol";
 
 contract MirinHelpers {
-    address public immutable FACTORY;
-    address public immutable WETH;
+    address public immutable factory;
+    address public immutable legacyFactory;
+    address public immutable weth;
 
     modifier ensure(uint256 deadline) {
         require(deadline >= block.timestamp, "MIRIN: EXPIRED");
         _;
     }
 
-    constructor(address _FACTORY, address _WETH) {
-        FACTORY = _FACTORY;
-        WETH = _WETH;
+    constructor(
+        address _factory,
+        address _legacyFactory,
+        address _weth
+    ) {
+        factory = _factory;
+        legacyFactory = _legacyFactory;
+        weth = _weth;
     }
 
     receive() external payable {
-        assert(msg.sender == WETH); // only accept ETH via fallback from the WETH contract
+        assert(msg.sender == weth); // only accept ETH via fallback from the weth contract
     }
 
     function _swapExactTokensForTokens(
@@ -42,11 +49,11 @@ contract MirinHelpers {
         uint256[] calldata pids,
         address to
     ) internal returns (uint256[] memory amounts) {
-        require(path[0] == WETH, "MIRIN: INVALID_PATH");
+        require(path[0] == weth, "MIRIN: INVALID_PATH");
         amounts = _getAmountsOut(msg.value, path, pids);
         require(amounts[amounts.length - 1] >= amountOutMin, "MIRIN: INSUFFICIENT_OUTPUT_AMOUNT");
-        IWETH(WETH).deposit{value: amounts[0]}();
-        assert(IWETH(WETH).transfer(_getPool(path[0], path[1], pids[0]), amounts[0]));
+        IWETH(weth).deposit{value: amounts[0]}();
+        assert(IWETH(weth).transfer(_getPool(path[0], path[1], pids[0]), amounts[0]));
         _swap(amounts, path, pids, to);
     }
 
@@ -57,12 +64,12 @@ contract MirinHelpers {
         uint256[] calldata pids,
         address to
     ) internal returns (uint256[] memory amounts) {
-        require(path[path.length - 1] == WETH, "MIRIN: INVALID_PATH");
+        require(path[path.length - 1] == weth, "MIRIN: INVALID_PATH");
         amounts = _getAmountsOut(amountIn, path, pids);
         require(amounts[amounts.length - 1] >= amountOutMin, "MIRIN: INSUFFICIENT_OUTPUT_AMOUNT");
         _safeTransferFrom(path[0], msg.sender, _getPool(path[0], path[1], pids[0]), amounts[0]);
         _swap(amounts, path, pids, address(this));
-        IWETH(WETH).withdraw(amounts[amounts.length - 1]);
+        IWETH(weth).withdraw(amounts[amounts.length - 1]);
         _safeTransferETH(to, amounts[amounts.length - 1]);
     }
 
@@ -79,7 +86,7 @@ contract MirinHelpers {
             (uint256 amount0Out, uint256 amount1Out) =
                 input == token0 ? (uint256(0), amountOut) : (amountOut, uint256(0));
             address to = i < path.length - 2 ? _getPool(output, path[i + 2], pids[i + 1]) : _to;
-            MirinPool(_getPool(input, output, pids[i])).swap(amount0Out, amount1Out, to);
+            IMirinPool(_getPool(input, output, pids[i])).swap(amount0Out, amount1Out, to, bytes(""));
         }
     }
 
@@ -95,7 +102,7 @@ contract MirinHelpers {
         address pool = _getPool(tokenA, tokenB, pid);
         _safeTransferFrom(tokenA, msg.sender, pool, amountA);
         _safeTransferFrom(tokenB, msg.sender, pool, amountB);
-        liquidity = MirinPool(pool).mint(to);
+        liquidity = IMirinPool(pool).mint(to);
         require(liquidity >= liquidityMin, "MIRIN: INSUFFICIENT_LIQUIDITY");
     }
 
@@ -107,11 +114,11 @@ contract MirinHelpers {
         uint256 liquidityMin,
         address to
     ) internal returns (uint256 liquidity) {
-        address pool = _getPool(token, WETH, pid);
+        address pool = _getPool(token, weth, pid);
         _safeTransferFrom(token, msg.sender, pool, amountToken);
-        IWETH(WETH).deposit{value: amountETH}();
-        assert(IWETH(WETH).transfer(pool, amountETH));
-        liquidity = MirinPool(pool).mint(to);
+        IWETH(weth).deposit{value: amountETH}();
+        assert(IWETH(weth).transfer(pool, amountETH));
+        liquidity = IMirinPool(pool).mint(to);
         require(liquidity >= liquidityMin, "MIRIN: INSUFFICIENT_LIQUIDITY");
     }
 
@@ -125,8 +132,8 @@ contract MirinHelpers {
         address to
     ) internal returns (uint256 amountA, uint256 amountB) {
         address pool = _getPool(tokenA, tokenB, pid);
-        MirinPool(pool).transferFrom(msg.sender, pool, liquidity);
-        (uint256 amount0, uint256 amount1) = MirinPool(pool).burn(0, 0, to);
+        IMirinPool(pool).transferFrom(msg.sender, pool, liquidity);
+        (uint256 amount0, uint256 amount1) = IMirinPool(pool).burn(to);
         (address token0, ) = _sortTokens(tokenA, tokenB);
         (amountA, amountB) = tokenA == token0 ? (amount0, amount1) : (amount1, amount0);
         require(amountA >= amountAMin, "MIRIN: INSUFFICIENT_A_AMOUNT");
@@ -143,7 +150,7 @@ contract MirinHelpers {
     ) internal returns (uint256 amountToken, uint256 amountETH) {
         (amountToken, amountETH) = _removeLiquidity(
             token,
-            WETH,
+            weth,
             pid,
             liquidity,
             amountTokenMin,
@@ -151,7 +158,7 @@ contract MirinHelpers {
             address(this)
         );
         _safeTransfer(token, to, amountToken);
-        IWETH(WETH).withdraw(amountETH);
+        IWETH(weth).withdraw(amountETH);
         _safeTransferETH(to, amountETH);
     }
 
@@ -160,7 +167,7 @@ contract MirinHelpers {
         address tokenB,
         uint256 pid
     ) internal view returns (address pool) {
-        pool = MirinFactory(FACTORY).getPool(tokenA, tokenB, pid);
+        pool = MirinFactory(factory).getPool(tokenA, tokenB, pid);
     }
 
     function _getPoolInfo(address pool, address tokenA)
@@ -173,7 +180,7 @@ contract MirinHelpers {
             uint8 weightB
         )
     {
-        address token0 = MirinPool(pool).TOKEN0();
+        address token0 = MirinPool(pool).token0();
         (uint256 reserve0, uint256 reserve1, ) = MirinPool(pool).getReserves();
         (uint8 weight0, uint8 weight1) = MirinPool(pool).getWeights();
         (reserveA, reserveB, weightA, weightB) = tokenA == token0

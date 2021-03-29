@@ -10,6 +10,17 @@ import "./MirinGovernance.sol";
  * @author LevX
  */
 contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
+    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
+    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
+    event Swap(
+        address indexed sender,
+        uint256 amount0In,
+        uint256 amount1In,
+        uint256 amount0Out,
+        uint256 amount1Out,
+        address indexed to
+    );
+
     uint256 public constant MINIMUM_LIQUIDITY = 10**3;
     bytes4 private constant SELECTOR = bytes4(keccak256(bytes("transfer(address,uint256)")));
     uint256 public kLast;
@@ -23,7 +34,7 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
     }
 
     modifier enabled() {
-        require(IMirinFactory(FACTORY).isPool(address(this)), "MIRIN: DISABLED_POOL");
+        require(IMirinFactory(factory).isPool(address(this)), "MIRIN: DISABLED_POOL");
         _;
     }
 
@@ -37,6 +48,10 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
         address _swapFeeTo
     ) MirinOptions(_token0, _token1, _weight0, _weight1) MirinGovernance(_operator, _swapFee, _swapFeeTo) {}
 
+    function initialize(address, address) external {
+        revert("MIRIN: NOT_IMPLEMENTED");
+    }
+
     function _safeTransfer(
         address token,
         address to,
@@ -46,32 +61,22 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
         require(success && (data.length == 0 || abi.decode(data, (bool))), "MIRIN: TRANSFER_FAILED");
     }
 
-    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
-    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
-    event Swap(
-        address indexed sender,
-        uint256 amount0In,
-        uint256 amount1In,
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address indexed to
-    );
-
     function _mintFee(uint112 _reserve0, uint112 _reserve1) private {
         uint256 _kLast = kLast;
         if (_kLast != 0) {
+            (uint8 _weight0, uint8 _weight1) = (weight0, weight1);
             uint256 rootK =
-                MirinMath.root(uint256(_reserve0)**WEIGHT0 * uint256(_reserve1)**WEIGHT1, WEIGHT0 + WEIGHT1);
-            uint256 rootKLast = MirinMath.root(_kLast, WEIGHT0 + WEIGHT1);
+                MirinMath.root(uint256(_reserve0)**_weight0 * uint256(_reserve1)**_weight1, _weight0 + _weight1);
+            uint256 rootKLast = MirinMath.root(_kLast, _weight0 + weight1);
             if (rootK > rootKLast) {
                 uint256 numerator = totalSupply * (rootK - rootKLast);
                 uint256 denominator = (rootK * (swapFee * 2 - 1)) + rootKLast; // 0.05% of increased liquidity
                 uint256 liquidity = numerator / denominator;
                 if (liquidity > 0) {
                     if (swapFeeTo == address(0)) {
-                        _mint(IMirinFactory(FACTORY).feeTo(), liquidity * 2);
+                        _mint(IMirinFactory(factory).feeTo(), liquidity * 2);
                     } else {
-                        _mint(IMirinFactory(FACTORY).feeTo(), liquidity);
+                        _mint(IMirinFactory(factory).feeTo(), liquidity);
                         _mint(swapFeeTo, liquidity);
                     }
                 }
@@ -81,19 +86,20 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
 
     function mint(address to) external lock enabled notBlacklisted(to) returns (uint256 liquidity) {
         (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
-        uint256 balance0 = IERC20(TOKEN0).balanceOf(address(this));
-        uint256 balance1 = IERC20(TOKEN1).balanceOf(address(this));
+        uint256 balance0 = IERC20(token0).balanceOf(address(this));
+        uint256 balance1 = IERC20(token1).balanceOf(address(this));
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
 
         _mintFee(_reserve0, _reserve1);
         uint256 _totalSupply = totalSupply;
-        uint256 k = balance0**WEIGHT0 * balance1**WEIGHT1;
+        (uint8 _weight0, uint8 _weight1) = (weight0, weight1);
+        uint256 k = balance0**_weight0 * balance1**_weight1;
         if (_totalSupply == 0) {
-            liquidity = MirinMath.root(k, WEIGHT0 + WEIGHT1) - MINIMUM_LIQUIDITY;
+            liquidity = MirinMath.root(k, _weight0 + _weight1) - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
-            liquidity = MirinMath.root(k, WEIGHT0 + WEIGHT1) - _totalSupply;
+            liquidity = MirinMath.root(k, _weight0 + _weight1) - _totalSupply;
         }
         require(liquidity > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_MINTED");
         _mint(to, liquidity);
@@ -103,14 +109,26 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
         emit Mint(msg.sender, amount0, amount1, to);
     }
 
+    function burn(address to) external returns (uint256 amount0, uint256 amount1) {
+        return burn(0, 0, to);
+    }
+
     function burn(
         uint256 amount0Out,
         uint256 amount1Out,
         address to
-    ) external lock notBlacklisted(to) returns (uint256 amount0, uint256 amount1) {
+    ) public lock notBlacklisted(to) returns (uint256 amount0, uint256 amount1) {
+        return _burn(amount0Out, amount1Out, to);
+    }
+
+    function _burn(
+        uint256 amount0Out,
+        uint256 amount1Out,
+        address to
+    ) private returns (uint256 amount0, uint256 amount1) {
         (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
-        uint256 balance0 = IERC20(TOKEN0).balanceOf(address(this));
-        uint256 balance1 = IERC20(TOKEN1).balanceOf(address(this));
+        uint256 balance0 = IERC20(token0).balanceOf(address(this));
+        uint256 balance1 = IERC20(token1).balanceOf(address(this));
         uint256 liquidity = balanceOf[address(this)];
 
         _mintFee(_reserve0, _reserve1);
@@ -118,13 +136,15 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
         amount0 = amount0Out == 0 ? (liquidity * balance0) / _totalSupply : amount0Out;
         amount1 = amount1Out == 0 ? (liquidity * balance1) / _totalSupply : amount1Out;
         require(amount0 > 0 && amount1 > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_BURNED");
-        _safeTransfer(TOKEN0, to, amount0);
-        _safeTransfer(TOKEN1, to, amount1);
-        balance0 = IERC20(TOKEN0).balanceOf(address(this));
-        balance1 = IERC20(TOKEN1).balanceOf(address(this));
-        uint256 k = balance0**WEIGHT0 * balance1**WEIGHT1;
-        uint256 rootK = MirinMath.root(k, WEIGHT0 + WEIGHT1);
-        uint256 rootKDelta = MirinMath.root(kLast, WEIGHT0 + WEIGHT1) - rootK;
+        _safeTransfer(token0, to, amount0);
+        _safeTransfer(token1, to, amount1);
+        balance0 = IERC20(token0).balanceOf(address(this));
+        balance1 = IERC20(token1).balanceOf(address(this));
+
+        (uint8 _weight0, uint8 _weight1) = (weight0, weight1);
+        uint256 k = balance0**_weight0 * balance1**_weight1;
+        uint256 rootK = MirinMath.root(k, _weight0 + _weight1);
+        uint256 rootKDelta = MirinMath.root(kLast, _weight0 + _weight1) - rootK;
         if (rootKDelta > 0 && rootKDelta < liquidity) {
             _transfer(address(this), to, liquidity - rootKDelta);
             liquidity -= rootKDelta;
@@ -140,8 +160,17 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
     function swap(
         uint256 amount0Out,
         uint256 amount1Out,
+        address to,
+        bytes calldata
+    ) external {
+        swap(amount0Out, amount1Out, to);
+    }
+
+    function swap(
+        uint256 amount0Out,
+        uint256 amount1Out,
         address to
-    ) external lock enabled notBlacklisted(to) {
+    ) public lock enabled notBlacklisted(to) {
         require(amount0Out > 0 || amount1Out > 0, "MIRIN: INSUFFICIENT_OUTPUT_AMOUNT");
         (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
         require(amount0Out < _reserve0 && amount1Out < _reserve1, "MIRIN: INSUFFICIENT_LIQUIDITY");
@@ -149,21 +178,22 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
         uint256 balance0;
         uint256 balance1;
         {
-            require(to != TOKEN0 && to != TOKEN1, "MIRIN: INVALID_TO");
-            if (amount0Out > 0) _safeTransfer(TOKEN0, to, amount0Out);
-            if (amount1Out > 0) _safeTransfer(TOKEN1, to, amount1Out);
-            balance0 = IERC20(TOKEN0).balanceOf(address(this));
-            balance1 = IERC20(TOKEN1).balanceOf(address(this));
+            require(to != token0 && to != token1, "MIRIN: INVALID_TO");
+            if (amount0Out > 0) _safeTransfer(token0, to, amount0Out);
+            if (amount1Out > 0) _safeTransfer(token1, to, amount1Out);
+            balance0 = IERC20(token0).balanceOf(address(this));
+            balance1 = IERC20(token1).balanceOf(address(this));
         }
         uint256 amount0In = balance0 > _reserve0 - amount0Out ? balance0 - (_reserve0 - amount0Out) : 0;
         uint256 amount1In = balance1 > _reserve1 - amount1Out ? balance1 - (_reserve1 - amount1Out) : 0;
         require(amount0In > 0 || amount1In > 0, "MIRIN: INSUFFICIENT_INPUT_AMOUNT");
         {
+            (uint8 _weight0, uint8 _weight1) = (weight0, weight1);
             uint256 balance0Adjusted = balance0 * 1000 - amount0In * swapFee;
             uint256 balance1Adjusted = balance1 * 1000 - amount1In * swapFee;
             require(
-                balance0Adjusted**WEIGHT0 * balance1Adjusted**WEIGHT1 >=
-                    uint256(_reserve0 * 1000)**WEIGHT0 * uint256(_reserve1 * 1000)**WEIGHT1,
+                balance0Adjusted**_weight0 * balance1Adjusted**_weight1 >=
+                    uint256(_reserve0 * 1000)**_weight0 * uint256(_reserve1 * 1000)**_weight1,
                 "MIRIN: K"
             );
         }
@@ -173,11 +203,11 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
     }
 
     function skim(address to) external lock {
-        _safeTransfer(TOKEN0, to, IERC20(TOKEN0).balanceOf(address(this)) - reserve0);
-        _safeTransfer(TOKEN1, to, IERC20(TOKEN1).balanceOf(address(this)) - reserve1);
+        _safeTransfer(token0, to, IERC20(token0).balanceOf(address(this)) - reserve0);
+        _safeTransfer(token1, to, IERC20(token1).balanceOf(address(this)) - reserve1);
     }
 
     function sync() external lock {
-        _update(IERC20(TOKEN0).balanceOf(address(this)), IERC20(TOKEN1).balanceOf(address(this)), reserve0, reserve1);
+        _update(IERC20(token0).balanceOf(address(this)), IERC20(token1).balanceOf(address(this)), reserve0, reserve1);
     }
 }

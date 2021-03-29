@@ -15,10 +15,16 @@ contract MirinOracle {
 
     event Sync(uint112 reserve0, uint112 reserve1);
 
-    address public immutable TOKEN0;
-    address public immutable TOKEN1;
-    uint8 public immutable WEIGHT0;
-    uint8 public immutable WEIGHT1;
+    struct PricePoint {
+        uint256 timestamp;
+        uint256 price0Cumulative;
+        uint256 price1Cumulative;
+    }
+
+    address public immutable token0;
+    address public immutable token1;
+    uint8 public immutable weight0;
+    uint8 public immutable weight1;
 
     uint112 internal reserve0;
     uint112 internal reserve1;
@@ -27,33 +33,18 @@ contract MirinOracle {
     uint256 public price0CumulativeLast;
     uint256 public price1CumulativeLast;
 
+    PricePoint[] public pricePoints;
+
     constructor(
         address _token0,
         address _token1,
         uint8 _weight0,
         uint8 _weight1
     ) {
-        TOKEN0 = _token0;
-        TOKEN1 = _token1;
-        WEIGHT0 = _weight0;
-        WEIGHT1 = _weight1;
-    }
-
-    struct point {
-        uint256 timestamp;
-        uint256 price0Cumulative;
-        uint256 price1Cumulative;
-    }
-
-    point[] public points;
-
-    function pointsLength() external view returns (uint256) {
-        return points.length;
-    }
-
-    function getWeights() public view returns (uint8 weight0, uint8 weight1) {
-        weight0 = WEIGHT0;
-        weight1 = WEIGHT1;
+        token0 = _token0;
+        token1 = _token1;
+        weight0 = _weight0;
+        weight1 = _weight1;
     }
 
     function getReserves()
@@ -70,6 +61,15 @@ contract MirinOracle {
         _blockTimestampLast = blockTimestampLast;
     }
 
+    function getWeights() public view returns (uint8 _weight0, uint8 _weight1) {
+        _weight0 = weight0;
+        _weight1 = weight1;
+    }
+
+    function pricePointsLength() external view returns (uint256) {
+        return pricePoints.length;
+    }
+
     // update reserves and, on the first call per block, price accumulators
     function _update(
         uint256 balance0,
@@ -83,12 +83,12 @@ contract MirinOracle {
         if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
             // * never overflows, and + overflow is desired
             price0CumulativeLast +=
-                FixedPoint.encode(_reserve1).mul(WEIGHT0).div(_reserve0).div(WEIGHT1)._x *
+                FixedPoint.encode(_reserve1).mul(weight0).div(_reserve0).div(weight1)._x *
                 timeElapsed;
             price1CumulativeLast +=
-                FixedPoint.encode(_reserve0).mul(WEIGHT1).div(_reserve1).div(WEIGHT0)._x *
+                FixedPoint.encode(_reserve0).mul(weight1).div(_reserve1).div(weight0)._x *
                 timeElapsed;
-            points.push(point(block.timestamp, price0CumulativeLast, price1CumulativeLast));
+            pricePoints.push(PricePoint(block.timestamp, price0CumulativeLast, price1CumulativeLast));
         }
         reserve0 = uint112(balance0);
         reserve1 = uint112(balance1);
@@ -116,7 +116,7 @@ contract MirinOracle {
         return MirinMath.vol(sample(tokenIn, uint256(10)**IERC20(tokenIn).decimals(), p, window));
     }
 
-    function computeAmountOut(
+    function _computeAmountOut(
         uint256 priceCumulativeStart,
         uint256 priceCumulativeEnd,
         uint256 timeElapsed,
@@ -129,16 +129,17 @@ contract MirinOracle {
     }
 
     function quotePrice(address tokenIn, uint256 amountIn) public view returns (uint256 amountOut) {
-        point memory p = points[points.length - 1];
+        uint256 len = pricePoints.length;
+        PricePoint memory p = pricePoints[len - 1];
         if (block.timestamp == p.timestamp) {
-            p = points[points.length - 2];
+            p = pricePoints[len - 2];
         }
 
         uint256 timeElapsed = block.timestamp - p.timestamp;
-        if (TOKEN0 == tokenIn) {
-            return computeAmountOut(p.price0Cumulative, price0CumulativeLast, timeElapsed, amountIn);
+        if (token0 == tokenIn) {
+            return _computeAmountOut(p.price0Cumulative, price0CumulativeLast, timeElapsed, amountIn);
         } else {
-            return computeAmountOut(p.price1Cumulative, price1CumulativeLast, timeElapsed, amountIn);
+            return _computeAmountOut(p.price1Cumulative, price1CumulativeLast, timeElapsed, amountIn);
         }
     }
 
@@ -150,18 +151,18 @@ contract MirinOracle {
     ) public view returns (uint256[] memory) {
         uint256[] memory _prices = new uint256[](p);
 
-        uint256 len = points.length - 1;
+        uint256 len = pricePoints.length - 1;
         uint256 i = len - p * window;
         uint256 nextIndex = 0;
         uint256 index = 0;
 
-        if (TOKEN0 == tokenIn) {
+        if (token0 == tokenIn) {
             for (; i < len; i += window) {
                 nextIndex = i + window;
-                _prices[index] = computeAmountOut(
-                    points[i].price0Cumulative,
-                    points[nextIndex].price0Cumulative,
-                    points[nextIndex].timestamp - points[i].timestamp,
+                _prices[index] = _computeAmountOut(
+                    pricePoints[i].price0Cumulative,
+                    pricePoints[nextIndex].price0Cumulative,
+                    pricePoints[nextIndex].timestamp - pricePoints[i].timestamp,
                     amountIn
                 );
                 index = index + 1;
@@ -169,10 +170,10 @@ contract MirinOracle {
         } else {
             for (; i < len; i += window) {
                 nextIndex = i + window;
-                _prices[index] = computeAmountOut(
-                    points[i].price1Cumulative,
-                    points[nextIndex].price1Cumulative,
-                    points[nextIndex].timestamp - points[i].timestamp,
+                _prices[index] = _computeAmountOut(
+                    pricePoints[i].price1Cumulative,
+                    pricePoints[nextIndex].price1Cumulative,
+                    pricePoints[nextIndex].timestamp - pricePoints[i].timestamp,
                     amountIn
                 );
                 index = index + 1;
