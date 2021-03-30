@@ -67,7 +67,7 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
             (uint8 _weight0, uint8 _weight1) = (weight0, weight1);
             uint256 rootK =
                 MirinMath.root(uint256(_reserve0)**_weight0 * uint256(_reserve1)**_weight1, _weight0 + _weight1);
-            uint256 rootKLast = MirinMath.root(_kLast, _weight0 + weight1);
+            uint256 rootKLast = MirinMath.root(_kLast, _weight0 + _weight1);
             if (rootK > rootKLast) {
                 uint256 numerator = totalSupply * (rootK - rootKLast);
                 uint256 denominator = (rootK * (swapFee * 2 - 1)) + rootKLast; // 0.05% of increased liquidity
