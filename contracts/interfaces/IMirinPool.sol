@@ -188,7 +188,7 @@ interface IMirinPool is IUniswapV2Pair {
 
     function exerciseOptionProfitOnly(uint256 id) external;
 
-    function excerciseOption(uint256 id) external;
+    function exerciseOption(uint256 id) external;
 
     function swap(
         uint256 amount0Out,

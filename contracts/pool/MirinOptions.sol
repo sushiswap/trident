@@ -247,7 +247,7 @@ contract MirinOptions is MirinOracle {
         emit OptionExercised(id, msg.sender, _o.asset, _o.amount, _o.strike, block.timestamp, _o.expire);
     }
 
-    function excerciseOption(uint256 id) external {
+    function exerciseOption(uint256 id) external {
         require(optionContracts.isApprovedOrOwner(msg.sender, id), "MIRIN: FORBIDDEN");
         OptionInternal storage _pos = _options[id];
         Option memory _o = _unpackOption(_pos);
