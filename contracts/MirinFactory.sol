@@ -57,25 +57,29 @@ contract MirinFactory {
         require(weight0 > 0 && weight1 > 0 && MirinMath.isPow2(weight0 + weight1), "MIRIN: INVALID_WEIGHTS");
         uint256 length = getPool[token0][token1].length;
         if (operator == address(0)) {
-            require(length == 0, "MIRIN: MUST_BE_FIRST_POOL");
-        } else {
-            require(length > 0, "MIRIN: MUST_NOT_BE_FIRST_POOL");
+            require(length == 0 || getPool[token0][token1][0] == address(0), "MIRIN: FAILED_TO_CREATE_PUBLIC_POOL");
+        } else if (length == 0) {
+            getPool[token0][token1].push(address(0));
+            getPool[token1][token0].push(address(0));
         }
-
         pool = new MirinPool(token0, token1, weight0, weight1, operator, swapFee, swapFeeTo);
-        getPool[token0][token1].push(address(pool));
-        getPool[token1][token0].push(address(pool));
+        if (operator == address(0) && length > 0) {
+            getPool[token0][token1][0] = address(pool);
+            getPool[token1][token0][0] = address(pool);
+        } else {
+            getPool[token0][token1].push(address(pool));
+            getPool[token1][token0].push(address(pool));
+        }
         isPool[address(pool)] = true;
         allPools.push(address(pool));
-
         if (operator != address(0)) {
             IERC20(SUSHI).transferFrom(msg.sender, address(this), SUSHI_DEPOSIT);
         }
-
         emit PoolCreated(token0, token1, length, address(pool), operator);
     }
 
     function disablePool(address to) external {
+        require(MirinPool(msg.sender).operator() != address(0), "MIRIN: CANNOT_DISABLE_PUBLIC_POOL");
         require(isPool[msg.sender], "MIRIN: ALREADY_DISABLED");
         isPool[msg.sender] = false;
 
