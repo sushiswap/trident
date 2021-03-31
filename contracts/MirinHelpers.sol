@@ -8,6 +8,7 @@ import "./interfaces/IMirinPool.sol";
 
 contract MirinHelpers {
     uint256 public constant LEGACY_POOL_INDEX = type(uint256).max;
+    uint256 public constant FRANCHISED_POOL_INDEX_0 = 2**255;
 
     address public immutable factory;
     address public immutable legacyFactory;
@@ -185,8 +186,10 @@ contract MirinHelpers {
                     )
                 )
             );
+        } else if (pid >= FRANCHISED_POOL_INDEX_0) {
+            pool = MirinFactory(factory).getFranchisedPool(tokenA, tokenB, pid - FRANCHISED_POOL_INDEX_0);
         } else {
-            pool = MirinFactory(factory).getPool(tokenA, tokenB, pid);
+            pool = MirinFactory(factory).getPublicPool(tokenA, tokenB, pid);
         }
     }
 

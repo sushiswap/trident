@@ -11,14 +11,16 @@ contract MirinFactory {
     address public feeTo;
     address public owner;
 
-    mapping(address => mapping(address => address[])) public getPool;
+    mapping(address => mapping(address => address[])) public getPublicPool;
+    mapping(address => mapping(address => address[])) public getFranchisedPool;
     mapping(address => bool) public isPool;
     address[] public allPools;
 
     event PoolCreated(
         address indexed token0,
         address indexed token1,
-        uint256 pid,
+        bool isPublic,
+        uint256 length,
         address indexed pool,
         address operator
     );
@@ -34,8 +36,12 @@ contract MirinFactory {
         owner = _owner;
     }
 
-    function poolsLength(address token0, address token1) external view returns (uint256) {
-        return getPool[token0][token1].length;
+    function publicPoolsLength(address token0, address token1) external view returns (uint256) {
+        return getPublicPool[token0][token1].length;
+    }
+
+    function franchisedPoolsLength(address token0, address token1) external view returns (uint256) {
+        return getFranchisedPool[token0][token1].length;
     }
 
     function allPoolsLength() external view returns (uint256) {
@@ -55,27 +61,24 @@ contract MirinFactory {
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         require(token0 != address(0), "MIRIN: ZERO_ADDRESS");
         require(weight0 > 0 && weight1 > 0 && MirinMath.isPow2(weight0 + weight1), "MIRIN: INVALID_WEIGHTS");
-        uint256 length = getPool[token0][token1].length;
-        if (operator == address(0)) {
-            require(length == 0 || getPool[token0][token1][0] == address(0), "MIRIN: FAILED_TO_CREATE_PUBLIC_POOL");
-        } else if (length == 0) {
-            getPool[token0][token1].push(address(0));
-            getPool[token1][token0].push(address(0));
-        }
         pool = new MirinPool(token0, token1, weight0, weight1, operator, swapFee, swapFeeTo);
-        if (operator == address(0) && length > 0) {
-            getPool[token0][token1][0] = address(pool);
-            getPool[token1][token0][0] = address(pool);
+        bool isPublic = operator == address(0);
+        uint256 length;
+        if (isPublic) {
+            length = getPublicPool[token0][token1].length;
+            getPublicPool[token0][token1].push(address(pool));
+            getPublicPool[token1][token0].push(address(pool));
         } else {
-            getPool[token0][token1].push(address(pool));
-            getPool[token1][token0].push(address(pool));
+            length = getFranchisedPool[token0][token1].length;
+            getFranchisedPool[token0][token1].push(address(pool));
+            getFranchisedPool[token1][token0].push(address(pool));
         }
         isPool[address(pool)] = true;
         allPools.push(address(pool));
-        if (operator != address(0)) {
+        if (!isPublic) {
             IERC20(SUSHI).transferFrom(msg.sender, address(this), SUSHI_DEPOSIT);
         }
-        emit PoolCreated(token0, token1, length, address(pool), operator);
+        emit PoolCreated(token0, token1, isPublic, length, address(pool), operator);
     }
 
     function disablePool(address to) external {
