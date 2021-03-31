@@ -82,7 +82,6 @@ contract MirinFactory {
     }
 
     function disablePool(address to) external {
-        require(MirinPool(msg.sender).operator() != address(0), "MIRIN: CANNOT_DISABLE_PUBLIC_POOL");
         require(isPool[msg.sender], "MIRIN: ALREADY_DISABLED");
         isPool[msg.sender] = false;
 
