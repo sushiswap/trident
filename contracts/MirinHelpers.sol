@@ -193,34 +193,6 @@ contract MirinHelpers {
         }
     }
 
-    function _getPoolInfo(
-        address pool,
-        address tokenA,
-        bool legacy
-    )
-        internal
-        view
-        returns (
-            uint256 reserveA,
-            uint256 reserveB,
-            uint8 weightA,
-            uint8 weightB
-        )
-    {
-        address token0 = IMirinPool(pool).token0();
-        (uint256 reserve0, uint256 reserve1, ) = IMirinPool(pool).getReserves();
-        if (legacy) {
-            (reserveA, reserveB, weightA, weightB) = tokenA == token0
-                ? (reserve0, reserve1, 1, 1)
-                : (reserve1, reserve0, 1, 1);
-        } else {
-            (uint8 weight0, uint8 weight1) = IMirinPool(pool).getWeights();
-            (reserveA, reserveB, weightA, weightB) = tokenA == token0
-                ? (reserve0, reserve1, weight0, weight1)
-                : (reserve1, reserve0, weight1, weight0);
-        }
-    }
-
     function _getAmountsOut(
         uint256 amountIn,
         address[] memory path,
@@ -232,18 +204,24 @@ contract MirinHelpers {
         for (uint256 i; i < path.length - 1; i++) {
             address tokenA = path[i];
             uint256 pid = pids[i];
-            bool legacy = pid == LEGACY_POOL_INDEX;
             address pool = _getPool(tokenA, path[i + 1], pid);
-            (uint256 reserveIn, uint256 reserveOut, uint8 weightIn, uint8 weightOut) =
-                _getPoolInfo(pool, tokenA, legacy);
-            amounts[i + 1] = _getAmountOut(
-                amounts[i],
-                reserveIn,
-                reserveOut,
-                weightIn,
-                weightOut,
-                legacy ? 3 : IMirinPool(pool).swapFee()
-            );
+            address token0 = IMirinPool(pool).token0();
+            (uint112 reserve0, uint112 reserve1, ) = IMirinPool(pool).getReserves();
+            if (pid == LEGACY_POOL_INDEX) {
+                (uint256 reserveIn, uint256 reserveOut) =
+                    tokenA == token0 ? (reserve0, reserve1) : (reserve1, reserve0);
+                amounts[i + 1] = _getAmountOut(amounts[i], reserveIn, reserveOut);
+            } else {
+                address curve = IMirinPool(pool).curve();
+                amounts[i + 1] = IMirinCurve(curve).computeAmountOut(
+                    amounts[i],
+                    reserve0,
+                    reserve1,
+                    IMirinPool(pool).curveData(),
+                    IMirinPool(pool).swapFee(),
+                    tokenA == token0 ? 0 : 1
+                );
+            }
         }
     }
 
@@ -258,49 +236,49 @@ contract MirinHelpers {
         for (uint256 i = path.length - 1; i > 0; i--) {
             address tokenA = path[i - 1];
             uint256 pid = pids[i - 1];
-            bool legacy = pid == LEGACY_POOL_INDEX;
             address pool = _getPool(tokenA, path[i], pid);
-            (uint256 reserveIn, uint256 reserveOut, uint8 weightIn, uint8 weightOut) =
-                _getPoolInfo(pool, tokenA, pid == LEGACY_POOL_INDEX);
-            amounts[i - 1] = _getAmountIn(
-                amounts[i],
-                reserveIn,
-                reserveOut,
-                weightIn,
-                weightOut,
-                legacy ? 3 : IMirinPool(pool).swapFee()
-            );
+            address token0 = IMirinPool(pool).token0();
+            (uint112 reserve0, uint112 reserve1, ) = IMirinPool(pool).getReserves();
+            if (pid == LEGACY_POOL_INDEX) {
+                (uint256 reserveIn, uint256 reserveOut) =
+                    tokenA == token0 ? (reserve0, reserve1) : (reserve1, reserve0);
+                amounts[i - 1] = _getAmountIn(amounts[i], reserveIn, reserveOut);
+            } else {
+                address curve = IMirinPool(pool).curve();
+                amounts[i + 1] = IMirinCurve(curve).computeAmountIn(
+                    amounts[i],
+                    reserve0,
+                    reserve1,
+                    IMirinPool(pool).curveData(),
+                    IMirinPool(pool).swapFee(),
+                    tokenA == token0 ? 0 : 1
+                );
+            }
         }
     }
 
     function _getAmountOut(
         uint256 amountIn,
         uint256 reserveIn,
-        uint256 reserveOut,
-        uint8 weightIn,
-        uint8 weightOut,
-        uint8 swapFee
+        uint256 reserveOut
     ) internal pure returns (uint256 amountOut) {
         require(amountIn > 0, "MIRIN: INSUFFICIENT_INPUT_AMOUNT");
         require(reserveIn > 0 && reserveOut > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
-        uint256 amountInWithFee = amountIn * (1000 - swapFee);
-        uint256 numerator = amountInWithFee * reserveOut * weightIn;
-        uint256 denominator = reserveIn * weightOut * 1000 + amountInWithFee;
+        uint256 amountInWithFee = amountIn * (1000 - 3);
+        uint256 numerator = amountInWithFee * reserveOut;
+        uint256 denominator = reserveIn * 1000 + amountInWithFee;
         amountOut = numerator / denominator;
     }
 
     function _getAmountIn(
         uint256 amountOut,
         uint256 reserveIn,
-        uint256 reserveOut,
-        uint8 weightIn,
-        uint8 weightOut,
-        uint8 swapFee
+        uint256 reserveOut
     ) internal pure returns (uint256 amountIn) {
         require(amountOut > 0, "MIRIN: INSUFFICIENT_OUTPUT_AMOUNT");
         require(reserveIn > 0 && reserveOut > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
-        uint256 numerator = reserveIn * weightOut * amountOut * 1000;
-        uint256 denominator = (reserveOut - amountOut) * weightIn * (1000 - swapFee);
+        uint256 numerator = reserveIn * amountOut * 1000;
+        uint256 denominator = (reserveOut - amountOut) * (1000 - 3);
         amountIn = (numerator / denominator) + 1;
     }
 

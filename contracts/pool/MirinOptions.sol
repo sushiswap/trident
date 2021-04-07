@@ -59,9 +59,9 @@ contract MirinOptions is MirinOracle {
     constructor(
         address _token0,
         address _token1,
-        uint8 _weight0,
-        uint8 _weight1
-    ) MirinOracle(_token0, _token1, _weight0, _weight1) {
+        address _curve,
+        bytes32 _curveData
+    ) MirinOracle(_token0, _token1, _curve, _curveData) {
         loanContracts = new MirinLoanContracts();
         optionContracts = new MirinOptionContracts();
     }

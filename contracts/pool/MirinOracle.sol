@@ -4,6 +4,7 @@ pragma solidity =0.8.2;
 
 import "../libraries/MirinMath.sol";
 import "../libraries/SafeERC20.sol";
+import "../interfaces/IMirinCurve.sol";
 
 /**
  * @dev Originally DeriswapV1Oracle
@@ -23,13 +24,13 @@ contract MirinOracle {
 
     address public immutable token0;
     address public immutable token1;
-    uint8 public immutable weight0;
-    uint8 public immutable weight1;
+    address public immutable curve;
 
     uint112 internal reserve0;
     uint112 internal reserve1;
     uint32 internal blockTimestampLast;
 
+    bytes32 public curveData;
     uint256 public price0CumulativeLast;
     uint256 public price1CumulativeLast;
 
@@ -38,13 +39,13 @@ contract MirinOracle {
     constructor(
         address _token0,
         address _token1,
-        uint8 _weight0,
-        uint8 _weight1
+        address _curve,
+        bytes32 _curveData
     ) {
         token0 = _token0;
         token1 = _token1;
-        weight0 = _weight0;
-        weight1 = _weight1;
+        curve = _curve;
+        curveData = _curveData;
     }
 
     function getReserves()
@@ -61,16 +62,10 @@ contract MirinOracle {
         _blockTimestampLast = blockTimestampLast;
     }
 
-    function getWeights() public view returns (uint8 _weight0, uint8 _weight1) {
-        _weight0 = weight0;
-        _weight1 = weight1;
-    }
-
     function pricePointsLength() external view returns (uint256) {
         return pricePoints.length;
     }
 
-    // update reserves and, on the first call per block, price accumulators
     function _update(
         uint256 balance0,
         uint256 balance1,
@@ -81,13 +76,9 @@ contract MirinOracle {
         uint32 blockTimestamp = uint32(block.timestamp % 2**32);
         uint32 timeElapsed = blockTimestamp - blockTimestampLast; // overflow is desired
         if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
-            // * never overflows, and + overflow is desired
-            price0CumulativeLast +=
-                FixedPoint.encode(_reserve1).mul(weight0).div(_reserve0).div(weight1)._x *
-                timeElapsed;
-            price1CumulativeLast +=
-                FixedPoint.encode(_reserve0).mul(weight1).div(_reserve1).div(weight0)._x *
-                timeElapsed;
+            bytes32 _curveData = curveData;
+            price0CumulativeLast += IMirinCurve(curve).computePrice(_reserve0, _reserve1, _curveData, 0) * timeElapsed;
+            price1CumulativeLast += IMirinCurve(curve).computePrice(_reserve0, _reserve1, _curveData, 1) * timeElapsed;
             pricePoints.push(PricePoint(block.timestamp, price0CumulativeLast, price1CumulativeLast));
         }
         reserve0 = uint112(balance0);

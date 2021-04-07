@@ -51,8 +51,8 @@ contract MirinFactory {
     function createPool(
         address tokenA,
         address tokenB,
-        uint8 weight0,
-        uint8 weight1,
+        address curve,
+        bytes32 curveData,
         address operator,
         uint8 swapFee,
         address swapFeeTo
@@ -60,8 +60,9 @@ contract MirinFactory {
         require(tokenA != tokenB, "MIRIN: IDENTICAL_ADDRESSES");
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         require(token0 != address(0), "MIRIN: ZERO_ADDRESS");
-        require(weight0 > 0 && weight1 > 0 && MirinMath.isPow2(weight0 + weight1), "MIRIN: INVALID_WEIGHTS");
-        pool = new MirinPool(token0, token1, weight0, weight1, operator, swapFee, swapFeeTo);
+        require(curve != address(0), "MIRIN: INVALID_CURVE");
+        require(IMirinCurve(curve).isValidData(curveData), "MIRIN: INVALID_CURVE_DATA");
+        pool = new MirinPool(token0, token1, curve, curveData, operator, swapFee, swapFeeTo);
         bool isPublic = operator == address(0);
         uint256 length;
         if (isPublic) {

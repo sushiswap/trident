@@ -53,9 +53,9 @@ interface IMirinPool is IUniswapV2Pair {
 
     function removeFromBlacklist(address[] calldata accounts) external;
 
-    function weight0() external view returns (uint8);
+    function curve() external view returns (address);
 
-    function weight1() external view returns (uint8);
+    function curveData() external view returns (bytes32);
 
     function pricePoints(uint256)
         external
@@ -65,8 +65,6 @@ interface IMirinPool is IUniswapV2Pair {
             uint256 price0Cumulative,
             uint256 price1Cumulative
         );
-
-    function getWeights() external view returns (uint8 _weight0, uint8 _weight1);
 
     function pricePointsLength() external view returns (uint256);
 
