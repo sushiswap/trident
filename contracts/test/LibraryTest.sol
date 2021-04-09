@@ -9,7 +9,7 @@ import "../libraries/FixedPoint.sol";
 import "../libraries/SafeERC20.sol";
 import "../libraries/EnumerableMap.sol";
 import "../libraries/EnumerableSet.sol";
-import "../libraries/MirinMath.sol";
+import "../libraries/MathUtils.sol";
 
 import "hardhat/console.sol";
 
@@ -20,6 +20,8 @@ contract LibraryTest {
     using SafeERC20 for IERC20;
     using EnumerableMap for EnumerableMap.UintToAddressMap;
     using EnumerableSet for EnumerableSet.UintSet;
+    using EnumerableSet for EnumerableSet.AddressSet;
+    using MathUtils for uint256;
 
     receive() external payable {}
 
@@ -77,5 +79,170 @@ contract LibraryTest {
 
     function uqdiv(uint224 x, uint112 y) public pure returns (uint224) {
         return UQ112x112.uqdiv(x, y);
+    }
+
+    // FixedPoint
+    function encodeFP(uint112 x) public pure returns (FixedPoint.uq112x112 memory) {
+        return FixedPoint.encode(x);
+    }
+
+    function encode144(uint144 x) public pure returns (FixedPoint.uq144x112 memory) {
+        return FixedPoint.encode144(x);
+    }
+
+    function div224By112(FixedPoint.uq112x112 memory self, uint112 x)
+        public
+        pure
+        returns (FixedPoint.uq112x112 memory)
+    {
+        return FixedPoint.div(self, x);
+    }
+
+    function mul224To256(FixedPoint.uq112x112 memory self, uint256 y)
+        public
+        pure
+        returns (FixedPoint.uq144x112 memory)
+    {
+        return FixedPoint.mul(self, y);
+    }
+
+    function div256By112(FixedPoint.uq144x112 memory self, uint112 x)
+        public
+        pure
+        returns (FixedPoint.uq144x112 memory)
+    {
+        return FixedPoint.div(self, x);
+    }
+
+    function mul256To256(FixedPoint.uq144x112 memory self, uint256 y)
+        public
+        pure
+        returns (FixedPoint.uq144x112 memory)
+    {
+        return FixedPoint.mul(self, y);
+    }
+
+    function fraction(uint112 numerator, uint112 denominator) public pure returns (FixedPoint.uq112x112 memory) {
+        return FixedPoint.fraction(numerator, denominator);
+    }
+
+    function decode(FixedPoint.uq112x112 memory self) public pure returns (uint112) {
+        return FixedPoint.decode(self);
+    }
+
+    function decode144(FixedPoint.uq144x112 memory self) public pure returns (uint144) {
+        return FixedPoint.decode144(self);
+    }
+
+    // SafeERC20
+    function safeTransfer(
+        IERC20 token,
+        address to,
+        uint256 value
+    ) public {
+        SafeERC20.safeTransfer(token, to, value);
+    }
+
+    function safeTransferFrom(
+        IERC20 token,
+        address from,
+        address to,
+        uint256 value
+    ) public {
+        SafeERC20.safeTransferFrom(token, from, to, value);
+    }
+
+    function safeApprove(
+        IERC20 token,
+        address spender,
+        uint256 value
+    ) public {
+        SafeERC20.safeApprove(token, spender, value);
+    }
+
+    // EnumerableMap
+    EnumerableMap.UintToAddressMap private tokenOwners;
+
+    function set(uint256 key, address value) public returns (bool) {
+        return tokenOwners.set(key, value);
+    }
+
+    function remove(uint256 key) public returns (bool) {
+        return tokenOwners.remove(key);
+    }
+
+    function contains(uint256 key) public view returns (bool) {
+        return tokenOwners.contains(key);
+    }
+
+    function length() public view returns (uint256) {
+        return tokenOwners.length();
+    }
+
+    function at(uint256 index) public view returns (uint256, address) {
+        (uint256 key, address value) = tokenOwners.at(index);
+        return (key, value);
+    }
+
+    function get(uint256 key) public view returns (address) {
+        return tokenOwners.get(key);
+    }
+
+    function get(uint256 key, string memory errorMessage) public view returns (address) {
+        return tokenOwners.get(key, errorMessage);
+    }
+
+    // EnumerableSet
+    mapping(address => EnumerableSet.UintSet) private myTokens;
+
+    function addSetUint(uint256 value) public returns (bool) {
+        return myTokens[msg.sender].add(value);
+    }
+
+    function removeSetUint(uint256 value) public returns (bool) {
+        return myTokens[msg.sender].remove(value);
+    }
+
+    function containsSetUint(uint256 value) public view returns (bool) {
+        return myTokens[msg.sender].contains(value);
+    }
+
+    function lengthSetUint() public view returns (uint256) {
+        return myTokens[msg.sender].length();
+    }
+
+    function atSetUint(uint256 index) public view returns (uint256) {
+        return myTokens[msg.sender].at(index);
+    }
+
+    mapping(uint256 => EnumerableSet.AddressSet) private tokenBidders;
+
+    function addSetAddr(address value) public returns (bool) {
+        return tokenBidders[0].add(value);
+    }
+
+    function removeSetAddr(address value) public returns (bool) {
+        return tokenBidders[0].remove(value);
+    }
+
+    function containsSetAddr(address value) public view returns (bool) {
+        return tokenBidders[0].contains(value);
+    }
+
+    function lengthSetAddr() public view returns (uint256) {
+        return tokenBidders[0].length();
+    }
+
+    function atSetAddr(uint256 index) public view returns (address) {
+        return tokenBidders[0].at(index);
+    }
+
+    // MathUtils
+    function within1(uint256 a, uint256 b) public pure returns (bool) {
+        return MathUtils.within1(a, b);
+    }
+
+    function difference(uint256 a, uint256 b) public pure returns (uint256) {
+        return MathUtils.difference(a, b);
     }
 }
