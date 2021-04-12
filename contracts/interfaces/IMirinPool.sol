@@ -29,6 +29,8 @@ interface IMirinPool is IUniswapV2Pair {
         uint256 expire
     );
 
+    function initialize() external;
+
     function MIN_SWAP_FEE() external view returns (uint8);
 
     function MAX_SWAP_FEE() external view returns (uint8);

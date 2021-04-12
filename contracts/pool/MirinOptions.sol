@@ -84,7 +84,7 @@ contract MirinOptions is MirinOracle {
         uint256 st
     ) public view returns (uint256 call, uint256 put) {
         uint256 v = realizedVolatility(tokenIn, t, 48);
-        return MirinMath.quoteOptionAll(t, v, sp, st);
+        return quoteOptionAll(t, v, sp, st);
     }
 
     function options(uint256 _id) external view returns (Option memory _option) {

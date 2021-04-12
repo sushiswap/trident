@@ -63,6 +63,7 @@ contract MirinFactory {
         require(curve != address(0), "MIRIN: INVALID_CURVE");
         require(IMirinCurve(curve).isValidData(curveData), "MIRIN: INVALID_CURVE_DATA");
         pool = new MirinPool(token0, token1, curve, curveData, operator, swapFee, swapFeeTo);
+        pool.initialize();
         bool isPublic = operator == address(0);
         uint256 length;
         if (isPublic) {

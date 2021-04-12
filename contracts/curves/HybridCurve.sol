@@ -3,7 +3,7 @@
 pragma solidity =0.8.2;
 
 import "../interfaces/IMirinCurve.sol";
-import "../libraries/MirinMath.sol";
+import "../libraries/FixedPoint.sol";
 import "../libraries/SafeMath.sol";
 import "../libraries/MathUtils.sol";
 
@@ -32,7 +32,7 @@ contract HybridCurve is IMirinCurve {
         _;
     }
 
-    function isValidData(bytes32 data) public pure override returns (bool) {
+    function isValidData(bytes32 data) public view override returns (bool) {
         (uint8 decimals0, uint8 decimals1, uint256 A) = decodeData(data);
         return decimals0 <= POOL_PRECISION_DECIMALS && decimals1 <= POOL_PRECISION_DECIMALS && A > 0;
     }
@@ -41,7 +41,7 @@ contract HybridCurve is IMirinCurve {
         uint112 reserve0,
         uint112 reserve1,
         bytes32 data
-    ) public pure override onlyValidData(data) returns (uint256) {
+    ) public view override onlyValidData(data) returns (uint256) {
         (uint8 decimals0, uint8 decimals1, uint256 A) = decodeData(data);
         uint256[] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
         return _getD(xp, A);
@@ -51,13 +51,13 @@ contract HybridCurve is IMirinCurve {
         uint112 reserve0,
         uint112 reserve1,
         bytes32 data
-    ) external pure override onlyValidData(data) returns (uint256) {
+    ) external view override onlyValidData(data) returns (uint256) {
         (uint8 decimals0, uint8 decimals1, uint256 A) = decodeData(data);
         uint256[] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
         return _getD(xp, A);
     }
 
-    function computeLiquidity(uint256 k, bytes32 data) external pure override onlyValidData(data) returns (uint256) {
+    function computeLiquidity(uint256 k, bytes32 data) external view override onlyValidData(data) returns (uint256) {
         return k;
     }
 
@@ -66,7 +66,7 @@ contract HybridCurve is IMirinCurve {
         uint112 reserve1,
         bytes32 data,
         uint8 tokenIn
-    ) external pure override onlyValidData(data) returns (uint256) {
+    ) external view override onlyValidData(data) returns (uint256) {
         (uint8 decimals0, uint8 decimals1, uint256 A) = decodeData(data);
         uint256[] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
         uint256 D = _getD(xp, A);
@@ -80,7 +80,7 @@ contract HybridCurve is IMirinCurve {
         bytes32 data,
         uint8 swapFee,
         uint8 tokenIn
-    ) external pure override onlyValidData(data) returns (uint256) {
+    ) external view override onlyValidData(data) returns (uint256) {
         (uint8 decimals0, uint8 decimals1, uint256 A) = decodeData(data);
         uint256[] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
         return _getY(tokenIn == 0 ? 0 : 1, tokenIn == 0 ? 1 : 0, amountIn, xp, A);
@@ -93,7 +93,7 @@ contract HybridCurve is IMirinCurve {
         bytes32 data,
         uint8 swapFee,
         uint8 tokenIn
-    ) external pure override onlyValidData(data) returns (uint256 amountIn) {
+    ) external view override onlyValidData(data) returns (uint256 amountIn) {
         amountIn = 0; // TODO
     }
 
@@ -107,7 +107,7 @@ contract HybridCurve is IMirinCurve {
         )
     {
         decimals0 = uint8(uint256(data) >> 248);
-        decimals1 = uint8((uint256(data) >> 240) % (2 ^ 8));
+        decimals1 = uint8((uint256(data) >> 240) % (1 << 8));
         A = uint240(uint256(data));
     }
 
@@ -176,7 +176,7 @@ contract HybridCurve is IMirinCurve {
         uint256 x,
         uint256[] memory xp,
         uint256 _A
-    ) private pure returns (uint256) {
+    ) private view returns (uint256) {
         uint256 numTokens = xp.length;
 
         // uint256 _A = _getAPrecise(self);
