@@ -83,7 +83,7 @@ contract HybridCurve is IMirinCurve {
     ) external view override onlyValidData(data) returns (uint256) {
         (uint8 decimals0, uint8 decimals1, uint256 A) = decodeData(data);
         uint256[] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
-        return _getY(tokenIn == 0 ? 0 : 1, tokenIn == 0 ? 1 : 0, amountIn, xp, A);
+        return _getY(tokenIn == 0 ? 0 : 1, tokenIn == 0 ? 1 : 0, amountIn * (1000 - swapFee), xp, A);
     }
 
     function computeAmountIn(

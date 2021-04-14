@@ -78,9 +78,9 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
         require(swapFee < MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
         (uint112 reserveIn, uint112 reserveOut) = tokenIn == 0 ? (reserve0, reserve1) : (reserve1, reserve0);
         (uint8 weightIn, uint8 weightOut) = decodeData(data, tokenIn);
-        (uint256 result, uint8 precision) =
-            power(reserveIn / (reserveIn + amountIn * (1000 - swapFee), 1, weightIn, weightOut));
-        amountOut = reserveOut - (reserveOut * result) / (1 << precision);
+        (uint256 numerator, ) = power(reserveIn, 1, weightIn, weightOut);
+        (uint256 denominator, ) = power(reserveIn + amountIn * (1000 - swapFee), 1, weightIn, weightOut);
+        amountOut = reserveOut - (reserveOut * numerator) / denominator;
     }
 
     function computeAmountIn(
@@ -96,7 +96,7 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
         require(swapFee < MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
         (uint112 reserveIn, uint112 reserveOut) = tokenIn == 0 ? (reserve0, reserve1) : (reserve1, reserve0);
         (uint8 weightIn, uint8 weightOut) = decodeData(data, tokenIn);
-        (uint256 result, uint8 precision) = power(reserveOut / (reserveOut - amountOut), 1, weightOut, weightIn) - 1;
+        (uint256 result, uint8 precision) = power(reserveOut, reserveOut - amountOut, weightOut, weightIn);
         amountIn = ((reserveIn * result) / (1 << precision) - reserveIn) * (1000 - swapFee);
     }
 
