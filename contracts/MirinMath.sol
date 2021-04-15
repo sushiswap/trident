@@ -180,11 +180,11 @@ contract MirinMath {
 
         // If x > 1, then we compute the fraction part of log2(x), which is larger than 0.
         if (x > FIXED_1) {
-            for (uint8 i = 127; i > 0; --i) {
+            for (uint8 i = MAX_PRECISION; i > 0; --i) {
                 x = (x * x) / FIXED_1; // now 1 < x < 4
                 if (x >= FIXED_2) {
                     x >>= 1; // now 1 < x < 2
-                    res += uint256(1) << (i - 1);
+                    res += ONE << (i - 1);
                 }
             }
         }
@@ -251,11 +251,11 @@ contract MirinMath {
 
         // If x > 1, then we compute the fraction part of log2(x), which is larger than 0.
         if (x > FIXED_1) {
-            for (uint8 i = 127; i > 0; --i) {
+            for (uint8 i = MAX_PRECISION; i > 0; --i) {
                 x = (x * x) / FIXED_1; // now 1 < x < 4
                 if (x >= FIXED_2) {
                     x >>= 1; // now 1 < x < 2
-                    res += uint256(1) << (i - 1);
+                    res += ONE << (i - 1);
                 }
             }
         }
@@ -278,7 +278,7 @@ contract MirinMath {
         } else {
             // Exactly 8 iterations
             for (uint8 s = 128; s > 0; s >>= 1) {
-                if (_n >= (uint256(1) << s)) {
+                if (_n >= (ONE << s)) {
                     _n >>= s;
                     res |= s;
                 }
@@ -389,7 +389,7 @@ contract MirinMath {
     }
 
     /**
-     * @dev computes log(x / FIXED_1) * FIXED_1
+     * @dev computes ln(x / FIXED_1) * FIXED_1
      * Input range: FIXED_1 <= x <= OPT_LOG_MAX_VAL - 1
      * Auto-generated via 'PrintFunctionOptimalLog.py'
      * Detailed description:
@@ -400,6 +400,7 @@ contract MirinMath {
      * - For example: log(250) = log(e^4 * e^1 * e^0.5 * 1.021692859) = 4 + 1 + 0.5 + log(1 + 0.021692859)
      */
     function optimalLog(uint256 x) internal pure returns (uint256) {
+        require(FIXED_1 <= x, "MIRIN: Outranged");
         uint256 res = 0;
 
         uint256 y;
@@ -472,6 +473,7 @@ contract MirinMath {
      * - For example: e^5.521692859 = e^(4 + 1 + 0.5 + 0.021692859) = e^4 * e^1 * e^0.5 * e^0.021692859
      */
     function optimalExp(uint256 x) internal pure returns (uint256) {
+        require(x <= OPT_EXP_MAX_VAL - 1, "MIRIN: Outranged");
         uint256 res = 0;
 
         uint256 y;
@@ -547,7 +549,7 @@ contract MirinMath {
 
         if (sp > st) {
             _c = C(t, v, sp, st);
-            _p = st - sp + _c;
+            _p = sp - st + _c;
         } else {
             _p = C(t, v, st, sp);
             _c = st - sp + _p;
@@ -599,8 +601,14 @@ contract MirinMath {
     }
 
     function vol(uint256[] memory p) internal pure returns (uint256 x) {
+        uint256 _v;
         for (uint8 i = 1; i <= (p.length - 1); i++) {
-            x += ((generalLog(p[i] * FIXED_1) - generalLog(p[i - 1] * FIXED_1)))**2;
+            if (p[i] > p[i - 1]) {
+                _v = generalLog(p[i] * FIXED_1) - generalLog(p[i - 1] * FIXED_1);
+            } else {
+                _v = generalLog(p[i - 1] * FIXED_1) - generalLog(p[i] * FIXED_1);
+            }
+            x += _v**2;
             //denom += FIXED_1**2;
         }
         //return (sum, denom);
@@ -637,7 +645,11 @@ contract MirinMath {
         uint256 mean = sum / numbers.length; // Integral value; float not supported in Solidity
         sum = 0;
         for (uint256 i = 0; i < numbers.length; i++) {
-            sum += (numbers[i] - mean)**2;
+            if (numbers[i] > mean) {
+                sum += (numbers[i] - mean)**2;
+            } else {
+                sum += (mean - numbers[i])**2;
+            }
         }
         sd = sqrt(sum / (numbers.length - 1)); //Integral value; float not supported in Solidity
         return sd;
