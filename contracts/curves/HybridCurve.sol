@@ -33,7 +33,7 @@ contract HybridCurve is IMirinCurve {
     }
 
     function isValidData(bytes32 data) public view override returns (bool) {
-        (uint8 decimals0, uint8 decimals1, uint256 A) = decodeData(data);
+        (uint8 decimals0, uint8 decimals1, uint240 A) = decodeData(data);
         return decimals0 <= POOL_PRECISION_DECIMALS && decimals1 <= POOL_PRECISION_DECIMALS && A > 0;
     }
 
@@ -42,7 +42,7 @@ contract HybridCurve is IMirinCurve {
         uint112 reserve1,
         bytes32 data
     ) public view override onlyValidData(data) returns (uint256) {
-        (uint8 decimals0, uint8 decimals1, uint256 A) = decodeData(data);
+        (uint8 decimals0, uint8 decimals1, uint240 A) = decodeData(data);
         uint256[] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
         return _getD(xp, A);
     }
@@ -52,7 +52,7 @@ contract HybridCurve is IMirinCurve {
         uint112 reserve1,
         bytes32 data
     ) external view override onlyValidData(data) returns (uint256) {
-        (uint8 decimals0, uint8 decimals1, uint256 A) = decodeData(data);
+        (uint8 decimals0, uint8 decimals1, uint240 A) = decodeData(data);
         uint256[] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
         return _getD(xp, A);
     }
@@ -67,7 +67,7 @@ contract HybridCurve is IMirinCurve {
         bytes32 data,
         uint8 tokenIn
     ) external view override onlyValidData(data) returns (uint256) {
-        (uint8 decimals0, uint8 decimals1, uint256 A) = decodeData(data);
+        (uint8 decimals0, uint8 decimals1, uint240 A) = decodeData(data);
         uint256[] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
         uint256 D = _getD(xp, A);
         return _getYD(A, tokenIn, xp, D);
@@ -81,7 +81,7 @@ contract HybridCurve is IMirinCurve {
         uint8 swapFee,
         uint8 tokenIn
     ) external view override onlyValidData(data) returns (uint256) {
-        (uint8 decimals0, uint8 decimals1, uint256 A) = decodeData(data);
+        (uint8 decimals0, uint8 decimals1, uint240 A) = decodeData(data);
         uint256[] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
         return _getY(tokenIn == 0 ? 0 : 1, tokenIn == 0 ? 1 : 0, amountIn * (1000 - swapFee), xp, A);
     }
@@ -103,7 +103,7 @@ contract HybridCurve is IMirinCurve {
         returns (
             uint8 decimals0,
             uint8 decimals1,
-            uint256 A
+            uint240 A
         )
     {
         decimals0 = uint8(uint256(data) >> 248);
