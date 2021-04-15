@@ -32,6 +32,10 @@ contract HybridCurve is IMirinCurve {
         _;
     }
 
+    function canUpdateData() external view returns (bool) {
+        return true;
+    }
+
     function isValidData(bytes32 data) public view override returns (bool) {
         (uint8 decimals0, uint8 decimals1, uint240 A) = decodeData(data);
         return decimals0 <= POOL_PRECISION_DECIMALS && decimals1 <= POOL_PRECISION_DECIMALS && A > 0;

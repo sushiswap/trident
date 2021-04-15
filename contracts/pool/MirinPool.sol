@@ -53,6 +53,12 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
         revert("MIRIN: NOT_IMPLEMENTED");
     }
 
+    function updateCurveData(bytes32 data) external onlyOperator {
+        require(IMirinCurve(curve).canUpdateData(), "MIRIN: CANNOT_UPDATE_DATA");
+        require(IMirinCurve(curve).isValidData(data), "MIRIN: INVALID_CURVE_DATA");
+        curveData = data;
+    }
+
     function _safeTransfer(
         address token,
         address to,

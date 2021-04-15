@@ -190,6 +190,8 @@ interface IMirinPool is IUniswapV2Pair {
 
     function exerciseOption(uint256 id) external;
 
+    function updateCurveData(bytes32 data) external;
+
     function swap(
         uint256 amount0Out,
         uint256 amount1Out,

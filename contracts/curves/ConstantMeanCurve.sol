@@ -21,6 +21,10 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
         _;
     }
 
+    function canUpdateData() external view returns (bool) {
+        return false;
+    }
+
     function isValidData(bytes32 data) public view override returns (bool) {
         (uint8 weight0, uint8 weight1) = decodeData(data, 0);
         return weight0 > 0 && weight1 > 0 && weight0 + weight1 == WEIGHT_SUM;

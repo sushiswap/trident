@@ -3,6 +3,8 @@
 pragma solidity >=0.5.0;
 
 interface IMirinCurve {
+    function canUpdateData() external view returns (bool);
+
     function isValidData(bytes32 data) external view returns (bool);
 
     function computeK(
