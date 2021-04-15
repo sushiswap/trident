@@ -223,7 +223,7 @@ contract MirinMath {
         if (base < OPT_LOG_MAX_VAL) {
             baseLog = optimalLog(base);
         } else {
-            baseLog = generalLog(base);
+            baseLog = ln(base);
         }
 
         uint256 baseLogTimesExp = (baseLog * _expN) / _expD;
