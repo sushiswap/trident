@@ -11,6 +11,7 @@ contract MirinFactory {
     address public feeTo;
     address public owner;
 
+    mapping(address => bool) public isCurveWhitelisted;
     mapping(address => mapping(address => address[])) public getPublicPool;
     mapping(address => mapping(address => address[])) public getFranchisedPool;
     mapping(address => bool) public isPool;
@@ -25,6 +26,11 @@ contract MirinFactory {
         address operator
     );
     event PoolDisabled(address indexed pool);
+
+    modifier onlyOwner {
+        require(msg.sender == owner, "MIRIN: FORBIDDEN");
+        _;
+    }
 
     constructor(
         address _sushi,
@@ -48,6 +54,10 @@ contract MirinFactory {
         return allPools.length;
     }
 
+    function whitelistCurve(address curve) external onlyOwner {
+        isCurveWhitelisted[curve] = true;
+    }
+
     function createPool(
         address tokenA,
         address tokenB,
@@ -60,7 +70,7 @@ contract MirinFactory {
         require(tokenA != tokenB, "MIRIN: IDENTICAL_ADDRESSES");
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         require(token0 != address(0), "MIRIN: ZERO_ADDRESS");
-        require(curve != address(0), "MIRIN: INVALID_CURVE");
+        require(isCurveWhitelisted[curve], "MIRIN: INVALID_CURVE");
         require(IMirinCurve(curve).isValidData(curveData), "MIRIN: INVALID_CURVE_DATA");
         pool = new MirinPool(token0, token1, curve, curveData, operator, swapFee, swapFeeTo);
         pool.initialize();
@@ -92,13 +102,11 @@ contract MirinFactory {
         emit PoolDisabled(msg.sender);
     }
 
-    function setFeeTo(address _feeTo) external {
-        require(msg.sender == owner, "MIRIN: FORBIDDEN");
+    function setFeeTo(address _feeTo) external onlyOwner {
         feeTo = _feeTo;
     }
 
-    function setOwner(address _owner) external {
-        require(msg.sender == owner, "MIRIN: FORBIDDEN");
+    function setOwner(address _owner) external onlyOwner {
         owner = _owner;
     }
 }
