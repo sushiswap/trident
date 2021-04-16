@@ -87,9 +87,13 @@ contract HybridCurve is IMirinCurve {
     ) external view override onlyValidData(data) returns (uint256) {
         (uint8 decimals0, uint8 decimals1, uint240 A) = decodeData(data);
         uint256[2] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
-        amountIn = amountIn * (1000 - swapFee) * 10**(POOL_PRECISION_DECIMALS - (tokenIn != 0 ? decimals1 : decimals0)) / 1000;
-        uint256 newAmount = xp[tokenIn] + amountIn;
-        return _getY(tokenIn, newAmount, xp, A);
+        amountIn = amountIn * 10**(POOL_PRECISION_DECIMALS - (tokenIn != 0 ? decimals1 : decimals0));
+        uint256 x = xp[tokenIn] + amountIn;
+        uint256 y = _getY(x, xp, A);
+        uint256 dy = xp[1 - tokenIn] - y - 1;
+        dy = dy - (dy * swapFee / 1000);
+        dy = dy * 10**(POOL_PRECISION_DECIMALS - (tokenIn != 0 ? decimals0 : decimals1));
+        return dy;
     }
 
     function computeAmountIn(
@@ -160,13 +164,11 @@ contract HybridCurve is IMirinCurve {
      *
      * @dev Originally https://github.com/saddle-finance/saddle-contract/blob/0b76f7fb519e34b878aa1d58cffc8d8dc0572c12/contracts/SwapUtils.sol#L432
      *
-     * @param tokenIn index of FROM token
      * @param x the new total amount of FROM token
      * @param xp balances of the tokens in the pool
      * @return the amount of TO token that should remain in the pool
      */
     function _getY(
-        uint8 tokenIn,
         uint256 x,
         uint256[2] memory xp,
         uint256 _A
