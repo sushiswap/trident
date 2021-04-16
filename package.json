@@ -26,7 +26,7 @@
     "test": "cross-env TS_NODE_TRANSPILE_ONLY=1 hardhat test",
     "test:coverage": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" hardhat coverage",
     "test:gas": "cross-env REPORT_GAS=true yarn test",
-    "prettier": "prettier --write test/**/*.{js,ts} && prettier --write contracts/**/*.sol",
+    "prettier": "prettier --write 'test/**/*.{js,ts}' && prettier --write contracts/**/*.sol",
     "lint": "yarn prettier && solhint -c .solhint.json contracts/**/*.sol"
   },
   "devDependencies": {
@@ -53,7 +53,10 @@
     "hardhat-spdx-license-identifier": "^2.0.0",
     "hardhat-typechain": "^0.3.0",
     "hardhat-watcher": "^2.0.0",
-    "prettier-plugin-solidity": "^1.0.0-beta.3",
+    "prettier": "^2.2.1",
+    "prettier-plugin-solidity": "^1.0.0-beta.9",
+    "solhint": "^3.3.4",
+    "solhint-plugin-prettier": "^0.0.5",
     "solidity-coverage": "^0.7.0",
     "ts-generator": "^0.1.0",
     "ts-node": "^9.1.0",
