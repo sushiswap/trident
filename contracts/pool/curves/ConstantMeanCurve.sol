@@ -2,9 +2,9 @@
 
 pragma solidity =0.8.2;
 
-import "../MirinMath.sol";
-import "../interfaces/IMirinCurve.sol";
-import "../libraries/FixedPoint.sol";
+import "../../MirinMath.sol";
+import "../../interfaces/IMirinCurve.sol";
+import "../../libraries/FixedPoint.sol";
 
 /**
  * @dev Constant mean curve for tokens with different possible weights (k = r_0^w_0 * r_1^w1)
@@ -21,7 +21,7 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
         _;
     }
 
-    function canUpdateData() external view returns (bool) {
+    function canUpdateData() external view override returns (bool) {
         return false;
     }
 

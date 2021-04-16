@@ -2,10 +2,10 @@
 
 pragma solidity =0.8.2;
 
-import "../interfaces/IMirinCurve.sol";
-import "../libraries/FixedPoint.sol";
-import "../libraries/SafeMath.sol";
-import "../libraries/MathUtils.sol";
+import "../../interfaces/IMirinCurve.sol";
+import "../../libraries/FixedPoint.sol";
+import "../../libraries/SafeMath.sol";
+import "../../libraries/MathUtils.sol";
 
 /**
  * @dev Hybrid curve of constant product and constant sum ones (4a(r_0 +r _1) + k = 4ak + (k^3/4r_0r_1))
@@ -32,7 +32,7 @@ contract HybridCurve is IMirinCurve {
         _;
     }
 
-    function canUpdateData() external view returns (bool) {
+    function canUpdateData() external view override returns (bool) {
         return true;
     }
 
