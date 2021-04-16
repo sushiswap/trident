@@ -7,19 +7,11 @@ interface IMirinCurve {
 
     function isValidData(bytes32 data) external pure returns (bool);
 
-    function computeK(
-        uint112 reserve0,
-        uint112 reserve1,
-        bytes32 data
-    ) external view returns (uint256);
-
     function computeLiquidity(
         uint112 reserve0,
         uint112 reserve1,
         bytes32 data
     ) external view returns (uint256);
-
-    function computeLiquidity(uint256 k, bytes32 data) external view returns (uint256);
 
     function computePrice(
         uint112 reserve0,
