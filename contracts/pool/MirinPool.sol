@@ -49,13 +49,12 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
         address _swapFeeTo
     ) MirinOptions(_token0, _token1, _curve, _curveData) MirinGovernance(_operator, _swapFee, _swapFeeTo) {}
 
-    function initialize(address, address) external {
+    function initialize(address, address) external pure {
         revert("MIRIN: NOT_IMPLEMENTED");
     }
 
     function updateCurveData(bytes32 data) external onlyOperator {
-        require(IMirinCurve(curve).canUpdateData(), "MIRIN: CANNOT_UPDATE_DATA");
-        require(IMirinCurve(curve).isValidData(data), "MIRIN: INVALID_CURVE_DATA");
+        require(IMirinCurve(curve).canUpdateData(curveData, data), "MIRIN: CANNOT_UPDATE_DATA");
         curveData = data;
     }
 

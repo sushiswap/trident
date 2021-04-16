@@ -21,11 +21,11 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
         _;
     }
 
-    function canUpdateData() external view override returns (bool) {
+    function canUpdateData(bytes32, bytes32) external pure override returns (bool) {
         return false;
     }
 
-    function isValidData(bytes32 data) public view override returns (bool) {
+    function isValidData(bytes32 data) public pure override returns (bool) {
         (uint8 weight0, uint8 weight1) = decodeData(data, 0);
         return weight0 > 0 && weight1 > 0 && weight0 + weight1 == WEIGHT_SUM;
     }
@@ -34,7 +34,7 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
         uint112 reserve0,
         uint112 reserve1,
         bytes32 data
-    ) external view override onlyValidData(data) returns (uint256) {
+    ) external pure override onlyValidData(data) returns (uint256) {
         (uint8 weight0, uint8 weight1) = decodeData(data, 0);
         return uint256(reserve0)**weight0 * uint256(reserve1)**weight1;
     }
@@ -61,7 +61,7 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
         uint112 reserve1,
         bytes32 data,
         uint8 tokenIn
-    ) external view override onlyValidData(data) returns (uint256) {
+    ) external pure override onlyValidData(data) returns (uint256) {
         (uint8 weight0, uint8 weight1) = decodeData(data, tokenIn);
         return
             tokenIn == 0
