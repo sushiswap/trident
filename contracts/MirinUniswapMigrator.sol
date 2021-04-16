@@ -16,11 +16,11 @@ contract MirinUniswapMigrator is MirinHelpers {
         uniswapFactory = _uniswapFactory;
     }
 
-    function migrateFromUniswapWithPermit(
+    function migrateWithPermit(
         address tokenA,
         address tokenB,
         uint256 pid,
-        uint256 liquidity,
+        uint256 amountToRemove,
         uint256 liquidityMin,
         address to,
         uint256 deadline,
@@ -29,8 +29,33 @@ contract MirinUniswapMigrator is MirinHelpers {
         bytes32 s
     ) external {
         IUniswapV2Pair pair = IUniswapV2Pair(_pairFor(tokenA, tokenB));
-        pair.permit(msg.sender, address(this), liquidity, deadline, v, r, s);
-        migrateFromUniswap(tokenA, tokenB, pid, liquidity, liquidityMin, to, deadline);
+        pair.permit(msg.sender, address(this), amountToRemove, deadline, v, r, s);
+        migrate(tokenA, tokenB, pid, amountToRemove, liquidityMin, to, deadline);
+    }
+
+    function migrate(
+        address tokenA,
+        address tokenB,
+        uint256 pid,
+        uint256 amountToRemove,
+        uint256 liquidityMin,
+        address to,
+        uint256 deadline
+    ) public ensure(deadline) {
+        (uint256 amountA, uint256 amountB) = _removeLiquidityFromUniswap(tokenA, tokenB, amountToRemove);
+        _addLiquidity(tokenA, tokenB, pid, amountA, amountB, liquidityMin, to);
+    }
+
+    function _removeLiquidityFromUniswap(
+        address tokenA,
+        address tokenB,
+        uint256 amountToRemove
+    ) internal returns (uint256 amountA, uint256 amountB) {
+        IUniswapV2Pair pair = IUniswapV2Pair(_pairFor(tokenA, tokenB));
+        _safeTransferFrom(address(pair), msg.sender, address(pair), amountToRemove);
+        (uint256 amount0, uint256 amount1) = pair.burn(address(this));
+        (address token0, ) = _sortTokens(tokenA, tokenB);
+        (amountA, amountB) = tokenA == token0 ? (amount0, amount1) : (amount1, amount0);
     }
 
     function _pairFor(address tokenA, address tokenB) internal view returns (address pair) {
@@ -49,30 +74,5 @@ contract MirinUniswapMigrator is MirinHelpers {
                 )
             )
         );
-    }
-
-    function migrateFromUniswap(
-        address tokenA,
-        address tokenB,
-        uint256 pid,
-        uint256 liquidity,
-        uint256 liquidityMin,
-        address to,
-        uint256 deadline
-    ) public ensure(deadline) {
-        (uint256 amountA, uint256 amountB) = _removeLiquidityFromUniswap(tokenA, tokenB, liquidity);
-        _addLiquidity(tokenA, tokenB, pid, amountA, amountB, liquidityMin, to);
-    }
-
-    function _removeLiquidityFromUniswap(
-        address tokenA,
-        address tokenB,
-        uint256 liquidity
-    ) internal returns (uint256 amountA, uint256 amountB) {
-        IUniswapV2Pair pair = IUniswapV2Pair(_pairFor(tokenA, tokenB));
-        _safeTransferFrom(address(pair), msg.sender, address(pair), liquidity);
-        (uint256 amount0, uint256 amount1) = pair.burn(address(this));
-        (address token0, ) = _sortTokens(tokenA, tokenB);
-        (amountA, amountB) = tokenA == token0 ? (amount0, amount1) : (amount1, amount0);
     }
 }
