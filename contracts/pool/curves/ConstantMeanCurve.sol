@@ -58,7 +58,7 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
         uint8 tokenIn
     ) external view override returns (uint256 amountOut) {
         require(amountIn > 0, "MIRIN: INSUFFICIENT_INPUT_AMOUNT");
-        require(reserve0 > 0 && reserve0 > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
+        require(reserve0 > 0 && reserve1 > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
         require(swapFee < MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
         (uint112 reserveIn, uint112 reserveOut) = tokenIn == 0 ? (reserve0, reserve1) : (reserve1, reserve0);
         (uint8 weightIn, uint8 weightOut) = decodeData(data, tokenIn);
@@ -79,7 +79,7 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
         uint8 tokenIn
     ) external view override returns (uint256 amountIn) {
         require(amountOut > 0, "MIRIN: INSUFFICIENT_INPUT_AMOUNT");
-        require(reserve0 > 0 && reserve0 > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
+        require(reserve0 > 0 && reserve1 > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
         require(swapFee < MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
         (uint8 weightIn, uint8 weightOut) = decodeData(data, tokenIn);
         (uint112 reserveIn, uint112 reserveOut) = tokenIn == 0 ? (reserve0, reserve1) : (reserve1, reserve0);
