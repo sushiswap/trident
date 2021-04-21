@@ -34,8 +34,35 @@ contract HybridCurve is IMirinCurve {
     }
 
     function isValidData(bytes32 data) public pure override returns (bool) {
-        (uint8 decimals0, uint8 decimals1, uint240 A) = decodeData(data);
+        (uint8 decimals0, uint8 decimals1, uint240 A) = _decodeData(data);
         return decimals0 <= POOL_PRECISION_DECIMALS && decimals1 <= POOL_PRECISION_DECIMALS && A > 0;
+    }
+
+    function decodeData(bytes32 data)
+        public
+        pure
+        returns (
+            uint8 decimals0,
+            uint8 decimals1,
+            uint240 A
+        )
+    {
+        require(isValidData(data), "MIRIN: INVALID_DATA");
+        return _decodeData(data);
+    }
+
+    function _decodeData(bytes32 data)
+        internal
+        pure
+        returns (
+            uint8 decimals0,
+            uint8 decimals1,
+            uint240 A
+        )
+    {
+        decimals0 = uint8(uint256(data) >> 248);
+        decimals1 = uint8((uint256(data) >> 240) % (1 << 8));
+        A = uint240(uint256(data));
     }
 
     function computeLiquidity(
@@ -82,21 +109,6 @@ contract HybridCurve is IMirinCurve {
         uint8 tokenIn
     ) external pure override returns (uint256 amountIn) {
         amountIn = 0; // TODO
-    }
-
-    function decodeData(bytes32 data)
-        public
-        pure
-        returns (
-            uint8 decimals0,
-            uint8 decimals1,
-            uint240 A
-        )
-    {
-        require(isValidData(data), "MIRIN: INVALID_DATA");
-        decimals0 = uint8(uint256(data) >> 248);
-        decimals1 = uint8((uint256(data) >> 240) % (1 << 8));
-        A = uint240(uint256(data));
     }
 
     /**

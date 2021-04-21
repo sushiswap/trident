@@ -23,8 +23,20 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
     }
 
     function isValidData(bytes32 data) public pure override returns (bool) {
-        (uint8 weight0, uint8 weight1) = decodeData(data, 0);
+        (uint8 weight0, uint8 weight1) = _decodeData(data);
         return weight0 > 0 && weight1 > 0 && weight0 + weight1 == WEIGHT_SUM;
+    }
+
+    function decodeData(bytes32 data, uint8 tokenIn) public pure returns (uint8 weightIn, uint8 weightOut) {
+        require(isValidData(data), "MIRIN: INVALID_DATA");
+        (uint8 weight0, uint8 weight1) = _decodeData(data);
+        weightIn = tokenIn == 0 ? weight0 : weight1;
+        weightOut = tokenIn == 0 ? weight1 : weight0;
+    }
+
+    function _decodeData(bytes32 data) internal pure returns (uint8 weight0, uint8 weight1) {
+        weight0 = uint8(uint256(data) >> 248);
+        weight1 = uint8((uint256(data) >> 240) % (1 << 8));
     }
 
     function computeLiquidity(
@@ -87,14 +99,6 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
         uint256 weightRatio = MirinMath2.roundDiv(uint256(weightOut), uint256(weightIn));
         uint256 base = MirinMath2.roundDiv(uint256(reserveOut), uint256(reserveOut) - amountOut);
         uint256 pow = MirinMath2.power(base, weightRatio);
-        amountIn = uint256(reserveIn) * (pow - MirinMath2.BASE) / MirinMath2.BASE - (uint256(swapFee) * 10**15);
-    }
-
-    function decodeData(bytes32 data, uint8 tokenIn) public pure returns (uint8 weightIn, uint8 weightOut) {
-        require(isValidData(data), "MIRIN: INVALID_DATA");
-        uint8 weight0 = uint8(uint256(data) >> 248);
-        uint8 weight1 = uint8((uint256(data) >> 240) % (2 ^ 8));
-        weightIn = tokenIn == 0 ? weight0 : weight1;
-        weightOut = tokenIn == 0 ? weight1 : weight0;
+        amountIn = (uint256(reserveIn) * (pow - MirinMath2.BASE)) / MirinMath2.BASE - (uint256(swapFee) * 10**15);
     }
 }
