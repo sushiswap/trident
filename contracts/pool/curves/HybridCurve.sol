@@ -67,7 +67,7 @@ contract HybridCurve is IMirinCurve {
         bytes32 data
     ) external pure override returns (uint256) {
         (uint8 decimals0, uint8 decimals1, uint240 A) = decodeData(data);
-        uint256[] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
+        uint256[2] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
         return _getD(xp, A);
     }
 
@@ -78,7 +78,7 @@ contract HybridCurve is IMirinCurve {
         uint8 tokenIn
     ) external pure override returns (uint256) {
         (uint8 decimals0, uint8 decimals1, uint240 A) = decodeData(data);
-        uint256[] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
+        uint256[2] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
         uint256 D = _getD(xp, A);
         return _getYD(A, tokenIn, xp, D);
     }
@@ -92,8 +92,14 @@ contract HybridCurve is IMirinCurve {
         uint8 tokenIn
     ) external pure override returns (uint256) {
         (uint8 decimals0, uint8 decimals1, uint240 A) = decodeData(data);
-        uint256[] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
-        return _getY(tokenIn == 0 ? 0 : 1, tokenIn == 0 ? 1 : 0, amountIn * (1000 - swapFee), xp, A);
+        uint256[2] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
+        amountIn = amountIn * 10**(POOL_PRECISION_DECIMALS - (tokenIn != 0 ? decimals1 : decimals0));
+        uint256 x = xp[tokenIn] + amountIn;
+        uint256 y = _getY(x, xp, A);
+        uint256 dy = xp[1 - tokenIn] - y - 1;
+        dy = dy - (dy * swapFee / 1000);
+        dy = dy * 10**(POOL_PRECISION_DECIMALS - (tokenIn != 0 ? decimals0 : decimals1));
+        return dy;
     }
 
     function computeAmountIn(
@@ -119,31 +125,21 @@ contract HybridCurve is IMirinCurve {
      * See the StableSwap paper for details
      * @return the invariant, at the precision of the pool
      */
-    function _getD(uint256[] memory xp, uint256 _A) private pure returns (uint256) {
-        uint256 numTokens = xp.length;
-        uint256 s;
-        for (uint256 i = 0; i < numTokens; i++) {
-            s = s.add(xp[i]);
-        }
+    function _getD(uint256[2] memory xp, uint256 _A) private pure returns (uint256) {
+        uint256 s = xp[0] + xp[1];
         if (s == 0) {
             return 0;
         }
 
         uint256 prevD;
         uint256 D = s;
-        uint256 nA = _A.mul(numTokens);
+        uint256 nA = _A * 2;
 
         for (uint256 i = 0; i < MAX_LOOP_LIMIT; i++) {
-            uint256 dP = D;
-            for (uint256 j = 0; j < numTokens; j++) {
-                dP = dP.mul(D).div(xp[j].mul(numTokens));
-                // If we were to protect the division loss we would have to keep the denominator separate
-                // and divide at the end. However this leads to overflow with large numTokens or/and D.
-                // dP = dP * D * D * D * ... overflow!
-            }
+            uint256 dP = D ** 3 / (xp[0] * xp[1] * 4);
             prevD = D;
-            D = nA.mul(s).div(A_PRECISION).add(dP.mul(numTokens)).mul(D).div(
-                nA.div(A_PRECISION).sub(1).mul(D).add(numTokens.add(1).mul(dP))
+            D = nA.mul(s).div(A_PRECISION).add(dP * 2).mul(D).div(
+                nA.div(A_PRECISION).sub(1).mul(D).add(dP * 3)
             );
             if (D.within1(prevD)) {
                 break;
@@ -160,54 +156,28 @@ contract HybridCurve is IMirinCurve {
      *
      * @dev Originally https://github.com/saddle-finance/saddle-contract/blob/0b76f7fb519e34b878aa1d58cffc8d8dc0572c12/contracts/SwapUtils.sol#L432
      *
-     * @param tokenIndexFrom index of FROM token
-     * @param tokenIndexTo index of TO token
      * @param x the new total amount of FROM token
      * @param xp balances of the tokens in the pool
      * @return the amount of TO token that should remain in the pool
      */
     function _getY(
-        uint8 tokenIndexFrom,
-        uint8 tokenIndexTo,
         uint256 x,
-        uint256[] memory xp,
+        uint256[2] memory xp,
         uint256 _A
     ) private pure returns (uint256) {
-        uint256 numTokens = xp.length;
-
-        // uint256 _A = _getAPrecise(self);
         uint256 D = _getD(xp, _A);
-        //
-        // Below is identical to the original code
-        //
-        uint256 c = D;
-        uint256 s;
-        uint256 nA = numTokens.mul(_A);
+        uint256 nA = 2 * _A;
+        uint256 c = D**2 / (x * 2);
 
-        uint256 _x;
-        for (uint256 i = 0; i < numTokens; i++) {
-            if (i == tokenIndexFrom) {
-                _x = x;
-            } else if (i != tokenIndexTo) {
-                _x = xp[i];
-            } else {
-                continue;
-            }
-            s = s.add(_x);
-            c = c.mul(D).div(_x.mul(numTokens));
-            // If we were to protect the division loss we would have to keep the denominator separate
-            // and divide at the end. However this leads to overflow with large numTokens or/and D.
-            // c = c * D * D * D * ... overflow!
-        }
-        c = c.mul(D).div(nA.mul(numTokens).div(A_PRECISION));
-        uint256 b = s.add(D.mul(A_PRECISION).div(nA));
+        c = c * D * A_PRECISION / (nA * 2);
+        uint256 b = x + (D * A_PRECISION / nA);
         uint256 yPrev;
         uint256 y = D;
 
         // iterative approximation
         for (uint256 i = 0; i < MAX_LOOP_LIMIT; i++) {
             yPrev = y;
-            y = y.mul(y).add(c).div(y.mul(2).add(b).sub(D));
+            y = (y * y + c) / (y * 2 + b - D);
             if (y.within1(yPrev)) {
                 break;
             }
@@ -230,7 +200,7 @@ contract HybridCurve is IMirinCurve {
      * @dev Originally https://github.com/saddle-finance/saddle-contract/blob/0b76f7fb519e34b878aa1d58cffc8d8dc0572c12/contracts/SwapUtils.sol#L276
      *
      * @param _A the amplification coefficient * n * (n - 1). See the StableSwap paper for details.
-     * @param tokenIndex Index of token we are calculating for.
+     * @param tokenIn Index of token we are calculating for.
      * @param xp a precision-adjusted set of pool balances. Array should be
      * the same cardinality as the pool.
      * @param D the stableswap invariant
@@ -238,38 +208,21 @@ contract HybridCurve is IMirinCurve {
      */
     function _getYD(
         uint256 _A,
-        uint8 tokenIndex,
-        uint256[] memory xp,
+        uint8 tokenIn,
+        uint256[2] memory xp,
         uint256 D
     ) internal pure returns (uint256) {
-        uint256 numTokens = xp.length;
-
-        //
-        // Below is identical to the original code
-        //
-        uint256 c = D;
-        uint256 s;
-        uint256 nA = _A.mul(numTokens);
-
-        for (uint256 i = 0; i < numTokens; i++) {
-            if (i != tokenIndex) {
-                s = s.add(xp[i]);
-                c = c.mul(D).div(xp[i].mul(numTokens));
-                // If we were to protect the division loss we would have to keep the denominator separate
-                // and divide at the end. However this leads to overflow with large numTokens or/and D.
-                // c = c * D * D * D * ... overflow!
-            } else {
-                continue;
-            }
-        }
-        c = c.mul(D).div(nA.mul(numTokens).div(A_PRECISION));
+        uint256 nA = 2 * _A;
+        uint256 s = xp[1 - tokenIn];
+        uint256 c = D**2 / (s * 2);
+        c = c * D * A_PRECISION / (nA * 2);
 
         uint256 b = s.add(D.mul(A_PRECISION).div(nA));
         uint256 yPrev;
         uint256 y = D;
         for (uint256 i = 0; i < MAX_LOOP_LIMIT; i++) {
             yPrev = y;
-            y = y.mul(y).add(c).div(y.mul(2).add(b).sub(D));
+            y = (y * y + c) / (y * 2 + b - D);
             if (y.within1(yPrev)) {
                 break;
             }
@@ -282,9 +235,9 @@ contract HybridCurve is IMirinCurve {
         uint112 reserve1,
         uint8 decimals0,
         uint8 decimals1
-    ) private pure returns (uint256[] memory xp) {
-        xp = new uint256[](2);
+    ) private pure returns (uint256[2] memory xp) {
         xp[0] = uint256(reserve0) * 10**(POOL_PRECISION_DECIMALS - decimals0);
         xp[1] = uint256(reserve1) * 10**(POOL_PRECISION_DECIMALS - decimals1);
+        return xp;
     }
 }
