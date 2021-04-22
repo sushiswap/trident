@@ -2,7 +2,7 @@
 
 pragma solidity =0.8.2;
 
-contract FakeERC20Token{
+contract FakeERC20Token {
     string public name = "Fake ERC20 Test Token";
     string public symbol = "FE20";
     uint256 public totalSupply;

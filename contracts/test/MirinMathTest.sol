@@ -45,7 +45,12 @@ contract MirinMathTest is MirinMath {
         return optimalExp(x);
     }
 
-    function _power(uint256 _baseN, uint256 _baseD, uint32 _expN, uint32 _expD) public view returns (uint256, uint8) {
+    function _power(
+        uint256 _baseN,
+        uint256 _baseD,
+        uint32 _expN,
+        uint32 _expD
+    ) public view returns (uint256, uint8) {
         return power(_baseN, _baseD, _expN, _expD);
     }
 
