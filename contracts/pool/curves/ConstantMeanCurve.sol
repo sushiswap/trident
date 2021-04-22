@@ -16,27 +16,27 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
     using MirinMath2 for uint256;
 
     uint8 public constant MAX_SWAP_FEE = 100;
-    uint8 public constant WEIGHT_SUM = 100;
+    uint8 public constant WEIGHT_SUM = 10;
 
     function canUpdateData(bytes32, bytes32) external pure override returns (bool) {
         return false;
     }
 
     function isValidData(bytes32 data) public pure override returns (bool) {
-        (uint8 weight0, uint8 weight1) = _decodeData(data);
-        return weight0 > 0 && weight1 > 0 && weight0 + weight1 == WEIGHT_SUM;
+        (uint8 weight0, uint8 weight1) = decodeData(data, 0);
+        return _isValidData(weight0, weight1);
     }
 
     function decodeData(bytes32 data, uint8 tokenIn) public pure returns (uint8 weightIn, uint8 weightOut) {
-        require(isValidData(data), "MIRIN: INVALID_DATA");
-        (uint8 weight0, uint8 weight1) = _decodeData(data);
+        uint8 weight0 = uint8(uint256(data));
+        uint8 weight1 = WEIGHT_SUM - weight0;
+        require(_isValidData(weight0, weight1), "MIRIN: INVALID_DATA");
         weightIn = tokenIn == 0 ? weight0 : weight1;
         weightOut = tokenIn == 0 ? weight1 : weight0;
     }
 
-    function _decodeData(bytes32 data) internal pure returns (uint8 weight0, uint8 weight1) {
-        weight0 = uint8(uint256(data) >> 248);
-        weight1 = uint8((uint256(data) >> 240) % (1 << 8));
+    function _isValidData(uint8 weight0, uint8 weight1) internal pure returns (bool) {
+        return weight0 > 0 && weight1 > 0 && weight0 + weight1 == WEIGHT_SUM;
     }
 
     function computeLiquidity(
