@@ -27,42 +27,48 @@ contract HybridCurve is IMirinCurve {
     // Constant values used in ramping A calculations
     uint256 private constant A_PRECISION = 100;
 
-    modifier onlyValidData(bytes32 data) {
-        require(isValidData(data), "MIRIN: INVALID_DATA");
-        _;
+    function canUpdateData(bytes32 oldData, bytes32 newData) external pure override returns (bool) {
+        (uint8 oldDecimals0, uint8 oldDecimals1, ) = decodeData(oldData);
+        (uint8 newDecimals0, uint8 newDecimals1, uint240 newA) = decodeData(newData);
+        return oldDecimals0 == newDecimals0 && oldDecimals1 == newDecimals1 && newA > 0;
     }
 
-    function canUpdateData() external view override returns (bool) {
-        return true;
-    }
-
-    function isValidData(bytes32 data) public view override returns (bool) {
+    function isValidData(bytes32 data) public pure override returns (bool) {
         (uint8 decimals0, uint8 decimals1, uint240 A) = decodeData(data);
+        return _isValidData(decimals0, decimals1, A);
+    }
+
+    function decodeData(bytes32 data)
+        public
+        pure
+        returns (
+            uint8 decimals0,
+            uint8 decimals1,
+            uint240 A
+        )
+    {
+        decimals0 = uint8(uint256(data) >> 248);
+        decimals1 = uint8((uint256(data) >> 240) % (1 << 8));
+        A = uint240(uint256(data));
+        require(_isValidData(decimals0, decimals1, A), "MIRIN: INVALID_DATA");
+    }
+
+    function _isValidData(
+        uint8 decimals0,
+        uint8 decimals1,
+        uint240 A
+    ) internal pure returns (bool) {
         return decimals0 <= POOL_PRECISION_DECIMALS && decimals1 <= POOL_PRECISION_DECIMALS && A > 0;
-    }
-
-    function computeK(
-        uint112 reserve0,
-        uint112 reserve1,
-        bytes32 data
-    ) public view override onlyValidData(data) returns (uint256) {
-        (uint8 decimals0, uint8 decimals1, uint240 A) = decodeData(data);
-        uint256[2] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
-        return _getD(xp, A);
     }
 
     function computeLiquidity(
         uint112 reserve0,
         uint112 reserve1,
         bytes32 data
-    ) external view override onlyValidData(data) returns (uint256) {
+    ) external pure override returns (uint256) {
         (uint8 decimals0, uint8 decimals1, uint240 A) = decodeData(data);
         uint256[2] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
         return _getD(xp, A);
-    }
-
-    function computeLiquidity(uint256 k, bytes32 data) external view override onlyValidData(data) returns (uint256) {
-        return k;
     }
 
     function computePrice(
@@ -70,7 +76,7 @@ contract HybridCurve is IMirinCurve {
         uint112 reserve1,
         bytes32 data,
         uint8 tokenIn
-    ) external view override onlyValidData(data) returns (uint256) {
+    ) external pure override returns (uint256) {
         (uint8 decimals0, uint8 decimals1, uint240 A) = decodeData(data);
         uint256[2] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
         uint256 D = _getD(xp, A);
@@ -84,7 +90,7 @@ contract HybridCurve is IMirinCurve {
         bytes32 data,
         uint8 swapFee,
         uint8 tokenIn
-    ) external view override onlyValidData(data) returns (uint256) {
+    ) external pure override returns (uint256) {
         (uint8 decimals0, uint8 decimals1, uint240 A) = decodeData(data);
         uint256[2] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
         amountIn = amountIn * 10**(POOL_PRECISION_DECIMALS - (tokenIn != 0 ? decimals1 : decimals0));
@@ -103,22 +109,8 @@ contract HybridCurve is IMirinCurve {
         bytes32 data,
         uint8 swapFee,
         uint8 tokenIn
-    ) external view override onlyValidData(data) returns (uint256 amountIn) {
+    ) external pure override returns (uint256 amountIn) {
         amountIn = 0; // TODO
-    }
-
-    function decodeData(bytes32 data)
-        public
-        pure
-        returns (
-            uint8 decimals0,
-            uint8 decimals1,
-            uint240 A
-        )
-    {
-        decimals0 = uint8(uint256(data) >> 248);
-        decimals1 = uint8((uint256(data) >> 240) % (1 << 8));
-        A = uint240(uint256(data));
     }
 
     /**
@@ -172,7 +164,7 @@ contract HybridCurve is IMirinCurve {
         uint256 x,
         uint256[2] memory xp,
         uint256 _A
-    ) private view returns (uint256) {
+    ) private pure returns (uint256) {
         uint256 D = _getD(xp, _A);
         uint256 nA = 2 * _A;
         uint256 c = D**2 / (x * 2);

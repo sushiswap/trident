@@ -49,13 +49,12 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
         address _swapFeeTo
     ) MirinOptions(_token0, _token1, _curve, _curveData) MirinGovernance(_operator, _swapFee, _swapFeeTo) {}
 
-    function initialize(address, address) external {
+    function initialize(address, address) external pure {
         revert("MIRIN: NOT_IMPLEMENTED");
     }
 
     function updateCurveData(bytes32 data) external onlyOperator {
-        require(IMirinCurve(curve).canUpdateData(), "MIRIN: CANNOT_UPDATE_DATA");
-        require(IMirinCurve(curve).isValidData(data), "MIRIN: INVALID_CURVE_DATA");
+        require(IMirinCurve(curve).canUpdateData(curveData, data), "MIRIN: CANNOT_UPDATE_DATA");
         curveData = data;
     }
 
@@ -72,11 +71,10 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
         uint256 _kLast = kLast;
         if (_kLast != 0) {
             bytes32 _curveData = curveData;
-            uint256 liquidityNew = IMirinCurve(curve).computeLiquidity(_reserve0, _reserve1, _curveData);
-            uint256 liquidityLast = IMirinCurve(curve).computeLiquidity(_kLast, _curveData);
-            if (liquidityNew > liquidityLast) {
-                uint256 numerator = totalSupply * (liquidityNew - liquidityLast);
-                uint256 denominator = (liquidityNew * (swapFee * 2 - 1)) + liquidityLast; // 0.05% of increased liquidity
+            uint256 computed = IMirinCurve(curve).computeLiquidity(_reserve0, _reserve1, _curveData);
+            if (computed > _kLast) {
+                uint256 numerator = totalSupply * (computed - _kLast);
+                uint256 denominator = (computed * (swapFee * 2 - 1)) + _kLast; // 0.05% of increased liquidity
                 uint256 liquidity = numerator / denominator;
                 if (liquidity > 0) {
                     if (swapFeeTo == address(0)) {
@@ -100,18 +98,18 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
         _mintFee(_reserve0, _reserve1);
         uint256 _totalSupply = totalSupply;
         bytes32 _curveData = curveData;
-        uint256 k = IMirinCurve(curve).computeK(uint112(balance0), uint112(balance1), _curveData);
+        uint256 computed = IMirinCurve(curve).computeLiquidity(uint112(balance0), uint112(balance1), _curveData);
         if (_totalSupply == 0) {
-            liquidity = IMirinCurve(curve).computeLiquidity(k, _curveData) - MINIMUM_LIQUIDITY;
+            liquidity = computed - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
-            liquidity = IMirinCurve(curve).computeLiquidity(k, _curveData) - _totalSupply;
+            liquidity = computed - _totalSupply;
         }
         require(liquidity > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_MINTED");
         _mint(to, liquidity);
 
         _update(balance0, balance1, _reserve0, _reserve1);
-        kLast = k;
+        kLast = computed;
         emit Mint(msg.sender, amount0, amount1, to);
     }
 
@@ -144,9 +142,9 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
         require(amount0 > 0 && amount1 > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_BURNED");
 
         bytes32 _curveData = curveData;
-        uint256 k = IMirinCurve(curve).computeK(uint112(_reserve0 - amount0), uint112(_reserve1 - amount1), _curveData);
-        uint256 liquidity = IMirinCurve(curve).computeLiquidity(k, _curveData);
-        uint256 liquidityDelta = IMirinCurve(curve).computeLiquidity(kLast, _curveData) - liquidity;
+        uint256 liquidity =
+            IMirinCurve(curve).computeLiquidity(uint112(_reserve0 - amount0), uint112(_reserve1 - amount1), _curveData);
+        uint256 liquidityDelta = kLast - liquidity;
         if (liquidityDelta < liquidityBurned) {
             _transfer(address(this), to, liquidityBurned - liquidityDelta);
             liquidityBurned = liquidityDelta;
@@ -160,7 +158,7 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
         balance1 = IERC20(token1).balanceOf(address(this));
 
         _update(balance0, balance1, _reserve0, _reserve1);
-        kLast = k;
+        kLast = liquidity;
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
@@ -199,9 +197,9 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
             uint256 balance1Adjusted = balance1 * 1000 - amount1In * swapFee;
             bytes32 _curveData = curveData;
             require(
-                IMirinCurve(curve).computeK(uint112(balance0Adjusted), uint112(balance1Adjusted), _curveData) >=
-                    IMirinCurve(curve).computeK(_reserve0 * 1000, _reserve1 * 1000, _curveData),
-                "MIRIN: K"
+                IMirinCurve(curve).computeLiquidity(uint112(balance0Adjusted), uint112(balance1Adjusted), _curveData) >=
+                    IMirinCurve(curve).computeLiquidity(_reserve0 * 1000, _reserve1 * 1000, _curveData),
+                "MIRIN: LIQUIDITY"
             );
         }
 

@@ -5,6 +5,7 @@ pragma solidity =0.8.2;
 import "../../MirinMath.sol";
 import "../../interfaces/IMirinCurve.sol";
 import "../../libraries/FixedPoint.sol";
+import "../../libraries/MirinMath2.sol";
 
 /**
  * @dev Constant mean curve for tokens with different possible weights (k = r_0^w_0 * r_1^w1)
@@ -12,48 +13,39 @@ import "../../libraries/FixedPoint.sol";
  */
 contract ConstantMeanCurve is IMirinCurve, MirinMath {
     using FixedPoint for *;
+    using MirinMath2 for uint256;
 
     uint8 public constant MAX_SWAP_FEE = 100;
-    uint8 public constant WEIGHT_SUM = 100;
+    uint8 public constant WEIGHT_SUM = 10;
 
-    modifier onlyValidData(bytes32 data) {
-        require(isValidData(data), "MIRIN: INVALID_DATA");
-        _;
-    }
-
-    function canUpdateData() external view override returns (bool) {
+    function canUpdateData(bytes32, bytes32) external pure override returns (bool) {
         return false;
     }
 
-    function isValidData(bytes32 data) public view override returns (bool) {
+    function isValidData(bytes32 data) public pure override returns (bool) {
         (uint8 weight0, uint8 weight1) = decodeData(data, 0);
-        return weight0 > 0 && weight1 > 0 && weight0 + weight1 == WEIGHT_SUM;
+        return _isValidData(weight0, weight1);
     }
 
-    function computeK(
-        uint112 reserve0,
-        uint112 reserve1,
-        bytes32 data
-    ) external view override onlyValidData(data) returns (uint256) {
-        (uint8 weight0, uint8 weight1) = decodeData(data, 0);
-        return uint256(reserve0)**weight0 * uint256(reserve1)**weight1;
+    function decodeData(bytes32 data, uint8 tokenIn) public pure returns (uint8 weightIn, uint8 weightOut) {
+        uint8 weight0 = uint8(uint256(data));
+        uint8 weight1 = WEIGHT_SUM - weight0;
+        require(_isValidData(weight0, weight1), "MIRIN: INVALID_DATA");
+        weightIn = tokenIn == 0 ? weight0 : weight1;
+        weightOut = tokenIn == 0 ? weight1 : weight0;
+    }
+
+    function _isValidData(uint8 weight0, uint8 weight1) internal pure returns (bool) {
+        return weight0 > 0 && weight1 > 0 && weight0 + weight1 == WEIGHT_SUM;
     }
 
     function computeLiquidity(
         uint112 reserve0,
         uint112 reserve1,
         bytes32 data
-    ) external view override onlyValidData(data) returns (uint256) {
+    ) external view override returns (uint256) {
         (uint8 weight0, uint8 weight1) = decodeData(data, 0);
-        (uint256 result, uint8 precision) =
-            power(uint256(reserve0)**weight0 * uint256(reserve1)**weight1, 1, 1, weight0 + weight1);
-        return result >> precision;
-    }
-
-    function computeLiquidity(uint256 k, bytes32 data) external view override onlyValidData(data) returns (uint256) {
-        (uint8 weight0, uint8 weight1) = decodeData(data, 0);
-        (uint256 result, uint8 precision) = power(k, 1, 1, weight0 + weight1);
-        return result >> precision;
+        return generalExp(ln((weight0 * reserve0 + weight1 * reserve1) * FIXED_1) / (weight0 + weight1), MAX_PRECISION);
     }
 
     function computePrice(
@@ -61,7 +53,7 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
         uint112 reserve1,
         bytes32 data,
         uint8 tokenIn
-    ) external view override onlyValidData(data) returns (uint256) {
+    ) external pure override returns (uint256) {
         (uint8 weight0, uint8 weight1) = decodeData(data, tokenIn);
         return
             tokenIn == 0
@@ -76,15 +68,18 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
         bytes32 data,
         uint8 swapFee,
         uint8 tokenIn
-    ) external view override onlyValidData(data) returns (uint256 amountOut) {
+    ) external view override returns (uint256 amountOut) {
         require(amountIn > 0, "MIRIN: INSUFFICIENT_INPUT_AMOUNT");
-        require(reserve0 > 0 && reserve0 > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
+        require(reserve0 > 0 && reserve1 > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
         require(swapFee < MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
         (uint112 reserveIn, uint112 reserveOut) = tokenIn == 0 ? (reserve0, reserve1) : (reserve1, reserve0);
         (uint8 weightIn, uint8 weightOut) = decodeData(data, tokenIn);
-        (uint256 numerator, ) = power(reserveIn, 1, weightIn, weightOut);
-        (uint256 denominator, ) = power(reserveIn + amountIn * (1000 - swapFee), 1, weightIn, weightOut);
-        amountOut = reserveOut - (reserveOut * numerator) / denominator;
+
+        uint256 weightRatio = MirinMath2.roundDiv(uint256(weightIn), uint256(weightOut));
+        uint256 adjustedIn = MirinMath2.roundMul(amountIn, MirinMath2.BASE - (uint256(swapFee) * 10**15));
+        uint256 base = MirinMath2.roundDiv(uint256(reserveIn), uint256(reserveIn) + adjustedIn);
+        uint256 pow = MirinMath2.power(base, weightRatio);
+        amountOut = MirinMath2.roundMul(uint256(reserveOut), MirinMath2.BASE - pow);
     }
 
     function computeAmountIn(
@@ -94,20 +89,16 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
         bytes32 data,
         uint8 swapFee,
         uint8 tokenIn
-    ) external view override onlyValidData(data) returns (uint256 amountIn) {
+    ) external view override returns (uint256 amountIn) {
         require(amountOut > 0, "MIRIN: INSUFFICIENT_INPUT_AMOUNT");
-        require(reserve0 > 0 && reserve0 > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
+        require(reserve0 > 0 && reserve1 > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
         require(swapFee < MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
-        (uint112 reserveIn, uint112 reserveOut) = tokenIn == 0 ? (reserve0, reserve1) : (reserve1, reserve0);
         (uint8 weightIn, uint8 weightOut) = decodeData(data, tokenIn);
-        (uint256 result, uint8 precision) = power(reserveOut, reserveOut - amountOut, weightOut, weightIn);
-        amountIn = ((reserveIn * result) / (1 << precision) - reserveIn) * (1000 - swapFee);
-    }
+        (uint112 reserveIn, uint112 reserveOut) = tokenIn == 0 ? (reserve0, reserve1) : (reserve1, reserve0);
 
-    function decodeData(bytes32 data, uint8 tokenIn) public pure returns (uint8 weightIn, uint8 weightOut) {
-        uint8 weight0 = uint8(uint256(data) >> 248);
-        uint8 weight1 = uint8((uint256(data) >> 240) % (2 ^ 8));
-        weightIn = tokenIn == 0 ? weight0 : weight1;
-        weightOut = tokenIn == 0 ? weight1 : weight0;
+        uint256 weightRatio = MirinMath2.roundDiv(uint256(weightOut), uint256(weightIn));
+        uint256 base = MirinMath2.roundDiv(uint256(reserveOut), uint256(reserveOut) - amountOut);
+        uint256 pow = MirinMath2.power(base, weightRatio);
+        amountIn = (uint256(reserveIn) * (pow - MirinMath2.BASE)) / MirinMath2.BASE - (uint256(swapFee) * 10**15);
     }
 }

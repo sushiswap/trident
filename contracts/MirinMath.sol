@@ -7,20 +7,20 @@ pragma solidity =0.8.2;
  * @author Andre Cronje, LevX
  */
 contract MirinMath {
-    uint256 private constant ONE = 1;
-    uint256 private constant FIXED_1 = 0x080000000000000000000000000000000;
-    uint256 private constant FIXED_2 = 0x100000000000000000000000000000000;
-    uint256 private constant SQRT_1 = 13043817825332782212;
-    uint256 private constant LNX = 3988425491;
-    uint256 private constant LOG_10_2 = 3010299957;
-    uint256 private constant LOG_E_2 = 6931471806;
-    uint256 private constant BASE = 1e10;
+    uint256 internal constant ONE = 1;
+    uint256 internal constant FIXED_1 = 0x080000000000000000000000000000000;
+    uint256 internal constant FIXED_2 = 0x100000000000000000000000000000000;
+    uint256 internal constant SQRT_1 = 13043817825332782212;
+    uint256 internal constant LNX = 3988425491;
+    uint256 internal constant LOG_10_2 = 3010299957;
+    uint256 internal constant LOG_E_2 = 6931471806;
+    uint256 internal constant BASE = 1e10;
 
-    uint256 private constant MAX_NUM = 0x200000000000000000000000000000000;
-    uint8 private constant MIN_PRECISION = 32;
-    uint8 private constant MAX_PRECISION = 127;
-    uint256 private constant OPT_LOG_MAX_VAL = 0x15bf0a8b1457695355fb8ac404e7a79e3;
-    uint256 private constant OPT_EXP_MAX_VAL = 0x800000000000000000000000000000000;
+    uint256 internal constant MAX_NUM = 0x200000000000000000000000000000000;
+    uint8 internal constant MIN_PRECISION = 32;
+    uint8 internal constant MAX_PRECISION = 127;
+    uint256 internal constant OPT_LOG_MAX_VAL = 0x15bf0a8b1457695355fb8ac404e7a79e3;
+    uint256 internal constant OPT_EXP_MAX_VAL = 0x800000000000000000000000000000000;
 
     // Auto-generated via 'PrintMaxExpArray.py'
     uint256[128] private maxExpArray;

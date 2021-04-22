@@ -3,23 +3,15 @@
 pragma solidity >=0.5.0;
 
 interface IMirinCurve {
-    function canUpdateData() external view returns (bool);
+    function canUpdateData(bytes32 oldData, bytes32 newData) external pure returns (bool);
 
-    function isValidData(bytes32 data) external view returns (bool);
-
-    function computeK(
-        uint112 reserve0,
-        uint112 reserve1,
-        bytes32 data
-    ) external view returns (uint256);
+    function isValidData(bytes32 data) external pure returns (bool);
 
     function computeLiquidity(
         uint112 reserve0,
         uint112 reserve1,
         bytes32 data
     ) external view returns (uint256);
-
-    function computeLiquidity(uint256 k, bytes32 data) external view returns (uint256);
 
     function computePrice(
         uint112 reserve0,
