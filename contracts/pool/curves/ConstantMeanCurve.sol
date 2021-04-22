@@ -71,9 +71,10 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
     ) external view override returns (uint256 amountOut) {
         require(amountIn > 0, "MIRIN: INSUFFICIENT_INPUT_AMOUNT");
         require(reserve0 > 0 && reserve1 > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
-        require(swapFee < MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
+        require(swapFee <= MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
         (uint112 reserveIn, uint112 reserveOut) = tokenIn == 0 ? (reserve0, reserve1) : (reserve1, reserve0);
         (uint8 weightIn, uint8 weightOut) = decodeData(data, tokenIn);
+        require(amountIn <= reserveIn / 2, "MIRIN: ERR_MAX_IN_RATIO");
 
         uint256 weightRatio = MirinMath2.roundDiv(uint256(weightIn), uint256(weightOut));
         uint256 adjustedIn = MirinMath2.roundMul(amountIn, MirinMath2.BASE - (uint256(swapFee) * 10**15));
@@ -92,13 +93,14 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
     ) external view override returns (uint256 amountIn) {
         require(amountOut > 0, "MIRIN: INSUFFICIENT_INPUT_AMOUNT");
         require(reserve0 > 0 && reserve1 > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
-        require(swapFee < MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
-        (uint8 weightIn, uint8 weightOut) = decodeData(data, tokenIn);
+        require(swapFee <= MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
         (uint112 reserveIn, uint112 reserveOut) = tokenIn == 0 ? (reserve0, reserve1) : (reserve1, reserve0);
+        (uint8 weightIn, uint8 weightOut) = decodeData(data, tokenIn);
+        require(amountOut <= reserveOut / 3, "MIRIN: ERR_MAX_OUT_RATIO");
 
         uint256 weightRatio = MirinMath2.roundDiv(uint256(weightOut), uint256(weightIn));
         uint256 base = MirinMath2.roundDiv(uint256(reserveOut), uint256(reserveOut) - amountOut);
         uint256 pow = MirinMath2.power(base, weightRatio);
-        amountIn = (uint256(reserveIn) * (pow - MirinMath2.BASE)) / MirinMath2.BASE - (uint256(swapFee) * 10**15);
+        amountIn = (uint256(reserveIn) * (pow - MirinMath2.BASE)) / (MirinMath2.BASE - (uint256(swapFee) * 10**15));
     }
 }
