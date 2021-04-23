@@ -413,16 +413,19 @@ describe("ConstantMeanCurve additional Test", function () {
                 .div(w0 + w1)
                 .mul(Fixed1.toHexString())
                 .floor();
-            let lnLiq1 = lnLiq.mul(1 + Math.pow(10, -9));
-            let lnLiq2 = lnLiq.mul(1 - Math.pow(10, -9));
 
-            let js1 = lnLiq1.div(Fixed1.toHexString()).exp().floor();
-            let js2 = lnLiq2.div(Fixed1.toHexString()).exp().floor();
+            js = lnLiq.div(Fixed1.toHexString()).exp().floor();
+            let js1 = js.mul(1 + Math.pow(10, -8)).floor();
+            let js2 = js.mul(1 - Math.pow(10, -8)).floor();
             con = await test.computeLiquidity(r0, r1, data);
 
-            expect(con).to.be.lte(BigNumber.from(js1.toHex()));
-            expect(con).to.be.gte(BigNumber.from(js2.toHex()));
-
+            if(con.gte(Math.pow(10,10))) {
+                expect(con).to.be.lte(BigNumber.from(js1.toHex()));
+                expect(con).to.be.gte(BigNumber.from(js2.toHex()));
+            } else {
+                expect(con).to.be.lte(BigNumber.from(js1.add(10).toHex()));
+                expect(con).to.be.gte(BigNumber.from(js2.sub(10).toHex()));
+            }
             n++;
         }
 
