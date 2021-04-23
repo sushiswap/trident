@@ -4,18 +4,12 @@ pragma solidity =0.8.2;
 
 library MirinMath2 {
     // TODO Checklist.
-    // uint256 public constant MIN_WEIGHT = BASE;
-    // uint256 public constant MAX_WEIGHT = BASE * 50;
-    // uint256 public constant MAX_TOTAL_WEIGHT = BASE * 50;
     // uint256 public constant MIN_BALANCE = BASE / 10**12;
-    // uint256 public constant MAX_IN_RATIO = BASE / 2;
-    // uint256 public constant MAX_OUT_RATIO = (BASE / 3) + 1 wei;
 
     uint256 public constant BASE = 10**18;
     uint256 public constant MIN_POWER_BASE = 1 wei;
     uint256 public constant MAX_POWER_BASE = (2 * BASE) - 1 wei;
     uint256 public constant POWER_PRECISION = BASE / 10**10;
-
 
     function toInt(uint256 a) internal pure returns (uint256) {
         return a / BASE;
@@ -37,12 +31,11 @@ library MirinMath2 {
         return c1 / b;
     }
 
-    function power(uint256 base, uint256 exp) internal pure returns (uint256)
-    {
+    function power(uint256 base, uint256 exp) internal pure returns (uint256) {
         require(base >= MIN_POWER_BASE, "ERR_POWER_BASE_TOO_LOW");
         require(base <= MAX_POWER_BASE, "ERR_POWER_BASE_TOO_HIGH");
 
-        uint256 whole  = toFloor(exp);   
+        uint256 whole = toFloor(exp);
         uint256 remain = exp - whole;
 
         uint256 wholePow = powInt(base, toInt(whole));
@@ -55,8 +48,7 @@ library MirinMath2 {
         return roundMul(wholePow, partialResult);
     }
 
-    function powInt(uint256 a, uint256 n) private pure returns (uint256)
-    {
+    function powInt(uint256 a, uint256 n) private pure returns (uint256) {
         uint256 z = n % 2 != 0 ? a : BASE;
 
         for (n /= 2; n != 0; n /= 2) {
@@ -69,10 +61,13 @@ library MirinMath2 {
         return z;
     }
 
-    function powFrac(uint256 base, uint256 exp, uint256 precision) private pure returns (uint256)
-    {
+    function powFrac(
+        uint256 base,
+        uint256 exp,
+        uint256 precision
+    ) private pure returns (uint256) {
         uint256 a = exp;
-        (uint256 x, bool xneg)  = base >= BASE ? (base - BASE, false) : (BASE - base, true);
+        (uint256 x, bool xneg) = base >= BASE ? (base - BASE, false) : (BASE - base, true);
         uint256 term = BASE;
         uint256 sum = term;
         bool negative = false;
@@ -93,5 +88,5 @@ library MirinMath2 {
             }
         }
         return sum;
-    }     
+    }
 }

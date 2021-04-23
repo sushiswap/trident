@@ -3,14 +3,13 @@ const { ethers } = require("hardhat");
 const { BigNumber } = require("ethers");
 const { Decimal } = require("decimal.js");
 Decimal18 = Decimal.clone({ precision: 18 });
+Decimal40 = Decimal.clone({ precision: 40 });
 
 let aIn, aOut, rIn, rOut, swapFee, wI, wO;
 
 function randRA() {
-    let RA = 0,
-        i,
-        j,
-        dec;
+    let i, j, dec;
+    let RA = 0;
     dec = Math.floor(Math.random() * 28) + 6;
     for (i = 6; i <= dec; i++) {
         j = Math.floor(Math.random() * 10); //0~9
@@ -19,6 +18,23 @@ function randRA() {
         RA = BigNumber.from(RA).add(BigNumber.from(10).pow(i).mul(j));
     }
     return RA;
+}
+
+function randRAforCL() {
+    const Uint112Max = BigNumber.from(2).pow(112).sub(1);
+    let i, j, dec;
+    while (true) {
+        let RA = 0;
+        dec = Math.floor(Math.random() * 35);
+        for (i = 0; i <= dec; i++) {
+            j = Math.floor(Math.random() * 10); //0~9
+            if (i === 0 && j === 0) j = 1;
+            RA = BigNumber.from(RA).add(BigNumber.from(10).pow(i).mul(j));
+        }
+        if (Uint112Max.gte(RA)) {
+            return RA;
+        }
+    }
 }
 
 function randParams() {
@@ -30,6 +46,17 @@ function randParams() {
     rOut = randRA();
     aIn = randRA();
     aOut = randRA();
+}
+
+function randParamsforCL() {
+    wI = Math.floor(Math.random() * 99) + 1; //1~99
+    wO = 100 - wI; //1~99
+    swapFee = Math.floor(Math.random() * 101); //0~100
+
+    rIn = randRAforCL();
+    rOut = randRAforCL();
+    aIn = randRAforCL();
+    aOut = randRAforCL();
 }
 
 function getData() {
@@ -49,7 +76,6 @@ describe("MirinMath2 Test", function () {
     });
 
     it("Should fail if decodeData is not valid", async function () {
-        let data;
         wO = 0;
         wI = 100;
         data = getData();
@@ -133,7 +159,7 @@ describe("MirinMath2 Test", function () {
 
     it("Should compute amoutOut value as precisely as possible", async function () {
         n = 0;
-        while (n < 1000) {
+        while (n < 2000) {
             randParams();
             data = getData();
             if (BigNumber.from(aIn).gt(rIn.div(2))) {
@@ -232,7 +258,7 @@ describe("MirinMath2 Test", function () {
 
     it("Should compute amoutIn value as precisely as possible", async function () {
         n = 0;
-        while (n < 1000) {
+        while (n < 2000) {
             randParams();
             data = getData();
             if (BigNumber.from(aOut).gt(BigNumber.from(rOut).div(3))) {
@@ -281,5 +307,129 @@ describe("MirinMath2 Test", function () {
                 if (!js.isZero()) n++;
             }
         }
+    });
+});
+
+describe("ConstantMeanCurve additional Test", function () {
+    let CMC, test;
+    let n, js, con, data;
+    const BASE = BigNumber.from(10).pow(18);
+
+    before(async function () {
+        CMC = await ethers.getContractFactory("ConstantMeanCurve");
+        test = await CMC.deploy();
+    });
+
+    it("Should fail if data is not valid through isValidData fn", async function () {
+        wO = 0;
+        wI = 100;
+        data = getData();
+        await expect(test.isValidData(data)).to.be.revertedWith("MIRIN: INVALID_DATA");
+
+        wO = 100;
+        wI = 0;
+        data = getData();
+        await expect(test.isValidData(data)).to.be.revertedWith("MIRIN: INVALID_DATA");
+
+        wO = 49;
+        wI = 63;
+        data = getData();
+        await expect(test.isValidData(data)).to.be.revertedWith("MIRIN: INVALID_DATA");
+    });
+
+    it("Should pass true if data is valid through isValidData fn", async function () {
+        n = 0;
+        while (n < 100) {
+            randParams();
+            data = getData();
+            expect(await test.isValidData(data)).to.be.true;
+            n++;
+        }
+    });
+
+    it("Should compute price as precisely as possible", async function () {
+        let r0, r1, w0, w1;
+        n = 0;
+        while (n < 100) {
+            randParams();
+            data = getData();
+            r0 = rIn;
+            r1 = rOut;
+            w0 = wI;
+            w1 = wO;
+
+            con = await test.computePrice(r0, r1, data, 0);
+            js = r1.mul(BigNumber.from(2).pow(112)).mul(w0).div(r0).div(w1);
+            expect(con).to.eq(js);
+            n++;
+        }
+        n = 0;
+        while (n < 100) {
+            randParams();
+            data = getData();
+            r0 = rOut;
+            r1 = rIn;
+            w0 = wO;
+            w1 = wI;
+
+            con = await test.computePrice(r0, r1, data, 1);
+            js = r0.mul(BigNumber.from(2).pow(112)).mul(w1).div(r1).div(w0);
+            expect(con).to.eq(js);
+            n++;
+        }
+    });
+
+    it("Should fail to compute Liquidity when insufficient liquidity", async function () {
+        randParamsforCL();
+        data = getData();
+        rIn = 0;
+
+        await expect(test.computeLiquidity(rIn, rOut, data)).to.be.revertedWith("MIRIN: INSUFFICIENT_LIQUIDITY");
+
+        randParamsforCL();
+        data = getData();
+        rOut = 0;
+
+        await expect(test.computeLiquidity(rIn, rOut, data)).to.be.revertedWith("MIRIN: INSUFFICIENT_LIQUIDITY");
+    });
+
+    it("Should compute Liquidity as precisely as possible", async function () {
+        const Fixed1 = BigNumber.from(2).pow(127);
+        let r0, r1, w0, w1;
+        n = 0;
+
+        while (n < 1000) {
+            randParamsforCL();
+            r0 = rIn;
+            r1 = rOut;
+            w0 = wI;
+            w1 = wO;
+            data = getData();
+
+            let lnLiq = Decimal40(r0.toHexString())
+                .ln()
+                .mul(w0)
+                .add(Decimal40(r1.toHexString()).ln().mul(w1))
+                .div(w0 + w1)
+                .mul(Fixed1.toHexString())
+                .floor();
+            let lnLiq1 = lnLiq.mul(1 + Math.pow(10, -9));
+            let lnLiq2 = lnLiq.mul(1 - Math.pow(10, -9));
+
+            let js1 = lnLiq1.div(Fixed1.toHexString()).exp().floor();
+            let js2 = lnLiq2.div(Fixed1.toHexString()).exp().floor();
+            con = await test.computeLiquidity(r0, r1, data);
+
+            expect(con).to.be.lte(BigNumber.from(js1.toHex()));
+            expect(con).to.be.gte(BigNumber.from(js2.toHex()));
+
+            n++;
+        }
+
+        randParamsforCL();
+        rIn = 1;
+        rOut = 1;
+        data = getData();
+        expect(await test.computeLiquidity(rIn, rOut, data)).to.be.eq(1);
     });
 });
