@@ -19,7 +19,6 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
     uint8 public constant WEIGHT_SUM = 100;
 
     function canUpdateData(bytes32, bytes32) external pure override returns (bool) {
-        //TODO:
         return false;
     }
 
@@ -29,15 +28,15 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
     }
 
     function decodeData(bytes32 data, uint8 tokenIn) public pure returns (uint8 weightIn, uint8 weightOut) {
-        uint8 weight0 = uint8(uint256(data) >> 248);
-        uint8 weight1 = uint8((uint256(data) >> 240) % (1 << 8));
+        uint8 weight0 = uint8(uint256(data));
+        uint8 weight1 = WEIGHT_SUM - weight0;
         require(_isValidData(weight0, weight1), "MIRIN: INVALID_DATA");
         weightIn = tokenIn == 0 ? weight0 : weight1;
         weightOut = tokenIn == 0 ? weight1 : weight0;
     }
 
     function _isValidData(uint8 weight0, uint8 weight1) internal pure returns (bool) {
-        return weight0 > 0 && weight1 > 0 && weight0 + weight1 == WEIGHT_SUM;
+        return weight0 > 0 && weight1 > 0;
     }
 
     function computeLiquidity(
@@ -45,30 +44,23 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
         uint112 reserve1,
         bytes32 data
     ) external view override returns (uint256) {
-        require(reserve0 > 0 && reserve1 > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
-        if (reserve0 == 1 && reserve1 == 1) return 1;
-
-        uint256 maxVal = OPT_EXP_MAX_VAL - 1;
         (uint8 weight0, uint8 weight1) = decodeData(data, 0);
+        uint256 maxVal = OPT_EXP_MAX_VAL - 1;
         uint256 lnR0 = ln(reserve0 * FIXED_1);
         uint256 lnR1 = ln(reserve1 * FIXED_1);
         uint256 lnLiq = (lnR0 * weight0 + lnR1 * weight1) / (weight0 + weight1);
-        uint8 i = uint8(lnLiq / maxVal);
-        uint256 res = lnLiq % maxVal; //lnLiq = maxVal * i + res
+        uint8 loop = uint8(lnLiq / maxVal);
+        uint256 res = lnLiq % maxVal; //lnLiq = maxVal * loop + res
 
         uint256 liq = optimalExp(res);
 
-        if (i > 0) {
+        if (loop > 0) {
             uint256 maxValLiq = optimalExp(maxVal);
             uint256 limit = type(uint256).max / maxValLiq;
-            for (uint8 j = 0; j < i; j++) {
-                if (liq <= limit) {
-                    liq = (liq * maxValLiq) / FIXED_1;
-                } else {
-                    uint256 t = liq / limit;
-                    liq = liq - (limit * t); //LiqIni = limit * t + LiqRes   (t >= 1)
-                    liq = ((limit * maxValLiq) / FIXED_1) * t + ((liq * maxValLiq) / FIXED_1);
-                }
+            for (uint8 i = 0; i < loop; i++) {
+                uint256 t = liq / limit;
+                liq = liq - (limit * t);    //liqIni = limit * t + liqRes
+                liq = ((limit * maxValLiq) / FIXED_1) * t + ((liq * maxValLiq) / FIXED_1);
             }
         }
         return liq / FIXED_1;

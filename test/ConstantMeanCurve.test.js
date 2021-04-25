@@ -1,6 +1,6 @@
 const { expect, assert } = require("chai");
 const { ethers } = require("hardhat");
-const { BigNumber } = require("ethers");
+const { BigNumber, utils } = require("ethers");
 const { Decimal } = require("decimal.js");
 Decimal18 = Decimal.clone({ precision: 18 });
 Decimal40 = Decimal.clone({ precision: 40 });
@@ -60,9 +60,8 @@ function randParamsforCL() {
 }
 
 function getData() {
-    let d1 = BigNumber.from(2).pow(240).mul(wO).add(BigNumber.from(2).pow(248).mul(wI)).toHexString();
-    if (ethers.utils.isHexString(d1, 32)) return d1;
-    else return ethers.utils.hexZeroPad(d1, 32);
+    let d1 = BigNumber.from(wI).toHexString();
+    return utils.hexZeroPad(d1, 32);
 }
 
 describe("MirinMath2 Test", function () {
@@ -83,11 +82,6 @@ describe("MirinMath2 Test", function () {
 
         wO = 100;
         wI = 0;
-        data = getData();
-        await expect(test.decodeData(data, 0)).to.be.revertedWith("MIRIN: INVALID_DATA");
-
-        wO = 23;
-        wI = 70;
         data = getData();
         await expect(test.decodeData(data, 0)).to.be.revertedWith("MIRIN: INVALID_DATA");
     });
@@ -320,6 +314,13 @@ describe("ConstantMeanCurve additional Test", function () {
         test = await CMC.deploy();
     });
 
+    it("Should return false whatever data is in canUpdateData fn", async function () {
+        let p1 = utils.hexZeroPad(BigNumber.from(13579).toHexString(), 32);
+        let p2 = utils.formatBytes32String("Hello, world!");
+
+        expect(await test.canUpdateData(p1, p2)).to.be.false;
+    });
+
     it("Should fail if data is not valid through isValidData fn", async function () {
         wO = 0;
         wI = 100;
@@ -328,11 +329,6 @@ describe("ConstantMeanCurve additional Test", function () {
 
         wO = 100;
         wI = 0;
-        data = getData();
-        await expect(test.isValidData(data)).to.be.revertedWith("MIRIN: INVALID_DATA");
-
-        wO = 49;
-        wI = 63;
         data = getData();
         await expect(test.isValidData(data)).to.be.revertedWith("MIRIN: INVALID_DATA");
     });
@@ -379,26 +375,12 @@ describe("ConstantMeanCurve additional Test", function () {
         }
     });
 
-    it("Should fail to compute Liquidity when insufficient liquidity", async function () {
-        randParamsforCL();
-        data = getData();
-        rIn = 0;
-
-        await expect(test.computeLiquidity(rIn, rOut, data)).to.be.revertedWith("MIRIN: INSUFFICIENT_LIQUIDITY");
-
-        randParamsforCL();
-        data = getData();
-        rOut = 0;
-
-        await expect(test.computeLiquidity(rIn, rOut, data)).to.be.revertedWith("MIRIN: INSUFFICIENT_LIQUIDITY");
-    });
-
     it("Should compute Liquidity as precisely as possible", async function () {
         const Fixed1 = BigNumber.from(2).pow(127);
         let r0, r1, w0, w1;
         n = 0;
 
-        while (n < 1000) {
+        while (n < 700) {
             randParamsforCL();
             r0 = rIn;
             r1 = rOut;
@@ -428,11 +410,5 @@ describe("ConstantMeanCurve additional Test", function () {
             }
             n++;
         }
-
-        randParamsforCL();
-        rIn = 1;
-        rOut = 1;
-        data = getData();
-        expect(await test.computeLiquidity(rIn, rOut, data)).to.be.eq(1);
     });
 });

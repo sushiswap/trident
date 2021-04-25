@@ -23,24 +23,6 @@ describe("MirinMath Test", function () {
         test = await Test.deploy();
     });
 
-    it("initialize, findPositionInMaxExpArray", async function () {
-        con = await test._findPositionInMaxExpArray(0);
-        expect(con).to.be.equal(127);
-        await expect(test._findPositionInMaxExpArray(1)).to.be.reverted;
-
-        await test._initialize();
-        expect(await test._findPositionInMaxExpArray(1)).to.be.equal(127);
-
-        temp = BigNumber.from("0x0292c5bdd3b92ec810287b1b3fffffffff").sub(100); //maxExpArray[89] = 0x0292c5bdd3b92ec810287b1b3fffffffff
-        expect(await test._findPositionInMaxExpArray(temp)).to.be.equal(89);
-
-        temp = BigNumber.from("0x075af62cbac95f7dfa7fffffffffffffff"); //maxExpArray[64] = 0x075af62cbac95f7dfa7fffffffffffffff
-        expect(await test._findPositionInMaxExpArray(temp)).to.be.equal(64);
-
-        temp = BigNumber.from("0x1c35fedd14ffffffffffffffffffffffff").add(1); //maxExpArray[32] = 0x1c35fedd14ffffffffffffffffffffffff
-        await expect(test._findPositionInMaxExpArray(temp)).to.be.reverted;
-    });
-
     it("max, min", async function () {
         expect(await test._max(10, 28)).to.be.equal(28);
         expect(await test._max(1896, 71)).to.be.equal(1896);
@@ -130,8 +112,6 @@ describe("MirinMath Test", function () {
         assert.isTrue(con.isZero());
     });
 
-    //generalEXP        TODO
-
     it("optimalLog", async function () {
         await expect(test._optimalLog(Fixed1.sub(1))).to.be.revertedWith("MIRIN: Outranged");
         await expect(test._optimalLog(Fixed4)).to.be.reverted;
@@ -173,8 +153,6 @@ describe("MirinMath Test", function () {
             "MIRIN: Outranged"
         );
     });
-
-    //power            TODO
 
     it("sqrt", async function () {
         i = 0;
