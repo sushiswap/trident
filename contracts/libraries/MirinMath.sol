@@ -6,7 +6,7 @@ pragma solidity =0.8.2;
  * @dev Originally DeriswapV1Math
  * @author Andre Cronje, LevX
  */
-contract MirinMath {
+library MirinMath {
     uint256 internal constant ONE = 1;
     uint256 internal constant FIXED_1 = 0x080000000000000000000000000000000;
     uint256 internal constant FIXED_2 = 0x100000000000000000000000000000000;
@@ -119,7 +119,7 @@ contract MirinMath {
      * - For example: log(250) = log(e^4 * e^1 * e^0.5 * 1.021692859) = 4 + 1 + 0.5 + log(1 + 0.021692859)
      */
     function optimalLog(uint256 x) internal pure returns (uint256) {
-        require(FIXED_1 <= x, "MIRIN: Outranged");
+        require(FIXED_1 <= x, "MIRIN: OVERFLOW");
         uint256 res = 0;
 
         uint256 y;
@@ -192,7 +192,7 @@ contract MirinMath {
      * - For example: e^5.521692859 = e^(4 + 1 + 0.5 + 0.021692859) = e^4 * e^1 * e^0.5 * e^0.021692859
      */
     function optimalExp(uint256 x) internal pure returns (uint256) {
-        require(x <= OPT_EXP_MAX_VAL - 1, "MIRIN: Outranged");
+        require(x <= OPT_EXP_MAX_VAL - 1, "MIRIN: OVERFLOW");
         uint256 res = 0;
 
         uint256 y;

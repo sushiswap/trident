@@ -32,8 +32,8 @@ library MirinMath2 {
     }
 
     function power(uint256 base, uint256 exp) internal pure returns (uint256) {
-        require(base >= MIN_POWER_BASE, "ERR_POWER_BASE_TOO_LOW");
-        require(base <= MAX_POWER_BASE, "ERR_POWER_BASE_TOO_HIGH");
+        require(base >= MIN_POWER_BASE, "MIRIN: POWER_BASE_TOO_LOW");
+        require(base <= MAX_POWER_BASE, "MIRIN: POWER_BASE_TOO_HIGH");
 
         uint256 whole = toFloor(exp);
         uint256 remain = exp - whole;

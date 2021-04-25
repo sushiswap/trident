@@ -2,18 +2,17 @@
 
 pragma solidity =0.8.2;
 
-import "../../MirinMath.sol";
 import "../../interfaces/IMirinCurve.sol";
 import "../../libraries/FixedPoint.sol";
+import "../../libraries/MirinMath.sol";
 import "../../libraries/MirinMath2.sol";
 
 /**
  * @dev Constant mean curve for tokens with different possible weights (k = r_0^w_0 * r_1^w1)
  * @author LevX
  */
-contract ConstantMeanCurve is IMirinCurve, MirinMath {
+contract ConstantMeanCurve is IMirinCurve {
     using FixedPoint for *;
-    using MirinMath2 for uint256;
 
     uint8 public constant MAX_SWAP_FEE = 100;
     uint8 public constant WEIGHT_SUM = 100;
@@ -22,21 +21,16 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
         return false;
     }
 
-    function isValidData(bytes32 data) public pure override returns (bool) {
+    function validateData(bytes32 data) public override {
         decodeData(data, 0);
-        return true;
     }
 
     function decodeData(bytes32 data, uint8 tokenIn) public pure returns (uint8 weightIn, uint8 weightOut) {
         uint8 weight0 = uint8(uint256(data));
         uint8 weight1 = WEIGHT_SUM - weight0;
-        require(_isValidData(weight0, weight1), "MIRIN: INVALID_DATA");
+        require(weight0 > 0 && weight1 > 0, "MIRIN: INVALID_DATA");
         weightIn = tokenIn == 0 ? weight0 : weight1;
         weightOut = tokenIn == 0 ? weight1 : weight0;
-    }
-
-    function _isValidData(uint8 weight0, uint8 weight1) internal pure returns (bool) {
-        return weight0 > 0 && weight1 > 0;
     }
 
     function computeLiquidity(
@@ -45,25 +39,25 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
         bytes32 data
     ) external view override returns (uint256) {
         (uint8 weight0, uint8 weight1) = decodeData(data, 0);
-        uint256 maxVal = OPT_EXP_MAX_VAL - 1;
-        uint256 lnR0 = ln(reserve0 * FIXED_1);
-        uint256 lnR1 = ln(reserve1 * FIXED_1);
+        uint256 maxVal = MirinMath.OPT_EXP_MAX_VAL - 1;
+        uint256 lnR0 = MirinMath.ln(reserve0 * MirinMath.FIXED_1);
+        uint256 lnR1 = MirinMath.ln(reserve1 * MirinMath.FIXED_1);
         uint256 lnLiq = (lnR0 * weight0 + lnR1 * weight1) / (weight0 + weight1);
         uint8 loop = uint8(lnLiq / maxVal);
         uint256 res = lnLiq % maxVal; //lnLiq = maxVal * loop + res
 
-        uint256 liq = optimalExp(res);
+        uint256 liq = MirinMath.optimalExp(res);
 
         if (loop > 0) {
-            uint256 maxValLiq = optimalExp(maxVal);
+            uint256 maxValLiq = MirinMath.optimalExp(maxVal);
             uint256 limit = type(uint256).max / maxValLiq;
             for (uint8 i = 0; i < loop; i++) {
                 uint256 t = liq / limit;
-                liq = liq - (limit * t);    //liqIni = limit * t + liqRes
-                liq = ((limit * maxValLiq) / FIXED_1) * t + ((liq * maxValLiq) / FIXED_1);
+                liq = liq - (limit * t); //liqIni = limit * t + liqRes
+                liq = ((limit * maxValLiq) / MirinMath.FIXED_1) * t + ((liq * maxValLiq) / MirinMath.FIXED_1);
             }
         }
-        return liq / FIXED_1;
+        return liq / MirinMath.FIXED_1;
     }
 
     function computePrice(

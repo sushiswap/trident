@@ -33,9 +33,8 @@ contract HybridCurve is IMirinCurve {
         return oldDecimals0 == newDecimals0 && oldDecimals1 == newDecimals1 && newA > 0;
     }
 
-    function isValidData(bytes32 data) public pure override returns (bool) {
-        (uint8 decimals0, uint8 decimals1, uint240 A) = decodeData(data);
-        return _isValidData(decimals0, decimals1, A);
+    function validateData(bytes32 data) public override {
+        decodeData(data);
     }
 
     function decodeData(bytes32 data)
@@ -50,15 +49,10 @@ contract HybridCurve is IMirinCurve {
         decimals0 = uint8(uint256(data) >> 248);
         decimals1 = uint8((uint256(data) >> 240) % (1 << 8));
         A = uint240(uint256(data));
-        require(_isValidData(decimals0, decimals1, A), "MIRIN: INVALID_DATA");
-    }
-
-    function _isValidData(
-        uint8 decimals0,
-        uint8 decimals1,
-        uint240 A
-    ) internal pure returns (bool) {
-        return decimals0 <= POOL_PRECISION_DECIMALS && decimals1 <= POOL_PRECISION_DECIMALS && A > 0;
+        require(
+            decimals0 <= POOL_PRECISION_DECIMALS && decimals1 <= POOL_PRECISION_DECIMALS && A > 0,
+            "MIRIN: INVALID_DATA"
+        );
     }
 
     function computeLiquidity(
@@ -97,7 +91,7 @@ contract HybridCurve is IMirinCurve {
         uint256 x = xp[tokenIn] + amountIn;
         uint256 y = _getY(x, xp, A);
         uint256 dy = xp[1 - tokenIn] - y - 1;
-        dy = dy - (dy * swapFee / 1000);
+        dy = dy - ((dy * swapFee) / 1000);
         dy = dy * 10**(POOL_PRECISION_DECIMALS - (tokenIn != 0 ? decimals0 : decimals1));
         return dy;
     }
@@ -136,11 +130,9 @@ contract HybridCurve is IMirinCurve {
         uint256 nA = _A * 2;
 
         for (uint256 i = 0; i < MAX_LOOP_LIMIT; i++) {
-            uint256 dP = D ** 3 / (xp[0] * xp[1] * 4);
+            uint256 dP = D**3 / (xp[0] * xp[1] * 4);
             prevD = D;
-            D = nA.mul(s).div(A_PRECISION).add(dP * 2).mul(D).div(
-                nA.div(A_PRECISION).sub(1).mul(D).add(dP * 3)
-            );
+            D = nA.mul(s).div(A_PRECISION).add(dP * 2).mul(D).div(nA.div(A_PRECISION).sub(1).mul(D).add(dP * 3));
             if (D.within1(prevD)) {
                 break;
             }
@@ -169,8 +161,8 @@ contract HybridCurve is IMirinCurve {
         uint256 nA = 2 * _A;
         uint256 c = D**2 / (x * 2);
 
-        c = c * D * A_PRECISION / (nA * 2);
-        uint256 b = x + (D * A_PRECISION / nA);
+        c = (c * D * A_PRECISION) / (nA * 2);
+        uint256 b = x + ((D * A_PRECISION) / nA);
         uint256 yPrev;
         uint256 y = D;
 
@@ -215,7 +207,7 @@ contract HybridCurve is IMirinCurve {
         uint256 nA = 2 * _A;
         uint256 s = xp[1 - tokenIn];
         uint256 c = D**2 / (s * 2);
-        c = c * D * A_PRECISION / (nA * 2);
+        c = (c * D * A_PRECISION) / (nA * 2);
 
         uint256 b = s.add(D.mul(A_PRECISION).div(nA));
         uint256 yPrev;

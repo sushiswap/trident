@@ -71,9 +71,7 @@ contract MirinFactory {
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         require(token0 != address(0), "MIRIN: ZERO_ADDRESS");
         require(isCurveWhitelisted[curve], "MIRIN: INVALID_CURVE");
-        require(IMirinCurve(curve).isValidData(curveData), "MIRIN: INVALID_CURVE_DATA");
         pool = new MirinPool(token0, token1, curve, curveData, operator, swapFee, swapFeeTo);
-        pool.initialize();
         bool isPublic = operator == address(0);
         uint256 length;
         if (isPublic) {

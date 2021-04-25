@@ -2,16 +2,16 @@
 
 pragma solidity =0.8.2;
 
-import "../MirinMath.sol";
 import "../interfaces/IMirinCurve.sol";
 import "../libraries/FixedPoint.sol";
 import "../libraries/SafeERC20.sol";
+import "../libraries/MirinMath.sol";
 
 /**
  * @dev Originally DeriswapV1Oracle
  * @author Andre Cronje, LevX
  */
-contract MirinOracle is MirinMath {
+contract MirinOracle {
     using FixedPoint for *;
     using SafeERC20 for IERC20;
 
@@ -43,6 +43,7 @@ contract MirinOracle is MirinMath {
         address _curve,
         bytes32 _curveData
     ) {
+        IMirinCurve(_curve).validateData(_curveData);
         token0 = _token0;
         token1 = _token1;
         curve = _curve;
@@ -97,7 +98,7 @@ contract MirinOracle is MirinMath {
         uint256 p,
         uint256 window
     ) external view returns (uint256) {
-        return stddev(sample(tokenIn, uint256(10)**IERC20(tokenIn).decimals(), p, window));
+        return MirinMath.stddev(sample(tokenIn, uint256(10)**IERC20(tokenIn).decimals(), p, window));
     }
 
     function realizedVolatility(
@@ -105,7 +106,7 @@ contract MirinOracle is MirinMath {
         uint256 p,
         uint256 window
     ) public view returns (uint256) {
-        return vol(sample(tokenIn, uint256(10)**IERC20(tokenIn).decimals(), p, window));
+        return MirinMath.vol(sample(tokenIn, uint256(10)**IERC20(tokenIn).decimals(), p, window));
     }
 
     function _computeAmountOut(
