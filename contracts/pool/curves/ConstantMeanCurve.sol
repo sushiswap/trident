@@ -16,15 +16,15 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
     using MirinMath2 for uint256;
 
     uint8 public constant MAX_SWAP_FEE = 100;
-    uint8 public constant WEIGHT_SUM = 10;
+    uint8 public constant WEIGHT_SUM = 100;
 
     function canUpdateData(bytes32, bytes32) external pure override returns (bool) {
         return false;
     }
 
     function isValidData(bytes32 data) public pure override returns (bool) {
-        (uint8 weight0, uint8 weight1) = decodeData(data, 0);
-        return _isValidData(weight0, weight1);
+        decodeData(data, 0);
+        return true;
     }
 
     function decodeData(bytes32 data, uint8 tokenIn) public pure returns (uint8 weightIn, uint8 weightOut) {
@@ -36,7 +36,7 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
     }
 
     function _isValidData(uint8 weight0, uint8 weight1) internal pure returns (bool) {
-        return weight0 > 0 && weight1 > 0 && weight0 + weight1 == WEIGHT_SUM;
+        return weight0 > 0 && weight1 > 0;
     }
 
     function computeLiquidity(
@@ -45,7 +45,25 @@ contract ConstantMeanCurve is IMirinCurve, MirinMath {
         bytes32 data
     ) external view override returns (uint256) {
         (uint8 weight0, uint8 weight1) = decodeData(data, 0);
-        return generalExp(ln((weight0 * reserve0 + weight1 * reserve1) * FIXED_1) / (weight0 + weight1), MAX_PRECISION);
+        uint256 maxVal = OPT_EXP_MAX_VAL - 1;
+        uint256 lnR0 = ln(reserve0 * FIXED_1);
+        uint256 lnR1 = ln(reserve1 * FIXED_1);
+        uint256 lnLiq = (lnR0 * weight0 + lnR1 * weight1) / (weight0 + weight1);
+        uint8 loop = uint8(lnLiq / maxVal);
+        uint256 res = lnLiq % maxVal; //lnLiq = maxVal * loop + res
+
+        uint256 liq = optimalExp(res);
+
+        if (loop > 0) {
+            uint256 maxValLiq = optimalExp(maxVal);
+            uint256 limit = type(uint256).max / maxValLiq;
+            for (uint8 i = 0; i < loop; i++) {
+                uint256 t = liq / limit;
+                liq = liq - (limit * t);    //liqIni = limit * t + liqRes
+                liq = ((limit * maxValLiq) / FIXED_1) * t + ((liq * maxValLiq) / FIXED_1);
+            }
+        }
+        return liq / FIXED_1;
     }
 
     function computePrice(
