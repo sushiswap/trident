@@ -8,9 +8,9 @@ contract MirinUniswapMigrator is MirinHelpers {
     address public immutable uniswapFactory;
 
     constructor(
+        address _uniswapFactory,
         address _factory,
         address _legacyFactory,
-        address _uniswapFactory,
         address _weth
     ) MirinHelpers(_factory, _legacyFactory, _weth) {
         uniswapFactory = _uniswapFactory;
