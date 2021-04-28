@@ -128,12 +128,6 @@ contract MirinYieldRebalancer is MirinHelpers {
         emit ClaimReward(pid, amountReceived, msg.sender);
     }
 
-    function _deposit(
-        uint256 pid,
-        uint256 amount,
-        address from
-    ) internal {}
-
     function _withdraw(
         uint256 pid,
         uint256 amount,
