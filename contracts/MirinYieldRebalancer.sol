@@ -4,6 +4,7 @@ pragma solidity =0.8.2;
 
 import "./MirinHelpers.sol";
 import "./interfaces/IMasterChefV2.sol";
+import "./interfaces/IMirinTwapOracle.sol";
 
 contract MirinYieldRebalancer is MirinHelpers {
     struct Checkpoint {
@@ -21,6 +22,7 @@ contract MirinYieldRebalancer is MirinHelpers {
 
     IMasterChefV2 public immutable masterChef;
     IERC20 public immutable sushi;
+    IMirinTwapOracle public immutable oracle;
 
     uint256 public lastSushiBalance;
     mapping(uint256 => Reward[]) public rewards;
@@ -44,12 +46,14 @@ contract MirinYieldRebalancer is MirinHelpers {
     constructor(
         IMasterChefV2 _masterChef,
         IERC20 _sushi,
+        IMirinTwapOracle _oracle,
         address _factory,
         address _legacyFactory,
         address _weth
     ) MirinHelpers(_factory, _legacyFactory, _weth) {
         masterChef = _masterChef;
         sushi = _sushi;
+        oracle = _oracle;
     }
 
     function pendingSushi(uint256 pid, address owner) external view returns (uint256 amount) {
@@ -159,9 +163,9 @@ contract MirinYieldRebalancer is MirinHelpers {
         uint64 allocPoint = masterChef.poolInfo(pid).allocPoint;
         uint256 lpSupply = IMirinPool(pool).balanceOf(address(masterChef));
         (uint112 reserve0, uint112 reserve1, ) = IMirinPool(pool).getReserves();
-        uint112 wethReserve = token0 == weth ? reserve0 : reserve1;
+        (uint112 wethReserve, uint112 tokenReserve) = token0 == weth ? (reserve0, reserve1) : (reserve1, reserve0);
 
-        reward = (lpAmount * allocPoint) / (lpSupply * wethReserve);
+        reward = (lpAmount * allocPoint) / (lpSupply * (wethReserve + oracle.current(token, tokenReserve, weth)));
     }
 
     function _updatePoolFactor(
