@@ -199,8 +199,8 @@ interface IMirinPool is IUniswapV2Pair {
     ) external;
 
     function burn(
-        uint256 amount0Out,
-        uint256 amount1Out,
+        uint256 amount0,
+        uint256 amount1,
         address to
-    ) external returns (uint256 amount0, uint256 amount1);
+    ) external;
 }

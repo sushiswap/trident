@@ -113,52 +113,52 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
         emit Mint(msg.sender, amount0, amount1, to);
     }
 
-    function burn(address to) external returns (uint256 amount0, uint256 amount1) {
-        return burn(0, 0, to);
+    function burn(address to) external lock notBlacklisted(to) returns (uint256 amount0, uint256 amount1) {
+        uint256 liquidity = balanceOf[address(this)];
+        uint256 balance0 = IERC20(token0).balanceOf(address(this));
+        uint256 balance1 = IERC20(token1).balanceOf(address(this));
+        uint256 _totalSupply = totalSupply;
+        amount0 = (liquidity * balance0) / _totalSupply;
+        amount1 = (liquidity * balance1) / _totalSupply;
+        _burn(liquidity, amount0, amount1, to);
     }
 
     function burn(
-        uint256 amount0Out,
-        uint256 amount1Out,
+        uint256 amount0,
+        uint256 amount1,
         address to
-    ) public lock notBlacklisted(to) returns (uint256 amount0, uint256 amount1) {
-        return _burn(amount0Out, amount1Out, to);
+    ) external lock notBlacklisted(to) {
+        _burn(balanceOf[address(this)], amount0, amount1, to);
     }
 
     function _burn(
-        uint256 amount0Out,
-        uint256 amount1Out,
+        uint256 liquidity,
+        uint256 amount0,
+        uint256 amount1,
         address to
-    ) private returns (uint256 amount0, uint256 amount1) {
+    ) private {
+        require(amount0 > 0 || amount1 > 0, "MIRIN: INVALID_AMOUNTS");
+
         (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
-        uint256 balance0 = IERC20(token0).balanceOf(address(this));
-        uint256 balance1 = IERC20(token1).balanceOf(address(this));
-        uint256 liquidityBurned = balanceOf[address(this)];
-
         _mintFee(_reserve0, _reserve1);
-        uint256 _totalSupply = totalSupply;
-        amount0 = amount0Out == 0 ? (liquidityBurned * balance0) / _totalSupply : amount0Out;
-        amount1 = amount1Out == 0 ? (liquidityBurned * balance1) / _totalSupply : amount1Out;
-        require(amount0 > 0 && amount1 > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_BURNED");
 
-        bytes32 _curveData = curveData;
-        uint256 liquidity =
-            IMirinCurve(curve).computeLiquidity(uint112(_reserve0 - amount0), uint112(_reserve1 - amount1), _curveData);
-        uint256 liquidityDelta = kLast - liquidity;
-        if (liquidityDelta < liquidityBurned) {
-            _transfer(address(this), to, liquidityBurned - liquidityDelta);
-            liquidityBurned = liquidityDelta;
+        uint256 computed =
+            IMirinCurve(curve).computeLiquidity(uint112(_reserve0 - amount0), uint112(_reserve1 - amount1), curveData);
+        uint256 liquidityDelta = kLast - computed;
+        if (liquidityDelta < liquidity) {
+            _transfer(address(this), to, liquidity - liquidityDelta);
+            liquidity = liquidityDelta;
         }
-        _burn(address(this), liquidityBurned);
-        require(liquidity == totalSupply, "MIRIN: K");
+        _burn(address(this), liquidity);
+        require(computed == totalSupply, "MIRIN: LIQUIDITY");
 
         _safeTransfer(token0, to, amount0);
         _safeTransfer(token1, to, amount1);
-        balance0 = IERC20(token0).balanceOf(address(this));
-        balance1 = IERC20(token1).balanceOf(address(this));
+        uint256 balance0 = IERC20(token0).balanceOf(address(this));
+        uint256 balance1 = IERC20(token1).balanceOf(address(this));
 
         _update(balance0, balance1, _reserve0, _reserve1);
-        kLast = liquidity;
+        kLast = computed;
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
