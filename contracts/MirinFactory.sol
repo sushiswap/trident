@@ -5,7 +5,7 @@ pragma solidity =0.8.2;
 import "./pool/MirinPool.sol";
 
 contract MirinFactory {
-    uint256 public constant SUSHI_DEPOSIT = 10000;
+    uint256 public constant SUSHI_DEPOSIT = 10000 * 1e18;
 
     address public immutable SUSHI;
     address public feeTo;
