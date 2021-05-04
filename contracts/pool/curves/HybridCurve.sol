@@ -33,7 +33,7 @@ contract HybridCurve is IMirinCurve {
         return oldDecimals0 == newDecimals0 && oldDecimals1 == newDecimals1 && newA > 0;
     }
 
-    function isValidData(bytes32 data) public view override returns (bool) {
+    function isValidData(bytes32 data) public pure override returns (bool) {
         uint8 decimals0 = uint8(uint256(data) >> 248);
         uint8 decimals1 = uint8((uint256(data) >> 240) % (1 << 8));
         uint240 A = uint240(uint256(data));

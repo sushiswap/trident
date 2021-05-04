@@ -2,7 +2,6 @@
 
 pragma solidity =0.8.2;
 
-import "./MirinOptions.sol";
 import "./MirinERC20.sol";
 import "./MirinGovernance.sol";
 import "../interfaces/IMirinCurve.sol";
@@ -10,7 +9,7 @@ import "../interfaces/IMirinCurve.sol";
 /**
  * @author LevX
  */
-contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
+contract MirinPool is MirinERC20, MirinGovernance {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Swap(
@@ -21,10 +20,23 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
         uint256 amount1Out,
         address indexed to
     );
+    event Sync(uint112 reserve0, uint112 reserve1);
 
     uint256 public constant MINIMUM_LIQUIDITY = 10**3;
     bytes4 private constant SELECTOR = bytes4(keccak256(bytes("transfer(address,uint256)")));
+
+    address public immutable token0;
+    address public immutable token1;
+    address public immutable curve;
+
+    bytes32 public curveData;
+    uint256 public price0CumulativeLast;
+    uint256 public price1CumulativeLast;
     uint256 public kLast;
+
+    uint112 internal reserve0;
+    uint112 internal reserve1;
+    uint32 internal blockTimestampLast;
 
     uint256 private unlocked = 1;
     modifier lock() {
@@ -47,7 +59,13 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
         address _operator,
         uint8 _swapFee,
         address _swapFeeTo
-    ) MirinOptions(_token0, _token1, _curve, _curveData) MirinGovernance(_operator, _swapFee, _swapFeeTo) {}
+    ) MirinGovernance(_operator, _swapFee, _swapFeeTo) {
+        require(IMirinCurve(_curve).isValidData(_curveData), "MIRIN: INVALID_CURVE_DATA");
+        token0 = _token0;
+        token1 = _token1;
+        curve = _curve;
+        curveData = _curveData;
+    }
 
     function initialize(address, address) external pure {
         revert("MIRIN: NOT_IMPLEMENTED");
@@ -56,6 +74,48 @@ contract MirinPool is MirinOptions, MirinERC20, MirinGovernance {
     function updateCurveData(bytes32 data) external onlyOperator {
         require(IMirinCurve(curve).canUpdateData(curveData, data), "MIRIN: CANNOT_UPDATE_DATA");
         curveData = data;
+    }
+
+    function getReserves()
+        public
+        view
+        returns (
+            uint112 _reserve0,
+            uint112 _reserve1,
+            uint32 _blockTimestampLast
+        )
+    {
+        _reserve0 = reserve0;
+        _reserve1 = reserve1;
+        _blockTimestampLast = blockTimestampLast;
+    }
+
+    function _update(
+        uint256 balance0,
+        uint256 balance1,
+        uint112 _reserve0,
+        uint112 _reserve1
+    ) internal {
+        require(balance0 <= type(uint112).max && balance1 <= type(uint112).max, "MIRIN: OVERFLOW");
+        uint32 blockTimestamp = uint32(block.timestamp % 2**32);
+        uint32 timeElapsed;
+        unchecked {timeElapsed = blockTimestamp - blockTimestampLast;}
+        if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
+            bytes32 _curveData = curveData;
+            unchecked {
+                price0CumulativeLast +=
+                    IMirinCurve(curve).computePrice(_reserve0, _reserve1, _curveData, 0) *
+                    timeElapsed;
+                price1CumulativeLast +=
+                    IMirinCurve(curve).computePrice(_reserve0, _reserve1, _curveData, 1) *
+                    timeElapsed;
+            }
+        }
+        reserve0 = uint112(balance0);
+        reserve1 = uint112(balance1);
+        blockTimestampLast = blockTimestamp;
+
+        emit Sync(uint112(balance0), uint112(balance1));
     }
 
     function _safeTransfer(

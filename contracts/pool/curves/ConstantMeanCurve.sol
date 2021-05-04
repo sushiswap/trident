@@ -21,7 +21,7 @@ contract ConstantMeanCurve is IMirinCurve {
         return false;
     }
 
-    function isValidData(bytes32 data) public view override returns (bool) {
+    function isValidData(bytes32 data) public pure override returns (bool) {
         uint8 weight0 = uint8(uint256(data));
         uint8 weight1 = WEIGHT_SUM - weight0;
         return weight0 > 0 && weight1 > 0;
