@@ -68,8 +68,10 @@ contract MirinYieldRebalancer is MirinHelpers {
         require(amount > 0, "MIRIN: INVALID_AMOUNT");
 
         // TODO: consider pool factor
+        uint256 factor = _latestValue(_poolFactors[pid], FACTOR_BASE);
+        uint256 amountAdjusted = (amount * FACTOR_BASE) / factor;
         Checkpoint[] storage checkpoints = _lpBalances[pid][msg.sender];
-        _updateValueAtNow(checkpoints, _latestValue(checkpoints, 0) + amount);
+        _updateValueAtNow(checkpoints, _latestValue(checkpoints, 0) + amountAdjusted);
 
         address lpToken = masterChef.lpToken(pid);
         _safeTransferFrom(lpToken, msg.sender, address(this), amount);
@@ -103,12 +105,12 @@ contract MirinYieldRebalancer is MirinHelpers {
         require(fromReward < toRewardMin, "MIRIN: DEFICIT");
 
         uint256 fromLpTotal = masterChef.userInfo(fromPid, address(this)).amount;
-        _updatePoolFactor(_poolFactors[fromPid], fromPid, fromLpTotal - fromAmount, fromLpTotal);
+        _updatePoolFactor(_poolFactors[fromPid], fromLpTotal - fromAmount, fromLpTotal);
         _withdraw(fromPid, fromAmount, address(this));
         uint256 toAmount = _swapPoolToPool(fromPool, fromToken, fromAmount, toPool, toToken, toAmountMin);
 
         uint256 toLpTotal = masterChef.userInfo(toPid, address(this)).amount;
-        _updatePoolFactor(_poolFactors[toPid], toPid, toLpTotal + toAmount, toLpTotal);
+        _updatePoolFactor(_poolFactors[toPid], toLpTotal + toAmount, toLpTotal);
         IERC20(toPool).approve(address(masterChef), toAmount);
         masterChef.deposit(toPid, toAmount, address(this));
 
@@ -170,13 +172,10 @@ contract MirinYieldRebalancer is MirinHelpers {
 
     function _updatePoolFactor(
         Checkpoint[] storage poolFactors,
-        uint256 pid,
         uint256 numerator,
         uint256 denominator
     ) internal {
-        uint256 fromLpTotal = masterChef.userInfo(pid, address(this)).amount;
-        uint256 newFromLpFactor = (_latestValue(poolFactors, FACTOR_BASE) * numerator) / denominator;
-        _updateValueAtNow(poolFactors, newFromLpFactor);
+        _updateValueAtNow(poolFactors, (_latestValue(poolFactors, FACTOR_BASE) * numerator) / denominator);
     }
 
     function _swapPoolToPool(
