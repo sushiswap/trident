@@ -321,16 +321,16 @@ describe("ConstantMeanCurve additional Test", function () {
         expect(await test.canUpdateData(p1, p2)).to.be.false;
     });
 
-    it("Should fail if data is not valid through isValidData fn", async function () {
+    it("Should return false if data is not valid through isValidData fn", async function () {
         wO = 0;
         wI = 100;
         data = getData();
-        await expect(test.isValidData(data)).to.be.revertedWith("MIRIN: INVALID_DATA");
+        expect(await test.isValidData(data)).to.be.false;
 
         wO = 100;
         wI = 0;
         data = getData();
-        await expect(test.isValidData(data)).to.be.revertedWith("MIRIN: INVALID_DATA");
+        expect(await test.isValidData(data)).to.be.false;
     });
 
     it("Should pass true if data is valid through isValidData fn", async function () {
@@ -401,7 +401,7 @@ describe("ConstantMeanCurve additional Test", function () {
             let js2 = js.mul(1 - Math.pow(10, -8)).floor();
             con = await test.computeLiquidity(r0, r1, data);
 
-            if(con.gte(Math.pow(10,10))) {
+            if (con.gte(Math.pow(10, 10))) {
                 expect(con).to.be.lte(BigNumber.from(js1.toHex()));
                 expect(con).to.be.gte(BigNumber.from(js2.toHex()));
             } else {

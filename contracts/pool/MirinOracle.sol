@@ -43,7 +43,7 @@ contract MirinOracle {
         address _curve,
         bytes32 _curveData
     ) {
-        IMirinCurve(_curve).validateData(_curveData);
+        require(IMirinCurve(_curve).isValidData(_curveData), "MIRIN: INVALID_CURVE_DATA");
         token0 = _token0;
         token1 = _token1;
         curve = _curve;

@@ -113,7 +113,7 @@ describe("MirinMath Test", function () {
     });
 
     it("optimalLog", async function () {
-        await expect(test._optimalLog(Fixed1.sub(1))).to.be.revertedWith("MIRIN: Outranged");
+        await expect(test._optimalLog(Fixed1.sub(1))).to.be.revertedWith("MIRIN: OVERFLOW");
         await expect(test._optimalLog(Fixed4)).to.be.reverted;
         i = 0;
         while (i < 10) {
@@ -150,7 +150,7 @@ describe("MirinMath Test", function () {
             i++;
         }
         await expect(test._optimalExp(BigNumber.from("0x800000000000000000000000000000000"))).to.be.revertedWith(
-            "MIRIN: Outranged"
+            "MIRIN: OVERFLOW"
         );
     });
 
