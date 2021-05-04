@@ -68,21 +68,24 @@ contract MirinGovernance {
         operator = _operator;
 
         if (_operator == address(0)) {
-            updateSwapFee(3);
+            _updateSwapFee(3);
         } else {
-            updateSwapFee(_fee);
-            updateSwapFeeTo(_feeTo);
+            _updateSwapFee(_fee);
+            _updateSwapFeeTo(_feeTo);
         }
     }
 
-    function setOperator(address newOperator) external {
-        require(operator == msg.sender, "MIRIN: UNAUTHORIZED");
+    function setOperator(address newOperator) external onlyOperator {
         require(newOperator != address(0), "MIRIN: INVALID_OPERATOR");
         emit OperatorSet(operator, newOperator);
         operator = newOperator;
     }
 
     function updateSwapFee(uint8 newFee) public onlyOperator {
+        _updateSwapFee(newFee);
+    }
+
+    function _updateSwapFee(uint8 newFee) private {
         require(newFee >= MIN_SWAP_FEE && newFee <= MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
 
         swapFee = newFee;
@@ -91,6 +94,10 @@ contract MirinGovernance {
     }
 
     function updateSwapFeeTo(address newFeeTo) public onlyOperator {
+        _updateSwapFeeTo(newFeeTo);
+    }
+
+    function _updateSwapFeeTo(address newFeeTo) private {
         swapFeeTo = newFeeTo;
 
         emit SwapFeeToUpdated(newFeeTo);
