@@ -2,7 +2,6 @@
 
 pragma solidity =0.8.2;
 
-import "../libraries/FixedPoint.sol";
 import "../libraries/SafeERC20.sol";
 
 /**
@@ -10,7 +9,6 @@ import "../libraries/SafeERC20.sol";
  * @author Andre Cronje, LevX
  */
 contract MirinERC20 {
-    using FixedPoint for *;
     using SafeERC20 for IERC20;
 
     string public constant name = "Mirin";

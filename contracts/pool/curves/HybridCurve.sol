@@ -3,7 +3,6 @@
 pragma solidity =0.8.2;
 
 import "../../interfaces/IMirinCurve.sol";
-import "../../libraries/FixedPoint.sol";
 import "../../libraries/SafeMath.sol";
 import "../../libraries/MathUtils.sol";
 
@@ -14,9 +13,10 @@ import "../../libraries/MathUtils.sol";
  * @author LevX
  */
 contract HybridCurve is IMirinCurve {
-    using FixedPoint for *;
     using SafeMath for *;
     using MathUtils for uint256;
+
+    uint8 private constant PRECISION = 104;
 
     // the precision all pools tokens will be converted to
     uint8 private constant POOL_PRECISION_DECIMALS = 18;
@@ -73,11 +73,12 @@ contract HybridCurve is IMirinCurve {
         uint112 reserve1,
         bytes32 data,
         uint8 tokenIn
-    ) external pure override returns (uint256) {
+    ) external pure override returns (uint224) {
         (uint8 decimals0, uint8 decimals1, uint240 A) = decodeData(data);
         uint256[2] memory xp = _xp(reserve0, reserve1, decimals0, decimals1);
         uint256 D = _getD(xp, A);
-        return _getYD(A, tokenIn, xp, D);
+        uint8 decimals = tokenIn == 0 ? decimals0 : decimals1;
+        return uint224(_getYD(A, tokenIn, xp, D) << (PRECISION / 10**(POOL_PRECISION_DECIMALS - decimals)));
     }
 
     function computeAmountOut(

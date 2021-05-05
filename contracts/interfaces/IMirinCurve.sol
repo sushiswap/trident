@@ -18,7 +18,7 @@ interface IMirinCurve {
         uint112 reserve1,
         bytes32 data,
         uint8 tokenIn
-    ) external view returns (uint256);
+    ) external view returns (uint224);
 
     function computeAmountOut(
         uint256 amountIn,

@@ -4,8 +4,6 @@ pragma solidity =0.8.2;
 
 import "../libraries/Strings.sol";
 import "../libraries/Address.sol";
-import "../libraries/UQ112x112.sol";
-import "../libraries/FixedPoint.sol";
 import "../libraries/SafeERC20.sol";
 import "../libraries/EnumerableMap.sol";
 import "../libraries/EnumerableSet.sol";
@@ -16,7 +14,6 @@ import "hardhat/console.sol";
 contract LibraryTest {
     using Strings for uint256;
     using Address for address;
-    using FixedPoint for *;
     using SafeERC20 for IERC20;
     using EnumerableMap for EnumerableMap.UintToAddressMap;
     using EnumerableSet for EnumerableSet.UintSet;
@@ -70,68 +67,6 @@ contract LibraryTest {
 
     function returnCallData(string memory signature, bytes memory data) public pure returns (bytes memory) {
         return abi.encodePacked(bytes4(keccak256(bytes(signature))), data);
-    }
-
-    // UQ112x112
-    function encode(uint112 y) public pure returns (uint224) {
-        return UQ112x112.encode(y);
-    }
-
-    function uqdiv(uint224 x, uint112 y) public pure returns (uint224) {
-        return UQ112x112.uqdiv(x, y);
-    }
-
-    // FixedPoint
-    function encodeFP(uint112 x) public pure returns (FixedPoint.uq112x112 memory) {
-        return FixedPoint.encode(x);
-    }
-
-    function encode144(uint144 x) public pure returns (FixedPoint.uq144x112 memory) {
-        return FixedPoint.encode144(x);
-    }
-
-    function div224By112(FixedPoint.uq112x112 memory self, uint112 x)
-        public
-        pure
-        returns (FixedPoint.uq112x112 memory)
-    {
-        return FixedPoint.div(self, x);
-    }
-
-    function mul224To256(FixedPoint.uq112x112 memory self, uint256 y)
-        public
-        pure
-        returns (FixedPoint.uq144x112 memory)
-    {
-        return FixedPoint.mul(self, y);
-    }
-
-    function div256By112(FixedPoint.uq144x112 memory self, uint112 x)
-        public
-        pure
-        returns (FixedPoint.uq144x112 memory)
-    {
-        return FixedPoint.div(self, x);
-    }
-
-    function mul256To256(FixedPoint.uq144x112 memory self, uint256 y)
-        public
-        pure
-        returns (FixedPoint.uq144x112 memory)
-    {
-        return FixedPoint.mul(self, y);
-    }
-
-    function fraction(uint112 numerator, uint112 denominator) public pure returns (FixedPoint.uq112x112 memory) {
-        return FixedPoint.fraction(numerator, denominator);
-    }
-
-    function decode(FixedPoint.uq112x112 memory self) public pure returns (uint112) {
-        return FixedPoint.decode(self);
-    }
-
-    function decode144(FixedPoint.uq144x112 memory self) public pure returns (uint144) {
-        return FixedPoint.decode144(self);
     }
 
     // SafeERC20

@@ -3,7 +3,6 @@
 pragma solidity =0.8.2;
 
 import "../../interfaces/IMirinCurve.sol";
-import "../../libraries/FixedPoint.sol";
 import "../../libraries/MirinMath.sol";
 import "../../libraries/MirinMath2.sol";
 
@@ -12,10 +11,9 @@ import "../../libraries/MirinMath2.sol";
  * @author LevX
  */
 contract ConstantMeanCurve is IMirinCurve {
-    using FixedPoint for *;
-
     uint8 public constant MAX_SWAP_FEE = 100;
     uint8 public constant WEIGHT_SUM = 100;
+    uint8 private constant PRECISION = 104;
 
     function canUpdateData(bytes32, bytes32) external pure override returns (bool) {
         return false;
@@ -39,7 +37,7 @@ contract ConstantMeanCurve is IMirinCurve {
         uint112 reserve0,
         uint112 reserve1,
         bytes32 data
-    ) external view override returns (uint256) {
+    ) external pure override returns (uint256) {
         (uint8 weight0, uint8 weight1) = decodeData(data, 0);
         uint256 maxVal = MirinMath.OPT_EXP_MAX_VAL - 1;
         uint256 lnR0 = MirinMath.ln(reserve0 * MirinMath.FIXED_1);
@@ -67,12 +65,12 @@ contract ConstantMeanCurve is IMirinCurve {
         uint112 reserve1,
         bytes32 data,
         uint8 tokenIn
-    ) external pure override returns (uint256) {
+    ) external pure override returns (uint224) {
         (uint8 weight0, uint8 weight1) = decodeData(data, tokenIn);
         return
             tokenIn == 0
-                ? FixedPoint.encode(reserve1).mul(weight0).div(reserve0).div(weight1)._x
-                : FixedPoint.encode(reserve0).mul(weight1).div(reserve1).div(weight0)._x;
+                ? ((uint224(reserve1) * weight0) << PRECISION) / reserve0 / weight1
+                : ((uint224(reserve0) * weight1) << PRECISION) / reserve1 / weight0;
     }
 
     function computeAmountOut(
@@ -82,7 +80,7 @@ contract ConstantMeanCurve is IMirinCurve {
         bytes32 data,
         uint8 swapFee,
         uint8 tokenIn
-    ) external view override returns (uint256 amountOut) {
+    ) external pure override returns (uint256 amountOut) {
         require(amountIn > 0, "MIRIN: INSUFFICIENT_INPUT_AMOUNT");
         require(reserve0 > 0 && reserve1 > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
         require(swapFee <= MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
@@ -104,7 +102,7 @@ contract ConstantMeanCurve is IMirinCurve {
         bytes32 data,
         uint8 swapFee,
         uint8 tokenIn
-    ) external view override returns (uint256 amountIn) {
+    ) external pure override returns (uint256 amountIn) {
         require(amountOut > 0, "MIRIN: INSUFFICIENT_INPUT_AMOUNT");
         require(reserve0 > 0 && reserve1 > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
         require(swapFee <= MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
