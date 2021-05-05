@@ -2,9 +2,13 @@
 
 pragma solidity =0.8.2;
 
-import "./MirinHelpers.sol";
+import "./interfaces/IWETH.sol";
+import "./libraries/MirinLibrary.sol";
+import "./libraries/SafeERC20.sol";
 
-contract MirinLiquidityManager is MirinHelpers {
+contract MirinLiquidityManager {
+    using SafeERC20 for IERC20;
+
     struct AddLiquidityParams {
         address tokenA;
         address tokenB;
@@ -39,11 +43,12 @@ contract MirinLiquidityManager is MirinHelpers {
         uint256 amountETHMin;
     }
 
-    modifier onlyOperator(
-        address tokenA,
-        address tokenB,
-        uint256 pid
-    ) {
+    address public immutable factory;
+    address public immutable legacyFactory;
+    address public immutable weth;
+
+    modifier ensure(uint256 deadline) {
+        require(deadline >= block.timestamp, "MIRIN: EXPIRED");
         _;
     }
 
@@ -51,7 +56,15 @@ contract MirinLiquidityManager is MirinHelpers {
         address _factory,
         address _legacyFactory,
         address _weth
-    ) MirinHelpers(_factory, _legacyFactory, _weth) {}
+    ) {
+        factory = _factory;
+        legacyFactory = _legacyFactory;
+        weth = _weth;
+    }
+
+    receive() external payable {
+        assert(msg.sender == weth); // only accept ETH via fallback from the weth contract
+    }
 
     function addLiquidityMultiple(
         AddLiquidityParams[] calldata params,
@@ -59,29 +72,16 @@ contract MirinLiquidityManager is MirinHelpers {
         uint256 deadline
     ) external ensure(deadline) {
         for (uint256 i; i < params.length; i++) {
-            _addLiquidity(
-                params[i].tokenA,
-                params[i].tokenB,
-                params[i].pid,
-                params[i].amountA,
-                params[i].amountB,
-                params[i].liquidityMin,
-                to
-            );
+            _addLiquidity(params[i], to);
         }
     }
 
     function addLiquidity(
-        address tokenA,
-        address tokenB,
-        uint256 pid,
-        uint256 amountA,
-        uint256 amountB,
-        uint256 liquidityMin,
+        AddLiquidityParams calldata params,
         address to,
         uint256 deadline
     ) external ensure(deadline) returns (uint256 liquidity) {
-        return _addLiquidity(tokenA, tokenB, pid, amountA, amountB, liquidityMin, to);
+        return _addLiquidity(params, to);
     }
 
     function addLiquidityETHMultiple(
@@ -90,26 +90,16 @@ contract MirinLiquidityManager is MirinHelpers {
         uint256 deadline
     ) external payable ensure(deadline) {
         for (uint256 i; i < params.length; i++) {
-            _addLiquidityETH(
-                params[i].token,
-                params[i].pid,
-                params[i].amountToken,
-                params[i].amountETH,
-                params[i].liquidityMin,
-                to
-            );
+            _addLiquidityETH(params[i], to);
         }
     }
 
     function addLiquidityETH(
-        address token,
-        uint256 pid,
-        uint256 amountToken,
-        uint256 liquidityMin,
+        AddLiquidityETHParams calldata params,
         address to,
         uint256 deadline
     ) external payable ensure(deadline) returns (uint256 liquidity) {
-        return _addLiquidityETH(token, pid, amountToken, msg.value, liquidityMin, to);
+        return _addLiquidityETH(params, to);
     }
 
     function removeLiquidityMultiple(
@@ -118,29 +108,16 @@ contract MirinLiquidityManager is MirinHelpers {
         uint256 deadline
     ) external ensure(deadline) {
         for (uint256 i; i < params.length; i++) {
-            _removeLiquidity(
-                params[i].tokenA,
-                params[i].tokenB,
-                params[i].pid,
-                params[i].liquidity,
-                params[i].amountAMin,
-                params[i].amountBMin,
-                to
-            );
+            _removeLiquidity(params[i], to);
         }
     }
 
     function removeLiquidity(
-        address tokenA,
-        address tokenB,
-        uint256 pid,
-        uint256 liquidity,
-        uint256 amountAMin,
-        uint256 amountBMin,
+        RemoveLiquidityParams calldata params,
         address to,
         uint256 deadline
-    ) public ensure(deadline) returns (uint256 amountA, uint256 amountB) {
-        return _removeLiquidity(tokenA, tokenB, pid, liquidity, amountAMin, amountBMin, to);
+    ) external ensure(deadline) returns (uint256 amountA, uint256 amountB) {
+        return _removeLiquidity(params, to);
     }
 
     function removeLiquidityETHMultiple(
@@ -149,36 +126,20 @@ contract MirinLiquidityManager is MirinHelpers {
         uint256 deadline
     ) external ensure(deadline) {
         for (uint256 i; i < params.length; i++) {
-            _removeLiquidityETH(
-                params[i].token,
-                params[i].pid,
-                params[i].liquidity,
-                params[i].amountTokenMin,
-                params[i].amountETHMin,
-                to
-            );
+            _removeLiquidityETH(params[i], to);
         }
     }
 
     function removeLiquidityETH(
-        address token,
-        uint256 pid,
-        uint256 liquidity,
-        uint256 amountTokenMin,
-        uint256 amountETHMin,
+        RemoveLiquidityETHParams calldata params,
         address to,
         uint256 deadline
     ) external ensure(deadline) returns (uint256 amountToken, uint256 amountETH) {
-        return _removeLiquidityETH(token, pid, liquidity, amountTokenMin, amountETHMin, to);
+        return _removeLiquidityETH(params, to);
     }
 
     function removeLiquidityWithPermit(
-        address tokenA,
-        address tokenB,
-        uint256 pid,
-        uint256 liquidity,
-        uint256 amountAMin,
-        uint256 amountBMin,
+        RemoveLiquidityParams calldata params,
         address to,
         uint256 deadline,
         bool approveMax,
@@ -186,24 +147,20 @@ contract MirinLiquidityManager is MirinHelpers {
         bytes32 r,
         bytes32 s
     ) external ensure(deadline) returns (uint256 amountA, uint256 amountB) {
-        MirinPool(_getPool(tokenA, tokenB, pid)).permit(
+        IMirinPool(MirinLibrary.getPool(factory, legacyFactory, params.tokenA, params.tokenB, params.pid)).permit(
             msg.sender,
             address(this),
-            approveMax ? type(uint256).max : liquidity,
+            approveMax ? type(uint256).max : params.liquidity,
             deadline,
             v,
             r,
             s
         );
-        (amountA, amountB) = _removeLiquidity(tokenA, tokenB, pid, liquidity, amountAMin, amountBMin, to);
+        (amountA, amountB) = _removeLiquidity(params, to);
     }
 
     function removeLiquidityETHWithPermit(
-        address token,
-        uint256 pid,
-        uint256 liquidity,
-        uint256 amountTokenMin,
-        uint256 amountETHMin,
+        RemoveLiquidityETHParams calldata params,
         address to,
         uint256 deadline,
         bool approveMax,
@@ -211,15 +168,61 @@ contract MirinLiquidityManager is MirinHelpers {
         bytes32 r,
         bytes32 s
     ) external returns (uint256 amountToken, uint256 amountETH) {
-        MirinPool(_getPool(token, weth, pid)).permit(
+        IMirinPool(MirinLibrary.getPool(factory, legacyFactory, params.token, weth, params.pid)).permit(
             msg.sender,
             address(this),
-            approveMax ? type(uint256).max : liquidity,
+            approveMax ? type(uint256).max : params.liquidity,
             deadline,
             v,
             r,
             s
         );
-        (amountToken, amountETH) = _removeLiquidityETH(token, pid, liquidity, amountTokenMin, amountETHMin, to);
+        (amountToken, amountETH) = _removeLiquidityETH(params, to);
+    }
+
+    function _addLiquidity(AddLiquidityParams memory params, address to) internal returns (uint256 liquidity) {
+        address pool = MirinLibrary.getPool(factory, legacyFactory, params.tokenA, params.tokenB, params.pid);
+        IERC20(params.tokenA).safeTransferFrom(msg.sender, pool, params.amountA);
+        IERC20(params.tokenB).safeTransferFrom(msg.sender, pool, params.amountB);
+        liquidity = IMirinPool(pool).mint(to);
+        require(liquidity >= params.liquidityMin, "MIRIN: INSUFFICIENT_LIQUIDITY");
+    }
+
+    function _addLiquidityETH(AddLiquidityETHParams memory params, address to) internal returns (uint256 liquidity) {
+        address pool = MirinLibrary.getPool(factory, legacyFactory, params.token, weth, params.pid);
+        IERC20(params.token).safeTransferFrom(msg.sender, pool, params.amountToken);
+        IWETH(weth).deposit{value: params.amountETH}();
+        assert(IWETH(weth).transfer(pool, params.amountETH));
+        liquidity = IMirinPool(pool).mint(to);
+        require(liquidity >= params.liquidityMin, "MIRIN: INSUFFICIENT_LIQUIDITY");
+    }
+
+    function _removeLiquidity(RemoveLiquidityParams memory params, address to)
+        internal
+        returns (uint256 amountA, uint256 amountB)
+    {
+        address pool = MirinLibrary.getPool(factory, legacyFactory, params.tokenA, params.tokenB, params.pid);
+        IMirinPool(pool).transferFrom(msg.sender, pool, params.liquidity);
+        (uint256 amount0, uint256 amount1) = IMirinPool(pool).burn(to);
+        (address token0, ) = MirinLibrary.sortTokens(params.tokenA, params.tokenB);
+        (amountA, amountB) = params.tokenA == token0 ? (amount0, amount1) : (amount1, amount0);
+        require(amountA >= params.amountAMin, "MIRIN: INSUFFICIENT_A_AMOUNT");
+        require(amountB >= params.amountBMin, "MIRIN: INSUFFICIENT_B_AMOUNT");
+    }
+
+    function _removeLiquidityETH(RemoveLiquidityETHParams memory params, address to)
+        internal
+        returns (uint256 amountToken, uint256 amountETH)
+    {
+        address pool = MirinLibrary.getPool(factory, legacyFactory, params.token, weth, params.pid);
+        IMirinPool(pool).transferFrom(msg.sender, pool, params.liquidity);
+        (uint256 amount0, uint256 amount1) = IMirinPool(pool).burn(to);
+        (address token0, ) = MirinLibrary.sortTokens(params.token, weth);
+        (amountToken, amountETH) = params.token == token0 ? (amount0, amount1) : (amount1, amount0);
+        require(amountToken >= params.amountTokenMin, "MIRIN: INSUFFICIENT_TOKEN_AMOUNT");
+        require(amountETH >= params.amountETHMin, "MIRIN: INSUFFICIENT_ETH_AMOUNT");
+        IERC20(params.token).safeTransfer(to, amountToken);
+        IWETH(weth).withdraw(amountETH);
+        MirinLibrary.safeTransferETH(to, amountETH);
     }
 }

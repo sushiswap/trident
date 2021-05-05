@@ -2,18 +2,33 @@
 
 pragma solidity =0.8.2;
 
-import "./MirinHelpers.sol";
+import "./interfaces/IUniswapV2Pair.sol";
+import "./libraries/MirinLibrary.sol";
+import "./libraries/SafeERC20.sol";
 
-contract MirinUniswapMigrator is MirinHelpers {
+contract MirinUniswapMigrator {
+    using SafeERC20 for IERC20;
+
     address public immutable uniswapFactory;
+    address public immutable factory;
+    address public immutable legacyFactory;
+    address public immutable weth;
+
+    modifier ensure(uint256 deadline) {
+        require(deadline >= block.timestamp, "MIRIN: EXPIRED");
+        _;
+    }
 
     constructor(
         address _uniswapFactory,
         address _factory,
         address _legacyFactory,
         address _weth
-    ) MirinHelpers(_factory, _legacyFactory, _weth) {
+    ) {
         uniswapFactory = _uniswapFactory;
+        factory = _factory;
+        legacyFactory = _legacyFactory;
+        weth = _weth;
     }
 
     function migrateWithPermit(
@@ -51,15 +66,15 @@ contract MirinUniswapMigrator is MirinHelpers {
         address tokenB,
         uint256 amountToRemove
     ) internal returns (uint256 amountA, uint256 amountB) {
-        IUniswapV2Pair pair = IUniswapV2Pair(_pairFor(tokenA, tokenB));
-        _safeTransferFrom(address(pair), msg.sender, address(pair), amountToRemove);
-        (uint256 amount0, uint256 amount1) = pair.burn(address(this));
-        (address token0, ) = _sortTokens(tokenA, tokenB);
+        address pair = _pairFor(tokenA, tokenB);
+        IERC20(pair).safeTransferFrom(msg.sender, pair, amountToRemove);
+        (uint256 amount0, uint256 amount1) = IUniswapV2Pair(pair).burn(address(this));
+        (address token0, ) = MirinLibrary.sortTokens(tokenA, tokenB);
         (amountA, amountB) = tokenA == token0 ? (amount0, amount1) : (amount1, amount0);
     }
 
     function _pairFor(address tokenA, address tokenB) internal view returns (address pair) {
-        (address token0, address token1) = _sortTokens(tokenA, tokenB);
+        (address token0, address token1) = MirinLibrary.sortTokens(tokenA, tokenB);
         pair = address(
             uint160(
                 uint256(
@@ -74,5 +89,21 @@ contract MirinUniswapMigrator is MirinHelpers {
                 )
             )
         );
+    }
+
+    function _addLiquidity(
+        address tokenA,
+        address tokenB,
+        uint256 pid,
+        uint256 amountA,
+        uint256 amountB,
+        uint256 liquidityMin,
+        address to
+    ) internal returns (uint256 liquidity) {
+        address pool = MirinLibrary.getPool(factory, legacyFactory, tokenA, tokenB, pid);
+        IERC20(tokenA).safeTransferFrom(msg.sender, pool, amountA);
+        IERC20(tokenB).safeTransferFrom(msg.sender, pool, amountB);
+        liquidity = IMirinPool(pool).mint(to);
+        require(liquidity >= liquidityMin, "MIRIN: INSUFFICIENT_LIQUIDITY");
     }
 }

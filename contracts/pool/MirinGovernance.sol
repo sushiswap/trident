@@ -4,16 +4,7 @@ pragma solidity =0.8.2;
 
 import "./MirinERC20.sol";
 import "../interfaces/IERC20.sol";
-
-interface IMirinFactory {
-    function feeTo() external view returns (address);
-
-    function owner() external view returns (address);
-
-    function isPool(address pool) external view returns (bool);
-
-    function disablePool(address to) external;
-}
+import "../interfaces/IMirinFactory.sol";
 
 /**
  * @author LevX
