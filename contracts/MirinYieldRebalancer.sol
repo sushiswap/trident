@@ -200,7 +200,7 @@ contract MirinYieldRebalancer is MirinHelpers {
         require(toAmount >= toAmountMin, "MIRIN: INSUFFICIENT_TO_AMOUNT");
     }
 
-    function _path(address fromToken, address toToken) internal returns (address[] memory path) {
+    function _path(address fromToken, address toToken) internal view returns (address[] memory path) {
         path = new address[](3);
         path[0] = fromToken;
         path[1] = weth;
