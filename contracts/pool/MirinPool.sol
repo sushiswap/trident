@@ -114,12 +114,10 @@ contract MirinPool is MirinGovernance {
         if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
             bytes32 _curveData = curveData;
             unchecked {
-                price0CumulativeLast +=
-                    IMirinCurve(curve).computePrice(_reserve0, _reserve1, _curveData, 0) *
-                    timeElapsed;
-                price1CumulativeLast +=
-                    IMirinCurve(curve).computePrice(_reserve0, _reserve1, _curveData, 1) *
-                    timeElapsed;
+                uint256 price0 = IMirinCurve(curve).computePrice(_reserve0, _reserve1, _curveData, 0);
+                price0CumulativeLast += price0 * timeElapsed;
+                uint256 price1 = IMirinCurve(curve).computePrice(_reserve0, _reserve1, _curveData, 1);
+                price1CumulativeLast += price1 * timeElapsed;
             }
         }
         reserve0 = uint112(balance0);
