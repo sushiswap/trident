@@ -2,14 +2,13 @@
 
 pragma solidity =0.8.2;
 
-import "./MirinERC20.sol";
 import "./MirinGovernance.sol";
 import "../interfaces/IMirinCurve.sol";
 
 /**
  * @author LevX
  */
-contract MirinPool is MirinERC20, MirinGovernance {
+contract MirinPool is MirinGovernance {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Swap(
@@ -74,6 +73,18 @@ contract MirinPool is MirinERC20, MirinGovernance {
     function updateCurveData(bytes32 data) external onlyOperator {
         require(IMirinCurve(curve).canUpdateData(curveData, data), "MIRIN: CANNOT_UPDATE_DATA");
         curveData = data;
+    }
+
+    function updateSwapFee(uint8 newFee) public onlyOperator {
+        (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
+        _mintFee(_reserve0, _reserve1);
+        _updateSwapFee(newFee);
+    }
+
+    function updateSwapFeeTo(address newFeeTo) public onlyOperator {
+        (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
+        _mintFee(_reserve0, _reserve1);
+        _updateSwapFeeTo(newFeeTo);
     }
 
     function getReserves()

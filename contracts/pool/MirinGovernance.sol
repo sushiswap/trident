@@ -2,6 +2,7 @@
 
 pragma solidity =0.8.2;
 
+import "./MirinERC20.sol";
 import "../interfaces/IERC20.sol";
 
 interface IMirinFactory {
@@ -17,7 +18,7 @@ interface IMirinFactory {
 /**
  * @author LevX
  */
-contract MirinGovernance {
+contract MirinGovernance is MirinERC20 {
     uint8 public constant MIN_SWAP_FEE = 1;
     uint8 public constant MAX_SWAP_FEE = 100;
 
@@ -81,11 +82,7 @@ contract MirinGovernance {
         operator = newOperator;
     }
 
-    function updateSwapFee(uint8 newFee) public onlyOperator {
-        _updateSwapFee(newFee);
-    }
-
-    function _updateSwapFee(uint8 newFee) private {
+    function _updateSwapFee(uint8 newFee) internal {
         require(newFee >= MIN_SWAP_FEE && newFee <= MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
 
         swapFee = newFee;
@@ -93,11 +90,7 @@ contract MirinGovernance {
         emit SwapFeeUpdated(newFee);
     }
 
-    function updateSwapFeeTo(address newFeeTo) public onlyOperator {
-        _updateSwapFeeTo(newFeeTo);
-    }
-
-    function _updateSwapFeeTo(address newFeeTo) private {
+    function _updateSwapFeeTo(address newFeeTo) internal {
         swapFeeTo = newFeeTo;
 
         emit SwapFeeToUpdated(newFeeTo);
