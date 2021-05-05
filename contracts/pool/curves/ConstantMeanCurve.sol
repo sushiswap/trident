@@ -4,7 +4,6 @@ pragma solidity =0.8.2;
 
 import "../../interfaces/IMirinCurve.sol";
 import "../../libraries/MirinMath.sol";
-import "../../libraries/MirinMath2.sol";
 
 /**
  * @dev Constant mean curve for tokens with different possible weights (k = r_0^w_0 * r_1^w1)
@@ -88,11 +87,11 @@ contract ConstantMeanCurve is IMirinCurve {
         (uint8 weightIn, uint8 weightOut) = decodeData(data, tokenIn);
         require(amountIn <= reserveIn / 2, "MIRIN: ERR_MAX_IN_RATIO");
 
-        uint256 weightRatio = MirinMath2.roundDiv(uint256(weightIn), uint256(weightOut));
-        uint256 adjustedIn = MirinMath2.roundMul(amountIn, MirinMath2.BASE - (uint256(swapFee) * 10**15));
-        uint256 base = MirinMath2.roundDiv(uint256(reserveIn), uint256(reserveIn) + adjustedIn);
-        uint256 pow = MirinMath2.power(base, weightRatio);
-        amountOut = MirinMath2.roundMul(uint256(reserveOut), MirinMath2.BASE - pow);
+        uint256 weightRatio = MirinMath.roundDiv(uint256(weightIn), uint256(weightOut));
+        uint256 adjustedIn = MirinMath.roundMul(amountIn, MirinMath.BASE18 - (uint256(swapFee) * 10**15));
+        uint256 base = MirinMath.roundDiv(uint256(reserveIn), uint256(reserveIn) + adjustedIn);
+        uint256 pow = MirinMath.power(base, weightRatio);
+        amountOut = MirinMath.roundMul(uint256(reserveOut), MirinMath.BASE18 - pow);
     }
 
     function computeAmountIn(
@@ -110,9 +109,9 @@ contract ConstantMeanCurve is IMirinCurve {
         (uint8 weightIn, uint8 weightOut) = decodeData(data, tokenIn);
         require(amountOut <= reserveOut / 3, "MIRIN: ERR_MAX_OUT_RATIO");
 
-        uint256 weightRatio = MirinMath2.roundDiv(uint256(weightOut), uint256(weightIn));
-        uint256 base = MirinMath2.roundDiv(uint256(reserveOut), uint256(reserveOut) - amountOut);
-        uint256 pow = MirinMath2.power(base, weightRatio);
-        amountIn = (uint256(reserveIn) * (pow - MirinMath2.BASE)) / (MirinMath2.BASE - (uint256(swapFee) * 10**15));
+        uint256 weightRatio = MirinMath.roundDiv(uint256(weightOut), uint256(weightIn));
+        uint256 base = MirinMath.roundDiv(uint256(reserveOut), uint256(reserveOut) - amountOut);
+        uint256 pow = MirinMath.power(base, weightRatio);
+        amountIn = (uint256(reserveIn) * (pow - MirinMath.BASE18)) / (MirinMath.BASE18 - (uint256(swapFee) * 10**15));
     }
 }

@@ -64,7 +64,7 @@ function getData() {
     return utils.hexZeroPad(d1, 32);
 }
 
-describe("MirinMath2 Test", function () {
+describe("MirinMath Test_Latter Part", function () {
     let CMC, test;
     let n, js, con, data;
     const BASE = BigNumber.from(10).pow(18);
@@ -355,7 +355,7 @@ describe("ConstantMeanCurve additional Test", function () {
             w1 = wO;
 
             con = await test.computePrice(r0, r1, data, 0);
-            js = r1.mul(BigNumber.from(2).pow(112)).mul(w0).div(r0).div(w1);
+            js = r1.mul(BigNumber.from(2).pow(104)).mul(w0).div(r0).div(w1);
             expect(con).to.eq(js);
             n++;
         }
@@ -369,7 +369,7 @@ describe("ConstantMeanCurve additional Test", function () {
             w1 = wI;
 
             con = await test.computePrice(r0, r1, data, 1);
-            js = r0.mul(BigNumber.from(2).pow(112)).mul(w1).div(r1).div(w0);
+            js = r0.mul(BigNumber.from(2).pow(104)).mul(w1).div(r1).div(w0);
             expect(con).to.eq(js);
             n++;
         }
