@@ -21,12 +21,12 @@ contract MirinGovernance is MirinERC20 {
     address public operator;
 
     /**
-     * @dev Fee for swapping (out of 1000)
+     * @dev Fee for swapping (out of 100).
      */
     uint8 public swapFee;
 
     /**
-     * @dev Swap fee receiver
+     * @dev Swap fee receiver.
      */
     address public swapFeeTo;
 
@@ -36,7 +36,7 @@ contract MirinGovernance is MirinERC20 {
     bool public whitelistOn;
 
     /**
-     * @dev A blacklisted account cannot mint and burn
+     * @dev A `whitelisted` account can mint and burn.
      */
     mapping(address => bool) public whitelisted;
 
@@ -53,7 +53,7 @@ contract MirinGovernance is MirinERC20 {
     }
 
     modifier onlyWhitelisted(address account) {
-        require(whitelistOn && !whitelisted[account], "MIRIN: NOT_WHITELISTED");
+        require(whitelistOn && whitelisted[account], "MIRIN: NOT_WHITELISTED");
         _;
     }
 
