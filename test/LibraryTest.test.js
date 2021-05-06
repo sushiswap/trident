@@ -91,56 +91,6 @@ describe("Library Test", function () {
         await expect(test.functionCall1(C1.address, data3)).to.be.reverted;
     });
 
-    it("UQ112x112 test", async function () {
-        const exp = BigNumber.from("2").pow(112);
-        const t1 = BigNumber.from(await test.encode(223));
-        expect(t1).to.be.equal(BigNumber.from("223").mul(exp));
-        const t2 = BigNumber.from("2").pow(113);
-        const t3 = BigNumber.from("2").pow(100);
-        expect(await test.uqdiv(t2, t3)).to.be.equal(Math.pow(2, 13));
-    });
-
-    it("FixedPoint test", async function () {
-        const res = BigNumber.from("2").pow(112);
-
-        // encode
-        const t1 = BigNumber.from((await test.encodeFP(1479))[0]);
-        expect(t1).to.be.equal(BigNumber.from("1479").mul(res));
-
-        // encode144
-        const t2 = BigNumber.from("2").pow(123);
-        expect((await test.encode144(t2))[0]).to.be.equal(BigNumber.from(t2).mul(res));
-        const t3 = BigNumber.from("2").pow(100);
-
-        // div224By112
-        await expect(test.div224By112([t2], 0)).to.be.revertedWith("FixedPoint: DIV_BY_ZERO");
-        expect((await test.div224By112([t2], t3))[0]).to.be.equal(Math.pow(2, 23));
-        expect((await test.div224By112([12345], 123))[0]).to.be.equal(Math.floor(12345 / 123));
-
-        // mul224To256
-        const t4 = BigNumber.from("2").pow(223);
-        expect((await test.mul224To256([t2], t3))[0]).to.be.equal(t4);
-
-        // div256By112
-        await expect(test.div256By112([t2], 0)).to.be.revertedWith("FixedPoint: DIV_BY_ZERO");
-        expect((await test.div256By112([t4], t3))[0]).to.be.equal(t2);
-
-        // mul256To256
-        expect((await test.mul256To256([t2], t3))[0]).to.be.equal(t4);
-
-        // fraction
-        await expect(test.fraction(t3, 0)).to.be.revertedWith("FixedPoint: DIV_BY_ZERO");
-        const t5 = BigNumber.from(t3).mul(res).div("137");
-        expect((await test.fraction(t3, 137))[0]).to.be.equal(t5);
-
-        // decode
-        expect(await test.decode([t5])).to.be.equal(BigNumber.from(t3).div("137"));
-
-        // decode144
-        const t6 = BigNumber.from(t2).mul(res).div("1749");
-        expect(await test.decode144([t6])).to.be.equal(BigNumber.from(t2).div("1749"));
-    });
-
     it("SafeERC20 test", async function () {
         const Token = await ethers.getContractFactory("ERC20Token");
         const token = await Token.deploy();

@@ -14,7 +14,7 @@ library MirinMath {
     uint256 internal constant LNX = 3988425491;
     uint256 internal constant LOG_10_2 = 3010299957;
     uint256 internal constant LOG_E_2 = 6931471806;
-    uint256 internal constant BASE = 1e10;
+    uint256 internal constant BASE10 = 1e10;
 
     uint256 internal constant MAX_NUM = 0x200000000000000000000000000000000;
     uint8 internal constant MIN_PRECISION = 32;
@@ -22,13 +22,10 @@ library MirinMath {
     uint256 internal constant OPT_LOG_MAX_VAL = 0x15bf0a8b1457695355fb8ac404e7a79e3;
     uint256 internal constant OPT_EXP_MAX_VAL = 0x800000000000000000000000000000000;
 
-    function max(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a >= b ? a : b;
-    }
-
-    function min(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        z = x < y ? x : y;
-    }
+    uint256 internal constant BASE18 = 1e18;
+    uint256 internal constant MIN_POWER_BASE = 1 wei;
+    uint256 internal constant MAX_POWER_BASE = (2 * BASE18) - 1 wei;
+    uint256 internal constant POWER_PRECISION = BASE18 / 1e10;
 
     function ln(uint256 x) internal pure returns (uint256) {
         uint256 res = 0;
@@ -51,7 +48,7 @@ library MirinMath {
             }
         }
 
-        return (res * LOG_E_2) / BASE;
+        return (res * LOG_E_2) / BASE10;
     }
 
     /**
@@ -79,7 +76,7 @@ library MirinMath {
             }
         }
 
-        return (res * LOG_10_2) / BASE;
+        return (res * LOG_10_2) / BASE10;
     }
 
     /**
@@ -257,154 +254,82 @@ library MirinMath {
         return res;
     }
 
-    function quoteOptionAll(
-        uint256 t,
-        uint256 v,
-        uint256 sp,
-        uint256 st
-    ) internal pure returns (uint256 call, uint256 put) {
-        uint256 _c;
-        uint256 _p;
-
-        if (sp > st) {
-            _c = C(t, v, sp, st);
-            _p = sp - st + _c;
-        } else {
-            _p = C(t, v, st, sp);
-            _c = st - sp + _p;
-        }
-        return (_c, _p);
+    function toInt(uint256 a) internal pure returns (uint256) {
+        return a / BASE18;
     }
 
-    function C(
-        uint256 t,
-        uint256 v,
-        uint256 sp,
-        uint256 st
-    ) internal pure returns (uint256) {
-        if (sp == st) {
-            return (((((LNX * sp) / 1e10) * v) / 1e18) * sqrt((1e18 * t) / 365)) / 1e9;
-        }
-        uint256 sigma = ((v**2) / 2);
-        uint256 sigmaB = 1e36;
-
-        uint256 sig = (((1e18 * sigma) / sigmaB) * t) / 365;
-
-        uint256 sSQRT = (v * sqrt((1e18 * t) / 365)) / 1e9;
-
-        uint256 d1 = (1e18 * ln((FIXED_1 * sp) / st)) / FIXED_1;
-        d1 = ((d1 + sig) * 1e18) / sSQRT;
-        uint256 d2 = d1 - sSQRT;
-
-        uint256 cdfD1 = ncdf((FIXED_1 * d1) / 1e18);
-        uint256 cdfD2 = ncdf((FIXED_1 * d2) / 1e18);
-
-        return (sp * cdfD1) / 1e14 - (st * cdfD2) / 1e14;
+    function toFloor(uint256 a) internal pure returns (uint256) {
+        return toInt(a) * BASE18;
     }
 
-    function ncdf(uint256 x) internal pure returns (uint256) {
-        int256 t1 = int256(1e7 + ((2315419 * x) / FIXED_1));
-        uint256 exp = ((x / 2) * x) / FIXED_1;
-        int256 d = int256((3989423 * FIXED_1) / optimalExp(uint256(exp)));
-        uint256 prob =
-            uint256(
-                (d *
-                    (3193815 +
-                        ((-3565638 + ((17814780 + ((-18212560 + (13302740 * 1e7) / t1) * 1e7) / t1) * 1e7) / t1) *
-                            1e7) /
-                        t1) *
-                    1e7) / t1
-            );
-        if (x > 0) prob = 1e14 - prob;
-        return prob;
+    function roundMul(uint256 a, uint256 b) internal pure returns (uint256) {
+        uint256 c0 = a * b;
+        uint256 c1 = c0 + (BASE18 / 2);
+        return c1 / BASE18;
     }
 
-    function vol(uint256[] memory p) internal pure returns (uint256 x) {
-        uint256 _v;
-        for (uint8 i = 1; i <= (p.length - 1); i++) {
-            if (p[i] > p[i - 1]) {
-                _v = generalLog(p[i] * FIXED_1) - generalLog(p[i - 1] * FIXED_1);
-            } else {
-                _v = generalLog(p[i - 1] * FIXED_1) - generalLog(p[i] * FIXED_1);
-            }
-            x += _v**2;
-            //denom += FIXED_1**2;
-        }
-        //return (sum, denom);
-
-        x = sqrt(uint256(252) * sqrt(x / (p.length - 1)));
-        return (uint256(1e18) * x) / SQRT_1;
+    function roundDiv(uint256 a, uint256 b) internal pure returns (uint256) {
+        uint256 c0 = a * BASE18;
+        uint256 c1 = c0 + (b / 2);
+        return c1 / b;
     }
 
-    // computes square roots using the babylonian method
-    // https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Babylonian_method
-    // credit for this implementation goes to
-    // https://github.com/abdk-consulting/abdk-libraries-solidity/blob/master/ABDKMath64x64.sol#L687
-    function sqrt(uint256 x) internal pure returns (uint256) {
-        if (x == 0) return 0;
-        // this block is equivalent to r = uint256(1) << (BitMath.mostSignificantBit(x) / 2);
-        // however that code costs significantly more gas
-        uint256 xx = x;
-        uint256 r = 1;
-        if (xx >= 0x100000000000000000000000000000000) {
-            xx >>= 128;
-            r <<= 64;
+    function power(uint256 base, uint256 exp) internal pure returns (uint256) {
+        require(base >= MIN_POWER_BASE, "MIRIN: POWER_BASE_TOO_LOW");
+        require(base <= MAX_POWER_BASE, "MIRIN: POWER_BASE_TOO_HIGH");
+
+        uint256 whole = toFloor(exp);
+        uint256 remain = exp - whole;
+
+        uint256 wholePow = powInt(base, toInt(whole));
+
+        if (remain == 0) {
+            return wholePow;
         }
-        if (xx >= 0x10000000000000000) {
-            xx >>= 64;
-            r <<= 32;
-        }
-        if (xx >= 0x100000000) {
-            xx >>= 32;
-            r <<= 16;
-        }
-        if (xx >= 0x10000) {
-            xx >>= 16;
-            r <<= 8;
-        }
-        if (xx >= 0x100) {
-            xx >>= 8;
-            r <<= 4;
-        }
-        if (xx >= 0x10) {
-            xx >>= 4;
-            r <<= 2;
-        }
-        if (xx >= 0x8) {
-            r <<= 1;
-        }
-        r = (r + x / r) >> 1;
-        r = (r + x / r) >> 1;
-        r = (r + x / r) >> 1;
-        r = (r + x / r) >> 1;
-        r = (r + x / r) >> 1;
-        r = (r + x / r) >> 1;
-        r = (r + x / r) >> 1; // Seven iterations should be enough
-        uint256 r1 = x / r;
-        return (r < r1 ? r : r1);
+
+        uint256 partialResult = powFrac(base, remain, POWER_PRECISION);
+        return roundMul(wholePow, partialResult);
     }
 
-    /**
-     * @dev stddev calculates the standard deviation for an array of integers
-     * @dev precision is the same as sqrt above meaning for higher precision
-     * @dev the decimal place must be moved prior to passing the params
-     * @param numbers uint[] array of numbers to be used in calculation
-     */
-    function stddev(uint256[] memory numbers) internal pure returns (uint256 sd) {
-        uint256 sum = 0;
-        for (uint256 i = 0; i < numbers.length; i++) {
-            sum += numbers[i];
-        }
-        uint256 mean = sum / numbers.length; // Integral value; float not supported in Solidity
-        sum = 0;
-        for (uint256 i = 0; i < numbers.length; i++) {
-            if (numbers[i] > mean) {
-                sum += (numbers[i] - mean)**2;
-            } else {
-                sum += (mean - numbers[i])**2;
+    function powInt(uint256 a, uint256 n) private pure returns (uint256) {
+        uint256 z = n % 2 != 0 ? a : BASE18;
+
+        for (n /= 2; n != 0; n /= 2) {
+            a = roundMul(a, a);
+
+            if (n % 2 != 0) {
+                z = roundMul(z, a);
             }
         }
-        sd = sqrt(sum / (numbers.length - 1)); //Integral value; float not supported in Solidity
-        return sd;
+        return z;
+    }
+
+    function powFrac(
+        uint256 base,
+        uint256 exp,
+        uint256 precision
+    ) private pure returns (uint256) {
+        uint256 a = exp;
+        (uint256 x, bool xneg) = base >= BASE18 ? (base - BASE18, false) : (BASE18 - base, true);
+        uint256 term = BASE18;
+        uint256 sum = term;
+        bool negative = false;
+
+        for (uint256 i = 1; term >= precision; i++) {
+            uint256 bigK = i * BASE18;
+            (uint256 c, bool cneg) = a + BASE18 >= bigK ? (a + BASE18 - bigK, false) : (bigK - a - BASE18, true);
+            term = roundMul(term, roundMul(c, x));
+            term = roundDiv(term, bigK);
+            if (term == 0) break;
+
+            if (xneg) negative = !negative;
+            if (cneg) negative = !negative;
+            if (negative) {
+                sum = sum - term;
+            } else {
+                sum = sum + term;
+            }
+        }
+        return sum;
     }
 }
