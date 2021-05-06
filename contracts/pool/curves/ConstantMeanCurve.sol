@@ -65,7 +65,7 @@ contract ConstantMeanCurve is IMirinCurve {
         bytes32 data,
         uint8 tokenIn
     ) external pure override returns (uint224) {
-        (uint8 weight0, uint8 weight1) = decodeData(data, tokenIn);
+        (uint8 weight0, uint8 weight1) = decodeData(data, 0);
         return
             tokenIn == 0
                 ? ((uint224(reserve1) * weight0) << PRECISION) / reserve0 / weight1

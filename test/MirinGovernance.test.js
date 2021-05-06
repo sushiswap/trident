@@ -12,6 +12,14 @@ describe("MirinGovernance Test", function () {
     let tx, res;
     const Address0 = constants.AddressZero;
 
+    async function getMP(tk0Addr, tk1Addr, curveAddr, curvedata, operatorAddr, fee, feeToAddr) {
+        await mf.createPool(tk0Addr, tk1Addr, curveAddr, curvedata, operatorAddr, fee, feeToAddr);
+    
+        const eventFilter = mf.filters.PoolCreated();
+        const events = await mf.queryFilter(eventFilter, "latest");
+        return await MP.attach(events[0].args[4]);
+    }
+
     before(async function () {
         [owner, feeTo, operator, swapFeeTo, addr1, addr2, addr3] = await ethers.getSigners();
         
@@ -29,15 +37,12 @@ describe("MirinGovernance Test", function () {
         
         await SUSHI.approve(mf.address, BigNumber.from(10).pow(30));
         await mf.whitelistCurve(cmc.address);
+
+        MP = await ethers.getContractFactory("MirinPool");
     });
     
     beforeEach(async function () {
-        let Pool = await mf.callStatic.createPool(tk0.address, tk1.address, cmc.address, getData(20), operator.address, 10, swapFeeTo.address);
-        
-        await mf.createPool(tk0.address, tk1.address, cmc.address, getData(20), operator.address, 10, swapFeeTo.address);
-        
-        MP = await ethers.getContractFactory("MirinPool");
-        test = await MP.attach(Pool);
+        test = await getMP(tk0.address, tk1.address, cmc.address, getData(20), Address0, 0, Address0);
     });
     
     it("Should fail unless operator call functions with onlyOperator modifier", async function () {
@@ -140,12 +145,7 @@ describe("MirinGovernance Test", function () {
     });
 
     it("Should be that swapFee is 3 and swapFeeTo is zero when operator is zero address", async function () {
-        let Pool = await mf.callStatic.createPool(tk0.address, tk1.address, cmc.address, getData(20), Address0, 10, swapFeeTo.address);
-
-        await mf.createPool(tk0.address, tk1.address, cmc.address, getData(20), Address0, 10, swapFeeTo.address);
-
-        MP = await ethers.getContractFactory("MirinPool");
-        test = await MP.attach(Pool);
+        test = await getMP(tk0.address, tk1.address, cmc.address, getData(20), Address0, 10, swapFeeTo.address);
 
         expect(await test.callStatic.operator()).to.be.equal(Address0);
         expect(await test.swapFee()).to.be.equal(3);
