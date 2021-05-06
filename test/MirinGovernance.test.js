@@ -1,50 +1,56 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const { BigNumber, utils, constants } = require("ethers");
-
-function getData(w0) {
-    let d1 = BigNumber.from(w0).toHexString();
-    return utils.hexZeroPad(d1, 32);
-}
+const { BigNumber, utils, constants } = ethers;
+const { AddressZero } = constants;
 
 describe("MirinGovernance Test", function () {
-    let MF, mf, MP, test, tk0, tk1, CMC, cmc, SUSHI;
-    let tx, res;
-    const Address0 = constants.AddressZero;
+    let owner, feeTo, operator, swapFeeTo, addr1, addr2, addr3;
+    let ERC20, factory, test, curve, sushi, token0, token1;
 
-    async function getMP(tk0Addr, tk1Addr, curveAddr, curvedata, operatorAddr, fee, feeToAddr) {
-        await mf.createPool(tk0Addr, tk1Addr, curveAddr, curvedata, operatorAddr, fee, feeToAddr);
-    
-        const eventFilter = mf.filters.PoolCreated();
-        const events = await mf.queryFilter(eventFilter, "latest");
-        return await MP.attach(events[0].args[4]);
+    function getData(w0) {
+        let d1 = BigNumber.from(w0).toHexString();
+        return utils.hexZeroPad(d1, 32);
+    }
+
+    async function getPool(tk0Addr, tk1Addr, curveAddr, curvedata, operatorAddr, fee, feeToAddr) {
+        await factory.createPool(tk0Addr, tk1Addr, curveAddr, curvedata, operatorAddr, fee, feeToAddr);
+
+        const eventFilter = factory.filters.PoolCreated();
+        const events = await factory.queryFilter(eventFilter, "latest");
+
+        const Pool = await ethers.getContractFactory("MirinPool");
+        return await Pool.attach(events[0].args[4]);
     }
 
     before(async function () {
         [owner, feeTo, operator, swapFeeTo, addr1, addr2, addr3] = await ethers.getSigners();
-        
-        const ERC20 = await ethers.getContractFactory("ERC20TestToken");
+        ERC20 = await ethers.getContractFactory("ERC20TestToken");
+        sushi = await ERC20.deploy();
+        token0 = await ERC20.deploy();
+        token1 = await ERC20.deploy();
 
-        SUSHI = await ERC20.deploy();
-        tk0 = await ERC20.deploy();
-        tk1 = await ERC20.deploy();
-        
-        CMC = await ethers.getContractFactory("ConstantMeanCurve");
-        cmc = await CMC.deploy();
-        
-        MF = await ethers.getContractFactory("MirinFactory");
-        mf = await MF.deploy(SUSHI.address, feeTo.address, owner.address);
-        
-        await SUSHI.approve(mf.address, BigNumber.from(10).pow(30));
-        await mf.whitelistCurve(cmc.address);
+        const ConstantMeanCurve = await ethers.getContractFactory("ConstantMeanCurve");
+        curve = await ConstantMeanCurve.deploy();
 
-        MP = await ethers.getContractFactory("MirinPool");
+        const Factory = await ethers.getContractFactory("MirinFactory");
+        factory = await Factory.deploy(sushi.address, feeTo.address, owner.address);
+
+        await sushi.approve(factory.address, BigNumber.from(10).pow(30));
+        await factory.whitelistCurve(curve.address);
     });
-    
+
     beforeEach(async function () {
-        test = await getMP(tk0.address, tk1.address, cmc.address, getData(20), Address0, 0, Address0);
+        test = await getPool(
+            token0.address,
+            token1.address,
+            curve.address,
+            getData(20),
+            operator.address,
+            10,
+            swapFeeTo.address
+        );
     });
-    
+
     it("Should fail unless operator call functions with onlyOperator modifier", async function () {
         expect(await test.callStatic.operator()).to.be.equal(operator.address);
         await expect(test.setOperator(addr1.address)).to.be.revertedWith("MIRIN: UNAUTHORIZED");
@@ -52,16 +58,18 @@ describe("MirinGovernance Test", function () {
         await expect(test.updateSwapFeeTo(addr1.address)).to.be.revertedWith("MIRIN: UNAUTHORIZED");
         await expect(test.disable(addr1.address)).to.be.revertedWith("MIRIN: UNAUTHORIZED");
         await expect(test.addToBlacklist([addr1.address, addr2.address])).to.be.revertedWith("MIRIN: UNAUTHORIZED");
-        await expect(test.removeFromBlacklist([addr1.address, addr2.address])).to.be.revertedWith("MIRIN: UNAUTHORIZED");
+        await expect(test.removeFromBlacklist([addr1.address, addr2.address])).to.be.revertedWith(
+            "MIRIN: UNAUTHORIZED"
+        );
     });
 
     it("Should fail when newOperator address is zero", async function () {
-        await expect(test.connect(operator).setOperator(Address0)).to.be.revertedWith("MIRIN: INVALID_OPERATOR");
+        await expect(test.connect(operator).setOperator(AddressZero)).to.be.revertedWith("MIRIN: INVALID_OPERATOR");
     });
 
     it("Should change operator and emit event", async function () {
-        tx = await test.connect(operator).setOperator(addr1.address);
-        res = await tx.wait();
+        const tx = await test.connect(operator).setOperator(addr1.address);
+        const res = await tx.wait();
 
         expect(res.events[0].event).to.be.equal("OperatorSet");
         expect(res.events[0].args[0]).to.be.equal(operator.address);
@@ -76,9 +84,9 @@ describe("MirinGovernance Test", function () {
 
     it("Should update swapFee and emit event", async function () {
         expect(await test.swapFee()).to.be.equal(10);
-    
-        tx = await test.connect(operator).updateSwapFee(30);
-        res = await tx.wait();
+
+        const tx = await test.connect(operator).updateSwapFee(30);
+        const res = await tx.wait();
 
         expect(res.events[0].event).to.be.equal("SwapFeeUpdated");
         expect(res.events[0].args[0]).to.be.equal(30);
@@ -87,9 +95,9 @@ describe("MirinGovernance Test", function () {
 
     it("Should update swapFeeTo and emit event", async function () {
         expect(await test.swapFeeTo()).to.be.equal(swapFeeTo.address);
-    
-        tx = await test.connect(operator).updateSwapFeeTo(addr1.address);
-        res = await tx.wait();
+
+        const tx = await test.connect(operator).updateSwapFeeTo(addr1.address);
+        const res = await tx.wait();
 
         expect(res.events[0].event).to.be.equal("SwapFeeToUpdated");
         expect(res.events[0].args[0]).to.be.equal(addr1.address);
@@ -97,20 +105,24 @@ describe("MirinGovernance Test", function () {
     });
 
     it("Should disable pool and refund SUSHI_deposit", async function () {
-        expect(await mf.isPool(test.address)).to.be.true;
-    
-        await expect(() => test.connect(operator).disable(addr1.address)).to.changeTokenBalance(SUSHI, addr1, BigNumber.from(10).pow(18).mul(10000));
-      
-        expect(await mf.isPool(test.address)).to.be.false;
+        expect(await factory.isPool(test.address)).to.be.true;
+
+        await expect(() => test.connect(operator).disable(addr1.address)).to.changeTokenBalance(
+            sushi,
+            addr1,
+            BigNumber.from(10).pow(18).mul(10000)
+        );
+
+        expect(await factory.isPool(test.address)).to.be.false;
     });
 
     it("Should add and remove given addresses into/from blacklists and emit events", async function () {
         expect(await test.blacklisted(addr1.address)).to.be.false;
         expect(await test.blacklisted(addr2.address)).to.be.false;
         expect(await test.blacklisted(addr3.address)).to.be.false;
-    
-        tx = await test.connect(operator).addToBlacklist([addr1.address, addr2.address, addr3.address]);
-        res = await tx.wait();
+
+        let tx = await test.connect(operator).addToBlacklist([addr1.address, addr2.address, addr3.address]);
+        let res = await tx.wait();
 
         expect(res.events[0].event).to.be.equal("BlacklistAdded");
         expect(res.events[0].args[0]).to.be.equal(addr1.address);
@@ -120,7 +132,7 @@ describe("MirinGovernance Test", function () {
         expect(await test.blacklisted(addr1.address)).to.be.true;
         expect(await test.blacklisted(addr2.address)).to.be.true;
         expect(await test.blacklisted(addr3.address)).to.be.true;
-    
+
         tx = await test.connect(operator).removeFromBlacklist([addr1.address, addr2.address]);
         res = await tx.wait();
 
@@ -135,9 +147,9 @@ describe("MirinGovernance Test", function () {
 
     it("Should fail if an address on blacklists call function with notBlacklisted modifier", async function () {
         await test.connect(operator).addToBlacklist([addr1.address]);
-        
-        await tk0.transfer(test.address, 100000);
-        await tk1.transfer(test.address, 100000);
+
+        await token0.transfer(test.address, 100000);
+        await token1.transfer(test.address, 100000);
 
         await expect(test.mint(addr1.address)).to.be.revertedWith("MIRIN: BLACKLISTED");
 
@@ -145,10 +157,18 @@ describe("MirinGovernance Test", function () {
     });
 
     it("Should be that swapFee is 3 and swapFeeTo is zero when operator is zero address", async function () {
-        test = await getMP(tk0.address, tk1.address, cmc.address, getData(20), Address0, 10, swapFeeTo.address);
+        test = await getPool(
+            token0.address,
+            token1.address,
+            curve.address,
+            getData(20),
+            AddressZero,
+            10,
+            swapFeeTo.address
+        );
 
-        expect(await test.callStatic.operator()).to.be.equal(Address0);
+        expect(await test.callStatic.operator()).to.be.equal(AddressZero);
         expect(await test.swapFee()).to.be.equal(3);
-        expect(await test.swapFeeTo()).to.be.equal(Address0);
+        expect(await test.swapFeeTo()).to.be.equal(AddressZero);
     });
 });

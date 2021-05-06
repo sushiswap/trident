@@ -2,8 +2,8 @@ const { expect, assert } = require("chai");
 const { ethers } = require("hardhat");
 const { BigNumber, utils } = require("ethers");
 const { Decimal } = require("decimal.js");
-Decimal18 = Decimal.clone({ precision: 18 });
-Decimal40 = Decimal.clone({ precision: 40 });
+const Decimal18 = Decimal.clone({ precision: 18 });
+const Decimal40 = Decimal.clone({ precision: 40 });
 
 let aIn, aOut, rIn, rOut, swapFee, wI, wO;
 
