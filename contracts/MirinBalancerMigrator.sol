@@ -2,7 +2,8 @@
 
 pragma solidity =0.8.2;
 
-import "./MirinHelpers.sol";
+import "./libraries/MirinLibrary.sol";
+import "./libraries/SafeERC20.sol";
 
 interface IBFactory {
     function isBPool(address b) external view returns (bool);
@@ -16,16 +17,29 @@ interface IBPool {
     function exitPool(uint256 poolAmountIn, uint256[] calldata minAmountsOut) external;
 }
 
-contract MirinBalancerMigrator is MirinHelpers {
+contract MirinBalancerMigrator {
+    using SafeERC20 for IERC20;
+
     address public immutable bFactory;
+    address public immutable factory;
+    address public immutable legacyFactory;
+    address public immutable weth;
+
+    modifier ensure(uint256 deadline) {
+        require(deadline >= block.timestamp, "MIRIN: EXPIRED");
+        _;
+    }
 
     constructor(
         address _factory,
         address _legacyFactory,
         address _bFactory,
         address _weth
-    ) MirinHelpers(_factory, _legacyFactory, _weth) {
+    ) {
         bFactory = _bFactory;
+        factory = _factory;
+        legacyFactory = _legacyFactory;
+        weth = _weth;
     }
 
     function migrate(
@@ -47,11 +61,27 @@ contract MirinBalancerMigrator is MirinHelpers {
             "MIRIN: INVALID_TOKENS"
         );
 
-        _safeTransferFrom(pool, msg.sender, address(this), amountToRemove);
+        IERC20(pool).safeTransferFrom(msg.sender, address(this), amountToRemove);
         IBPool(pool).exitPool(amountToRemove, new uint256[](2));
 
         uint256 amountA = IERC20(tokenA).balanceOf(address(this));
         uint256 amountB = IERC20(tokenB).balanceOf(address(this));
         _addLiquidity(tokenA, tokenB, pid, amountA, amountB, liquidityMin, to);
+    }
+
+    function _addLiquidity(
+        address tokenA,
+        address tokenB,
+        uint256 pid,
+        uint256 amountA,
+        uint256 amountB,
+        uint256 liquidityMin,
+        address to
+    ) internal returns (uint256 liquidity) {
+        address pool = MirinLibrary.getPool(factory, legacyFactory, tokenA, tokenB, pid);
+        IERC20(tokenA).safeTransferFrom(msg.sender, pool, amountA);
+        IERC20(tokenB).safeTransferFrom(msg.sender, pool, amountB);
+        liquidity = IMirinPool(pool).mint(to);
+        require(liquidity >= liquidityMin, "MIRIN: INSUFFICIENT_LIQUIDITY");
     }
 }

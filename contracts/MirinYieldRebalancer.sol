@@ -2,11 +2,15 @@
 
 pragma solidity =0.8.2;
 
-import "./MirinHelpers.sol";
 import "./interfaces/IMasterChefV2.sol";
 import "./interfaces/IMirinTwapOracle.sol";
+import "./interfaces/IMirinPool.sol";
+import "./libraries/SafeERC20.sol";
+import "./libraries/MirinLibrary.sol";
 
-contract MirinYieldRebalancer is MirinHelpers {
+contract MirinYieldRebalancer {
+    using SafeERC20 for IERC20;
+
     struct Checkpoint {
         uint128 fromBlock;
         uint128 value;
@@ -23,6 +27,9 @@ contract MirinYieldRebalancer is MirinHelpers {
     IMasterChefV2 public immutable masterChef;
     IERC20 public immutable sushi;
     IMirinTwapOracle public immutable oracle;
+    address public immutable factory;
+    address public immutable legacyFactory;
+    address public immutable weth;
 
     uint256 public lastSushiBalance;
     mapping(uint256 => Reward[]) public rewards;
@@ -50,10 +57,13 @@ contract MirinYieldRebalancer is MirinHelpers {
         address _factory,
         address _legacyFactory,
         address _weth
-    ) MirinHelpers(_factory, _legacyFactory, _weth) {
+    ) {
         masterChef = _masterChef;
         sushi = _sushi;
         oracle = _oracle;
+        factory = _factory;
+        legacyFactory = _legacyFactory;
+        weth = _weth;
     }
 
     function pendingSushi(uint256 pid, address owner) external view returns (uint256 amount) {
@@ -74,7 +84,7 @@ contract MirinYieldRebalancer is MirinHelpers {
         _updateValueAtNow(checkpoints, _latestValue(checkpoints, 0) + amountAdjusted);
 
         address lpToken = masterChef.lpToken(pid);
-        _safeTransferFrom(lpToken, msg.sender, address(this), amount);
+        IERC20(lpToken).safeTransferFrom(msg.sender, address(this), amount);
         IERC20(lpToken).approve(address(masterChef), amount);
         masterChef.deposit(pid, amount, address(this));
 
@@ -129,7 +139,7 @@ contract MirinYieldRebalancer is MirinHelpers {
         lastRewardReceived[pid][msg.sender] = toIndex;
         lastSushiBalance = sushi.balanceOf(address(this)) - amountReceived;
 
-        _safeTransfer(address(sushi), msg.sender, amountReceived);
+        sushi.safeTransfer(msg.sender, amountReceived);
 
         emit ClaimReward(pid, amountReceived, msg.sender);
     }
@@ -186,16 +196,16 @@ contract MirinYieldRebalancer is MirinHelpers {
         address toToken,
         uint256 toAmountMin
     ) internal returns (uint256 toAmount) {
-        _safeTransfer(fromPool, fromPool, fromAmount);
+        IERC20(fromPool).safeTransfer(fromPool, fromAmount);
         (uint256 amount0, uint256 amount1) = IMirinPool(fromPool).burn(address(this));
         (uint256 amountIn, uint256 wethAmount) =
             fromToken == IMirinPool(fromPool).token0() ? (amount0, amount1) : (amount1, amount0);
-        _safeTransfer(fromToken, _getPool(fromToken, weth, 0), amountIn);
+        IERC20(fromToken).safeTransfer(MirinLibrary.getPool(factory, legacyFactory, fromToken, weth, 0), amountIn);
         address[] memory path = _path(fromToken, toToken);
         uint256[] memory pids = new uint256[](3);
-        uint256[] memory amounts = _getAmountsOut(amountIn, path, pids);
+        uint256[] memory amounts = MirinLibrary.getAmountsOut(factory, legacyFactory, amountIn, path, pids);
         _swap(amounts, path, pids, toPool);
-        _safeTransfer(weth, toPool, wethAmount);
+        IERC20(weth).safeTransfer(toPool, wethAmount);
         toAmount = IMirinPool(toPool).mint(address(this));
         require(toAmount >= toAmountMin, "MIRIN: INSUFFICIENT_TO_AMOUNT");
     }
@@ -245,6 +255,31 @@ contract MirinYieldRebalancer is MirinHelpers {
         } else {
             Checkpoint storage oldCheckPoint = checkpoints[checkpoints.length - 1];
             oldCheckPoint.value = uint128(value);
+        }
+    }
+
+    function _swap(
+        uint256[] memory amounts,
+        address[] memory path,
+        uint256[] memory pids,
+        address _to
+    ) internal {
+        for (uint256 i; i < path.length - 1; i++) {
+            (address input, address output) = (path[i], path[i + 1]);
+            (address token0, ) = MirinLibrary.sortTokens(input, output);
+            uint256 amountOut = amounts[i + 1];
+            (uint256 amount0Out, uint256 amount1Out) =
+                input == token0 ? (uint256(0), amountOut) : (amountOut, uint256(0));
+            address to =
+                i < path.length - 2
+                    ? MirinLibrary.getPool(factory, legacyFactory, output, path[i + 2], pids[i + 1])
+                    : _to;
+            IMirinPool(MirinLibrary.getPool(factory, legacyFactory, input, output, pids[i])).swap(
+                amount0Out,
+                amount1Out,
+                to,
+                bytes("")
+            );
         }
     }
 }
