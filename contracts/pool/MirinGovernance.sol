@@ -3,7 +3,6 @@
 pragma solidity =0.8.2;
 
 import "./MirinERC20.sol";
-import "../interfaces/IERC20.sol";
 import "../interfaces/IMirinFactory.sol";
 
 /**
@@ -53,7 +52,7 @@ contract MirinGovernance is MirinERC20 {
     }
 
     modifier onlyWhitelisted(address account) {
-        require(whitelistOn && whitelisted[account], "MIRIN: NOT_WHITELISTED");
+        if (whitelistOn) require(whitelisted[account], "MIRIN: NOT_WHITELISTED");
         _;
     }
 
