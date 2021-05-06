@@ -157,7 +157,7 @@ contract MirinPool is MirinGovernance {
         }
     }
 
-    function mint(address to) external lock enabled notBlacklisted(to) returns (uint256 liquidity) {
+    function mint(address to) external lock enabled onlyWhitelisted(to) returns (uint256 liquidity) {
         (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
         uint256 balance0 = IERC20(token0).balanceOf(address(this));
         uint256 balance1 = IERC20(token1).balanceOf(address(this));
@@ -182,7 +182,7 @@ contract MirinPool is MirinGovernance {
         emit Mint(msg.sender, amount0, amount1, to);
     }
 
-    function burn(address to) external lock notBlacklisted(to) returns (uint256 amount0, uint256 amount1) {
+    function burn(address to) external lock onlyWhitelisted(to) returns (uint256 amount0, uint256 amount1) {
         uint256 liquidity = balanceOf[address(this)];
         uint256 balance0 = IERC20(token0).balanceOf(address(this));
         uint256 balance1 = IERC20(token1).balanceOf(address(this));
@@ -196,7 +196,7 @@ contract MirinPool is MirinGovernance {
         uint256 amount0,
         uint256 amount1,
         address to
-    ) external lock notBlacklisted(to) {
+    ) external lock onlyWhitelisted(to) {
         _burn(balanceOf[address(this)], amount0, amount1, to);
     }
 
@@ -244,7 +244,7 @@ contract MirinPool is MirinGovernance {
         uint256 amount0Out,
         uint256 amount1Out,
         address to
-    ) public lock enabled notBlacklisted(to) {
+    ) public lock enabled onlyWhitelisted(to) {
         require(amount0Out > 0 || amount1Out > 0, "MIRIN: INSUFFICIENT_OUTPUT_AMOUNT");
         (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
         require(amount0Out < _reserve0 && amount1Out < _reserve1, "MIRIN: INSUFFICIENT_LIQUIDITY");

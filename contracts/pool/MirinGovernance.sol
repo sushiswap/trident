@@ -31,23 +31,29 @@ contract MirinGovernance is MirinERC20 {
     address public swapFeeTo;
 
     /**
+     * @dev If this is true, `whitelisted` is respected.
+     */
+    bool public whitelistOn;
+
+    /**
      * @dev A blacklisted account cannot mint and burn
      */
-    mapping(address => bool) public blacklisted;
+    mapping(address => bool) public whitelisted;
 
     event OperatorSet(address indexed previousOperator, address indexed newOperator);
     event SwapFeeUpdated(uint8 newFee);
     event SwapFeeToUpdated(address newFeeTo);
-    event BlacklistAdded(address indexed account);
-    event BlacklistRemoved(address indexed account);
+    event WhitelistOnSet(bool indexed on);
+    event WhitelistAdded(address indexed account);
+    event WhitelistRemoved(address indexed account);
 
     modifier onlyOperator() {
         require(operator == msg.sender, "MIRIN: UNAUTHORIZED");
         _;
     }
 
-    modifier notBlacklisted(address account) {
-        require(!blacklisted[account], "MIRIN: BLACKLISTED");
+    modifier onlyWhitelisted(address account) {
+        require(whitelistOn && !whitelisted[account], "MIRIN: NOT_WHITELISTED");
         _;
     }
 
@@ -91,17 +97,22 @@ contract MirinGovernance is MirinERC20 {
         IMirinFactory(factory).disablePool(to);
     }
 
-    function addToBlacklist(address[] calldata accounts) external onlyOperator {
+    function setWhitelistOn(bool on) external onlyOperator {
+        whitelistOn = on;
+        emit WhitelistOnSet(on);
+    }
+
+    function addToWhitelist(address[] calldata accounts) external onlyOperator {
         for (uint256 i; i < accounts.length; i++) {
-            blacklisted[accounts[i]] = true;
-            emit BlacklistAdded(accounts[i]);
+            whitelisted[accounts[i]] = true;
+            emit WhitelistAdded(accounts[i]);
         }
     }
 
-    function removeFromBlacklist(address[] calldata accounts) external onlyOperator {
+    function removeFromWhitelist(address[] calldata accounts) external onlyOperator {
         for (uint256 i; i < accounts.length; i++) {
-            blacklisted[accounts[i]] = false;
-            emit BlacklistRemoved(accounts[i]);
+            whitelisted[accounts[i]] = false;
+            emit WhitelistRemoved(accounts[i]);
         }
     }
 }
