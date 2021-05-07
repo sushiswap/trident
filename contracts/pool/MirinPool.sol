@@ -214,12 +214,12 @@ contract MirinPool is MirinGovernance {
         uint256 computed =
             IMirinCurve(curve).computeLiquidity(uint112(_reserve0 - amount0), uint112(_reserve1 - amount1), curveData);
         uint256 liquidityDelta = kLast - computed;
+        require(liquidityDelta <= liquidity, "MIRIN: LIQUIDITY");
         if (liquidityDelta < liquidity) {
             _transfer(address(this), to, liquidity - liquidityDelta);
             liquidity = liquidityDelta;
         }
         _burn(address(this), liquidity);
-        require(computed == totalSupply, "MIRIN: LIQUIDITY");
 
         _safeTransfer(token0, to, amount0);
         _safeTransfer(token1, to, amount1);
