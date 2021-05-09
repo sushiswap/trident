@@ -57,8 +57,8 @@ describe("MirinGovernance Test", function () {
         await expect(test.updateSwapFee(20)).to.be.revertedWith("MIRIN: UNAUTHORIZED");
         await expect(test.updateSwapFeeTo(addr1.address)).to.be.revertedWith("MIRIN: UNAUTHORIZED");
         await expect(test.disable(addr1.address)).to.be.revertedWith("MIRIN: UNAUTHORIZED");
-        await expect(test.addToBlacklist([addr1.address, addr2.address])).to.be.revertedWith("MIRIN: UNAUTHORIZED");
-        await expect(test.removeFromBlacklist([addr1.address, addr2.address])).to.be.revertedWith(
+        await expect(test.addToWhitelist([addr1.address, addr2.address])).to.be.revertedWith("MIRIN: UNAUTHORIZED");
+        await expect(test.removeFromWhitelist([addr1.address, addr2.address])).to.be.revertedWith(
             "MIRIN: UNAUTHORIZED"
         );
     });
@@ -116,42 +116,42 @@ describe("MirinGovernance Test", function () {
         expect(await factory.isPool(test.address)).to.be.false;
     });
 
-    it("Should add and remove given addresses into/from blacklists and emit events", async function () {
-        expect(await test.blacklisted(addr1.address)).to.be.false;
-        expect(await test.blacklisted(addr2.address)).to.be.false;
-        expect(await test.blacklisted(addr3.address)).to.be.false;
+    it("Should add and remove given addresses into/from whitelist and emit events", async function () {
+        expect(await test.whitelisted(addr1.address)).to.be.false;
+        expect(await test.whitelisted(addr2.address)).to.be.false;
+        expect(await test.whitelisted(addr3.address)).to.be.false;
 
-        let tx = await test.connect(operator).addToBlacklist([addr1.address, addr2.address, addr3.address]);
+        let tx = await test.connect(operator).addToWhitelist([addr1.address, addr2.address, addr3.address]);
         let res = await tx.wait();
 
-        expect(res.events[0].event).to.be.equal("BlacklistAdded");
+        expect(res.events[0].event).to.be.equal("WhitelistAdded");
         expect(res.events[0].args[0]).to.be.equal(addr1.address);
         expect(res.events[1].args[0]).to.be.equal(addr2.address);
         expect(res.events[2].args[0]).to.be.equal(addr3.address);
 
-        expect(await test.blacklisted(addr1.address)).to.be.true;
-        expect(await test.blacklisted(addr2.address)).to.be.true;
-        expect(await test.blacklisted(addr3.address)).to.be.true;
+        expect(await test.whitelisted(addr1.address)).to.be.true;
+        expect(await test.whitelisted(addr2.address)).to.be.true;
+        expect(await test.whitelisted(addr3.address)).to.be.true;
 
-        tx = await test.connect(operator).removeFromBlacklist([addr1.address, addr2.address]);
+        tx = await test.connect(operator).removeFromWhitelist([addr1.address, addr2.address]);
         res = await tx.wait();
 
-        expect(res.events[0].event).to.be.equal("BlacklistRemoved");
+        expect(res.events[0].event).to.be.equal("WhitelistRemoved");
         expect(res.events[0].args[0]).to.be.equal(addr1.address);
         expect(res.events[1].args[0]).to.be.equal(addr2.address);
 
-        expect(await test.blacklisted(addr1.address)).to.be.false;
-        expect(await test.blacklisted(addr2.address)).to.be.false;
-        expect(await test.blacklisted(addr3.address)).to.be.true;
+        expect(await test.whitelisted(addr1.address)).to.be.false;
+        expect(await test.whitelisted(addr2.address)).to.be.false;
+        expect(await test.whitelisted(addr3.address)).to.be.true;
     });
 
-    it("Should fail if an address on blacklists call function with notBlacklisted modifier", async function () {
-        await test.connect(operator).addToBlacklist([addr1.address]);
+    it("Should fail if an address not on whitelist calls function with onlyWhitelisted modifier", async function () {
+        await test.connect(operator).addToWhitelist([addr1.address]);
 
         await token0.transfer(test.address, 100000);
         await token1.transfer(test.address, 100000);
 
-        await expect(test.mint(addr1.address)).to.be.revertedWith("MIRIN: BLACKLISTED");
+        await expect(test.mint(addr1.address)).to.be.revertedWith("MIRIN: NOT_WHITELISTED");
 
         await test.mint(addr2.address);
     });
