@@ -8,8 +8,8 @@ interface IMirinCurve {
     function isValidData(bytes32 data) external view returns (bool);
 
     function computeLiquidity(
-        uint112 reserve0,
-        uint112 reserve1,
+        uint256 reserve0,
+        uint256 reserve1,
         bytes32 data
     ) external view returns (uint256);
 

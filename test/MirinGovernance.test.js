@@ -145,15 +145,39 @@ describe("MirinGovernance Test", function () {
         expect(await test.whitelisted(addr3.address)).to.be.true;
     });
 
-    it("Should fail if an address not on whitelist calls function with onlyWhitelisted modifier", async function () {
+    it("Should be true that anyone calls function with onlyWhitelisted modifier if whitelist is off", async function () {
+        expect(await test.whitelistOn()).to.be.false;
+        await test.connect(operator).addToWhitelist([addr1.address]);
+
+        await token0.transfer(test.address, 100000);
+        await token1.transfer(test.address, 100000);
+        await test.mint(addr1.address);
+
+        await token0.transfer(test.address, 100000);
+        await token1.transfer(test.address, 100000);
+        await test.mint(addr2.address);
+    });
+
+
+    it("Should fail when whitelist is on and an unwhitelisted address calls function with onlyWhitelisted modifier", async function () {
+        expect(await test.whitelistOn()).to.be.false;
+        let tx = await test.connect(operator).setWhitelistOn(true);
+        let res = await tx.wait();
+
+        expect(res.events[0].event).to.be.equal("WhitelistOnSet");
+        expect(res.events[0].args[0]).to.be.equal(true);
+        expect(await test.whitelistOn()).to.be.true;
+
         await test.connect(operator).addToWhitelist([addr1.address]);
 
         await token0.transfer(test.address, 100000);
         await token1.transfer(test.address, 100000);
 
-        await expect(test.mint(addr1.address)).to.be.revertedWith("MIRIN: NOT_WHITELISTED");
+        await expect(test.mint(addr2.address)).to.be.revertedWith("MIRIN: NOT_WHITELISTED");
+        await test.mint(addr1.address);
 
-        await test.mint(addr2.address);
+        await test.connect(operator).setWhitelistOn(false);
+        expect(await test.whitelistOn()).to.be.false;
     });
 
     it("Should be that swapFee is 3 and swapFeeTo is zero when operator is zero address", async function () {

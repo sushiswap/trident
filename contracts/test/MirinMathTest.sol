@@ -4,7 +4,7 @@ pragma solidity =0.8.2;
 
 import "../libraries/MirinMath.sol";
 
-contract MirinMathTestFormerPart {
+contract MirinMathTest {
     function _floorLog2(uint256 _n) public pure returns (uint8) {
         return MirinMath.floorLog2(_n);
     }

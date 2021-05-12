@@ -20,7 +20,7 @@ contract MirinGovernance is MirinERC20 {
     address public operator;
 
     /**
-     * @dev Fee for swapping (out of 100).
+     * @dev Fee for swapping (out of 1000).
      */
     uint8 public swapFee;
 

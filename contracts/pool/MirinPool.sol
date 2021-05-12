@@ -172,7 +172,7 @@ contract MirinPool is MirinGovernance {
             liquidity = computed - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
-            liquidity = computed - _totalSupply;
+            liquidity = (computed - kLast) * _totalSupply / kLast;
         }
         require(liquidity > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_MINTED");
         _mint(to, liquidity);
@@ -183,13 +183,26 @@ contract MirinPool is MirinGovernance {
     }
 
     function burn(address to) external lock onlyWhitelisted(to) returns (uint256 amount0, uint256 amount1) {
+        (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
+        _mintFee(_reserve0, _reserve1);
         uint256 liquidity = balanceOf[address(this)];
         uint256 balance0 = IERC20(token0).balanceOf(address(this));
         uint256 balance1 = IERC20(token1).balanceOf(address(this));
         uint256 _totalSupply = totalSupply;
         amount0 = (liquidity * balance0) / _totalSupply;
         amount1 = (liquidity * balance1) / _totalSupply;
-        _burn(liquidity, amount0, amount1, to);
+
+        _burn(address(this), liquidity);
+
+        _safeTransfer(token0, to, amount0);
+        _safeTransfer(token1, to, amount1);
+
+        balance0 -= amount0;
+        balance1 -= amount1;
+
+        _update(balance0, balance1, _reserve0, _reserve1);
+        kLast = IMirinCurve(curve).computeLiquidity(uint112(balance0), uint112(balance1), curveData);
+        emit Burn(msg.sender, amount0, amount1, to);
     }
 
     function burn(
@@ -197,23 +210,17 @@ contract MirinPool is MirinGovernance {
         uint256 amount1,
         address to
     ) external lock onlyWhitelisted(to) {
-        _burn(balanceOf[address(this)], amount0, amount1, to);
-    }
-
-    function _burn(
-        uint256 liquidity,
-        uint256 amount0,
-        uint256 amount1,
-        address to
-    ) private {
         require(amount0 > 0 || amount1 > 0, "MIRIN: INVALID_AMOUNTS");
 
+        uint256 liquidity = balanceOf[address(this)];
+        
         (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
         _mintFee(_reserve0, _reserve1);
 
         uint256 computed =
             IMirinCurve(curve).computeLiquidity(uint112(_reserve0 - amount0), uint112(_reserve1 - amount1), curveData);
-        uint256 liquidityDelta = kLast - computed;
+        uint256 liquidityDelta = (kLast - computed) * totalSupply / kLast;
+
         require(liquidityDelta <= liquidity, "MIRIN: LIQUIDITY");
         if (liquidityDelta < liquidity) {
             _transfer(address(this), to, liquidity - liquidityDelta);
@@ -262,7 +269,7 @@ contract MirinPool is MirinGovernance {
             uint256 balance1Adjusted = balance1 * 1000 - amount1In * swapFee;
             bytes32 _curveData = curveData;
             require(
-                IMirinCurve(curve).computeLiquidity(uint112(balance0Adjusted), uint112(balance1Adjusted), _curveData) >=
+                IMirinCurve(curve).computeLiquidity(balance0Adjusted, balance1Adjusted, _curveData) >=
                     IMirinCurve(curve).computeLiquidity(_reserve0 * 1000, _reserve1 * 1000, _curveData),
                 "MIRIN: LIQUIDITY"
             );

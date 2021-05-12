@@ -2,7 +2,7 @@ const { expect, assert } = require("chai");
 const { ethers } = require("hardhat");
 const { BigNumber } = ethers;
 
-describe("MirinMath Test_Former Part", function () {
+describe("MirinMath Test", function () {
     let test;
 
     const FIXED1 = BigNumber.from(2).pow(127);
@@ -13,7 +13,7 @@ describe("MirinMath Test_Former Part", function () {
     const BASE = BigNumber.from(10).pow(8);
 
     async function deployTest() {
-        const Test = await ethers.getContractFactory("MirinMathTestFormerPart");
+        const Test = await ethers.getContractFactory("MirinMathTest");
         return await Test.deploy();
     }
 
