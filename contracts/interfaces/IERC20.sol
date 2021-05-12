@@ -3,8 +3,7 @@
 pragma solidity >=0.5.0;
 
 /**
- * @dev Interface of the ERC20 standard as defined in the EIP. Does not include
- * the optional functions; to access them see {ERC20Detailed}.
+ * @dev Interface of the ERC20 standard as defined in the EIP.
  */
 interface IERC20 {
     /**
@@ -16,10 +15,6 @@ interface IERC20 {
      * @dev Returns the amount of tokens owned by `account`.
      */
     function balanceOf(address account) external view returns (uint256);
-
-    function decimals() external view returns (uint256);
-
-    function symbol() external view returns (string memory);
 
     /**
      * @dev Moves `amount` tokens from the caller's account to `recipient`.
