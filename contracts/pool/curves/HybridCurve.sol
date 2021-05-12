@@ -59,8 +59,8 @@ contract HybridCurve is IMirinCurve {
     }
 
     function computeLiquidity(
-        uint112 reserve0,
-        uint112 reserve1,
+        uint256 reserve0,
+        uint256 reserve1,
         bytes32 data
     ) external pure override returns (uint256) {
         (uint8 decimals0, uint8 decimals1, uint240 A) = decodeData(data);
@@ -227,13 +227,13 @@ contract HybridCurve is IMirinCurve {
     }
 
     function _xp(
-        uint112 reserve0,
-        uint112 reserve1,
+        uint256 reserve0,
+        uint256 reserve1,
         uint8 decimals0,
         uint8 decimals1
     ) private pure returns (uint256[2] memory xp) {
-        xp[0] = uint256(reserve0) * 10**(POOL_PRECISION_DECIMALS - decimals0);
-        xp[1] = uint256(reserve1) * 10**(POOL_PRECISION_DECIMALS - decimals1);
+        xp[0] = reserve0 * 10**(POOL_PRECISION_DECIMALS - decimals0);
+        xp[1] = reserve1 * 10**(POOL_PRECISION_DECIMALS - decimals1);
         return xp;
     }
 }

@@ -64,7 +64,7 @@ function getData() {
     return utils.hexZeroPad(d1, 32);
 }
 
-describe("MirinMath Test_Latter Part", function () {
+describe("MirinMath Test2", function () {
     let CMC, test;
     let n, js, con, data;
     const BASE = BigNumber.from(10).pow(18);
@@ -363,10 +363,10 @@ describe("ConstantMeanCurve additional Test", function () {
         while (n < 100) {
             randParams();
             data = getData();
-            r0 = rOut;
-            r1 = rIn;
-            w0 = wO;
-            w1 = wI;
+            r0 = rIn;
+            r1 = rOut;
+            w0 = wI;
+            w1 = wO;
 
             con = await test.computePrice(r0, r1, data, 1);
             js = r0.mul(BigNumber.from(2).pow(104)).mul(w1).div(r1).div(w0);

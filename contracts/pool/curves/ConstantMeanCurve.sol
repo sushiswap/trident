@@ -33,8 +33,8 @@ contract ConstantMeanCurve is IMirinCurve {
     }
 
     function computeLiquidity(
-        uint112 reserve0,
-        uint112 reserve1,
+        uint256 reserve0,
+        uint256 reserve1,
         bytes32 data
     ) external pure override returns (uint256) {
         (uint8 weight0, uint8 weight1) = decodeData(data, 0);

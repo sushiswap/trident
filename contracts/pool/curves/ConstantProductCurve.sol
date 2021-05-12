@@ -22,8 +22,8 @@ contract ConstantProductCurve is IMirinCurve {
     }
 
     function computeLiquidity(
-        uint112 reserve0,
-        uint112 reserve1,
+        uint256 reserve0,
+        uint256 reserve1,
         bytes32 data
     ) external pure override returns (uint256) {
         return MirinMath.sqrt(reserve0 * reserve1);
