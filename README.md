@@ -24,7 +24,7 @@ For liquidity pool creators, two types of new curves are added so that they can 
 
 #### Constant Product Curve
 
-<img src="https://latex.codecogs.com/gif.latex?k=r_0\cdot r_1" />
+<img src="https://latex.codecogs.com/gif.latex?k=r_0\cdot%20r_1" />
 
 #### Constant Mean Curve
  

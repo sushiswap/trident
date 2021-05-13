@@ -120,7 +120,7 @@ const config: HardhatUserConfig = {
     ),
   },
   solidity: {
-    version: "0.8.2",
+    version: "0.8.4",
     settings: {
       optimizer: {
         enabled: true,
@@ -140,7 +140,7 @@ const config: HardhatUserConfig = {
     },
   },
   mocha: {
-    timeout: 300000
+    timeout: 300000,
   },
 };
 

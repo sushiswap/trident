@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity =0.8.2;
+pragma solidity =0.8.4;
+
 interface IMPool {
     function skim(address to) external;
 }
 
-contract FakeERC20Token2{
+contract FakeERC20Token2 {
     string public name = "Fake ERC20 Test Token";
     string public symbol = "FE20";
     uint256 public totalSupply;

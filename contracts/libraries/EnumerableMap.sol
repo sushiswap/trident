@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity =0.8.2;
+pragma solidity =0.8.4;
 
 /**
  * @dev Library for managing an enumerable variant of Solidity's

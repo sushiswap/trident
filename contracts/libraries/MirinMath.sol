@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity =0.8.2;
+pragma solidity =0.8.4;
 
-/**
- * @dev Originally DeriswapV1Math
- * @author Andre Cronje, LevX
- */
 library MirinMath {
     uint256 internal constant ONE = 1;
     uint256 internal constant FIXED_1 = 0x080000000000000000000000000000000;

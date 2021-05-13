@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity =0.8.2;
+pragma solidity =0.8.4;
 
 import "./MirinGovernance.sol";
 import "../interfaces/IMirinCurve.sol";
@@ -173,7 +173,7 @@ contract MirinPool is MirinGovernance {
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
             uint256 k = IMirinCurve(curve).computeLiquidity(uint112(_reserve0), uint112(_reserve1), _curveData);
-            liquidity = (computed - k) * _totalSupply / k;
+            liquidity = ((computed - k) * _totalSupply) / k;
         }
         require(liquidity > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_MINTED");
         _mint(to, liquidity);
@@ -214,7 +214,7 @@ contract MirinPool is MirinGovernance {
         require(amount0 > 0 || amount1 > 0, "MIRIN: INVALID_AMOUNTS");
 
         uint256 liquidity = balanceOf[address(this)];
-        
+
         (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
         _mintFee(_reserve0, _reserve1);
 
@@ -222,7 +222,7 @@ contract MirinPool is MirinGovernance {
         uint256 k = IMirinCurve(curve).computeLiquidity(uint112(_reserve0), uint112(_reserve1), _curveData);
         uint256 computed =
             IMirinCurve(curve).computeLiquidity(uint112(_reserve0 - amount0), uint112(_reserve1 - amount1), _curveData);
-        uint256 liquidityDelta = (k - computed) * totalSupply / k;
+        uint256 liquidityDelta = ((k - computed) * totalSupply) / k;
 
         require(liquidityDelta <= liquidity, "MIRIN: LIQUIDITY");
         if (liquidityDelta < liquidity) {

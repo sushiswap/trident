@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity =0.8.2;
+pragma solidity =0.8.4;
 
-/**
- * @dev Collection of functions related to the address type
- * @author Andre Cronje
- */
 library Address {
     /**
      * @dev Returns true if `account` is a contract.

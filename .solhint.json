@@ -3,6 +3,6 @@
   "plugins": ["prettier"],
   "rules": {
     "prettier/prettier": "error",
-    "compiler-version" : ["warn", "0.8.2"]
+    "compiler-version" : ["warn", "0.8.4"]
   }
 }

@@ -1,13 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity =0.8.2;
+pragma solidity =0.8.4;
 
 import "../libraries/SafeERC20.sol";
 
-/**
- * @dev Originally DeriswapV1ERC20
- * @author Andre Cronje, LevX
- */
 contract MirinERC20 {
     using SafeERC20 for IERC20;
 
