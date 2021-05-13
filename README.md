@@ -3,22 +3,6 @@ MIRIN, a light alcohol particularly used to create sauces in Japanese cuisine, i
 
 ## Overview
 
-### Capital Efficiency ([Deriswap](https://andrecronje.medium.com/deriswap-capital-efficient-swaps-futures-options-and-loans-ea424b24a41c))
-Deriswap combines Swaps, Options, and Loans into a capital efficient single contract, allowing interaction between the two assets that make up the pair.
-
-#### Oracle
-The TWAP oracle was expanded to take readings every 30 minutes, this allows us to report realized variance, realized volatility, implied volatility (derived from Realizing Smiles), and price over an arbitrary selected time series.
-
-#### Options
-The above derived values allow us to quote Call/Put options using Black Scholes. These are American options, and can be settled at any point in time. Settlement occurs in the pair assets, so a Call needs to buy the full value, and a Put needs to sell the full value.
-
-Combining swaps and Options have an interesting interaction, options are a trade on volatility, trading fees are a hedge against volatility. The pair volatility(+ve trading fees) offsets the losses from settled options (-ve settlement).
-
-Full settlement was also selected since the LPs have a perpetual position on the pair itself, if only profits are settled that is a permanent loss, however if the underlying is settled, that is impermanent loss.
-Settlement can occur ITM, or OTM.
-
-Options are tokenized via Non Fungible Tokens (NFT) that allow the trade/creation of secondary markets.
-
 ### Public/Franchised Pools
 In MIRIN, every pair (such as SUSHI-ETH) can have one Public Pool and multiple Franchised Pools.
 
@@ -33,12 +17,16 @@ A franchised pool is technically separate, however, and we will give the reigns 
 * 1-Click Remove liquidity to a single token
 * 1-Click Remove liquidity to ETH
 * 1-Click Migrate from Uniswap
-* 1-Click Migrate from Balancer `Work in progress`
+* 1-Click Migrate from Balancer
 
 ### New LP Curve Options
 For liquidity pool creators, two types of new curves are added so that they can maximize the capital efficiency when providing a new pool to the ecosystem. The constant product curve from SushiSwapV2 will still be available, however, the two new proposed options will be:
 
-#### Arbitrary Weighted Constant Product
+#### Constant Product Curve
+
+<img src="https://latex.codecogs.com/gif.latex?k=r_0\cdot r_1" />
+
+#### Constant Mean Curve
  
 Unlike v2, MIRIN supports each token on a pool can have different weights.
 We can define the equation for the invariant like this:
@@ -50,21 +38,18 @@ where <img src="https://latex.codecogs.com/gif.latex?r_0" />,
 <img src="https://latex.codecogs.com/gif.latex?w_0" /> and
 <img src="https://latex.codecogs.com/gif.latex?w_1" />, are reserve for first asset, reserve for second asset, weight for first asset and weight for second asset, respectively.
 
-#### Mix of Constant Product + Sum Model
-> Work in progress
+#### Hybrid Curve (Mix of Constant Product + Sum)
 
 Fine-tuned for stable coins. (ex: Curve protocol)
 
 ### K3PR-Powered Yield Rebalancing
-> Work in progress.
 
 MIRIN provides you an automatic yield rebalancing tool, powered by K3PR technology. This can benefit you, since you can add a dedicated job to seek out the best LP yields for you. Keepers do the dirty work of all the calculations and comparisons needed to find the highest returns and automatically switches into those optimal pairs.
 
 ## RoadMap
 - [x] Franchised Pool
-- [x] Capital Efficiency (Deriswap)
-- [ ] New Curve Options (ETA: late-March)
-- [ ] K3PR-Powered Yield Rebalancing (ETA: mid-April)
+- [x] New Curve Options (ETA: late-March)
+- [x] K3PR-Powered Yield Rebalancing (ETA: mid-April)
 - [ ] Test Coverage (ETA: late-April)
 - [ ] Gas Optimization & Internal Audit (ETA: mid-May)
 - [ ] Formal Verification (ETA: late-May)
