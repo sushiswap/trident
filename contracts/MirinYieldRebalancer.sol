@@ -1,28 +1,16 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.2;
+pragma solidity =0.8.2;
 
 import "./interfaces/IMasterChefV2.sol";
 import "./interfaces/IMirinTwapOracle.sol";
 import "./interfaces/IMirinPool.sol";
 import "./libraries/SafeERC20.sol";
 import "./libraries/MirinLibrary.sol";
+import "./ERC20.sol";
 
-contract MirinYieldRebalancer {
+contract MirinYieldRebalancer is ERC20("SushiRebalancer", "rSUSHI") {
     using SafeERC20 for IERC20;
-
-    struct Checkpoint {
-        uint128 fromBlock;
-        uint128 value;
-    }
-
-    struct Reward {
-        uint128 block;
-        uint128 amount;
-        uint256 lpTotal;
-    }
-
-    uint256 internal constant FACTOR_BASE = 1e10;
 
     IMasterChefV2 public immutable masterChef;
     IERC20 public immutable sushi;
@@ -31,24 +19,22 @@ contract MirinYieldRebalancer {
     address public immutable legacyFactory;
     address public immutable weth;
 
-    uint256 public lastSushiBalance;
-    mapping(uint256 => Reward[]) public rewards;
-    mapping(uint256 => mapping(address => uint256)) public lastRewardReceived;
+    mapping(uint256 => uint256) public shares;
+    uint256 public totalShares;
 
-    mapping(uint256 => Checkpoint[]) private _poolFactors;
-    mapping(uint256 => mapping(address => Checkpoint[])) private _lpBalances;
-
-    event Deposit(uint256 indexed pid, uint256 amount, address indexed owner);
-    event Withdraw(uint256 indexed pid, uint256 amount, address indexed owner);
-    event ClaimReward(uint256 indexed pid, uint256 amount, address indexed owner);
-    event Rebalance(uint256 indexed fromPid, uint256 fromAmount, uint256 indexed toPid, uint256 toAmount);
-
-    modifier onlyWETHPool(uint256 pid) {
-        IMirinPool pool = IMirinPool(masterChef.lpToken(pid));
-        (address token0, address token1) = (pool.token0(), pool.token1());
-        require(token0 == weth || token1 == weth, "MIRIN: INVALID_POOL");
+    uint256 private unlocked = 1;
+    modifier lock() {
+        require(unlocked == 1, "MIRIN: LOCKED");
+        unlocked = 0;
         _;
+        unlocked = 1;
     }
+
+    event Mint(address indexed from, address indexed to, uint256 amount);
+    event Burn(address indexed from, uint256 amount);
+    event Deposit(uint256 indexed pid, uint256 liquidity);
+    event Withdraw(uint256 indexed pid, uint256 liquidity);
+    event Rebalance(uint256 pidFrom, uint256 liquidityFrom, uint256 pidTo, uint256 liquidityTo);
 
     constructor(
         IMasterChefV2 _masterChef,
@@ -66,220 +52,188 @@ contract MirinYieldRebalancer {
         weth = _weth;
     }
 
-    function pendingSushi(uint256 pid, address owner) external view returns (uint256 amount) {
-        for (uint256 i = lastRewardReceived[pid][owner]; i < rewards[pid].length; i++) {
-            Reward storage reward = rewards[pid][i];
-            uint256 lpBalance = _valueAt(_lpBalances[pid][owner], reward.block);
-            amount += (reward.amount * lpBalance) / reward.lpTotal;
-        }
+    function mint(
+        uint256 pid,
+        uint256 amountSushiIn,
+        uint256 liquidityMin,
+        address to
+    ) external lock {
+        require(amountSushiIn > 0, "MIRIN: INVALID_AMOUNT");
+
+        sushi.transferFrom(msg.sender, address(this), amountSushiIn);
+        _deposit(pid, amountSushiIn, liquidityMin);
+        // mint rSUSHI
+        uint256 _totalSupply = totalSupply();
+        _mint(
+            to,
+            (_totalSupply == 0 || totalShares == 0) ? amountSushiIn : (amountSushiIn * _totalSupply) / totalShares
+        );
+        // update shares
+        shares[pid] += amountSushiIn;
+        totalShares += amountSushiIn;
+
+        emit Mint(msg.sender, to, amountSushiIn);
     }
 
-    function deposit(uint256 pid, uint256 amount) external onlyWETHPool(pid) {
-        require(amount > 0, "MIRIN: INVALID_AMOUNT");
+    function _deposit(
+        uint256 pid,
+        uint256 amountSushiIn,
+        uint256 liquidityMin
+    ) private {
+        (IMirinPool lpToken, address token) = _getPoolAndToken(pid);
+        // swap sushi to weth
+        uint256 amountWETHOut = _swapTokens(amountSushiIn, address(sushi), weth, address(this));
+        uint256 amountWETHHalf = amountWETHOut / 2;
+        // swap half weth to token
+        _swapTokens(amountWETHHalf, weth, token, address(lpToken));
+        IERC20(weth).transfer(address(lpToken), amountWETHOut - amountWETHHalf);
+        // mint lp tokens
+        uint256 liquidity = lpToken.mint(address(this));
+        require(liquidity >= liquidityMin, "MIRIN: INSUFFICIENT_LIQUIDITY");
+        // deposit lp tokens
+        lpToken.approve(address(masterChef), liquidity);
+        masterChef.deposit(pid, liquidity, address(this));
 
-        // TODO: consider pool factor
-        uint256 factor = _latestValue(_poolFactors[pid], FACTOR_BASE);
-        uint256 amountAdjusted = (amount * FACTOR_BASE) / factor;
-        Checkpoint[] storage checkpoints = _lpBalances[pid][msg.sender];
-        _updateValueAtNow(checkpoints, _latestValue(checkpoints, 0) + amountAdjusted);
-
-        address lpToken = masterChef.lpToken(pid);
-        IERC20(lpToken).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20(lpToken).approve(address(masterChef), amount);
-        masterChef.deposit(pid, amount, address(this));
-
-        emit Deposit(pid, amount, msg.sender);
+        emit Deposit(pid, liquidity);
     }
 
-    function withdraw(uint256 pid, uint256 amount) external onlyWETHPool(pid) {
-        require(amount > 0, "MIRIN: INVALID_AMOUNT");
+    function burn(
+        uint256 pid,
+        uint256 liquidityOut,
+        uint256 amountSushiOutMin,
+        address to
+    ) external lock {
+        uint256 amountOut = _withdraw(pid, liquidityOut);
+        require(amountOut >= amountSushiOutMin, "MIRIN: INSUFFICIENT_SUSHI");
 
-        // TODO: consider pool factor
-        Checkpoint[] storage checkpoints = _lpBalances[pid][msg.sender];
-        _updateValueAtNow(checkpoints, _latestValue(checkpoints, 0) - amount);
+        uint256 poolShare = shares[pid];
+        uint256 lpTotal = masterChef.userInfo(pid, address(this)).amount;
+        uint256 share = (liquidityOut * poolShare) / lpTotal;
+        // burn rSUSHI
+        uint256 _totalShares = totalShares;
+        uint256 poolSupply = (poolShare * totalSupply()) / _totalShares;
+        _burn(msg.sender, (liquidityOut * poolSupply) / lpTotal);
+        // transfer reward
+        sushi.transfer(to, (share * sushi.balanceOf(address(this))) / _totalShares);
+        // update shares
+        shares[pid] -= share;
+        totalShares -= share;
 
-        _withdraw(pid, amount, msg.sender);
-        claimReward(pid);
+        emit Burn(msg.sender, share);
+    }
 
-        emit Withdraw(pid, amount, msg.sender);
+    function _withdraw(uint256 pid, uint256 liquidityOut) private returns (uint256 amountOut) {
+        // withdraw from MasterChef
+        masterChef.withdrawAndHarvest(pid, liquidityOut, address(this));
+        // burn lp tokens
+        (IMirinPool lpToken, address token) = _getPoolAndToken(pid);
+        lpToken.transfer(address(lpToken), lpToken.balanceOf(address(this)));
+        lpToken.burn(address(this));
+        // swap token to sushi
+        amountOut += _swapTokens(IERC20(token).balanceOf(address(this)), token, address(sushi), address(this));
+        // swap weth to sushi
+        amountOut += _swapTokens(IERC20(weth).balanceOf(address(this)), weth, address(sushi), address(this));
+
+        emit Withdraw(pid, liquidityOut);
     }
 
     function rebalance(
-        uint256 fromPid,
-        uint256 fromAmount,
-        uint256 toPid,
-        uint256 toAmountMin
+        uint256 pidFrom,
+        uint256 liquidityFrom,
+        uint256 pidTo,
+        uint256 liquidityToMin
     ) external {
-        (address fromPool, address fromToken, uint256 fromReward) = _computeReward(fromPid, fromAmount);
-        (address toPool, address toToken, uint256 toRewardMin) = _computeReward(toPid, toAmountMin);
-        require(fromReward < toRewardMin, "MIRIN: DEFICIT");
+        (IMirinPool poolFrom, address tokenFrom, uint256 rewardFrom) = _computeReward(pidFrom, liquidityFrom);
+        (IMirinPool poolTo, address tokenTo, uint256 rewardTo) = _computeReward(pidTo, liquidityToMin);
+        require(rewardFrom < rewardTo, "MIRIN: DEFICIT");
+        // withdraw lp tokens of pidFrom
+        masterChef.withdrawAndHarvest(pidFrom, liquidityFrom, address(this));
+        uint256 liquidityTo = _switchPool(poolFrom, tokenFrom, liquidityFrom, poolTo, tokenTo);
+        // check liquidityToMin
+        require(liquidityTo >= liquidityToMin, "MIRIN: INSUFFICIENT_LIQUIDITY");
+        // deposit lp tokens of pidTo
+        poolTo.approve(address(masterChef), liquidityTo);
+        masterChef.deposit(pidTo, liquidityTo, address(this));
 
-        uint256 fromLpTotal = masterChef.userInfo(fromPid, address(this)).amount;
-        _updatePoolFactor(_poolFactors[fromPid], fromLpTotal - fromAmount, fromLpTotal);
-        _withdraw(fromPid, fromAmount, address(this));
-        uint256 toAmount = _swapPoolToPool(fromPool, fromToken, fromAmount, toPool, toToken, toAmountMin);
-
-        uint256 toLpTotal = masterChef.userInfo(toPid, address(this)).amount;
-        _updatePoolFactor(_poolFactors[toPid], toLpTotal + toAmount, toLpTotal);
-        IERC20(toPool).approve(address(masterChef), toAmount);
-        masterChef.deposit(toPid, toAmount, address(this));
-
-        emit Rebalance(fromPid, fromAmount, toPid, toAmount);
-    }
-
-    function claimReward(uint256 pid) public {
-        uint256 amountReceived;
-        uint256 toIndex = rewards[pid].length;
-        for (uint256 i = lastRewardReceived[pid][msg.sender]; i < toIndex; i++) {
-            Reward storage reward = rewards[pid][i];
-            uint256 lpBalance = _valueAt(_lpBalances[pid][msg.sender], reward.block);
-            uint256 amount = (reward.amount * lpBalance) / reward.lpTotal;
-            amountReceived += amount;
-        }
-        lastRewardReceived[pid][msg.sender] = toIndex;
-        lastSushiBalance = sushi.balanceOf(address(this)) - amountReceived;
-
-        sushi.safeTransfer(msg.sender, amountReceived);
-
-        emit ClaimReward(pid, amountReceived, msg.sender);
-    }
-
-    function _withdraw(
-        uint256 pid,
-        uint256 amount,
-        address to
-    ) internal {
-        uint256 lpTotal = masterChef.userInfo(pid, address(this)).amount;
-        masterChef.withdraw(pid, amount, to);
-        masterChef.harvest(pid, address(this));
-
-        uint256 sushiBalance = sushi.balanceOf(address(this));
-        rewards[pid].push(Reward(uint128(block.number), uint128(sushiBalance - lastSushiBalance), lpTotal));
+        emit Rebalance(pidFrom, liquidityFrom, pidTo, liquidityTo);
     }
 
     function _computeReward(uint256 pid, uint256 lpAmount)
         internal
         view
         returns (
-            address pool,
+            IMirinPool pool,
             address token,
             uint256 reward
         )
     {
-        pool = masterChef.lpToken(pid);
-
-        (address token0, address token1) = (IMirinPool(pool).token0(), IMirinPool(pool).token1());
-        require(token0 == weth || token1 == weth, "MIRIN: INVALID_POOL");
-        token = token0 == weth ? token1 : token0;
+        (pool, token) = _getPoolAndToken(pid);
 
         uint64 allocPoint = masterChef.poolInfo(pid).allocPoint;
         uint256 lpSupply = IMirinPool(pool).balanceOf(address(masterChef));
         (uint112 reserve0, uint112 reserve1, ) = IMirinPool(pool).getReserves();
-        (uint112 wethReserve, uint112 tokenReserve) = token0 == weth ? (reserve0, reserve1) : (reserve1, reserve0);
+        (uint112 reserveWETH, uint112 reserveToken) =
+            pool.token0() == weth ? (reserve0, reserve1) : (reserve1, reserve0);
 
-        reward = (lpAmount * allocPoint) / (lpSupply * (wethReserve + oracle.current(token, tokenReserve, weth)));
+        reward = (lpAmount * allocPoint) / (lpSupply * (reserveWETH + oracle.current(token, reserveToken, weth)));
     }
 
-    function _updatePoolFactor(
-        Checkpoint[] storage poolFactors,
-        uint256 numerator,
-        uint256 denominator
-    ) internal {
-        _updateValueAtNow(poolFactors, (_latestValue(poolFactors, FACTOR_BASE) * numerator) / denominator);
+    function _getPoolAndToken(uint256 pid) public view returns (IMirinPool pool, address token) {
+        pool = IMirinPool(masterChef.lpToken(pid));
+        (address token0, address token1) = (pool.token0(), pool.token1());
+        require(token0 == weth || token1 == weth, "MIRIN: INVALID_POOL");
+        token = token0 == weth ? token1 : token0;
     }
 
-    function _swapPoolToPool(
-        address fromPool,
-        address fromToken,
-        uint256 fromAmount,
-        address toPool,
-        address toToken,
-        uint256 toAmountMin
-    ) internal returns (uint256 toAmount) {
-        IERC20(fromPool).safeTransfer(fromPool, fromAmount);
-        (uint256 amount0, uint256 amount1) = IMirinPool(fromPool).burn(address(this));
-        (uint256 amountIn, uint256 wethAmount) =
-            fromToken == IMirinPool(fromPool).token0() ? (amount0, amount1) : (amount1, amount0);
-        IERC20(fromToken).safeTransfer(MirinLibrary.getPool(factory, legacyFactory, fromToken, weth, 0), amountIn);
-        address[] memory path = _path(fromToken, toToken);
-        uint256[] memory pids = new uint256[](3);
-        uint256[] memory amounts = MirinLibrary.getAmountsOut(factory, legacyFactory, amountIn, path, pids);
-        _swap(amounts, path, pids, toPool);
-        IERC20(weth).safeTransfer(toPool, wethAmount);
-        toAmount = IMirinPool(toPool).mint(address(this));
-        require(toAmount >= toAmountMin, "MIRIN: INSUFFICIENT_TO_AMOUNT");
+    function _switchPool(
+        IMirinPool poolFrom,
+        address tokenFrom,
+        uint256 liquidityFrom,
+        IMirinPool poolTo,
+        address tokenTo
+    ) internal returns (uint256 liquidityTo) {
+        // burn poolFrom tokens
+        poolFrom.transfer(address(poolFrom), liquidityFrom);
+        (uint256 amount0, uint256 amount1) = poolFrom.burn(address(this));
+        (uint256 amountToken, uint256 amountWETH) =
+            tokenFrom == poolFrom.token0() ? (amount0, amount1) : (amount1, amount0);
+        // swap tokenFrom to weth
+        amountWETH += _swapTokens(amountToken, tokenFrom, weth, address(this));
+        // swap half of weth to tokenTo
+        uint256 amountWETHHalf = amountWETH / 2;
+        _swapTokens(amountWETHHalf, weth, tokenTo, address(poolTo));
+        // transfer another half of weth to poolTo
+        IERC20(weth).transfer(address(poolTo), amountWETH - amountWETHHalf);
+        // mint poolTo tokens
+        liquidityTo = poolTo.mint(address(this));
     }
 
-    function _path(address fromToken, address toToken) internal view returns (address[] memory path) {
-        path = new address[](3);
-        path[0] = fromToken;
-        path[1] = weth;
-        path[2] = toToken;
-    }
-
-    function _latestValue(Checkpoint[] storage checkpoints, uint256 defaultValue) internal view returns (uint256) {
-        if (checkpoints.length == 0) {
-            return defaultValue;
-        } else {
-            return checkpoints[checkpoints.length - 1].value;
+    function _swapTokens(
+        uint256 amountIn,
+        address tokenIn,
+        address tokenOut,
+        address to
+    ) private returns (uint256 amountOut) {
+        if (tokenIn == tokenOut) {
+            IERC20(tokenIn).safeTransfer(to, amountIn);
+            return amountIn;
         }
-    }
 
-    function _valueAt(Checkpoint[] storage checkpoints, uint256 blockNumber) internal view returns (uint256) {
-        if (checkpoints.length == 0) return 0;
+        address pool = MirinLibrary.getPool(factory, legacyFactory, tokenIn, tokenOut, 0);
+        IERC20(tokenIn).safeTransfer(pool, amountIn);
 
-        // Shortcut for the actual value
-        if (blockNumber >= checkpoints[checkpoints.length - 1].fromBlock)
-            return checkpoints[checkpoints.length - 1].value;
-        if (blockNumber < checkpoints[0].fromBlock) return 0;
-
-        // Binary search of the value in the array
-        uint256 min = 0;
-        uint256 max = checkpoints.length - 1;
-        while (max > min) {
-            uint256 mid = (max + min + 1) / 2;
-            if (checkpoints[mid].fromBlock <= blockNumber) {
-                min = mid;
-            } else {
-                max = mid - 1;
-            }
-        }
-        return checkpoints[min].value;
-    }
-
-    function _updateValueAtNow(Checkpoint[] storage checkpoints, uint256 value) internal {
-        if ((checkpoints.length == 0) || (checkpoints[checkpoints.length - 1].fromBlock < block.number)) {
-            Checkpoint storage newCheckPoint = checkpoints.push();
-            newCheckPoint.fromBlock = uint128(block.number);
-            newCheckPoint.value = uint128(value);
-        } else {
-            Checkpoint storage oldCheckPoint = checkpoints[checkpoints.length - 1];
-            oldCheckPoint.value = uint128(value);
-        }
-    }
-
-    function _swap(
-        uint256[] memory amounts,
-        address[] memory path,
-        uint256[] memory pids,
-        address _to
-    ) internal {
-        for (uint256 i; i < path.length - 1; i++) {
-            (address input, address output) = (path[i], path[i + 1]);
-            (address token0, ) = MirinLibrary.sortTokens(input, output);
-            uint256 amountOut = amounts[i + 1];
-            (uint256 amount0Out, uint256 amount1Out) =
-                input == token0 ? (uint256(0), amountOut) : (amountOut, uint256(0));
-            address to =
-                i < path.length - 2
-                    ? MirinLibrary.getPool(factory, legacyFactory, output, path[i + 2], pids[i + 1])
-                    : _to;
-            IMirinPool(MirinLibrary.getPool(factory, legacyFactory, input, output, pids[i])).swap(
-                amount0Out,
-                amount1Out,
-                to,
-                bytes("")
-            );
-        }
+        (uint112 reserve0, uint112 reserve1, ) = IMirinPool(pool).getReserves();
+        address token0 = IMirinPool(pool).token0();
+        amountOut = IMirinCurve(IMirinPool(pool).curve()).computeAmountOut(
+            amountIn,
+            reserve0,
+            reserve1,
+            IMirinPool(pool).curveData(),
+            IMirinPool(pool).swapFee(),
+            token0 == tokenIn ? 0 : 1
+        );
+        (uint256 amount0Out, uint256 amount1Out) =
+            token0 == tokenIn ? (uint256(0), amountOut) : (amountOut, uint256(0));
+        IMirinPool(pool).swap(amount0Out, amount1Out, to, bytes(""));
     }
 }
