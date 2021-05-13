@@ -60,34 +60,37 @@ contract MirinYieldRebalancer is ERC20("SushiRebalancer", "rSUSHI") {
 
     function mint(
         uint256 pid,
-        uint256 amountIn,
+        uint256 amountSushiIn,
         uint256 liquidityMin,
         address to
     ) external lock {
-        require(amountIn > 0, "MIRIN: INVALID_AMOUNT");
+        require(amountSushiIn > 0, "MIRIN: INVALID_AMOUNT");
 
-        sushi.transferFrom(msg.sender, address(this), amountIn);
-        _deposit(pid, amountIn, liquidityMin);
+        sushi.transferFrom(msg.sender, address(this), amountSushiIn);
+        _deposit(pid, amountSushiIn, liquidityMin);
 
         uint256 _totalSupply = totalSupply();
-        _mint(to, (_totalSupply == 0 || totalShares == 0) ? amountIn : (amountIn * _totalSupply) / totalShares);
+        _mint(
+            to,
+            (_totalSupply == 0 || totalShares == 0) ? amountSushiIn : (amountSushiIn * _totalSupply) / totalShares
+        );
 
-        shares[pid] += amountIn;
-        totalShares += amountIn;
+        shares[pid] += amountSushiIn;
+        totalShares += amountSushiIn;
 
-        emit Mint(msg.sender, to, amountIn);
+        emit Mint(msg.sender, to, amountSushiIn);
     }
 
     function _deposit(
         uint256 pid,
-        uint256 amountIn,
+        uint256 amountSushiIn,
         uint256 liquidityMin
     ) private {
         (IMirinPool lpToken, address token) = getPoolAndToken(pid);
         // swap weth to sushi
-        uint256 amountWETHOut = _swapTokens(amountIn / 2, weth, address(sushi), address(lpToken));
+        uint256 amountWETHOut = _swapTokens(amountSushiIn / 2, weth, address(sushi), address(lpToken));
         // swap token to sushi
-        uint256 amountTokenOut = _swapTokens(amountIn / 2, token, address(sushi), address(lpToken));
+        uint256 amountTokenOut = _swapTokens(amountSushiIn / 2, token, address(sushi), address(lpToken));
 
         // mint lp tokens
         uint256 liquidity = lpToken.mint(address(this));
@@ -103,22 +106,25 @@ contract MirinYieldRebalancer is ERC20("SushiRebalancer", "rSUSHI") {
     function burn(
         uint256 pid,
         uint256 liquidityOut,
-        uint256 amountOutMin,
+        uint256 amountSushiOutMin,
         address to
     ) external lock {
         uint256 amountOut = _withdraw(pid, liquidityOut);
-        require(amountOut >= amountOutMin, "MIRIN: INSUFFICIENT_SUSHI");
+        require(amountOut >= amountSushiOutMin, "MIRIN: INSUFFICIENT_SUSHI");
 
-        // TODO: update shares
+        uint256 poolShare = shares[pid];
         uint256 lpTotal = masterChef.userInfo(pid, address(this)).amount;
-        uint256 share = (liquidityOut * shares[pid]) / lpTotal;
-        shares[pid] -= share;
-        totalShares -= share;
+        uint256 share = (liquidityOut * poolShare) / lpTotal;
 
         // burn rSUSHI
-        _burn(msg.sender, share);
+        uint256 _totalShares = totalShares;
+        uint256 poolSupply = (poolShare * totalSupply()) / _totalShares;
+        _burn(msg.sender, (liquidityOut * poolSupply) / lpTotal);
         // transfer reward
-        sushi.transfer(to, (liquidityOut * sushi.balanceOf(address(this))) / lpTotal);
+        sushi.transfer(to, (share * sushi.balanceOf(address(this))) / _totalShares);
+        // update shares
+        shares[pid] -= share;
+        totalShares -= share;
 
         emit Burn(msg.sender, share);
     }
