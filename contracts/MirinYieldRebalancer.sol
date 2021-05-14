@@ -103,7 +103,7 @@ contract MirinYieldRebalancer is ERC20("SushiRebalancer", "rSUSHI") {
         uint256 amountSushiOutMin,
         address to
     ) external lock {
-        uint256 amountOut = _withdraw(pid, liquidityOut);
+        uint256 amountOut = _withdraw(pid, liquidityOut, to);
         require(amountOut >= amountSushiOutMin, "MIRIN: INSUFFICIENT_SUSHI");
 
         uint256 poolShare = shares[pid];
@@ -122,7 +122,11 @@ contract MirinYieldRebalancer is ERC20("SushiRebalancer", "rSUSHI") {
         emit Burn(msg.sender, share);
     }
 
-    function _withdraw(uint256 pid, uint256 liquidityOut) private returns (uint256 amountOut) {
+    function _withdraw(
+        uint256 pid,
+        uint256 liquidityOut,
+        address to
+    ) private returns (uint256 amountOut) {
         // withdraw from MasterChef
         masterChef.withdrawAndHarvest(pid, liquidityOut, address(this));
         // burn lp tokens
@@ -130,9 +134,9 @@ contract MirinYieldRebalancer is ERC20("SushiRebalancer", "rSUSHI") {
         lpToken.transfer(address(lpToken), lpToken.balanceOf(address(this)));
         lpToken.burn(address(this));
         // swap token to sushi
-        amountOut += _swapTokens(IERC20(token).balanceOf(address(this)), token, address(sushi), address(this));
+        amountOut += _swapTokens(IERC20(token).balanceOf(address(this)), token, address(sushi), to);
         // swap weth to sushi
-        amountOut += _swapTokens(IERC20(weth).balanceOf(address(this)), weth, address(sushi), address(this));
+        amountOut += _swapTokens(IERC20(weth).balanceOf(address(this)), weth, address(sushi), to);
 
         emit Withdraw(pid, liquidityOut);
     }
