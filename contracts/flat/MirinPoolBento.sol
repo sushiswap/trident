@@ -1051,109 +1051,6 @@ interface IMirinFactory {
     function setOwner(address _owner) external;
 }
 
-/**
- * @author LevX
- */
-contract MirinGovernance is SushiGovernance {
-    uint8 public constant MIN_SWAP_FEE = 1;
-    uint8 public constant MAX_SWAP_FEE = 100;
-
-    address public factory;
-
-    /**
-     * @dev If empty, this is a public pool.
-     */
-    address public operator;
-
-    /**
-     * @dev Fee for swapping (out of 100).
-     */
-    uint8 public swapFee;
-
-    /**
-     * @dev Swap fee receiver.
-     */
-    address public swapFeeTo;
-
-    /**
-     * @dev If this is true, `whitelisted` is respected.
-     */
-    bool public whitelistOn;
-
-    /**
-     * @dev A `whitelisted` account can mint and burn.
-     */
-    mapping(address => bool) public whitelisted;
-
-    event OperatorSet(address indexed previousOperator, address indexed newOperator);
-    event SwapFeeUpdated(uint8 newFee);
-    event SwapFeeToUpdated(address newFeeTo);
-    event WhitelistOnSet(bool indexed on);
-    event WhitelistAdded(address indexed account);
-    event WhitelistRemoved(address indexed account);
-
-    modifier onlyOperator() {
-        require(operator == msg.sender, "MIRIN: UNAUTHORIZED");
-        _;
-    }
-
-    modifier onlyWhitelisted(address account) {
-        if (whitelistOn) require(whitelisted[account], "MIRIN: NOT_WHITELISTED");
-        _;
-    }
-    
-    function initialize(address _operator, uint8 _fee, address _feeTo) internal {
-        factory = msg.sender;
-        operator = _operator;
-        
-        if (_operator == address(0)) {
-            _updateSwapFee(3);
-        } else {
-            _updateSwapFee(_fee);
-            _updateSwapFeeTo(_feeTo);
-        }
-    }
-
-    function setOperator(address newOperator) external onlyOperator {
-        require(newOperator != address(0), "MIRIN: INVALID_OPERATOR");
-        emit OperatorSet(operator, newOperator);
-        operator = newOperator;
-    }
-
-    function _updateSwapFee(uint8 newFee) internal {
-        require(newFee >= MIN_SWAP_FEE && newFee <= MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
-
-        swapFee = newFee;
-
-        emit SwapFeeUpdated(newFee);
-    }
-
-    function _updateSwapFeeTo(address newFeeTo) internal {
-        swapFeeTo = newFeeTo;
-
-        emit SwapFeeToUpdated(newFeeTo);
-    }
-
-    function setWhitelistOn(bool on) external onlyOperator {
-        whitelistOn = on;
-        emit WhitelistOnSet(on);
-    }
-
-    function addToWhitelist(address[] calldata accounts) external onlyOperator {
-        for (uint256 i; i < accounts.length; i++) {
-            whitelisted[accounts[i]] = true;
-            emit WhitelistAdded(accounts[i]);
-        }
-    }
-
-    function removeFromWhitelist(address[] calldata accounts) external onlyOperator {
-        for (uint256 i; i < accounts.length; i++) {
-            whitelisted[accounts[i]] = false;
-            emit WhitelistRemoved(accounts[i]);
-        }
-    }
-}
-
 interface IMirinCurve {
     function canUpdateData(bytes32 oldData, bytes32 newData) external pure returns (bool);
 
@@ -1209,7 +1106,7 @@ interface IBentoBoxV1 {
     ) external;
 }
 
-/// @notice Interface for low-level Boshi `swap()` call.
+/// @notice Interface for low-level `swap()` call.
 interface IMirinCallee {
     function mirinCall(address sender, uint256 amount0, uint256 amount1, bytes calldata data) external;
 }
@@ -1217,34 +1114,29 @@ interface IMirinCallee {
 /**
  * @author LevX
  */
-contract MirinPool is MirinGovernance {
+contract MirinPool is MirinERC20 {
     /**
      * @dev Immutable variables for `masterContract` and all pool clones
      */
     IBentoBoxV1 private immutable bentoBox;
     MirinPool private immutable masterContract;
-    address private immutable SUSHI;
     
     /**
      * @notice `masterContract` variables
      */
-    address public feeTo;
+    address public masterFeeTo;
     address public owner;
-    uint256 public SUSHI_DEPOSIT;
     
     mapping(address => bool) public isCurveWhitelisted;
-    mapping(address => mapping(address => address[])) public getPublicPool;
-    mapping(address => mapping(address => address[])) public getFranchisedPool;
+    mapping(address => mapping(address => address)) public getPool;
     mapping(address => bool) public isPool;
     address[] public allPools;
 
     event PoolCreated(
         address indexed token0,
         address indexed token1,
-        bool isPublic,
-        uint256 length,
         address indexed pool,
-        address operator
+        uint256 length
     );
     event PoolDisabled(address indexed pool);
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
@@ -1258,9 +1150,25 @@ contract MirinPool is MirinGovernance {
         address indexed to
     );
     event Sync(uint112 reserve0, uint112 reserve1);
+    event OperatorSet(address indexed previousOperator, address indexed newOperator);
+    event SwapFeeUpdated(uint8 newFee);
+    event SwapFeeToUpdated(address newFeeTo);
+    
+    uint8 public constant MIN_SWAP_FEE = 1;
+    uint8 public constant MAX_SWAP_FEE = 100;
 
     uint256 public constant MINIMUM_LIQUIDITY = 10**3;
     bytes4 private constant SELECTOR = bytes4(keccak256(bytes("transfer(address,uint256)")));
+    
+    address public operator;
+    /**
+     * @dev Fee for swapping (out of 1000).
+     */
+    uint8 public swapFee;
+    /**
+     * @dev Swap fee receiver.
+     */
+    address public feeTo;
 
     address public token0;
     address public token1;
@@ -1283,12 +1191,12 @@ contract MirinPool is MirinGovernance {
         _;
         unlocked = 1;
     }
-
-    modifier enabled() {
-        require(masterContract.isPool(address(this)), "MIRIN: DISABLED_POOL");
+    
+    modifier onlyOperator() {
+        require(operator == msg.sender, "MIRIN: UNAUTHORIZED");
         _;
     }
-    
+
     modifier onlyOwner {
         require(msg.sender == masterContract.owner(), "MIRIN: FORBIDDEN");
         _;
@@ -1299,79 +1207,48 @@ contract MirinPool is MirinGovernance {
      */
     constructor(
         IBentoBoxV1 _bentoBox,
-        address _SUSHI,
-        uint256 _SUSHI_DEPOSIT,
-        address _feeTo,
+        address _masterFeeTo,
         address _owner
     ) {
         bentoBox = _bentoBox;
         masterContract = this;
-        SUSHI = _SUSHI;
-        SUSHI_DEPOSIT = _SUSHI_DEPOSIT;
-        feeTo = _feeTo;
+        masterFeeTo = _masterFeeTo;
         owner = _owner;
     }
     
     /**
      * @notice Serves as the constructor for clones, as clones can't have a regular constructor
-     * @dev `data` is abi-encoded in the format: (address tokenA, address tokenB, address _curve, bytes32 _curveData, address _operator, uint8 _swapFee, address _swapFeeTo)
+     * @dev `data` is abi-encoded in the format: (address tokenA, address tokenB, address _curve, bytes32 _curveData, uint8 _swapFee, address _feeTo)
      */
     function init(bytes calldata data) external {
         require(address(token0) == address(0), 'MIRIN: ALREADY_INITIALIZED');
-        (address tokenA, address tokenB, address _curve, bytes32 _curveData, address _operator, uint8 _swapFee, address _swapFeeTo) = abi.decode(data, (address, address, address, bytes32, address, uint8, address));
+        (address tokenA, address tokenB, address _curve, bytes32 _curveData, address _operator, uint8 _swapFee, address _feeTo) = abi.decode(data, (address, address, address, bytes32, address, uint8, address));
         require(tokenA != tokenB, 'MIRIN: IDENTICAL_ADDRESSES');
         (address _token0, address _token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         require(_token0 != address(0), 'MIRIN: ZERO_ADDRESS');
         require(masterContract.isCurveWhitelisted(_curve), "MIRIN: INVALID_CURVE");
         require(IMirinCurve(_curve).isValidData(_curveData), "MIRIN: INVALID_CURVE_DATA");
-        bool isPublic = operator == address(0);
-        uint256 length;
-        if (isPublic) {
-            masterContract.pushPublicPool(_token0, _token1, address(this));
-            length = masterContract.publicPoolsLength(_token0, _token1) - 1; // subtract for accounting since reverse population for pair
-        } else {
-            masterContract.pushFranchisedPool(_token0, _token1, address(this));
-            length = masterContract.franchisedPoolsLength(_token0, _token1) - 1;
-        }
-        masterContract.isPool(address(this)) == true;
+        masterContract.getPool(_token0, _token1) == address(this);
+        masterContract.getPool(_token1, _token0) == address(this); // populate mapping in the reverse direction
         masterContract.pushPool(address(this));
-        if (!isPublic) {
-            IERC20(SUSHI).transferFrom(msg.sender, address(this), masterContract.SUSHI_DEPOSIT());
-        }
         token0 = _token0;
         token1 = _token1;
         curve = _curve;
         curveData = _curveData;
-        MirinGovernance.initialize(_operator, _swapFee, _swapFeeTo);
-        emit PoolCreated(_token0, _token1, isPublic, length, address(this), operator);
+        operator = _operator; // placeholder for tests - this should resolve to LP token voting
+        _updateSwapFee(_swapFee);
+        _updateSwapFeeTo(_feeTo);
+        emit PoolCreated(_token0, _token1, address(this), masterContract.allPoolsLength());
     }
     
-    /// **** PUSH POOLS ****
+    /// **** PUSH POOL ****
     function pushPool(address pool) external {
         allPools.push(pool);
     } 
-    
-    function pushPublicPool(address tokenA, address tokenB, address pool) external {
-        getPublicPool[tokenA][tokenB].push(pool);
-        getPublicPool[tokenB][tokenA].push(pool);
-    } 
-    
-    function pushFranchisedPool(address tokenA, address tokenB, address pool) external {
-        getFranchisedPool[tokenA][tokenB].push(pool);
-        getFranchisedPool[tokenB][tokenA].push(pool);
-    } 
-    
+
     /// **** GETTER FUNCTIONS ****
-    function publicPoolsLength(address tokenA, address tokenB) external view returns (uint256) {
-        return getPublicPool[tokenA][tokenB].length;
-    }
-
-    function franchisedPoolsLength(address tokenA, address tokenB) external view returns (uint256) {
-        return getFranchisedPool[tokenA][tokenB].length;
-    }
-
     function allPoolsLength() external view returns (uint256) {
-        return allPools.length;
+        return masterContract.allPoolsLength();
     }
 
     function getReserves()
@@ -1425,18 +1302,18 @@ contract MirinPool is MirinGovernance {
                 uint256 denominator = (computed * (swapFee * 2 - 1)) + _kLast; // 0.05% of increased liquidity
                 uint256 liquidity = numerator / denominator;
                 if (liquidity > 0) {
-                    if (swapFeeTo == address(0)) {
-                        _mint(IMirinFactory(factory).feeTo(), liquidity * 2);
+                    if (masterFeeTo == address(0)) {
+                        _mint(masterContract.masterFeeTo(), liquidity * 2);
                     } else {
-                        _mint(IMirinFactory(factory).feeTo(), liquidity);
-                        _mint(swapFeeTo, liquidity);
+                        _mint(masterContract.masterFeeTo(), liquidity);
+                        _mint(feeTo, liquidity);
                     }
                 }
             }
         }
     }
 
-    function mint(address to) external lock enabled onlyWhitelisted(to) returns (uint256 liquidity) {
+    function mint(address to) external lock returns (uint256 liquidity) {
         (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
         uint256 balance0 = bentoBox.balanceOf(IERC20(token0), address(this));
         uint256 balance1 = bentoBox.balanceOf(IERC20(token1), address(this));
@@ -1461,7 +1338,7 @@ contract MirinPool is MirinGovernance {
         emit Mint(msg.sender, amount0, amount1, to);
     }
 
-    function burn(address to) external lock onlyWhitelisted(to) returns (uint256 amount0, uint256 amount1) {
+    function burn(address to) external lock returns (uint256 amount0, uint256 amount1) {
         uint256 liquidity = balanceOf[address(this)];
         (uint256 balance0, uint256 balance1) = bentoBalance(IERC20(token0), IERC20(token1));
         uint256 _totalSupply = totalSupply;
@@ -1474,7 +1351,7 @@ contract MirinPool is MirinGovernance {
         uint256 amount0,
         uint256 amount1,
         address to
-    ) external lock onlyWhitelisted(to) {
+    ) external lock {
         _burn(balanceOf[address(this)], amount0, amount1, to);
     }
 
@@ -1534,7 +1411,7 @@ contract MirinPool is MirinGovernance {
         if (data.length > 0) IMirinCallee(to).mirinCall(msg.sender, amount0Out, amount1Out, data);
     }
 
-    function swap(uint256 amount0Out, uint256 amount1Out, address to, bytes calldata data) external lock enabled {
+    function swap(uint256 amount0Out, uint256 amount1Out, address to, bytes calldata data) external lock {
         (uint112 _reserve0, uint112 _reserve1, ) = getReserves(); // gas savings
         { // scope for _token{0,1} avoids stack too deep errors
         address _token0 = token0;
@@ -1559,16 +1436,24 @@ contract MirinPool is MirinGovernance {
         _update(balance0, balance1, reserve0, reserve1);
     }
     
-    /// **** POOL OPERATOR ****
-    function disablePool(address to) external onlyOperator {
-        require(masterContract.isPool(address(this)), "MIRIN: ALREADY_DISABLED");
-        masterContract.isPool(address(this)) == false;
-
-        IERC20(SUSHI).transfer(to, IERC20(SUSHI).balanceOf(address(this)));
-
-        emit PoolDisabled(address(this));
+    /// **** POOL GOVERNANCE **** 
+    function _updateSwapFee(uint8 newFee) internal {
+        require(newFee >= MIN_SWAP_FEE && newFee <= MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
+        swapFee = newFee;
+        emit SwapFeeUpdated(newFee);
     }
 
+    function _updateSwapFeeTo(address newFeeTo) internal {
+        feeTo = newFeeTo;
+        emit SwapFeeToUpdated(newFeeTo);
+    }
+    
+    function setOperator(address newOperator) external onlyOperator {
+        require(newOperator != address(0), "MIRIN: INVALID_OPERATOR");
+        operator = newOperator;
+        emit OperatorSet(operator, newOperator);
+    }
+    
     function updateCurveData(bytes32 data) external onlyOperator {
         require(IMirinCurve(curve).canUpdateData(curveData, data), "MIRIN: CANNOT_UPDATE_DATA");
         curveData = data;
@@ -1587,19 +1472,15 @@ contract MirinPool is MirinGovernance {
     }
     
     /// **** MASTER GOVERNANCE **** 
-    function setDeposit(uint256 _SUSHI_DEPOSIT) external onlyOwner {
-        SUSHI_DEPOSIT = _SUSHI_DEPOSIT;
-    }
-    
-    function setFeeTo(address _feeTo) external onlyOwner {
-        feeTo = _feeTo;
+    function setMasterFeeTo(address _masterFeeTo) external onlyOwner {
+        masterContract.masterFeeTo() == _masterFeeTo;
     }
 
     function setOwner(address _owner) external onlyOwner {
-        owner = _owner;
+        masterContract.owner() == _owner;
     }
     
     function whitelistCurve(address _curve) external onlyOwner {
-        isCurveWhitelisted[_curve] = true;
+        masterContract.isCurveWhitelisted(_curve) == true;
     }
 }
