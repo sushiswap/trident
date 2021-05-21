@@ -30,6 +30,7 @@
     "lint": "yarn prettier && solhint -c .solhint.json contracts/**/*.sol"
   },
   "devDependencies": {
+    "@openzeppelin/contracts": "=4.1.0",
     "@nomiclabs/hardhat-ethers": "^2.0.0",
     "@nomiclabs/hardhat-etherscan": "^2.1.0",
     "@nomiclabs/hardhat-solhint": "^2.0.0",
