@@ -1,6 +1,364 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity =0.8.2;
+pragma solidity =0.8.4;
+
+interface IUniswapV2Pair {
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    function name() external pure returns (string memory);
+
+    function symbol() external pure returns (string memory);
+
+    function decimals() external pure returns (uint8);
+
+    function totalSupply() external view returns (uint256);
+
+    function balanceOf(address owner) external view returns (uint256);
+
+    function allowance(address owner, address spender) external view returns (uint256);
+
+    function approve(address spender, uint256 value) external returns (bool);
+
+    function transfer(address to, uint256 value) external returns (bool);
+
+    function transferFrom(
+        address from,
+        address to,
+        uint256 value
+    ) external returns (bool);
+
+    function DOMAIN_SEPARATOR() external view returns (bytes32);
+
+    function PERMIT_TYPEHASH() external pure returns (bytes32);
+
+    function nonces(address owner) external view returns (uint256);
+
+    function permit(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external;
+
+    event Mint(address indexed sender, uint256 amount0, uint256 amount1);
+    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
+    event Swap(
+        address indexed sender,
+        uint256 amount0In,
+        uint256 amount1In,
+        uint256 amount0Out,
+        uint256 amount1Out,
+        address indexed to
+    );
+    event Sync(uint112 reserve0, uint112 reserve1);
+
+    function MINIMUM_LIQUIDITY() external pure returns (uint256);
+
+    function factory() external view returns (address);
+
+    function token0() external view returns (address);
+
+    function token1() external view returns (address);
+
+    function getReserves()
+        external
+        view
+        returns (
+            uint112 reserve0,
+            uint112 reserve1,
+            uint32 blockTimestampLast
+        );
+
+    function price0CumulativeLast() external view returns (uint256);
+
+    function price1CumulativeLast() external view returns (uint256);
+
+    function kLast() external view returns (uint256);
+
+    function mint(address to) external returns (uint256 liquidity);
+
+    function burn(address to) external returns (uint256 amount0, uint256 amount1);
+
+    function swap(
+        uint256 amount0Out,
+        uint256 amount1Out,
+        address to,
+        bytes calldata data
+    ) external;
+
+    function skim(address to) external;
+
+    function sync() external;
+
+    function initialize(address, address) external;
+}
+
+interface IMirinPool is IUniswapV2Pair {
+    event OperatorSet(address indexed previousOperator, address indexed newOperator);
+    event SwapFeeUpdated(uint8 newFee);
+    event SwapFeeToUpdated(address newFeeTo);
+    event BlacklistAdded(address indexed account);
+    event BlacklistRemoved(address indexed account);
+    event OptionCreated(
+        uint256 id,
+        address indexed owner,
+        address indexed token,
+        uint256 amount,
+        uint256 strike,
+        uint256 created,
+        uint256 expire
+    );
+    event OptionExercised(
+        uint256 id,
+        address indexed owner,
+        address indexed token,
+        uint256 amount,
+        uint256 strike,
+        uint256 excercised,
+        uint256 expire
+    );
+
+    function initialize() external;
+
+    function MIN_SWAP_FEE() external view returns (uint8);
+
+    function MAX_SWAP_FEE() external view returns (uint8);
+
+    function operator() external view returns (address);
+
+    function swapFee() external view returns (uint8);
+
+    function swapFeeTo() external view returns (address);
+
+    function blacklisted(address account) external view returns (bool);
+
+    function setOperator(address newOperator) external;
+
+    function updateSwapFee(uint8 newFee) external;
+
+    function updateSwapFeeTo(address newFeeTo) external;
+
+    function disable(address to) external;
+
+    function addToBlacklist(address[] calldata accounts) external;
+
+    function removeFromBlacklist(address[] calldata accounts) external;
+
+    function curve() external view returns (address);
+
+    function curveData() external view returns (bytes32);
+
+    function pricePoints(uint256)
+        external
+        view
+        returns (
+            uint256 timestamp,
+            uint256 price0Cumulative,
+            uint256 price1Cumulative
+        );
+
+    function pricePointsLength() external view returns (uint256);
+
+    function price(address token) external view returns (uint256);
+
+    function realizedVariance(
+        address tokenIn,
+        uint256 p,
+        uint256 window
+    ) external view returns (uint256);
+
+    function realizedVolatility(
+        address tokenIn,
+        uint256 p,
+        uint256 window
+    ) external view returns (uint256);
+
+    function quotePrice(address tokenIn, uint256 amountIn) external view returns (uint256 amountOut);
+
+    function sample(
+        address tokenIn,
+        uint256 amountIn,
+        uint256 p,
+        uint256 window
+    ) external view returns (uint256[] memory);
+
+    function loanContracts() external view returns (address);
+
+    function optionContracts() external view returns (address);
+
+    function quoteOption(address tokenIn, uint256 t) external view returns (uint256 call, uint256 put);
+
+    function quoteOptionPrice(
+        address tokenIn,
+        uint256 t,
+        uint256 sp,
+        uint256 st
+    ) external view returns (uint256 call, uint256 put);
+
+    function options(uint256)
+        external
+        view
+        returns (
+            address asset,
+            uint256 amount,
+            uint256 strike,
+            uint256 expire,
+            uint256 optionType
+        );
+
+    function optionsLength() external view returns (uint256);
+
+    function feeDetail(
+        address token,
+        uint256 st,
+        uint256 t,
+        uint256 optionType
+    )
+        external
+        view
+        returns (
+            uint256 _call,
+            uint256 _put,
+            uint256 _fee
+        );
+
+    function fee(
+        address token,
+        uint256 amount,
+        uint256 st,
+        uint256 t,
+        uint256 optionType
+    ) external view returns (uint256);
+
+    function callATM(
+        address token,
+        uint256 amount,
+        uint256 t,
+        uint256 maxFee
+    ) external;
+
+    function putATM(
+        address token,
+        uint256 amount,
+        uint256 t,
+        uint256 maxFee
+    ) external;
+
+    function createCall(
+        address token,
+        uint256 amount,
+        uint256 st,
+        uint256 t,
+        uint256 maxFee
+    ) external;
+
+    function createPut(
+        address token,
+        uint256 amount,
+        uint256 st,
+        uint256 t,
+        uint256 maxFee
+    ) external;
+
+    function utilization(
+        address token,
+        uint256 optionType,
+        uint256 amount
+    ) external view returns (uint256);
+
+    function createOption(
+        address token,
+        uint256 amount,
+        uint256 st,
+        uint256 t,
+        uint256 optionType,
+        uint256 maxFee
+    ) external;
+
+    function exerciseOptionProfitOnly(uint256 id) external;
+
+    function exerciseOption(uint256 id) external;
+
+    function updateCurveData(bytes32 data) external;
+
+    function swap(
+        uint256 amount0Out,
+        uint256 amount1Out,
+        address to
+    ) external;
+
+    function burn(
+        uint256 amount0,
+        uint256 amount1,
+        address to
+    ) external;
+}
+
+interface IMirinFactory {
+    event PoolCreated(
+        address indexed token0,
+        address indexed token1,
+        bool isPublic,
+        uint256 length,
+        address indexed pool,
+        address operator
+    );
+    event PoolDisabled(address indexed pool);
+
+    function SUSHI_DEPOSIT() external view returns (uint256);
+
+    function SUSHI() external view returns (address);
+
+    function feeTo() external view returns (address);
+
+    function owner() external view returns (address);
+
+    function isCurveWhitelisted(address curve) external view returns (bool);
+
+    function getPublicPool(
+        address token0,
+        address token1,
+        uint256 index
+    ) external view returns (address);
+
+    function getFranchisedPool(
+        address token0,
+        address token1,
+        uint256 index
+    ) external view returns (address);
+
+    function isPool(address pool) external view returns (bool);
+
+    function allPools(uint256 index) external view returns (address);
+
+    function publicPoolsLength(address token0, address token1) external view returns (uint256);
+
+    function franchisedPoolsLength(address token0, address token1) external view returns (uint256);
+
+    function allPoolsLength() external view returns (uint256);
+
+    function whitelistCurve(address curve) external;
+
+    function createPool(
+        address tokenA,
+        address tokenB,
+        address curve,
+        bytes32 curveData,
+        address operator,
+        uint8 swapFee,
+        address swapFeeTo
+    ) external returns (address pool);
+
+    function disablePool(address to) external;
+
+    function setFeeTo(address _feeTo) external;
+
+    function setOwner(address _owner) external;
+}
 
 /**
  * @dev Collection of functions related to the address type
@@ -415,650 +773,14 @@ contract MirinERC20 {
     }
 }
 
-// @notice A library for performing various math operations, including overflow/underflow checks and handling binary fixed point numbers,
-// based on awesomeness from DappHub, @Boring_Crypto and Uniswap V2.
-library BoshiMath {
-    uint224 constant Q112 = 2**112;
-
-    /// @dev Encode uint112 as UQ112x112.
-    function encode(uint112 y) internal pure returns (uint224 z) {
-        z = uint224(y) * Q112; // never overflows
-    }
-
-    /// @dev Divide UQ112x112 by uint112, returning UQ112x112.
-    function uqdiv(uint224 x, uint112 y) internal pure returns (uint224 z) {
-        z = x / uint224(y);
-    }
-
-    function min(uint x, uint y) internal pure returns (uint256 z) {
-        z = x < y ? x : y;
-    }
-
-    /// @dev Babylonian method (https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Babylonian_method).
-    function sqrt(uint y) internal pure returns (uint256 z) {
-        if (y > 3) {
-            z = y;
-            uint256 x = y / 2 + 1;
-            while (x < z) {
-                z = x;
-                x = (y / x + x) / 2;
-            }
-        } else if (y != 0) {
-            z = 1;
-        }
-    }
-
-    /// **** SAFE MATH ****
-    function add(uint256 a, uint256 b) internal pure returns (uint256 c) {
-        require((c = a + b) >= b, "BoshiMath: Add Overflow");
-    }
-
-    function sub(uint256 a, uint256 b) internal pure returns (uint256 c) {
-        require((c = a - b) <= a, "BoshiMath: Underflow");
-    }
-
-    function mul(uint256 a, uint256 b) internal pure returns (uint256 c) {
-        require(b == 0 || (c = a * b) / b == a, "BoshiMath: Mul Overflow");
-    }
-}
-
-// SushiToken-style Governance.
-contract SushiGovernance is MirinERC20 {
-    using BoshiMath for uint256;
-    // Copied and modified from YAM code:
-    // https://github.com/yam-finance/yam-protocol/blob/master/contracts/token/YAMGovernanceStorage.sol
-    // https://github.com/yam-finance/yam-protocol/blob/master/contracts/token/YAMGovernance.sol
-    // Which is copied and modified from COMPOUND:
-    // https://github.com/compound-finance/compound-protocol/blob/master/contracts/Governance/Comp.sol
-
-    /// @dev A record of each accounts delegate
-    mapping (address => address) internal _delegates;
-
-    /// @notice A checkpoint for marking number of votes from a given block
-    struct Checkpoint {
-        uint32 fromBlock;
-        uint256 votes;
-    }
-
-    /// @notice A record of votes checkpoints for each account, by index
-    mapping (address => mapping (uint32 => Checkpoint)) public checkpoints;
-
-    /// @notice The number of checkpoints for each account
-    mapping (address => uint32) public numCheckpoints;
-
-    /// @notice The EIP-712 typehash for the contract's domain
-    bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
-
-    /// @notice The EIP-712 typehash for the delegation struct used by the contract
-    bytes32 public constant DELEGATION_TYPEHASH = keccak256("Delegation(address delegatee,uint256 nonce,uint256 expiry)");
-
-    /// @notice An event thats emitted when an account changes its delegate
-    event DelegateChanged(address indexed delegator, address indexed fromDelegate, address indexed toDelegate);
-
-    /// @notice An event thats emitted when a delegate account's vote balance changes
-    event DelegateVotesChanged(address indexed delegate, uint previousBalance, uint newBalance);
-
-    /**
-     * @notice Delegate votes from `msg.sender` to `delegatee`
-     * @param delegator The address to get delegatee for
-     */
-    function delegates(address delegator)
-        external
-        view
-        returns (address)
-    {
-        return _delegates[delegator];
-    }
-
-   /**
-    * @notice Delegate votes from `msg.sender` to `delegatee`
-    * @param delegatee The address to delegate votes to
-    */
-    function delegate(address delegatee) external {
-        return _delegate(msg.sender, delegatee);
-    }
-
-    /**
-     * @notice Delegates votes from signatory to `delegatee`
-     * @param delegatee The address to delegate votes to
-     * @param nonce The contract state required to match the signature
-     * @param expiry The time at which to expire the signature
-     * @param v The recovery byte of the signature
-     * @param r Half of the ECDSA signature pair
-     * @param s Half of the ECDSA signature pair
-     */
-    function delegateBySig(
-        address delegatee,
-        uint nonce,
-        uint expiry,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    )
-        external
-    {
-        bytes32 domainSeparator = keccak256(
-            abi.encode(
-                DOMAIN_TYPEHASH,
-                //keccak256(bytes(name())),
-                getChainId(),
-                address(this)
-            )
-        );
-
-        bytes32 structHash = keccak256(
-            abi.encode(
-                DELEGATION_TYPEHASH,
-                delegatee,
-                nonce,
-                expiry
-            )
-        );
-
-        bytes32 digest = keccak256(
-            abi.encodePacked(
-                "\x19\x01",
-                domainSeparator,
-                structHash
-            )
-        );
-
-        address signatory = ecrecover(digest, v, r, s);
-        require(signatory != address(0), "SUSHI::delegateBySig: invalid signature");
-        require(nonce == nonces[signatory]++, "SUSHI::delegateBySig: invalid nonce");
-        require(block.timestamp <= expiry, "SUSHI::delegateBySig: signature expired");
-        return _delegate(signatory, delegatee);
-    }
-
-    /**
-     * @notice Gets the current votes balance for `account`
-     * @param account The address to get votes balance
-     * @return The number of current votes for `account`
-     */
-    function getCurrentVotes(address account)
-        external
-        view
-        returns (uint256)
-    {
-        uint32 nCheckpoints = numCheckpoints[account];
-        return nCheckpoints > 0 ? checkpoints[account][nCheckpoints - 1].votes : 0;
-    }
-
-    /**
-     * @notice Determine the prior number of votes for an account as of a block number
-     * @dev Block number must be a finalized block or else this function will revert to prevent misinformation.
-     * @param account The address of the account to check
-     * @param blockNumber The block number to get the vote balance at
-     * @return The number of votes the account had as of the given block
-     */
-    function getPriorVotes(address account, uint blockNumber)
-        external
-        view
-        returns (uint256)
-    {
-        require(blockNumber < block.number, "SUSHI::getPriorVotes: not yet determined");
-
-        uint32 nCheckpoints = numCheckpoints[account];
-        if (nCheckpoints == 0) {
-            return 0;
-        }
-
-        // First check most recent balance
-        if (checkpoints[account][nCheckpoints - 1].fromBlock <= blockNumber) {
-            return checkpoints[account][nCheckpoints - 1].votes;
-        }
-
-        // Next check implicit zero balance
-        if (checkpoints[account][0].fromBlock > blockNumber) {
-            return 0;
-        }
-
-        uint32 lower = 0;
-        uint32 upper = nCheckpoints - 1;
-        while (upper > lower) {
-            uint32 center = upper - (upper - lower) / 2; // ceil, avoiding overflow
-            Checkpoint memory cp = checkpoints[account][center];
-            if (cp.fromBlock == blockNumber) {
-                return cp.votes;
-            } else if (cp.fromBlock < blockNumber) {
-                lower = center;
-            } else {
-                upper = center - 1;
-            }
-        }
-        return checkpoints[account][lower].votes;
-    }
-
-    function _delegate(address delegator, address delegatee)
-        internal
-    {
-        address currentDelegate = _delegates[delegator];
-        uint256 delegatorBalance = balanceOf[delegator]; // balance of underlying SUSHIs (not scaled);
-        _delegates[delegator] = delegatee;
-
-        emit DelegateChanged(delegator, currentDelegate, delegatee);
-
-        _moveDelegates(currentDelegate, delegatee, delegatorBalance);
-    }
-
-    function _moveDelegates(address srcRep, address dstRep, uint256 amount) internal {
-        if (srcRep != dstRep && amount > 0) {
-            if (srcRep != address(0)) {
-                // decrease old representative
-                uint32 srcRepNum = numCheckpoints[srcRep];
-                uint256 srcRepOld = srcRepNum > 0 ? checkpoints[srcRep][srcRepNum - 1].votes : 0;
-                uint256 srcRepNew = srcRepOld.sub(amount);
-                _writeCheckpoint(srcRep, srcRepNum, srcRepOld, srcRepNew);
-            }
-
-            if (dstRep != address(0)) {
-                // increase new representative
-                uint32 dstRepNum = numCheckpoints[dstRep];
-                uint256 dstRepOld = dstRepNum > 0 ? checkpoints[dstRep][dstRepNum - 1].votes : 0;
-                uint256 dstRepNew = dstRepOld.add(amount);
-                _writeCheckpoint(dstRep, dstRepNum, dstRepOld, dstRepNew);
-            }
-        }
-    }
-
-    function _writeCheckpoint(
-        address delegatee,
-        uint32 nCheckpoints,
-        uint256 oldVotes,
-        uint256 newVotes
-    )
-        internal
-    {
-        uint32 blockNumber = safe32(block.number, "SUSHI::_writeCheckpoint: block number exceeds 32 bits");
-
-        if (nCheckpoints > 0 && checkpoints[delegatee][nCheckpoints - 1].fromBlock == blockNumber) {
-            checkpoints[delegatee][nCheckpoints - 1].votes = newVotes;
-        } else {
-            checkpoints[delegatee][nCheckpoints] = Checkpoint(blockNumber, newVotes);
-            numCheckpoints[delegatee] = nCheckpoints + 1;
-        }
-
-        emit DelegateVotesChanged(delegatee, oldVotes, newVotes);
-    }
-
-    function safe32(uint n, string memory errorMessage) internal pure returns (uint32) {
-        require(n < 2**32, errorMessage);
-        return uint32(n);
-    }
-
-    function getChainId() internal view returns (uint) {
-        uint256 chainId;
-        assembly { chainId := chainid() }
-        return chainId;
-    }
-}
-
-interface IUniswapV2Pair {
-    event Approval(address indexed owner, address indexed spender, uint256 value);
-    event Transfer(address indexed from, address indexed to, uint256 value);
-
-    function name() external pure returns (string memory);
-
-    function symbol() external pure returns (string memory);
-
-    function decimals() external pure returns (uint8);
-
-    function totalSupply() external view returns (uint256);
-
-    function balanceOf(address owner) external view returns (uint256);
-
-    function allowance(address owner, address spender) external view returns (uint256);
-
-    function approve(address spender, uint256 value) external returns (bool);
-
-    function transfer(address to, uint256 value) external returns (bool);
-
-    function transferFrom(
-        address from,
-        address to,
-        uint256 value
-    ) external returns (bool);
-
-    function DOMAIN_SEPARATOR() external view returns (bytes32);
-
-    function PERMIT_TYPEHASH() external pure returns (bytes32);
-
-    function nonces(address owner) external view returns (uint256);
-
-    function permit(
-        address owner,
-        address spender,
-        uint256 value,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external;
-
-    event Mint(address indexed sender, uint256 amount0, uint256 amount1);
-    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
-    event Swap(
-        address indexed sender,
-        uint256 amount0In,
-        uint256 amount1In,
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address indexed to
-    );
-    event Sync(uint112 reserve0, uint112 reserve1);
-
-    function MINIMUM_LIQUIDITY() external pure returns (uint256);
-
-    function factory() external view returns (address);
-
-    function token0() external view returns (address);
-
-    function token1() external view returns (address);
-
-    function getReserves()
-        external
-        view
-        returns (
-            uint112 reserve0,
-            uint112 reserve1,
-            uint32 blockTimestampLast
-        );
-
-    function price0CumulativeLast() external view returns (uint256);
-
-    function price1CumulativeLast() external view returns (uint256);
-
-    function kLast() external view returns (uint256);
-
-    function mint(address to) external returns (uint256 liquidity);
-
-    function burn(address to) external returns (uint256 amount0, uint256 amount1);
-
-    function swap(
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address to,
-        bytes calldata data
-    ) external;
-
-    function skim(address to) external;
-
-    function sync() external;
-
-    function initialize(address, address) external;
-}
-
-interface IMirinPool is IUniswapV2Pair {
-    event OperatorSet(address indexed previousOperator, address indexed newOperator);
-    event SwapFeeUpdated(uint8 newFee);
-    event SwapFeeToUpdated(address newFeeTo);
-    event BlacklistAdded(address indexed account);
-    event BlacklistRemoved(address indexed account);
-    event OptionCreated(
-        uint256 id,
-        address indexed owner,
-        address indexed token,
-        uint256 amount,
-        uint256 strike,
-        uint256 created,
-        uint256 expire
-    );
-    event OptionExercised(
-        uint256 id,
-        address indexed owner,
-        address indexed token,
-        uint256 amount,
-        uint256 strike,
-        uint256 excercised,
-        uint256 expire
-    );
-
-    function initialize() external;
-
-    function MIN_SWAP_FEE() external view returns (uint8);
-
-    function MAX_SWAP_FEE() external view returns (uint8);
-
-    function operator() external view returns (address);
-
-    function swapFee() external view returns (uint8);
-
-    function swapFeeTo() external view returns (address);
-
-    function blacklisted(address account) external view returns (bool);
-
-    function setOperator(address newOperator) external;
-
-    function updateSwapFee(uint8 newFee) external;
-
-    function updateSwapFeeTo(address newFeeTo) external;
-
-    function disable(address to) external;
-
-    function addToBlacklist(address[] calldata accounts) external;
-
-    function removeFromBlacklist(address[] calldata accounts) external;
-
-    function curve() external view returns (address);
-
-    function curveData() external view returns (bytes32);
-
-    function pricePoints(uint256)
-        external
-        view
-        returns (
-            uint256 timestamp,
-            uint256 price0Cumulative,
-            uint256 price1Cumulative
-        );
-
-    function pricePointsLength() external view returns (uint256);
-
-    function price(address token) external view returns (uint256);
-
-    function realizedVariance(
-        address tokenIn,
-        uint256 p,
-        uint256 window
-    ) external view returns (uint256);
-
-    function realizedVolatility(
-        address tokenIn,
-        uint256 p,
-        uint256 window
-    ) external view returns (uint256);
-
-    function quotePrice(address tokenIn, uint256 amountIn) external view returns (uint256 amountOut);
-
-    function sample(
-        address tokenIn,
-        uint256 amountIn,
-        uint256 p,
-        uint256 window
-    ) external view returns (uint256[] memory);
-
-    function loanContracts() external view returns (address);
-
-    function optionContracts() external view returns (address);
-
-    function quoteOption(address tokenIn, uint256 t) external view returns (uint256 call, uint256 put);
-
-    function quoteOptionPrice(
-        address tokenIn,
-        uint256 t,
-        uint256 sp,
-        uint256 st
-    ) external view returns (uint256 call, uint256 put);
-
-    function options(uint256)
-        external
-        view
-        returns (
-            address asset,
-            uint256 amount,
-            uint256 strike,
-            uint256 expire,
-            uint256 optionType
-        );
-
-    function optionsLength() external view returns (uint256);
-
-    function feeDetail(
-        address token,
-        uint256 st,
-        uint256 t,
-        uint256 optionType
-    )
-        external
-        view
-        returns (
-            uint256 _call,
-            uint256 _put,
-            uint256 _fee
-        );
-
-    function fee(
-        address token,
-        uint256 amount,
-        uint256 st,
-        uint256 t,
-        uint256 optionType
-    ) external view returns (uint256);
-
-    function callATM(
-        address token,
-        uint256 amount,
-        uint256 t,
-        uint256 maxFee
-    ) external;
-
-    function putATM(
-        address token,
-        uint256 amount,
-        uint256 t,
-        uint256 maxFee
-    ) external;
-
-    function createCall(
-        address token,
-        uint256 amount,
-        uint256 st,
-        uint256 t,
-        uint256 maxFee
-    ) external;
-
-    function createPut(
-        address token,
-        uint256 amount,
-        uint256 st,
-        uint256 t,
-        uint256 maxFee
-    ) external;
-
-    function utilization(
-        address token,
-        uint256 optionType,
-        uint256 amount
-    ) external view returns (uint256);
-
-    function createOption(
-        address token,
-        uint256 amount,
-        uint256 st,
-        uint256 t,
-        uint256 optionType,
-        uint256 maxFee
-    ) external;
-
-    function exerciseOptionProfitOnly(uint256 id) external;
-
-    function exerciseOption(uint256 id) external;
-
-    function updateCurveData(bytes32 data) external;
-
-    function swap(
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address to
-    ) external;
-
-    function burn(
-        uint256 amount0,
-        uint256 amount1,
-        address to
-    ) external;
-}
-
-interface IMirinFactory {
-    event PoolCreated(
-        address indexed token0,
-        address indexed token1,
-        bool isPublic,
-        uint256 length,
-        address indexed pool,
-        address operator
-    );
-    event PoolDisabled(address indexed pool);
-
-    function SUSHI_DEPOSIT() external view returns (uint256);
-
-    function SUSHI() external view returns (address);
-
-    function feeTo() external view returns (address);
-
-    function owner() external view returns (address);
-
-    function isCurveWhitelisted(address curve) external view returns (bool);
-
-    function getPublicPool(
-        address token0,
-        address token1,
-        uint256 index
-    ) external view returns (address);
-
-    function getFranchisedPool(
-        address token0,
-        address token1,
-        uint256 index
-    ) external view returns (address);
-
-    function isPool(address pool) external view returns (bool);
-
-    function allPools(uint256 index) external view returns (address);
-
-    function publicPoolsLength(address token0, address token1) external view returns (uint256);
-
-    function franchisedPoolsLength(address token0, address token1) external view returns (uint256);
-
-    function allPoolsLength() external view returns (uint256);
-
-    function whitelistCurve(address curve) external;
-
-    function createPool(
-        address tokenA,
-        address tokenB,
-        address curve,
-        bytes32 curveData,
-        address operator,
-        uint8 swapFee,
-        address swapFeeTo
-    ) external returns (address pool);
-
-    function disablePool(address to) external;
-
-    function setFeeTo(address _feeTo) external;
-
-    function setOwner(address _owner) external;
-}
-
 interface IMirinCurve {
     function canUpdateData(bytes32 oldData, bytes32 newData) external pure returns (bool);
 
     function isValidData(bytes32 data) external view returns (bool);
 
     function computeLiquidity(
-        uint112 reserve0,
-        uint112 reserve1,
+        uint256 reserve0,
+        uint256 reserve1,
         bytes32 data
     ) external view returns (uint256);
 
@@ -1090,6 +812,22 @@ interface IMirinCurve {
 
 interface IBentoBoxV1 {
     function balanceOf(IERC20, address) external view returns (uint256);
+    
+    function deposit( 
+        IERC20 token_,
+        address from,
+        address to,
+        uint256 amount,
+        uint256 share
+    ) external payable returns (uint256 amountOut, uint256 shareOut);
+
+    function withdraw(
+        IERC20 token_,
+        address from,
+        address to,
+        uint256 amount,
+        uint256 share
+    ) external returns (uint256 amountOut, uint256 shareOut);
 
     function transfer(
         IERC20 token,
@@ -1111,9 +849,6 @@ interface IMirinCallee {
     function mirinCall(address sender, uint256 amount0, uint256 amount1, bytes calldata data) external;
 }
 
-/**
- * @author LevX
- */
 contract MirinPool is MirinERC20 {
     /**
      * @dev Immutable variables for `masterContract` and all pool clones
@@ -1138,7 +873,6 @@ contract MirinPool is MirinERC20 {
         address indexed pool,
         uint256 length
     );
-    event PoolDisabled(address indexed pool);
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Swap(
@@ -1150,17 +884,11 @@ contract MirinPool is MirinERC20 {
         address indexed to
     );
     event Sync(uint112 reserve0, uint112 reserve1);
-    event OperatorSet(address indexed previousOperator, address indexed newOperator);
-    event SwapFeeUpdated(uint8 newFee);
-    event SwapFeeToUpdated(address newFeeTo);
 
     uint8 public constant MIN_SWAP_FEE = 1;
     uint8 public constant MAX_SWAP_FEE = 100;
-
     uint256 public constant MINIMUM_LIQUIDITY = 10**3;
-    bytes4 private constant SELECTOR = bytes4(keccak256(bytes("transfer(address,uint256)")));
 
-    address public operator;
     /**
      * @dev Fee for swapping (out of 1000).
      */
@@ -1168,7 +896,7 @@ contract MirinPool is MirinERC20 {
     /**
      * @dev Swap fee receiver.
      */
-    address public feeTo;
+    address public swapFeeTo;
 
     address public token0;
     address public token1;
@@ -1191,9 +919,9 @@ contract MirinPool is MirinERC20 {
         _;
         unlocked = 1;
     }
-
-    modifier onlyOperator() {
-        require(operator == msg.sender, "MIRIN: UNAUTHORIZED");
+    
+    modifier ensure(uint deadline) {
+        require(deadline >= block.timestamp, "MIRIN: EXPIRED");
         _;
     }
 
@@ -1218,16 +946,17 @@ contract MirinPool is MirinERC20 {
 
     /**
      * @notice Serves as the constructor for clones, as clones can't have a regular constructor
-     * @dev `data` is abi-encoded in the format: (address tokenA, address tokenB, address _curve, bytes32 _curveData, uint8 _swapFee, address _feeTo)
+     * @dev `data` is abi-encoded in the format: (address tokenA, address tokenB, address _curve, bytes32 _curveData, uint8 _swapFee, address _swapFeeTo)
      */
     function init(bytes calldata data) external {
         require(address(token0) == address(0), 'MIRIN: ALREADY_INITIALIZED');
-        (address tokenA, address tokenB, address _curve, bytes32 _curveData, address _operator, uint8 _swapFee, address _feeTo) = abi.decode(data, (address, address, address, bytes32, address, uint8, address));
+        (address tokenA, address tokenB, address _curve, bytes32 _curveData, uint8 _swapFee, address _swapFeeTo) = abi.decode(data, (address, address, address, bytes32, uint8, address));
         require(tokenA != tokenB, 'MIRIN: IDENTICAL_ADDRESSES');
         (address _token0, address _token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         require(_token0 != address(0), 'MIRIN: ZERO_ADDRESS');
         require(masterContract.isCurveWhitelisted(_curve), "MIRIN: INVALID_CURVE");
         require(IMirinCurve(_curve).isValidData(_curveData), "MIRIN: INVALID_CURVE_DATA");
+        require(_swapFee >= MIN_SWAP_FEE && _swapFee <= MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
         masterContract.getPool(_token0, _token1) == address(this);
         masterContract.getPool(_token1, _token0) == address(this); // populate mapping in the reverse direction
         masterContract.pushPool(address(this));
@@ -1235,18 +964,15 @@ contract MirinPool is MirinERC20 {
         token1 = _token1;
         curve = _curve;
         curveData = _curveData;
-        operator = _operator; // placeholder for tests - this should resolve to LP token voting
-        _updateSwapFee(_swapFee);
-        _updateSwapFeeTo(_feeTo);
+        swapFee = _swapFee;
+        swapFeeTo = _swapFeeTo;
         emit PoolCreated(_token0, _token1, address(this), masterContract.allPoolsLength());
     }
 
-    /// **** PUSH POOL ****
     function pushPool(address pool) external {
         allPools.push(pool);
     }
 
-    /// **** GETTER FUNCTIONS ****
     function allPoolsLength() external view returns (uint256) {
         return masterContract.allPoolsLength();
     }
@@ -1306,14 +1032,14 @@ contract MirinPool is MirinERC20 {
                         _mint(masterContract.masterFeeTo(), liquidity * 2);
                     } else {
                         _mint(masterContract.masterFeeTo(), liquidity);
-                        _mint(feeTo, liquidity);
+                        _mint(swapFeeTo, liquidity);
                     }
                 }
             }
         }
     }
 
-    function mint(address to) external lock returns (uint256 liquidity) {
+    function mint(address to) public lock returns (uint256 liquidity) {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves();
         uint256 balance0 = bentoBox.balanceOf(IERC20(token0), address(this));
         uint256 balance1 = bentoBox.balanceOf(IERC20(token1), address(this));
@@ -1338,7 +1064,7 @@ contract MirinPool is MirinERC20 {
         emit Mint(msg.sender, amount0, amount1, to);
     }
 
-    function burn(address to) external lock returns (uint256 amount0, uint256 amount1) {
+    function burn(address to) public lock returns (uint256 amount0, uint256 amount1) {
         uint256 liquidity = balanceOf[address(this)];
         (uint256 balance0, uint256 balance1) = bentoBalance(IERC20(token0), IERC20(token1));
         uint256 _totalSupply = totalSupply;
@@ -1433,47 +1159,54 @@ contract MirinPool is MirinERC20 {
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         }
         emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
-
+    }
+    
+    /// **** ADD LIQUIDITY ****
+    function addLiquidity(
+        uint256 amountADesired,
+        uint256 amountBDesired,
+        uint256 amountAMin,
+        uint256 amountBMin,
+        address to,
+        uint256 deadline
+    ) external ensure(deadline) lock returns (uint256 amount0, uint256 amount1, uint256 liquidity) {
+        (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
+        if (_reserve0 == 0 && _reserve1 == 0) {
+            (amount0, amount1) = (amountADesired, amountBDesired);
+        } else {
+            uint256 amountBOptimal  = amountADesired * (_reserve1 / _reserve0);
+            if (amountBOptimal  <= amountBDesired) {
+                require(amountBOptimal  >= amountBMin, 'MIRIN: INSUFFICIENT_B_AMOUNT');
+                (amount0, amount1) = (amountADesired, amountBOptimal );
+            } else {
+                uint256 amountAOptimal = amountBDesired * (_reserve1 / _reserve0);
+                assert(amountAOptimal <= amountADesired);
+                require(amountAOptimal >= amountAMin, 'MIRIN: INSUFFICIENT_A_AMOUNT');
+                (amount0, amount1) = (amountAOptimal, amountBDesired);
+            }
+        }
+        bentoBox.transfer(IERC20(token0), msg.sender, address(this), amount0);
+        bentoBox.transfer(IERC20(token1), msg.sender, address(this), amount1);
+        liquidity = mint(to);
+    }
+    
+    /// **** REMOVE LIQUIDITY ****
+    function removeLiquidity(
+        uint256 liquidity,
+        uint256 amountAMin,
+        uint256 amountBMin,
+        address to,
+        uint256 deadline
+    ) external ensure(deadline) lock returns (uint amountA, uint amountB) {
+        this.transferFrom(msg.sender, address(this), liquidity); // send liquidity to this pair
+        (amountA, amountB) = burn(to);
+        require(amountA >= amountAMin, 'MIRIN: INSUFFICIENT_A_AMOUNT');
+        require(amountB >= amountBMin, 'MIRIN: INSUFFICIENT_B_AMOUNT');
     }
 
     function sync() external lock {
         (uint256 balance0, uint256 balance1) = bentoBalance(IERC20(token0), IERC20(token1));
         _update(balance0, balance1, reserve0, reserve1, blockTimestampLast);
-    }
-
-    /// **** POOL GOVERNANCE ****
-    function _updateSwapFee(uint8 newFee) internal {
-        require(newFee >= MIN_SWAP_FEE && newFee <= MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
-        swapFee = newFee;
-        emit SwapFeeUpdated(newFee);
-    }
-
-    function _updateSwapFeeTo(address newFeeTo) internal {
-        feeTo = newFeeTo;
-        emit SwapFeeToUpdated(newFeeTo);
-    }
-
-    function setOperator(address newOperator) external onlyOperator {
-        require(newOperator != address(0), "MIRIN: INVALID_OPERATOR");
-        operator = newOperator;
-        emit OperatorSet(operator, newOperator);
-    }
-
-    function updateCurveData(bytes32 data) external onlyOperator {
-        require(IMirinCurve(curve).canUpdateData(curveData, data), "MIRIN: CANNOT_UPDATE_DATA");
-        curveData = data;
-    }
-
-    function updateSwapFee(uint8 newFee) public onlyOperator {
-        (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
-        _mintFee(_reserve0, _reserve1);
-        _updateSwapFee(newFee);
-    }
-
-    function updateSwapFeeTo(address newFeeTo) public onlyOperator {
-        (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
-        _mintFee(_reserve0, _reserve1);
-        _updateSwapFeeTo(newFeeTo);
     }
 
     /// **** MASTER GOVERNANCE ****
