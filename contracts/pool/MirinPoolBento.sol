@@ -5,6 +5,7 @@ pragma solidity =0.8.2;
 import "../interfaces/IMirinFactory.sol";
 import "./MirinERC20.sol";
 import "../interfaces/IMirinCurve.sol";
+import "../interfaces/IBentoBox.sol";
 
 contract MirinPool is MirinERC20 {
     /**
