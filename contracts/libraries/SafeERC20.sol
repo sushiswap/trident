@@ -3,7 +3,7 @@
 pragma solidity =0.8.2;
 
 import "./Address.sol";
-import "../interfaces/IERC20.sol";
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 library SafeERC20 {
     using Address for address;
