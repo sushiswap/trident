@@ -735,7 +735,6 @@ contract MirinPool is ConstantMeanCurve, MirinERC20 {
     IBentoBoxV1 private immutable bentoBox;
     MirinPool private immutable masterContract;
 
-    address public governance;
     address public masterFeeTo;
     address public swapFeeTo;
 
@@ -764,22 +763,15 @@ contract MirinPool is ConstantMeanCurve, MirinERC20 {
         _;
     }
 
-    modifier onlyGovernance {
-        require(msg.sender == masterContract.governance(), "MIRIN: FORBIDDEN");
-        _;
-    }
-
     /**
      * @notice The constructor is only used for the initial `masterContract`. Subsequent clones are initialized via {initialize}.
      */
     constructor(
         IBentoBoxV1 _bentoBox,
-        address _governance,
         address _masterFeeTo
     ) {
         bentoBox = _bentoBox;
         masterContract = this;
-        governance = _governance;
         masterFeeTo = _masterFeeTo;
     }
     
