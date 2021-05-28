@@ -2,14 +2,15 @@
 pragma solidity ^0.8.2;
 pragma abicoder v2;
 
-import './interfaces/ISwapRouter.sol';
-import './interfaces/IWETH.sol';
-import './interfaces/IPool.sol';
+import "./interfaces/ISwapRouter.sol";
+import "./interfaces/IWETH.sol";
+import "./interfaces/IPool.sol";
 
-import './base/Multicall.sol';
-import './base/SelfPermit.sol';
+import "./base/Multicall.sol";
+import "./base/SelfPermit.sol";
+import "./deployer/MasterDeployer.sol";
 
-import './libraries/TransferHelper.sol';
+import "./libraries/TransferHelper.sol";
 
 contract SwapRouter is
     ISwapRouter,
@@ -18,18 +19,20 @@ contract SwapRouter is
 {
 
     address public immutable WETH9;
+    address public immutable masterDeployer;
 
-    constructor(address _WETH9) {
+    constructor(address _WETH9, address _masterDeployer) {
         WETH9 = _WETH9;
+        masterDeployer = _masterDeployer;
     }
 
     modifier checkDeadline(uint256 deadline) {
-        require(block.timestamp <= deadline, 'Transaction too old');
+        require(block.timestamp <= deadline, "Transaction too old");
         _;
     }
 
     receive() external payable {
-        require(msg.sender == WETH9, 'Not WETH9');
+        require(msg.sender == WETH9, "Not WETH9");
     }
 
     /// @dev Performs a single exact input swap
@@ -42,10 +45,11 @@ contract SwapRouter is
         address payer,
         uint256 amountIn
     ) private returns (uint256 amountOut) {
+        require(MasterDeployer(masterDeployer).pool(pool), "Not official pool");
+
         // Pay optimisticly.
         pay(tokenIn, payer, pool, amountIn);
 
-        // TODO: Ensure that the pool is an authorized SushiSwap pool
         amountOut =
             IPool(pool).swap(
                 tokenIn,
@@ -74,7 +78,7 @@ contract SwapRouter is
             params.amountIn
 
         );
-        require(amountOut >= params.amountOutMinimum, 'Too little received');
+        require(amountOut >= params.amountOutMinimum, "Too little received");
     }
 
     function exactInput(ExactInputParams memory params)
@@ -104,12 +108,12 @@ contract SwapRouter is
             payer = address(this);
         }
 
-        require(amount >= params.amountOutMinimum, 'Too little received');
+        require(amount >= params.amountOutMinimum, "Too little received");
     }
 
     function unwrapWETH9(uint256 amountMinimum, address recipient) external payable {
         uint256 balanceWETH9 = IWETH(WETH9).balanceOf(address(this));
-        require(balanceWETH9 >= amountMinimum, 'Insufficient WETH9');
+        require(balanceWETH9 >= amountMinimum, "Insufficient WETH9");
 
         if (balanceWETH9 > 0) {
             IWETH(WETH9).withdraw(balanceWETH9);
@@ -123,7 +127,7 @@ contract SwapRouter is
         address recipient
     ) external payable {
         uint256 balanceToken = IERC20(token).balanceOf(address(this));
-        require(balanceToken >= amountMinimum, 'Insufficient token');
+        require(balanceToken >= amountMinimum, "Insufficient token");
 
         if (balanceToken > 0) {
             TransferHelper.safeTransfer(token, recipient, balanceToken);

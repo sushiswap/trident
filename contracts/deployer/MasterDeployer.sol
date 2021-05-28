@@ -12,12 +12,15 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract MasterDeployer is Ownable {
     mapping (address => bool) public whitelistedFactories;
 
+    mapping (address => bool) public pool;
+
     constructor() Ownable() {}
 
-    function deployPool(address _factory, bytes memory _deployData, bytes memory _initData) external returns (address) {
+    function deployPool(address _factory, bytes memory _deployData, bytes memory _initData) external returns (address poolAddress) {
         require(whitelistedFactories[_factory], "Factory not whitelisted");
         address logic = PoolFactory(_factory).deployPoolLogic(_deployData);
-        return address(new PoolProxy(logic, _initData));
+        poolAddress = address(new PoolProxy(logic, _initData));
+        pool[poolAddress] = true;
     }
 
     function addToWhitelist(address _factory) external onlyOwner {
