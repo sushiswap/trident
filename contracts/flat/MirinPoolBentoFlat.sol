@@ -728,7 +728,7 @@ contract MirinPool is ConstantMeanCurve, MirinERC20 { // WIP - adapted for Bento
     );
     event Sync(uint112 reserve0, uint112 reserve1);
     
-    IBentoBoxV1 private constant bentoBox = IBentoBoxV1(0xF5BCE5077908a1b7370B9ae04AdC565EBd643966);
+    IBentoBoxV1 private immutable bentoBox;
     
     uint8 public swapFee;
     uint8 public constant MIN_SWAP_FEE = 1;
@@ -763,6 +763,7 @@ contract MirinPool is ConstantMeanCurve, MirinERC20 { // WIP - adapted for Bento
     }
 
     constructor(
+        IBentoBoxV1 _bentoBox,
         IERC20 tokenA, 
         IERC20 tokenB, 
         bytes32 _curveData, 
@@ -774,6 +775,7 @@ contract MirinPool is ConstantMeanCurve, MirinERC20 { // WIP - adapted for Bento
         require(_token0 != _token1, "MIRIN: IDENTICAL_ADDRESSES");
         require(isValidData(_curveData), "MIRIN: INVALID_CURVE_DATA");
         require(_swapFee >= MIN_SWAP_FEE && _swapFee <= MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
+        bentoBox = _bentoBox;
         token0 = _token0;
         token1 = _token1;
         curveData = _curveData;
