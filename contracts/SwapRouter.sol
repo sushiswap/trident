@@ -5,6 +5,7 @@ pragma abicoder v2;
 import "./interfaces/ISwapRouter.sol";
 import "./interfaces/IWETH.sol";
 import "./interfaces/IPool.sol";
+import "./interfaces/IBentoBox.sol";
 
 import "./base/Multicall.sol";
 import "./base/SelfPermit.sol";
@@ -20,10 +21,12 @@ contract SwapRouter is
 
     address public immutable WETH9;
     address public immutable masterDeployer;
+    address public immutable bento;
 
-    constructor(address _WETH9, address _masterDeployer) {
+    constructor(address _WETH9, address _masterDeployer, address _bento) {
         WETH9 = _WETH9;
         masterDeployer = _masterDeployer;
+        bento = _bento;
     }
 
     modifier checkDeadline(uint256 deadline) {
@@ -45,10 +48,23 @@ contract SwapRouter is
         address payer,
         uint256 amountIn
     ) private returns (uint256 amountOut) {
-        require(MasterDeployer(masterDeployer).pool(pool), "Not official pool");
-
         // Pay optimisticly.
         pay(tokenIn, payer, pool, amountIn);
+
+        exactInputInternalWithoutPay(tokenIn, tokenOut, pool, context, recipient, payer, amountIn);
+    }
+
+    /// @dev Performs a single exact input swap
+    function exactInputInternalWithoutPay(
+        address tokenIn,
+        address tokenOut,
+        address pool,
+        bytes memory context,
+        address recipient,
+        address payer,
+        uint256 amountIn
+    ) private returns (uint256 amountOut) {
+        require(MasterDeployer(masterDeployer).pool(pool), "Not official pool");
 
         amountOut =
             IPool(pool).swap(
@@ -111,13 +127,105 @@ contract SwapRouter is
         require(amount >= params.amountOutMinimum, "Too little received");
     }
 
-    function unwrapWETH9(uint256 amountMinimum, address recipient) external payable {
-        uint256 balanceWETH9 = IWETH(WETH9).balanceOf(address(this));
-        require(balanceWETH9 >= amountMinimum, "Insufficient WETH9");
+    function exactInputFirstHopWithNativeTokens(
+        address tokenIn,
+        address tokenOut,
+        address pool,
+        bytes memory context,
+        address recipient,
+        address payer,
+        uint256 amountIn,
+        bool nativeInput
+    ) private returns (uint256 amountOut) {
+        if (nativeInput) {
+            IBentoBoxV1(bento).deposit(IERC20(tokenIn), payer, address(this), amountIn, 0);
+            amountOut = exactInputInternalWithoutPay(
+                tokenIn,
+                tokenOut,
+                pool,
+                context,
+                recipient,
+                msg.sender,
+                amountIn
+            );
+        } else {
+            amountOut = exactInputInternal(
+                tokenIn,
+                tokenOut,
+                pool,
+                context,
+                recipient,
+                msg.sender,
+                amountIn
+            );
+        }
+    }
 
-        if (balanceWETH9 > 0) {
-            IWETH(WETH9).withdraw(balanceWETH9);
-            TransferHelper.safeTransferETH(recipient, balanceWETH9);
+    function exactInputSingleWithNativeTokens(ExactInputSingleParams calldata params, bool nativeInput, bool nativeOutput)
+        external
+        payable
+        checkDeadline(params.deadline)
+        returns (uint256 amountOut)
+    {
+        address recipient = nativeOutput ? address(this) : params.recipient;
+
+        amountOut = exactInputFirstHopWithNativeTokens(
+            params.tokenIn,
+            params.tokenOut,
+            params.pool,
+            params.context,
+            recipient,
+            msg.sender,
+            params.amountIn,
+            nativeInput
+        );
+
+        require(amountOut >= params.amountOutMinimum, "Too little received");
+
+        if (nativeOutput) {
+            IBentoBoxV1(bento).withdraw(IERC20(params.tokenOut), address(this), params.recipient, amountOut, 0);
+        }
+    }
+
+    function exactInputWithNativeTokens(ExactInputParams memory params, bool nativeInput, bool nativeOutput)
+        external
+        payable
+        checkDeadline(params.deadline)
+        returns (uint256 amount)
+    {
+        address payer = msg.sender;
+
+        amount = exactInputFirstHopWithNativeTokens(
+            params.path[0].inputToken,
+            params.path.length > 1 ? params.path[1].inputToken : params.tokenOut,
+            params.path[0].pool,
+            params.path[0].context,
+            params.path.length > 1 || nativeOutput ? address(this) : params.recipient,
+            msg.sender,
+            params.amountIn,
+            nativeInput
+        );
+
+        for (uint256 i = 1; i < params.path.length; i++) {
+            bool isLastPool = params.path.length == i + 1;
+
+            // the outputs of prior swaps become the inputs to subsequent ones
+            amount = exactInputInternal(
+                params.path[i].inputToken,
+                isLastPool ? params.path[i + 1].inputToken : params.tokenOut,
+                params.path[i].pool,
+                params.path[i].context,
+                isLastPool && !nativeOutput ? params.recipient : address(this),
+                payer,
+                amount
+            );
+
+            payer = address(this);
+        }
+
+        require(amount >= params.amountOutMinimum, "Too little received");
+        if (nativeOutput) {
+            IBentoBoxV1(bento).withdraw(IERC20(params.tokenOut), address(this), params.recipient, amount, 0);
         }
     }
 
@@ -149,15 +257,11 @@ contract SwapRouter is
         uint256 value
     ) internal {
         if (token == WETH9 && address(this).balance >= value) {
-            // pay with WETH9
-            IWETH(WETH9).deposit{value: value}(); // wrap only what is needed to pay
-            IWETH(WETH9).transfer(recipient, value);
-        } else if (payer == address(this)) {
-            // pay with tokens already in the contract (for the exact input multihop case)
-            TransferHelper.safeTransfer(token, recipient, value);
+            // Deposit eth into recepients bentobox
+            IBentoBoxV1(bento).deposit(IERC20(token), address(this), recipient, value, 0);
         } else {
-            // pull payment
-            TransferHelper.safeTransferFrom(token, payer, recipient, value);
+            // Process payment via bentobox
+            IBentoBoxV1(bento).transfer(IERC20(token), payer, recipient, IBentoBoxV1(bento).toShare(IERC20(token), value, false));
         }
     }
 }

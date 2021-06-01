@@ -36,4 +36,10 @@ interface IBentoBoxV1 {
         address[] calldata tos,
         uint256[] calldata shares
     ) external;
+
+    function toShare(
+        IERC20 token,
+        uint256 amount,
+        bool roundUp
+    ) external view returns (uint256 share);
 }
