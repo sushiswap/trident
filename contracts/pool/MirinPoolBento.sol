@@ -205,6 +205,11 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 { // WIP - adapted for 
         masterFeeTo = _swapFeeTo;
     }
 
+    function init() public {
+        require(totalSupply == 0);
+        unlocked = 1;
+    }
+
     function getReserves()
         public
         view
