@@ -10,6 +10,8 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * @author Mudit Gupta
  */
 contract MasterDeployer is Ownable {
+    event NewPoolCreated(address indexed poolAddress);
+
     mapping (address => bool) public whitelistedFactories;
 
     mapping (address => bool) public pool;
@@ -21,6 +23,7 @@ contract MasterDeployer is Ownable {
         address logic = PoolFactory(_factory).deployPoolLogic(_deployData);
         poolAddress = address(new PoolProxy(logic, _initData));
         pool[poolAddress] = true;
+        emit NewPoolCreated(poolAddress);
     }
 
     function addToWhitelist(address _factory) external onlyOwner {

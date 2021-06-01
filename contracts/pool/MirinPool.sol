@@ -213,7 +213,7 @@ contract MirinPool is MirinGovernance {
         require(amount0 > 0 || amount1 > 0, "MIRIN: INVALID_AMOUNTS");
 
         uint256 liquidity = balanceOf[address(this)];
-        
+
         (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
         _mintFee(_reserve0, _reserve1);
 

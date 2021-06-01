@@ -11,6 +11,6 @@ contract MirinPoolFactory {
     // Consider deploying via an upgradable proxy to allow upgrading pools in the future
 
     function deployPoolLogic(bytes memory _deployData) external returns (address) {
-        return address(new MirinPool(_deployData));
+        return address(new MirinPoolBento(_deployData));
     }
 }
