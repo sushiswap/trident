@@ -27,6 +27,7 @@ contract SwapRouter is
         WETH9 = _WETH9;
         masterDeployer = _masterDeployer;
         bento = _bento;
+        IBentoBoxV1(_bento).registerProtocol();
     }
 
     modifier checkDeadline(uint256 deadline) {
@@ -51,7 +52,7 @@ contract SwapRouter is
         // Pay optimisticly.
         pay(tokenIn, payer, pool, amountIn);
 
-        exactInputInternalWithoutPay(tokenIn, tokenOut, pool, context, recipient, payer, amountIn);
+        amountOut = exactInputInternalWithoutPay(tokenIn, tokenOut, pool, context, recipient, payer, amountIn);
     }
 
     /// @dev Performs a single exact input swap
@@ -112,8 +113,8 @@ contract SwapRouter is
 
             // the outputs of prior swaps become the inputs to subsequent ones
             amount = exactInputInternal(
-                params.path[i].inputToken,
-                isLastPool ? params.path[i + 1].inputToken : params.tokenOut,
+                params.path[i].tokenIn,
+                isLastPool ? params.tokenOut : params.path[i + 1].tokenIn,
                 params.path[i].pool,
                 params.path[i].context,
                 isLastPool ? params.recipient : address(this),
@@ -196,8 +197,8 @@ contract SwapRouter is
         address payer = msg.sender;
 
         amount = exactInputFirstHopWithNativeTokens(
-            params.path[0].inputToken,
-            params.path.length > 1 ? params.path[1].inputToken : params.tokenOut,
+            params.path[0].tokenIn,
+            params.path.length > 1 ? params.path[1].tokenIn : params.tokenOut,
             params.path[0].pool,
             params.path[0].context,
             params.path.length > 1 || nativeOutput ? address(this) : params.recipient,
@@ -211,8 +212,8 @@ contract SwapRouter is
 
             // the outputs of prior swaps become the inputs to subsequent ones
             amount = exactInputInternal(
-                params.path[i].inputToken,
-                isLastPool ? params.path[i + 1].inputToken : params.tokenOut,
+                params.path[i].tokenIn,
+                isLastPool ? params.path[i + 1].tokenIn : params.tokenOut,
                 params.path[i].pool,
                 params.path[i].context,
                 isLastPool && !nativeOutput ? params.recipient : address(this),

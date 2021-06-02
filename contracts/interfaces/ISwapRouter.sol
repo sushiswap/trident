@@ -5,7 +5,7 @@ pragma abicoder v2;
 interface ISwapRouter {
     /// @dev In case of a multi hop swap, the output token for first swap is the input token of the next swap
     struct Path {
-        address inputToken;
+        address tokenIn;
         address pool;
         bytes context;
     }

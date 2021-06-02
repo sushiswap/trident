@@ -42,4 +42,6 @@ interface IBentoBoxV1 {
         uint256 amount,
         bool roundUp
     ) external view returns (uint256 share);
+
+    function registerProtocol() external;
 }

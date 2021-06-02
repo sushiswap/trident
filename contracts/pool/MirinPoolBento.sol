@@ -6,6 +6,7 @@ import "../libraries/MirinMathNew.sol";
 import "../interfaces/IMirinCurve.sol";
 import "./MirinERC20.sol";
 import "../interfaces/IBentoBox.sol";
+import "hardhat/console.sol";
 
 /**
  * @dev Constant mean curve for tokens with different possible weights (k = r_0^w_0 * r_1^w1)
@@ -394,6 +395,15 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 { // WIP - adapted for 
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
+    function getAmountOut(address tokenIn, uint256 amountIn) public view returns (uint256 amountOut) {
+        (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
+        if (IERC20(tokenIn) == token0) {
+            amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
+        } else {
+            amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
+        }
+    }
+
     function _balance(IERC20 _token0, IERC20 _token1) private view returns (uint256 balance0, uint256 balance1) {
         balance0 = bentoBox.balanceOf(_token0, address(this));
         balance1 = bentoBox.balanceOf(_token1, address(this));
@@ -422,10 +432,10 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 { // WIP - adapted for 
         uint256 amountIn,
         uint256 reserveIn,
         uint256 reserveOut
-    ) private pure returns (uint256 amountOut) {
+    ) private view returns (uint256 amountOut) {
         require(amountIn > 0, "MIRIN: INSUFFICIENT_INPUT_AMOUNT");
         require(reserveIn > 0 && reserveOut > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
-        uint256 amountInWithFee = amountIn * 997;
+        uint256 amountInWithFee = amountIn * (1000 - swapFee);
         uint256 numerator = amountInWithFee * reserveOut;
         uint256 denominator = (reserveIn * 1000) + amountInWithFee;
         amountOut = numerator / denominator;
@@ -457,6 +467,7 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 { // WIP - adapted for 
         (uint256 balance0, uint256 balance1) = _balance(token0, token1);
         uint256 amount0In = balance0 + amount0Out - _reserve0;
         uint256 amount1In = balance1 + amount1Out - _reserve1;
+        console.log("amount0in is %s, amount1In is %s", amount0In, amount1In);
         _compute(amount0In, amount1In, balance0, balance1, _reserve0, _reserve1);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         //emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to); WIP - Can this event be in deployer/router to avoid 'stack size too deep' error?
@@ -469,13 +480,16 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 { // WIP - adapted for 
         address recipient,
         bool,
         uint256 amount
-    ) external lock returns (uint256 oppositeSideAmount) {
+    ) external returns (uint256 oppositeSideAmount) {
         (uint112 _reserve0, uint112 _reserve1, ) = getReserves(); // gas savings
+        console.log("Reserve0 is %s, Reserve1 is %s", _reserve0, _reserve1);
         if (IERC20(tokenIn) == token0) {
             oppositeSideAmount = _getAmountOut(amount, _reserve0, _reserve1);
+            console.log("Amount out is %s", oppositeSideAmount);
             swap(0, oppositeSideAmount, recipient, context);
         } else {
             oppositeSideAmount = _getAmountOut(amount, _reserve1, _reserve0);
+            console.log("Amount out is %s", oppositeSideAmount);
             swap(oppositeSideAmount, 0, recipient, context);
         }
     }
