@@ -258,8 +258,8 @@ contract SwapRouter is
         uint256 value
     ) internal {
         if (token == WETH9 && address(this).balance >= value) {
-            // Deposit eth into recepients bentobox
-            IBentoBoxV1(bento).deposit(IERC20(token), address(this), recipient, value, 0);
+            // Deposit eth into recipient bentobox
+            IBentoBoxV1(bento).deposit{value: value}(IERC20(address(0)), address(this), recipient, value, 0);
         } else {
             // Process payment via bentobox
             IBentoBoxV1(bento).transfer(IERC20(token), payer, recipient, IBentoBoxV1(bento).toShare(IERC20(token), value, false));

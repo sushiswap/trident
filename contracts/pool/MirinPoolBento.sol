@@ -135,7 +135,7 @@ interface IMirinCallee {
     function mirinCall(address sender, uint256 amount0, uint256 amount1, bytes calldata data) external;
 }
 
-contract MirinPoolBento is ConstantMeanCurve, MirinERC20 { // WIP - adapted for BentoBox vault & multiAMM deployer integration - see base template: https://github.com/sushiswap/mirin/blob/master/contracts/pool/MirinPool.sol *TO-DO: abstract curve library
+contract MirinPoolBento is ConstantMeanCurve, MirinERC20 {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Swap(
@@ -148,15 +148,14 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 { // WIP - adapted for 
     );
     event Sync(uint112 reserve0, uint112 reserve1);
 
-    IBentoBoxV1 private immutable bentoBox;
-
     uint8 public immutable swapFee;
     uint8 public constant MIN_SWAP_FEE = 1;
     uint256 public constant MINIMUM_LIQUIDITY = 10**3;
 
-    address public immutable masterFeeTo; // WIP - empty placeholder for testing - this addr will be stored in deployer / router?
+    address public immutable masterFeeTo;
     address public immutable swapFeeTo;
 
+    IBentoBoxV1 private immutable bento;
     IERC20 public immutable token0;
     IERC20 public immutable token1;
 
@@ -184,7 +183,7 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 { // WIP - adapted for 
 
     constructor(bytes memory _deployData) {
         (
-            IBentoBoxV1 _bentoBox,
+            IBentoBoxV1 _bento,
             IERC20 tokenA,
             IERC20 tokenB,
             bytes32 _curveData,
@@ -197,7 +196,7 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 { // WIP - adapted for 
         require(_token0 != _token1, "MIRIN: IDENTICAL_ADDRESSES");
         require(isValidData(_curveData), "MIRIN: INVALID_CURVE_DATA");
         require(_swapFee >= MIN_SWAP_FEE && _swapFee <= MAX_SWAP_FEE, "MIRIN: INVALID_SWAP_FEE");
-        bentoBox = _bentoBox;
+        bento = _bento;
         token0 = _token0;
         token1 = _token1;
         curveData = _curveData;
@@ -272,38 +271,10 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 { // WIP - adapted for 
         }
     }
 
-    function addLiquidity(
-        uint256 amountADesired,
-        uint256 amountBDesired,
-        uint256 amountAMin,
-        uint256 amountBMin,
-        address to,
-        uint256 deadline
-    ) external ensureDeadline(deadline) returns (uint256 amount0, uint256 amount1, uint256 liquidity) {
-        (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
-        if (_reserve0 == 0 && _reserve1 == 0) {
-            (amount0, amount1) = (amountADesired, amountBDesired);
-        } else {
-            uint256 amountBOptimal  = amountADesired * (_reserve1 / _reserve0);
-            if (amountBOptimal  <= amountBDesired) {
-                require(amountBOptimal  >= amountBMin, "MIRIN: INSUFFICIENT_B_AMOUNT");
-                (amount0, amount1) = (amountADesired, amountBOptimal );
-            } else {
-                uint256 amountAOptimal = amountBDesired * (_reserve1 / _reserve0);
-                assert(amountAOptimal <= amountADesired);
-                require(amountAOptimal >= amountAMin, "MIRIN: INSUFFICIENT_A_AMOUNT");
-                (amount0, amount1) = (amountAOptimal, amountBDesired);
-            }
-        }
-        bentoBox.transfer(token0, msg.sender, address(this), amount0);
-        bentoBox.transfer(token1, msg.sender, address(this), amount1);
-        liquidity = mint(to);
-    }
-
     function mint(address to) public lock returns (uint256 liquidity) {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves();
-        uint256 balance0 = bentoBox.balanceOf(token0, address(this));
-        uint256 balance1 = bentoBox.balanceOf(token1, address(this));
+        uint256 balance0 = bento.balanceOf(token0, address(this));
+        uint256 balance1 = bento.balanceOf(token1, address(this));
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
 
@@ -326,19 +297,6 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 { // WIP - adapted for 
         emit Mint(msg.sender, amount0, amount1, to);
     }
 
-    function removeLiquidity(
-        uint256 liquidity,
-        uint256 amountAMin,
-        uint256 amountBMin,
-        address to,
-        uint256 deadline
-    ) external ensureDeadline(deadline) returns (uint256 amountA, uint256 amountB) {
-        this.transferFrom(msg.sender, address(this), liquidity); // send liquidity to this pool
-        (amountA, amountB) = burn(to);
-        require(amountA >= amountAMin, "MIRIN: INSUFFICIENT_A_AMOUNT");
-        require(amountB >= amountBMin, "MIRIN: INSUFFICIENT_B_AMOUNT");
-    }
-
     function burn(address to) public lock returns (uint256 amount0, uint256 amount1) {
         IERC20 _token0 = IERC20(token0);                                 // gas savings
         IERC20 _token1 = IERC20(token1);                                 // gas savings
@@ -352,8 +310,8 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 { // WIP - adapted for 
 
         _burn(address(this), liquidity);
 
-        bentoBox.transfer(_token0, address(this), to, amount0);
-        bentoBox.transfer(_token1, address(this), to, amount1);
+        bento.transfer(_token0, address(this), to, amount0);
+        bento.transfer(_token1, address(this), to, amount1);
 
         balance0 -= amount0;
         balance1 -= amount1;
@@ -405,8 +363,8 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 { // WIP - adapted for 
     }
 
     function _balance(IERC20 _token0, IERC20 _token1) private view returns (uint256 balance0, uint256 balance1) {
-        balance0 = bentoBox.balanceOf(_token0, address(this));
-        balance1 = bentoBox.balanceOf(_token1, address(this));
+        balance0 = bento.balanceOf(_token0, address(this));
+        balance1 = bento.balanceOf(_token1, address(this));
     }
 
     function _compute(
@@ -441,7 +399,7 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 { // WIP - adapted for 
         amountOut = numerator / denominator;
     }
 
-    function _transferCall(
+    function _transferWithData(
         uint256 amount0Out,
         uint256 amount1Out,
         address to,
@@ -449,8 +407,8 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 { // WIP - adapted for 
         IERC20 _token0,
         IERC20 _token1
     ) private {
-        if (amount0Out > 0) bentoBox.transfer(_token0, address(this), to, amount0Out); // optimistically transfer tokens
-        if (amount1Out > 0) bentoBox.transfer(_token1, address(this), to, amount1Out); // optimistically transfer tokens
+        if (amount0Out > 0) bento.transfer(_token0, address(this), to, bento.toShare(_token0, amount0Out, false)); // optimistically transfer tokens
+        if (amount1Out > 0) bento.transfer(_token1, address(this), to, bento.toShare(_token1, amount1Out, false)); // optimistically transfer tokens
         if (data.length > 0) IMirinCallee(to).mirinCall(msg.sender, amount0Out, amount1Out, data);
     }
 
@@ -462,7 +420,7 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 { // WIP - adapted for 
         IERC20 _token0 = token0; // gas savings
         IERC20 _token1 = token1; // gas savings
         require(to != address(_token0) && to != address(_token1), "MIRIN: INVALID_TO");
-        _transferCall(amount0Out, amount1Out, to, data, _token0, _token1);
+        _transferWithData(amount0Out, amount1Out, to, data, _token0, _token1);
         }
         (uint256 balance0, uint256 balance1) = _balance(token0, token1);
         uint256 amount0In = balance0 + amount0Out - _reserve0;
@@ -473,7 +431,7 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 { // WIP - adapted for 
         //emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to); WIP - Can this event be in deployer/router to avoid 'stack size too deep' error?
     }
 
-    function swap( // WIP - formatted for {IPool}
+    function swap( // formatted for {IPool}
         address tokenIn,
         address,
         bytes calldata context,
@@ -496,8 +454,8 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 { // WIP - adapted for 
 
     function sync() external lock {
         _update(
-            bentoBox.balanceOf(token0, address(this)),
-            bentoBox.balanceOf(token1, address(this)),
+            bento.balanceOf(token0, address(this)),
+            bento.balanceOf(token1, address(this)),
             reserve0,
             reserve1,
             blockTimestampLast
