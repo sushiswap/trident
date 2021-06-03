@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity =0.8.2;
+pragma solidity ^0.8.2;
 
 contract FakeERC20Token {
     string public name = "Fake ERC20 Test Token";
@@ -23,7 +23,7 @@ contract FakeERC20Token {
         balances[to] += amount;
         totalSupply += amount;
     }
-    
+
     function balanceOf(address owner) public view returns (uint256) {
         return balances[owner];
     }

@@ -43,5 +43,11 @@ interface IBentoBoxV1 {
         bool roundUp
     ) external view returns (uint256 share);
 
+    function toAmount(
+        IERC20 token,
+        uint256 share,
+        bool roundUp
+    ) external view returns (uint256 amount);
+
     function registerProtocol() external;
 }

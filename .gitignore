@@ -17,3 +17,6 @@ typechain/
 # Coverage
 coverage/
 coverage.json
+
+# Temp/local stuff that shouldn't be pushed
+local/
