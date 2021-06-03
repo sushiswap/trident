@@ -8,7 +8,6 @@ interface IPool {
         address tokenOut,
         bytes calldata context,
         address recipient,
-        bool inAmountProvided,
         uint256 amount
     ) external returns(uint256 oppositeSideAmount);
 }

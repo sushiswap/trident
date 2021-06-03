@@ -47,26 +47,11 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         address recipient,
         address payer,
         uint256 amountIn
-    ) private returns (uint256 amountOut) {
+    ) internal returns (uint256 amountOut) {
         // Pay optimisticly.
         pay(tokenIn, payer, pool, amountIn);
 
-        amountOut = exactInputInternalWithoutPay(tokenIn, tokenOut, pool, context, recipient, payer, amountIn);
-    }
-
-    function exactInputInternalWithNativeToken(
-        address tokenIn,
-        address tokenOut,
-        address pool,
-        bytes memory context,
-        address recipient,
-        address payer,
-        uint256 amountIn
-    ) private returns (uint256 amountOut) {
-        // Deposit optimistically
-        IBentoBoxV1(bento).deposit(IERC20(tokenIn), payer, pool, amountIn, 0);
-
-        amountOut = exactInputInternalWithoutPay(tokenIn, tokenOut, pool, context, recipient, msg.sender, amountIn);
+        amountOut = exactInputInternalWithoutPay(tokenIn, tokenOut, pool, context, recipient, amountIn);
     }
 
     /// @dev Performs a single exact input swap
@@ -76,12 +61,30 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         address pool,
         bytes memory context,
         address recipient,
-        address payer,
         uint256 amountIn
-    ) private returns (uint256 amountOut) {
+    ) internal returns (uint256 amountOut) {
         require(MasterDeployer(masterDeployer).pool(pool), "Not official pool");
 
-        amountOut = IPool(pool).swap(tokenIn, tokenOut, context, recipient, true, amountIn);
+        amountOut = IPool(pool).swap(tokenIn, tokenOut, context, recipient, amountIn);
+    }
+
+    /// @param token The token to pay
+    /// @param payer The entity that must pay
+    /// @param recipient The entity that will receive payment
+    /// @param value The amount to pay
+    function pay(
+        address token,
+        address payer,
+        address recipient,
+        uint256 value
+    ) internal {
+        if (token == WETH && address(this).balance >= value) {
+            // Deposit eth into recipient bentobox
+            IBentoBoxV1(bento).deposit{value: value}(IERC20(address(0)), address(this), recipient, value, 0);
+        } else {
+            // Process payment via bentobox
+            IBentoBoxV1(bento).transfer(IERC20(token), payer, recipient, IBentoBoxV1(bento).toShare(IERC20(token), value, false));
+        }
     }
 
     function exactInputSingle(ExactInputSingleParams calldata params)
@@ -133,26 +136,25 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         require(amount >= params.amountOutMinimum, "Too little received");
     }
 
-    function exactInputSingleWithNativeToken(ExactInputSingleParams calldata params)
+    function exactInputSingleWithPreFunding(ExactInputSingleParams calldata params)
         external
         payable
         checkDeadline(params.deadline)
         returns (uint256 amountOut)
     {
-        amountOut = exactInputInternalWithNativeToken(
+        amountOut = exactInputInternalWithoutPay(
             params.tokenIn,
             params.tokenOut,
             params.pool,
             params.context,
             params.recipient,
-            msg.sender,
             params.amountIn
         );
 
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
 
-    function exactInputWithNativeToken(ExactInputParams memory params)
+    function exactInputWithPreFunding(ExactInputParams memory params)
         external
         payable
         checkDeadline(params.deadline)
@@ -160,13 +162,12 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
     {
         address payer = msg.sender;
 
-        amount = exactInputInternalWithNativeToken(
+        amount = exactInputInternalWithoutPay(
             params.path[0].tokenIn,
             params.path.length > 1 ? params.path[1].tokenIn : params.tokenOut,
             params.path[0].pool,
             params.path[0].context,
             params.path.length > 1 ? address(this) : params.recipient,
-            msg.sender,
             params.amountIn
         );
 
@@ -238,22 +239,5 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         }
     }
 
-    /// @param token The token to pay
-    /// @param payer The entity that must pay
-    /// @param recipient The entity that will receive payment
-    /// @param value The amount to pay
-    function pay(
-        address token,
-        address payer,
-        address recipient,
-        uint256 value
-    ) internal {
-        if (token == WETH && address(this).balance >= value) {
-            // Deposit eth into recipient bentobox
-            IBentoBoxV1(bento).deposit{value: value}(IERC20(address(0)), address(this), recipient, value, 0);
-        } else {
-            // Process payment via bentobox
-            IBentoBoxV1(bento).transfer(IERC20(token), payer, recipient, IBentoBoxV1(bento).toShare(IERC20(token), value, false));
-        }
-    }
+
 }

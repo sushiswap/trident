@@ -234,12 +234,11 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 {
         require(balance0 <= type(uint112).max && balance1 <= type(uint112).max, "MIRIN: OVERFLOW");
         uint32 blockTimestamp = uint32(block.timestamp % 2**32);
         if (blockTimestamp != _blockTimestampLast && _reserve0 != 0 && _reserve1 != 0) {
-            bytes32 _curveData = curveData;
             unchecked {
                 uint32 timeElapsed = blockTimestamp - _blockTimestampLast;
-                uint256 price0 = computePrice(_reserve0, _reserve1, _curveData, 0);
+                uint256 price0 = computePrice(_reserve0, _reserve1, curveData, 0);
                 price0CumulativeLast += price0 * timeElapsed;
-                uint256 price1 = ConstantMeanCurve.computePrice(_reserve0, _reserve1, _curveData, 1);
+                uint256 price1 = ConstantMeanCurve.computePrice(_reserve0, _reserve1, curveData, 1);
                 price1CumulativeLast += price1 * timeElapsed;
             }
         }
@@ -303,7 +302,7 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves();
         _mintFee(_reserve0, _reserve1);
         uint256 liquidity = balanceOf[address(this)];
-        (uint256 balance0, uint256 balance1) = _balance(_token0, _token1);
+        (uint256 balance0, uint256 balance1) = _balance();
         uint256 _totalSupply = totalSupply;
         amount0 = (liquidity * balance0) / _totalSupply;
         amount1 = (liquidity * balance1) / _totalSupply;
@@ -346,7 +345,7 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 {
         }
 
         _burn(address(this), liquidity);
-        (uint256 balance0, uint256 balance1) = _balance(token0, token1);
+        (uint256 balance0, uint256 balance1) = _balance();
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         kLast = computed;
 
@@ -362,9 +361,9 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 {
         }
     }
 
-    function _balance(IERC20 _token0, IERC20 _token1) private view returns (uint256 balance0, uint256 balance1) {
-        balance0 = bento.balanceOf(_token0, address(this));
-        balance1 = bento.balanceOf(_token1, address(this));
+    function _balance() private view returns (uint256 balance0, uint256 balance1) {
+        balance0 = bento.balanceOf(token0, address(this));
+        balance1 = bento.balanceOf(token1, address(this));
     }
 
     function _compute(
@@ -378,10 +377,9 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 {
         require(amount0In > 0 || amount1In > 0, "MIRIN: INSUFFICIENT_INPUT_AMOUNT");
         uint256 balance0Adjusted = balance0 * 1000 - amount0In * swapFee;
         uint256 balance1Adjusted = balance1 * 1000 - amount1In * swapFee;
-        bytes32 _curveData = curveData;
         require(
-            ConstantMeanCurve.computeLiquidity(balance0Adjusted, balance1Adjusted, _curveData) >=
-            ConstantMeanCurve.computeLiquidity(_reserve0 * 1000, _reserve1 * 1000, _curveData),
+            ConstantMeanCurve.computeLiquidity(balance0Adjusted, balance1Adjusted, curveData) >=
+            ConstantMeanCurve.computeLiquidity(_reserve0 * 1000, _reserve1 * 1000, curveData),
             "MIRIN: LIQUIDITY"
         );
     }
@@ -412,23 +410,9 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 {
         if (data.length > 0) IMirinCallee(to).mirinCall(msg.sender, amount0Out, amount1Out, data);
     }
 
-    function swap(uint256 amount0Out, uint256 amount1Out, address to, bytes calldata data) public lock {
-        require(amount0Out > 0 || amount1Out > 0, "MIRIN: INSUFFICIENT_OUTPUT_AMOUNT");
+    function swap(uint256 amount0Out, uint256 amount1Out, address to, bytes calldata data) external {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves(); // gas savings
-        require(amount0Out < _reserve0 && amount1Out < _reserve1, "MIRIN: INSUFFICIENT_LIQUIDITY");
-        { // scope for _token{0,1} avoids stack too deep errors
-        IERC20 _token0 = token0; // gas savings
-        IERC20 _token1 = token1; // gas savings
-        require(to != address(_token0) && to != address(_token1), "MIRIN: INVALID_TO");
-        _transferWithData(amount0Out, amount1Out, to, data, _token0, _token1);
-        }
-        (uint256 balance0, uint256 balance1) = _balance(token0, token1);
-        uint256 amount0In = balance0 + amount0Out - _reserve0;
-        uint256 amount1In = balance1 + amount1Out - _reserve1;
-        console.log("amount0in is %s, amount1In is %s", amount0In, amount1In);
-        _compute(amount0In, amount1In, balance0, balance1, _reserve0, _reserve1);
-        _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        //emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to); WIP - Can this event be in deployer/router to avoid 'stack size too deep' error?
+        swapInternal(amount0Out, amount1Out, to, data, _reserve0, _reserve1, _blockTimestampLast);
     }
 
     function swap( // formatted for {IPool}
@@ -436,20 +420,46 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 {
         address,
         bytes calldata context,
         address recipient,
-        bool,
         uint256 amount
     ) external returns (uint256 oppositeSideAmount) {
-        (uint112 _reserve0, uint112 _reserve1, ) = getReserves(); // gas savings
-        console.log("Reserve0 is %s, Reserve1 is %s", _reserve0, _reserve1);
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves(); // gas savings
+        //console.log("Reserve0 is %s, Reserve1 is %s", _reserve0, _reserve1);
         if (IERC20(tokenIn) == token0) {
             oppositeSideAmount = _getAmountOut(amount, _reserve0, _reserve1);
-            console.log("Amount out is %s", oppositeSideAmount);
-            swap(0, oppositeSideAmount, recipient, context);
+            //console.log("Amount out is %s", oppositeSideAmount);
+            swapInternal(0, oppositeSideAmount, recipient, context, _reserve0, _reserve1, _blockTimestampLast);
         } else {
             oppositeSideAmount = _getAmountOut(amount, _reserve1, _reserve0);
-            console.log("Amount out is %s", oppositeSideAmount);
-            swap(oppositeSideAmount, 0, recipient, context);
+            //console.log("Amount out is %s", oppositeSideAmount);
+            swapInternal(oppositeSideAmount, 0, recipient, context, _reserve0, _reserve1, _blockTimestampLast);
         }
+    }
+
+    function swapInternal(
+        uint256 amount0Out,
+        uint256 amount1Out,
+        address to,
+        bytes calldata data,
+        uint112 _reserve0,
+        uint112 _reserve1,
+        uint32 _blockTimestampLast
+    ) internal lock {
+        require(amount0Out > 0 || amount1Out > 0, "MIRIN: INSUFFICIENT_OUTPUT_AMOUNT");
+        require(amount0Out < _reserve0 && amount1Out < _reserve1, "MIRIN: INSUFFICIENT_LIQUIDITY");
+        require(to != address(token0) && to != address(token1), "MIRIN: INVALID_TO");
+        _transferWithData(amount0Out, amount1Out, to, data, token0, token1);
+
+        uint256 amount0In;
+        uint256 amount1In;
+        { // scope for _balance{0,1} avoids stack too deep errors
+        (uint256 balance0, uint256 balance1) = _balance();
+        amount0In = balance0 + amount0Out - _reserve0;
+        amount1In = balance1 + amount1Out - _reserve1;
+        //console.log("amount0in is %s, amount1In is %s", amount0In, amount1In);
+        _compute(amount0In, amount1In, balance0, balance1, _reserve0, _reserve1);
+        _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
+        }
+        emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
     }
 
     function sync() external lock {
