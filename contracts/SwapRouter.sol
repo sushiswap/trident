@@ -64,8 +64,13 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         uint256 amountIn
     ) internal returns (uint256 amountOut) {
         require(MasterDeployer(masterDeployer).pool(pool), "Not official pool");
-
-        amountOut = IPool(pool).swap(tokenIn, tokenOut, context, recipient, amountIn);
+        if (tokenIn == pool) {
+            // Burn liquidity
+            amountOut = IPool(pool).burnLiquiditySingle(tokenOut, recipient);
+        } else {
+            // Normal swap
+            amountOut = IPool(pool).swap(tokenIn, tokenOut, context, recipient, amountIn);
+        }
     }
 
     /// @param token The token to pay
@@ -191,6 +196,44 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         require(amount >= params.amountOutMinimum, "Too little received");
     }
 
+    function addLiquidityUnbalanced(
+        IPool.liquidityInputOptimal[] calldata liquidityInput,
+        address pool,
+        address to,
+        uint256 deadline,
+        uint256 minLiquidity
+    ) external checkDeadline(deadline) returns (uint256 liquidity) {
+        for (uint256 i; i < liquidityInput.length; i++) {
+            if (liquidityInput[i].native) {
+                IBentoBoxV1(bento).deposit(IERC20(liquidityInput[i].token), msg.sender, pool, liquidityInput[i].amount, 0);
+            } else {
+                uint256 shares = IBentoBoxV1(bento).toShare(IERC20(liquidityInput[i].token), liquidityInput[i].amount, false);
+                IBentoBoxV1(bento).transfer(IERC20(liquidityInput[i].token), msg.sender, pool, shares);
+            }
+        }
+        liquidity = IPool(pool).mint(to);
+        require(liquidity >= minLiquidity, "Not enough liquidity minted");
+    }
+
+    function addLiquidityBalanced(
+        IPool.liquidityInput[] calldata liquidityInput,
+        address pool,
+        address to,
+        uint256 deadline
+    ) external checkDeadline(deadline) returns (IPool.liquidityAmount[] memory liquidityOptimal, uint256 liquidity) {
+        liquidityOptimal = IPool(pool).getOptimalLiquidityInAmounts(liquidityInput);
+        for (uint256 i; i < liquidityOptimal.length; i++) {
+            require(liquidityOptimal[i].amount >= liquidityInput[i].amountMin, "Amount not Optimal");
+            if (liquidityInput[i].native) {
+                IBentoBoxV1(bento).deposit(IERC20(liquidityOptimal[i].token), msg.sender, pool, liquidityOptimal[i].amount, 0);
+            } else {
+                uint256 shares = IBentoBoxV1(bento).toShare(IERC20(liquidityOptimal[i].token), liquidityOptimal[i].amount, false);
+                IBentoBoxV1(bento).transfer(IERC20(liquidityOptimal[i].token), msg.sender, pool, shares);
+            }
+        }
+        liquidity = IPool(pool).mint(to);
+    }
+
     function depositToBentoBox(
         address token,
         uint256 amount,
@@ -238,6 +281,4 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
             TransferHelper.safeTransferETH(recipient, balanceWETH);
         }
     }
-
-
 }

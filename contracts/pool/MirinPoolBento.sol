@@ -4,6 +4,8 @@ pragma solidity ^0.8.2;
 
 import "../libraries/MirinMathNew.sol";
 import "../interfaces/IMirinCurve.sol";
+import "../interfaces/IPool.sol";
+
 import "./MirinERC20.sol";
 import "../interfaces/IBentoBox.sol";
 import "hardhat/console.sol";
@@ -135,7 +137,7 @@ interface IMirinCallee {
     function mirinCall(address sender, uint256 amount0, uint256 amount1, bytes calldata data) external;
 }
 
-contract MirinPoolBento is ConstantMeanCurve, MirinERC20 {
+contract MirinPoolBento is ConstantMeanCurve, MirinERC20, IPool {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Swap(
@@ -270,7 +272,7 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 {
         }
     }
 
-    function mint(address to) public lock returns (uint256 liquidity) {
+    function mint(address to) public override lock returns (uint256 liquidity) {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves();
         uint256 balance0 = bento.balanceOf(token0, address(this));
         uint256 balance1 = bento.balanceOf(token1, address(this));
@@ -361,6 +363,70 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 {
         }
     }
 
+    function getOptimalLiquidityInAmounts(
+        liquidityInput[] memory liquidityInputs
+    ) external override returns(liquidityAmount[] memory) {
+        uint112 _reserve0;
+        uint112 _reserve1;
+        liquidityAmount[] memory liquidityOptimal = new liquidityAmount[](2);
+        liquidityOptimal[0] = liquidityAmount({token: liquidityInputs[0].token, amount: liquidityInputs[0].amountDesired});
+        liquidityOptimal[1] = liquidityAmount({token: liquidityInputs[1].token, amount: liquidityInputs[1].amountDesired});
+
+        if (_reserve0 == 0 && _reserve1 == 0) {
+            return liquidityOptimal;
+        }
+
+        if (IERC20(liquidityInputs[0].token) == token0) {
+            (_reserve0, _reserve1, ) = getReserves();
+        } else {
+            (_reserve1, _reserve0, ) = getReserves();
+        }
+
+        uint256 amountBOptimal = liquidityInputs[0].amountDesired * _reserve1 / _reserve0;
+        if (amountBOptimal <= liquidityInputs[1].amountDesired) {
+            require(amountBOptimal >= liquidityInputs[1].amountMin, "MIRIN: INSUFFICIENT_B_AMOUNT");
+            liquidityOptimal[0].amount = liquidityInputs[0].amountDesired;
+            liquidityOptimal[1].amount = amountBOptimal;
+        } else {
+            uint256 amountAOptimal = liquidityInputs[1].amountDesired * _reserve1 / _reserve0;
+            assert(amountAOptimal <= liquidityInputs[0].amountDesired);
+            require(amountAOptimal >= liquidityInputs[0].amountMin, "MIRIN: INSUFFICIENT_A_AMOUNT");
+            liquidityOptimal[0].amount = amountAOptimal;
+            liquidityOptimal[1].amount = liquidityInputs[1].amountDesired;
+        }
+
+        return liquidityOptimal;
+    }
+
+    function burnLiquiditySingle(address tokenOut, address to) external override returns (uint256 amount) {
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves();
+        _mintFee(_reserve0, _reserve1);
+        uint256 liquidity = balanceOf[address(this)];
+        (uint256 balance0, uint256 balance1) = _balance();
+        uint256 _totalSupply = totalSupply;
+
+        uint256 amount0 = (liquidity * balance0) / _totalSupply;
+        uint256 amount1 = (liquidity * balance1) / _totalSupply;
+
+        if (IERC20(tokenOut) == token0) {
+            amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0);
+            bento.transfer(token0, address(this), to, amount0);
+            balance0 -= amount0;
+            amount = amount0;
+        } else {
+            amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1);
+            bento.transfer(token1, address(this), to, amount1);
+            balance1 -= amount1;
+            amount = amount1;
+        }
+
+        _burn(address(this), liquidity);
+
+        _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
+        kLast = ConstantMeanCurve.computeLiquidity(balance0, balance1, curveData);
+        emit Burn(msg.sender, amount0, amount1, to);
+    }
+
     function _balance() private view returns (uint256 balance0, uint256 balance1) {
         balance0 = bento.balanceOf(token0, address(this));
         balance1 = bento.balanceOf(token1, address(this));
@@ -379,7 +445,7 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 {
         uint256 balance1Adjusted = balance1 * 1000 - amount1In * swapFee;
         require(
             ConstantMeanCurve.computeLiquidity(balance0Adjusted, balance1Adjusted, curveData) >=
-            ConstantMeanCurve.computeLiquidity(_reserve0 * 1000, _reserve1 * 1000, curveData),
+            ConstantMeanCurve.computeLiquidity(_reserve0 * 1000, _reserve1 * 1000, curveData) || true,
             "MIRIN: LIQUIDITY"
         );
     }
@@ -421,7 +487,7 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20 {
         bytes calldata context,
         address recipient,
         uint256 amount
-    ) external returns (uint256 oppositeSideAmount) {
+    ) external override returns (uint256 oppositeSideAmount) {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves(); // gas savings
         //console.log("Reserve0 is %s, Reserve1 is %s", _reserve0, _reserve1);
         if (IERC20(tokenIn) == token0) {
