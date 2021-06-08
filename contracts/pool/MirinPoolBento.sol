@@ -5,6 +5,7 @@ pragma solidity ^0.8.2;
 import "../libraries/MirinMathNew.sol";
 import "../interfaces/IMirinCurve.sol";
 import "../interfaces/IPool.sol";
+import "../interfaces/IMirinCallee.sol";
 
 import "./MirinERC20.sol";
 import "../interfaces/IBentoBox.sol";
@@ -133,10 +134,6 @@ contract ConstantMeanCurve is IMirinCurve {
     }
 }
 
-interface IMirinCallee {
-    function mirinCall(address sender, uint256 amount0, uint256 amount1, bytes calldata data) external;
-}
-
 contract MirinPoolBento is ConstantMeanCurve, MirinERC20, IPool {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
@@ -176,11 +173,6 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20, IPool {
         unlocked = 0;
         _;
         unlocked = 1;
-    }
-
-    modifier ensureDeadline(uint256 deadline) {
-        require(deadline >= block.timestamp, "MIRIN: EXPIRED");
-        _;
     }
 
     constructor(bytes memory _deployData) {
@@ -274,8 +266,7 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20, IPool {
 
     function mint(address to) public override lock returns (uint256 liquidity) {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves();
-        uint256 balance0 = bento.balanceOf(token0, address(this));
-        uint256 balance1 = bento.balanceOf(token1, address(this));
+        (uint256 balance0, uint256 balance1) = _balance();
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
 
@@ -299,8 +290,8 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20, IPool {
     }
 
     function burn(address to) public lock returns (uint256 amount0, uint256 amount1) {
-        IERC20 _token0 = IERC20(token0);                                 // gas savings
-        IERC20 _token1 = IERC20(token1);                                 // gas savings
+        IERC20 _token0 = IERC20(token0);                                 
+        IERC20 _token1 = IERC20(token1);                                 
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves();
         _mintFee(_reserve0, _reserve1);
         uint256 liquidity = balanceOf[address(this)];
@@ -354,7 +345,7 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20, IPool {
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
-    function getAmountOut(address tokenIn, uint256 amountIn) public view returns (uint256 amountOut) {
+    function getAmountOut(address tokenIn, uint256 amountIn) external view returns (uint256 amountOut) {
         (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
         if (IERC20(tokenIn) == token0) {
             amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
@@ -365,7 +356,7 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20, IPool {
 
     function getOptimalLiquidityInAmounts(
         liquidityInput[] memory liquidityInputs
-    ) external override returns(liquidityAmount[] memory) {
+    ) external override view returns (liquidityAmount[] memory) {
         uint112 _reserve0;
         uint112 _reserve1;
         liquidityAmount[] memory liquidityOptimal = new liquidityAmount[](2);
@@ -428,8 +419,14 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20, IPool {
     }
 
     function _balance() private view returns (uint256 balance0, uint256 balance1) {
-        balance0 = bento.balanceOf(token0, address(this));
-        balance1 = bento.balanceOf(token1, address(this));
+        (bool success0, bytes memory data0) =
+            address(bento).staticcall(abi.encodeWithSelector(bento.balanceOf.selector, token0, address(this)));
+            require(success0 && data0.length >= 32);
+            balance0 = abi.decode(data0, (uint256));
+        (bool success1, bytes memory data1) =
+            address(bento).staticcall(abi.encodeWithSelector(bento.balanceOf.selector, token1, address(this)));
+            require(success1 && data1.length >= 32);
+            balance1 = abi.decode(data1, (uint256));
     }
 
     function _compute(
@@ -477,7 +474,7 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20, IPool {
     }
 
     function swap(uint256 amount0Out, uint256 amount1Out, address to, bytes calldata data) external {
-        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves(); // gas savings
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves(); 
         swapInternal(amount0Out, amount1Out, to, data, _reserve0, _reserve1, _blockTimestampLast);
     }
 
@@ -488,7 +485,7 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20, IPool {
         address recipient,
         uint256 amount
     ) external override returns (uint256 oppositeSideAmount) {
-        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves(); // gas savings
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves(); 
         //console.log("Reserve0 is %s, Reserve1 is %s", _reserve0, _reserve1);
         if (IERC20(tokenIn) == token0) {
             oppositeSideAmount = _getAmountOut(amount, _reserve0, _reserve1);
@@ -509,7 +506,7 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20, IPool {
         uint112 _reserve0,
         uint112 _reserve1,
         uint32 _blockTimestampLast
-    ) internal lock {
+    ) private lock {
         require(amount0Out > 0 || amount1Out > 0, "MIRIN: INSUFFICIENT_OUTPUT_AMOUNT");
         require(amount0Out < _reserve0 && amount1Out < _reserve1, "MIRIN: INSUFFICIENT_LIQUIDITY");
         require(to != address(token0) && to != address(token1), "MIRIN: INVALID_TO");
@@ -529,9 +526,10 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20, IPool {
     }
 
     function sync() external lock {
+        (uint256 balance0, uint256 balance1) = _balance();
         _update(
-            bento.balanceOf(token0, address(this)),
-            bento.balanceOf(token1, address(this)),
+            balance0,
+            balance1,
             reserve0,
             reserve1,
             blockTimestampLast
