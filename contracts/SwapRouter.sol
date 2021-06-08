@@ -13,6 +13,8 @@ import "./deployer/MasterDeployer.sol";
 
 import "./libraries/TransferHelper.sol";
 
+import "hardhat/console.sol";
+
 contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
     address public immutable WETH;
     address public immutable masterDeployer;

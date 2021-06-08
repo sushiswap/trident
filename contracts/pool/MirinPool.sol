@@ -4,6 +4,7 @@ pragma solidity ^0.8.2;
 
 import "./MirinGovernance.sol";
 import "../interfaces/IMirinCurve.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @author LevX

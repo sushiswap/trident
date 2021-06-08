@@ -5,7 +5,7 @@ pragma solidity ^0.8.2;
 import "../interfaces/IPool.sol";
 import "../interfaces/IBentoBox.sol";
 import "./MirinERC20.sol";
-
+import "../libraries/MirinMath.sol";
 import "hardhat/console.sol";
 
 interface IMirinCallee {
@@ -17,7 +17,7 @@ interface IMirinCallee {
     ) external;
 }
 
-contract BasicMirinPool is MirinERC20, IPool {
+contract ConstantProductPool is MirinERC20, IPool {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Swap(
@@ -68,8 +68,8 @@ contract BasicMirinPool is MirinERC20, IPool {
     /// @dev
     /// Only set immutable variables here. State changes made here will not be used.
     constructor(bytes memory _deployData) {
-        (IBentoBoxV1 _bento, IERC20 tokenA, IERC20 tokenB, bytes32 _data, uint8 _swapFee, address _swapFeeTo) =
-            abi.decode(_deployData, (IBentoBoxV1, IERC20, IERC20, bytes32, uint8, address));
+        (IBentoBoxV1 _bento, IERC20 tokenA, IERC20 tokenB, uint8 _swapFee, address _swapFeeTo) =
+            abi.decode(_deployData, (IBentoBoxV1, IERC20, IERC20, uint8, address));
 
         (IERC20 _token0, IERC20 _token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         require(address(_token0) != address(0), "MIRIN: ZERO_ADDRESS");
@@ -114,9 +114,9 @@ contract BasicMirinPool is MirinERC20, IPool {
         if (blockTimestamp != _blockTimestampLast && _reserve0 != 0 && _reserve1 != 0) {
             unchecked {
                 uint32 timeElapsed = blockTimestamp - _blockTimestampLast;
-                uint256 price0 = uint256(_reserve1) << (PRECISION / _reserve0);
+                uint256 price0 = (uint256(_reserve1) << PRECISION) / _reserve0;
                 price0CumulativeLast += price0 * timeElapsed;
-                uint256 price1 = uint256(_reserve0) << (PRECISION / _reserve1);
+                uint256 price1 = (uint256(_reserve0) << PRECISION) / _reserve1;
                 price1CumulativeLast += price1 * timeElapsed;
             }
         }
@@ -130,7 +130,7 @@ contract BasicMirinPool is MirinERC20, IPool {
     function _mintFee(uint112 _reserve0, uint112 _reserve1) private returns (uint256 computed) {
         uint256 _kLast = kLast;
         if (_kLast != 0) {
-            computed = _reserve0 * _reserve1;
+            computed = MirinMath.sqrt(uint256(_reserve0) * _reserve1);
             if (computed > _kLast) {
                 uint256 numerator = totalSupply * (computed - _kLast);
                 uint256 denominator = (computed * (swapFee * 2 - 1)) + _kLast; // 0.05% of increased liquidity
@@ -153,20 +153,18 @@ contract BasicMirinPool is MirinERC20, IPool {
         uint256 balance1 = bento.balanceOf(token1, address(this));
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
-
         _mintFee(_reserve0, _reserve1);
         uint256 _totalSupply = totalSupply;
-        uint256 computed = balance0 * balance1;
+        uint256 computed = MirinMath.sqrt(balance0 * balance1);
         if (_totalSupply == 0) {
             liquidity = computed - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
-            uint256 k = _reserve0 * _reserve1;
+            uint256 k = MirinMath.sqrt(uint256(_reserve0) * _reserve1);
             liquidity = ((computed - k) * _totalSupply) / k;
         }
         require(liquidity > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_MINTED");
         _mint(to, liquidity);
-
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         kLast = computed;
         emit Mint(msg.sender, amount0, amount1, to);
@@ -192,7 +190,7 @@ contract BasicMirinPool is MirinERC20, IPool {
         balance1 -= amount1;
 
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        kLast = balance0 * balance1;
+        kLast = MirinMath.sqrt(balance0 * balance1);
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
@@ -208,8 +206,8 @@ contract BasicMirinPool is MirinERC20, IPool {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves();
         _mintFee(_reserve0, _reserve1);
 
-        uint256 k = _reserve0 * _reserve1;
-        uint256 computed = _reserve0 - amount0 * _reserve1 - amount1;
+        uint256 k = MirinMath.sqrt(uint256(_reserve0) * _reserve1);
+        uint256 computed = MirinMath.sqrt(uint256(_reserve0) - amount0 * _reserve1 - amount1);
         uint256 liquidityDelta = ((k - computed) * totalSupply) / k;
 
         require(liquidityDelta <= liquidity, "MIRIN: LIQUIDITY");
@@ -247,14 +245,14 @@ contract BasicMirinPool is MirinERC20, IPool {
         liquidityOptimal[0] = liquidityAmount({token: liquidityInputs[0].token, amount: liquidityInputs[0].amountDesired});
         liquidityOptimal[1] = liquidityAmount({token: liquidityInputs[1].token, amount: liquidityInputs[1].amountDesired});
 
-        if (_reserve0 == 0 && _reserve1 == 0) {
-            return liquidityOptimal;
-        }
-
         if (IERC20(liquidityInputs[0].token) == token0) {
             (_reserve0, _reserve1, ) = getReserves();
         } else {
             (_reserve1, _reserve0, ) = getReserves();
+        }
+
+        if (_reserve0 == 0 && _reserve1 == 0) {
+            return liquidityOptimal;
         }
 
         uint256 amountBOptimal = (liquidityInputs[0].amountDesired * _reserve1) / _reserve0;
@@ -263,7 +261,7 @@ contract BasicMirinPool is MirinERC20, IPool {
             liquidityOptimal[0].amount = liquidityInputs[0].amountDesired;
             liquidityOptimal[1].amount = amountBOptimal;
         } else {
-            uint256 amountAOptimal = (liquidityInputs[1].amountDesired * _reserve1) / _reserve0;
+            uint256 amountAOptimal = (liquidityInputs[1].amountDesired * _reserve0) / _reserve1;
             assert(amountAOptimal <= liquidityInputs[0].amountDesired);
             require(amountAOptimal >= liquidityInputs[0].amountMin, "MIRIN: INSUFFICIENT_A_AMOUNT");
             liquidityOptimal[0].amount = amountAOptimal;
@@ -298,7 +296,7 @@ contract BasicMirinPool is MirinERC20, IPool {
         _burn(address(this), liquidity);
 
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        kLast = balance0 * balance1;
+        kLast = MirinMath.sqrt(balance0 * balance1);
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
@@ -318,7 +316,10 @@ contract BasicMirinPool is MirinERC20, IPool {
         require(amount0In > 0 || amount1In > 0, "MIRIN: INSUFFICIENT_INPUT_AMOUNT");
         uint256 balance0Adjusted = balance0 * 1000 - amount0In * swapFee;
         uint256 balance1Adjusted = balance1 * 1000 - amount1In * swapFee;
-        require(balance0Adjusted * balance1Adjusted >= _reserve0 * 1000 * _reserve1 * 1000, "MIRIN: LIQUIDITY");
+        require(
+            MirinMath.sqrt(balance0Adjusted * balance1Adjusted) >= MirinMath.sqrt(uint256(_reserve0) * _reserve1 * 1000000),
+            "MIRIN: LIQUIDITY"
+        );
     }
 
     function _getAmountOut(
@@ -366,14 +367,11 @@ contract BasicMirinPool is MirinERC20, IPool {
         uint256 amount
     ) external override returns (uint256 oppositeSideAmount) {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves(); // gas savings
-        //console.log("Reserve0 is %s, Reserve1 is %s", _reserve0, _reserve1);
         if (IERC20(tokenIn) == token0) {
             oppositeSideAmount = _getAmountOut(amount, _reserve0, _reserve1);
-            //console.log("Amount out is %s", oppositeSideAmount);
             swapInternal(0, oppositeSideAmount, recipient, context, _reserve0, _reserve1, _blockTimestampLast);
         } else {
             oppositeSideAmount = _getAmountOut(amount, _reserve1, _reserve0);
-            //console.log("Amount out is %s", oppositeSideAmount);
             swapInternal(oppositeSideAmount, 0, recipient, context, _reserve0, _reserve1, _blockTimestampLast);
         }
     }
@@ -399,7 +397,6 @@ contract BasicMirinPool is MirinERC20, IPool {
             (uint256 balance0, uint256 balance1) = _balance();
             amount0In = balance0 + amount0Out - _reserve0;
             amount1In = balance1 + amount1Out - _reserve1;
-            //console.log("amount0in is %s, amount1In is %s", amount0In, amount1In);
             _compute(amount0In, amount1In, balance0, balance1, _reserve0, _reserve1);
             _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         }
