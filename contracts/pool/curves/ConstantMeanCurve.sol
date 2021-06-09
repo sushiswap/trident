@@ -11,7 +11,7 @@ import "../../libraries/MirinMath.sol";
  */
 contract ConstantMeanCurve is IMirinCurve {
     uint8 public constant MAX_SWAP_FEE = 100;
-    uint8 public constant WEIGHT_SUM = 100;
+    uint8 public constant WEIGHT_SUM = 128;
     uint8 private constant PRECISION = 104;
 
     function canUpdateData(bytes32, bytes32) external pure override returns (bool) {

@@ -2,6 +2,7 @@ const { expect, assert } = require("chai");
 const { ethers } = require("hardhat");
 const { BigNumber, utils, constants, provider } = ethers;
 const { AddressZero } = constants;
+const WEIGHT_SUM = 128;
 
 function rand() {
     const dec = Math.floor(Math.random() * 20) + 3;
@@ -158,7 +159,7 @@ describe("MirinPool Test", function () {
                 factory.createPool(token0.address, token1.address, curve.address, getData(0), AddressZero, 0, AddressZero)
             ).to.be.revertedWith("IN: INVALID_CURVE_DATA");
             await expect(
-                factory.createPool(token0.address, token1.address, curve.address, getData(100), AddressZero, 0, AddressZero)
+                factory.createPool(token0.address, token1.address, curve.address, getData(WEIGHT_SUM), AddressZero, 0, AddressZero)
             ).to.be.revertedWith("IN: INVALID_CURVE_DATA");
         });
 
@@ -215,7 +216,7 @@ describe("MirinPool Test", function () {
 
         it("Should calculate price0/1CumulativeLast even in case of overflow", async function () {
             let tmax = 2 ** 32;
-            test = await getPool(token0.address, token1.address, curve.address, getData(99), AddressZero, 0, AddressZero);
+            test = await getPool(token0.address, token1.address, curve.address, getData(WEIGHT_SUM-1), AddressZero, 0, AddressZero);
 
             await token0.approve(test.address, BigNumber.from(2).pow(256).sub(1));
             await token1.approve(test.address, BigNumber.from(2).pow(256).sub(1));
@@ -235,7 +236,7 @@ describe("MirinPool Test", function () {
             let prc = BigNumber.from(2).pow(104);
             let cp0 = BigNumber.from(2)
                 .pow(110)
-                .mul(99)
+                .mul(WEIGHT_SUM-1)
                 .mul(prc)
                 .div(1)
                 .div(1)
@@ -244,7 +245,7 @@ describe("MirinPool Test", function () {
                 .mul(1)
                 .mul(prc)
                 .div(BigNumber.from(2).pow(110))
-                .div(99)
+                .div(WEIGHT_SUM-1)
                 .mul(tmax - 1);
 
             assert.isTrue(cp0.eq(await test.price0CumulativeLast()));
@@ -257,7 +258,7 @@ describe("MirinPool Test", function () {
             cp0 = cp0.add(
                 BigNumber.from(2)
                     .pow(111)
-                    .mul(99)
+                    .mul(WEIGHT_SUM-1)
                     .mul(prc)
                     .div(1)
                     .div(1)
@@ -268,7 +269,7 @@ describe("MirinPool Test", function () {
                     .mul(1)
                     .mul(prc)
                     .div(BigNumber.from(2).pow(111))
-                    .div(99)
+                    .div(WEIGHT_SUM-1)
                     .mul(tmax - 1)
             );
             assert.isTrue(cp0.eq(await test.price0CumulativeLast()));
@@ -281,7 +282,7 @@ describe("MirinPool Test", function () {
                 BigNumber.from(2)
                     .pow(112)
                     .sub(1)
-                    .mul(99)
+                    .mul(WEIGHT_SUM-1)
                     .mul(prc)
                     .div(1)
                     .div(1)
@@ -292,7 +293,7 @@ describe("MirinPool Test", function () {
                     .mul(1)
                     .mul(prc)
                     .div(BigNumber.from(2).pow(112).sub(1))
-                    .div(99)
+                    .div(WEIGHT_SUM-1)
                     .mul(tmax - 1)
             );
             assert.isTrue(cp0.eq(await test.price0CumulativeLast()));
@@ -305,7 +306,7 @@ describe("MirinPool Test", function () {
                 BigNumber.from(2)
                     .pow(112)
                     .sub(1)
-                    .mul(99)
+                    .mul(WEIGHT_SUM-1)
                     .mul(prc)
                     .div(1)
                     .div(1)
@@ -316,7 +317,7 @@ describe("MirinPool Test", function () {
                     .mul(1)
                     .mul(prc)
                     .div(BigNumber.from(2).pow(112).sub(1))
-                    .div(99)
+                    .div(WEIGHT_SUM-1)
                     .mul(tmax - 1)
             );
             assert.isTrue(cp0.gt(BigNumber.from(2).pow(256).sub(1)));

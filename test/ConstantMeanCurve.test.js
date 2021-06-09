@@ -4,7 +4,7 @@ const { BigNumber, utils } = require("ethers");
 const { Decimal } = require("decimal.js");
 const Decimal18 = Decimal.clone({ precision: 18 });
 const Decimal40 = Decimal.clone({ precision: 40 });
-const WEIGHT_SUM = 100;
+const WEIGHT_SUM = 128;
 
 let aIn, aOut, rIn, rOut, swapFee, wI, wO;
 
@@ -41,7 +41,7 @@ function randRAforCL() {
 function randParams() {
     wI = Math.floor(Math.random() * (WEIGHT_SUM-1)) + 1; //1~(WEIGHT_SUM-1)
     wO = WEIGHT_SUM - wI; //1~(WEIGHT_SUM-1)
-    swapFee = Math.floor(Math.random() * (WEIGHT_SUM+1)); //0~(WEIGHT_SUM)
+    swapFee = Math.floor(Math.random() * 101); //0~100
 
     rIn = randRA();
     rOut = randRA();
@@ -52,7 +52,7 @@ function randParams() {
 function randParamsforCL() {
     wI = Math.floor(Math.random() * (WEIGHT_SUM-1)) + 1; //1~(WEIGHT_SUM-1)
     wO = WEIGHT_SUM - wI; //1~(WEIGHT_SUM-1)
-    swapFee = Math.floor(Math.random() * (WEIGHT_SUM+1)); //0~WEIGHT_SUM
+    swapFee = Math.floor(Math.random() * 101); //0~100
 
     rIn = randRAforCL();
     rOut = randRAforCL();
@@ -138,11 +138,11 @@ describe("MirinMath Test2", function () {
                 r1 = rOut;
 
                 Out1 = await test.computeAmountOut(aIn, r0, r1, data, swapFee, 0);
-
+                
                 tempW = wI;
                 wI = wO;
                 wO = tempW;
-
+                
                 data = getData();
                 Out2 = await test.computeAmountOut(aIn, r1, r0, data, swapFee, 1);
 
