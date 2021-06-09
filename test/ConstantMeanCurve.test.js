@@ -4,6 +4,7 @@ const { BigNumber, utils } = require("ethers");
 const { Decimal } = require("decimal.js");
 const Decimal18 = Decimal.clone({ precision: 18 });
 const Decimal40 = Decimal.clone({ precision: 40 });
+const WEIGHT_SUM = 100;
 
 let aIn, aOut, rIn, rOut, swapFee, wI, wO;
 
@@ -38,9 +39,9 @@ function randRAforCL() {
 }
 
 function randParams() {
-    wI = Math.floor(Math.random() * 99) + 1; //1~99
-    wO = 100 - wI; //1~99
-    swapFee = Math.floor(Math.random() * 101); //0~100
+    wI = Math.floor(Math.random() * (WEIGHT_SUM-1)) + 1; //1~(WEIGHT_SUM-1)
+    wO = WEIGHT_SUM - wI; //1~(WEIGHT_SUM-1)
+    swapFee = Math.floor(Math.random() * (WEIGHT_SUM+1)); //0~(WEIGHT_SUM)
 
     rIn = randRA();
     rOut = randRA();
@@ -49,9 +50,9 @@ function randParams() {
 }
 
 function randParamsforCL() {
-    wI = Math.floor(Math.random() * 99) + 1; //1~99
-    wO = 100 - wI; //1~99
-    swapFee = Math.floor(Math.random() * 101); //0~100
+    wI = Math.floor(Math.random() * (WEIGHT_SUM-1)) + 1; //1~(WEIGHT_SUM-1)
+    wO = WEIGHT_SUM - wI; //1~(WEIGHT_SUM-1)
+    swapFee = Math.floor(Math.random() * (WEIGHT_SUM+1)); //0~WEIGHT_SUM
 
     rIn = randRAforCL();
     rOut = randRAforCL();
@@ -76,11 +77,11 @@ describe("MirinMath Test2", function () {
 
     it("Should fail if decodeData is not valid", async function () {
         wO = 0;
-        wI = 100;
+        wI = WEIGHT_SUM;
         data = getData();
         await expect(test.decodeData(data, 0)).to.be.revertedWith("MIRIN: INVALID_DATA");
 
-        wO = 100;
+        wO = WEIGHT_SUM;
         wI = 0;
         data = getData();
         await expect(test.decodeData(data, 0)).to.be.revertedWith("MIRIN: INVALID_DATA");
@@ -119,7 +120,7 @@ describe("MirinMath Test2", function () {
         );
 
         randParams();
-        swapFee = 101;
+        swapFee = WEIGHT_SUM+1;
         data = getData();
         await expect(test.computeAmountOut(aIn, rIn, rOut, data, swapFee, 0)).to.be.revertedWith(
             "MIRIN: INVALID_SWAP_FEE"
@@ -218,7 +219,7 @@ describe("MirinMath Test2", function () {
         );
 
         randParams();
-        swapFee = 101;
+        swapFee = WEIGHT_SUM+1;
         data = getData();
         await expect(test.computeAmountIn(aOut, rIn, rOut, data, swapFee, 0)).to.be.revertedWith(
             "MIRIN: INVALID_SWAP_FEE"
@@ -323,11 +324,11 @@ describe("ConstantMeanCurve additional Test", function () {
 
     it("Should return false if data is not valid through isValidData fn", async function () {
         wO = 0;
-        wI = 100;
+        wI = WEIGHT_SUM;
         data = getData();
         expect(await test.isValidData(data)).to.be.false;
 
-        wO = 100;
+        wO = WEIGHT_SUM;
         wI = 0;
         data = getData();
         expect(await test.isValidData(data)).to.be.false;
