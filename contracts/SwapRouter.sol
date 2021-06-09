@@ -66,13 +66,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         uint256 amountIn
     ) internal returns (uint256 amountOut) {
         require(MasterDeployer(masterDeployer).pool(pool), "Not official pool");
-        if (tokenIn == pool) {
-            // Burn liquidity
-            amountOut = IPool(pool).burnLiquiditySingle(tokenOut, recipient);
-        } else {
-            // Normal swap
-            amountOut = IPool(pool).swap(tokenIn, tokenOut, context, recipient, amountIn);
-        }
+        amountOut = IPool(pool).swap(tokenIn, tokenOut, context, recipient, amountIn, 0);
     }
 
     /// @param token The token to pay

@@ -290,8 +290,8 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20, IPool {
     }
 
     function burn(address to) public lock returns (uint256 amount0, uint256 amount1) {
-        IERC20 _token0 = IERC20(token0);                                 
-        IERC20 _token1 = IERC20(token1);                                 
+        IERC20 _token0 = IERC20(token0);
+        IERC20 _token1 = IERC20(token1);
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves();
         _mintFee(_reserve0, _reserve1);
         uint256 liquidity = balanceOf[address(this)];
@@ -389,7 +389,7 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20, IPool {
         return liquidityOptimal;
     }
 
-    function burnLiquiditySingle(address tokenOut, address to) external override returns (uint256 amount) {
+    function burnLiquiditySingle(address tokenOut, address to) external returns (uint256 amount) {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves();
         _mintFee(_reserve0, _reserve1);
         uint256 liquidity = balanceOf[address(this)];
@@ -474,7 +474,7 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20, IPool {
     }
 
     function swap(uint256 amount0Out, uint256 amount1Out, address to, bytes calldata data) external {
-        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves(); 
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves();
         swapInternal(amount0Out, amount1Out, to, data, _reserve0, _reserve1, _blockTimestampLast);
     }
 
@@ -483,9 +483,10 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20, IPool {
         address,
         bytes calldata context,
         address recipient,
-        uint256 amount
+        uint256 amount,
+        uint256
     ) external override returns (uint256 oppositeSideAmount) {
-        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves(); 
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = getReserves();
         //console.log("Reserve0 is %s, Reserve1 is %s", _reserve0, _reserve1);
         if (IERC20(tokenIn) == token0) {
             oppositeSideAmount = _getAmountOut(amount, _reserve0, _reserve1);

@@ -38,8 +38,8 @@ describe("Router", function () {
     await bento.setMasterContractApproval(alice.address, router.address, true, "0", "0x0000000000000000000000000000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000000000000000000000000000");
     // Pool deploy data
     const deployData = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "address", "uint8", "address"],
-      [bento.address, weth.address, sushi.address, 30, feeTo.address]
+      ["address", "address", "address", "uint8", "uint8", "address"],
+      [bento.address, weth.address, sushi.address, 30, 17, feeTo.address]
     );
     // Pool initialize data
     const initData = Pool.interface.encodeFunctionData("init");
@@ -221,9 +221,10 @@ describe("Router", function () {
       expect(intermediatePoolWethBalance).eq(initialPoolWethBalance.add(BigNumber.from(10).pow(18)));
       expect(intermediatePoolSushiBalance).gt(initialPoolSushiBalance);
       expect(intermediatePoolSushiBalance).lt(initialPoolSushiBalance.add(BigNumber.from(10).pow(18)));
-      // Fee charged ?
-      // expect(intermediatePoolWethBalance.mul(BigNumber.from(10).pow(36)).div(intermediateTotalSupply)).lte(initialPoolWethBalance.mul(BigNumber.from(10).pow(36)).div(initialTotalSupply));
-      // expect(intermediatePoolSushiBalance.mul(BigNumber.from(10).pow(36)).div(intermediateTotalSupply)).lte(initialPoolSushiBalance.mul(BigNumber.from(10).pow(36)).div(initialTotalSupply));
+
+      // Swap fee deducted
+      expect(intermediatePoolWethBalance.mul(BigNumber.from(10).pow(36)).div(intermediateTotalSupply)).lte(initialPoolWethBalance.mul(BigNumber.from(10).pow(36)).div(initialTotalSupply));
+      expect(intermediatePoolSushiBalance.mul(BigNumber.from(10).pow(36)).div(intermediateTotalSupply)).lte(initialPoolSushiBalance.mul(BigNumber.from(10).pow(36)).div(initialTotalSupply));
 
       liquidityInput = [
         {"token" : sushi.address, "native" : false, "amountDesired" : BigNumber.from(10).pow(18), "amountMin" : 1},
@@ -240,10 +241,9 @@ describe("Router", function () {
       expect(finalPoolSushiBalance).gt(intermediatePoolSushiBalance);
       expect(finalPoolSushiBalance).lt(intermediatePoolSushiBalance.add(BigNumber.from(10).pow(17)));
 
-      // expect(finalPoolWethBalance.mul(BigNumber.from(10).pow(36)).div(finalTotalSupply)).eq(initialPoolWethBalance.mul(BigNumber.from(10).pow(36)).div(initialTotalSupply));
-      // expect(finalPoolWethBalance.mul(BigNumber.from(10).pow(36)).div(finalTotalSupply)).eq(intermediatePoolWethBalance.mul(BigNumber.from(10).pow(36)).div(intermediateTotalSupply));
-      // expect(finalPoolSushiBalance.mul(BigNumber.from(10).pow(36)).div(finalTotalSupply)).eq(initialPoolSushiBalance.mul(BigNumber.from(10).pow(36)).div(initialTotalSupply));
-      // expect(finalPoolSushiBalance.mul(BigNumber.from(10).pow(36)).div(finalTotalSupply)).eq(intermediatePoolSushiBalance.mul(BigNumber.from(10).pow(36)).div(intermediateTotalSupply));
+      // Using 18 decimal precision rather than 36 here to accommodate for 1wei rounding errors
+      expect(finalPoolWethBalance.mul(BigNumber.from(10).pow(18)).div(finalTotalSupply)).eq(intermediatePoolWethBalance.mul(BigNumber.from(10).pow(18)).div(intermediateTotalSupply));
+      expect(finalPoolSushiBalance.mul(BigNumber.from(10).pow(18)).div(finalTotalSupply)).eq(intermediatePoolSushiBalance.mul(BigNumber.from(10).pow(18)).div(intermediateTotalSupply));
     });
   });
 })

@@ -26,13 +26,13 @@ interface IPool {
         address tokenOut,
         bytes calldata context,
         address recipient,
-        uint256 amount
-    ) external returns(uint256 oppositeSideAmount);
+        uint256 amountIn,
+        uint256 amountOut
+    ) external returns(uint256 finalAmountOut);
 
     function getOptimalLiquidityInAmounts(
         liquidityInput[] calldata liquidityInputs
     ) external returns(liquidityAmount[] memory liquidityOptimal);
 
     function mint(address to) external returns (uint256 liquidity);
-    function burnLiquiditySingle(address tokenOut, address to) external returns (uint256 amount);
 }
