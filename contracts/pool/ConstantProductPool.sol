@@ -59,11 +59,6 @@ contract ConstantProductPool is MirinERC20, IPool {
         unlocked = 1;
     }
 
-    modifier ensureDeadline(uint256 deadline) {
-        require(deadline >= block.timestamp, "MIRIN: EXPIRED");
-        _;
-    }
-
     /// @dev
     /// Only set immutable variables here. State changes made here will not be used.
     constructor(bytes memory _deployData) {
@@ -97,9 +92,8 @@ contract ConstantProductPool is MirinERC20, IPool {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         uint256 _totalSupply = totalSupply;
         _mintFee(_reserve0, _reserve1, _totalSupply);
-
-        uint256 balance0 = bento.balanceOf(token0, address(this));
-        uint256 balance1 = bento.balanceOf(token1, address(this));
+        
+        (uint256 balance0, uint256 balance1) = _balance();
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
 
@@ -398,9 +392,10 @@ contract ConstantProductPool is MirinERC20, IPool {
     }
 
     function sync() external lock {
+        (uint256 balance0, uint256 balance1) = _balance();
         _update(
-            bento.balanceOf(token0, address(this)),
-            bento.balanceOf(token1, address(this)),
+            balance0,
+            balance1,
             reserve0,
             reserve1,
             blockTimestampLast
