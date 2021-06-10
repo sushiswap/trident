@@ -16,7 +16,22 @@ contract MasterDeployer is Ownable {
 
     mapping (address => bool) public pool;
 
-    constructor() Ownable() {}
+    uint256 public barFee;
+
+    address public immutable barFeeTo;
+    address public immutable bento;
+
+    uint256 internal constant MAX_FEE = 10000; // 100%
+
+    constructor(uint256 _barFee, address _barFeeTo, address _bento) Ownable() {
+        require(_barFee <= MAX_FEE, "INVALID_BAR_FEE");
+        require(address(_barFeeTo) != address(0), "ZERO_ADDRESS");
+        require(address(_bento) != address(0), "ZERO_ADDRESS");
+
+        barFee = _barFee;
+        barFeeTo = _barFeeTo;
+        bento = _bento;
+    }
 
     function deployPool(address _factory, bytes memory _deployData, bytes memory _initData) external returns (address poolAddress) {
         require(whitelistedFactories[_factory], "Factory not whitelisted");
@@ -32,5 +47,10 @@ contract MasterDeployer is Ownable {
 
     function removeFromWhitelist(address _factory) external onlyOwner {
         whitelistedFactories[_factory] = false;
+    }
+
+    function setBarFee(uint256 _barFee) external onlyOwner {
+        require(_barFee <= MAX_FEE, "INVALID_BAR_FEE");
+        barFee = _barFee;
     }
 }

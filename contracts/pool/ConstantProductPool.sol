@@ -7,6 +7,7 @@ import "../interfaces/IBentoBox.sol";
 import "./MirinERC20.sol";
 import "../libraries/MirinMath.sol";
 import "hardhat/console.sol";
+import "../deployer/MasterDeployer.sol";
 
 interface IMirinCallee {
     function mirinCall(
@@ -33,13 +34,13 @@ contract ConstantProductPool is MirinERC20, IPool {
     uint256 internal constant MINIMUM_LIQUIDITY = 10**3;
 
     uint8 internal constant PRECISION = 112;
-    uint8 internal constant MAX_FEE = 100; // 1%
-    uint8 public immutable swapFee;
-    uint8 public immutable barFee;
+    uint256 internal constant MAX_FEE = 10000; // 100%
+    uint256 public immutable swapFee;
 
     address public immutable barFeeTo;
 
     IBentoBoxV1 private immutable bento;
+    MasterDeployer public immutable masterDeployer;
     IERC20 public immutable token0;
     IERC20 public immutable token1;
 
@@ -66,26 +67,22 @@ contract ConstantProductPool is MirinERC20, IPool {
 
     /// @dev
     /// Only set immutable variables here. State changes made here will not be used.
-    constructor(bytes memory _deployData) {
-        (IBentoBoxV1 _bento, IERC20 tokenA, IERC20 tokenB, uint8 _swapFee, uint8 _barFee, address _barFeeTo) =
-            abi.decode(_deployData, (IBentoBoxV1, IERC20, IERC20, uint8, uint8, address));
+    constructor(bytes memory _deployData, address _masterDeployer) {
+        (IERC20 tokenA, IERC20 tokenB, uint256 _swapFee) =
+            abi.decode(_deployData, (IERC20, IERC20, uint256));
 
         require(address(tokenA) != address(0), "MIRIN: ZERO_ADDRESS");
         require(address(tokenB) != address(0), "MIRIN: ZERO_ADDRESS");
         require(tokenA != tokenB, "MIRIN: IDENTICAL_ADDRESSES");
-        require(address(_barFeeTo) != address(0), "MIRIN: ZERO_ADDRESS");
-        require(address(_bento) != address(0), "MIRIN: ZERO_ADDRESS");
         require(_swapFee <= MAX_FEE, "MIRIN: INVALID_SWAP_FEE");
-        require(_barFee <= MAX_FEE, "MIRIN: INVALID_BAR_FEE");
 
         (IERC20 _token0, IERC20 _token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-
-        bento = _bento;
         token0 = _token0;
         token1 = _token1;
         swapFee = _swapFee;
-        barFee = _barFee;
-        barFeeTo = _barFeeTo;
+        bento = IBentoBoxV1(MasterDeployer(_masterDeployer).bento());
+        barFeeTo = MasterDeployer(_masterDeployer).barFeeTo();
+        masterDeployer = MasterDeployer(_masterDeployer);
     }
 
     function init() public {
@@ -237,7 +234,8 @@ contract ConstantProductPool is MirinERC20, IPool {
             if (computed > _kLast) {
                 // barFee % of increase in liquidity
                 // NB It's going to be slihgtly less than barFee % in reality due to the Math
-                uint256 liquidity = (_totalSupply * (computed - _kLast) * barFee) / computed / 100;
+                uint256 barFee = MasterDeployer(masterDeployer).barFee();
+                uint256 liquidity = (_totalSupply * (computed - _kLast) * barFee) / computed / MAX_FEE;
                 if (liquidity > 0) {
                     _mint(barFeeTo, liquidity);
                 }
@@ -331,10 +329,10 @@ contract ConstantProductPool is MirinERC20, IPool {
         uint112 _reserve1
     ) internal view {
         require(amount0In > 0 || amount1In > 0, "MIRIN: INSUFFICIENT_INPUT_AMOUNT");
-        uint256 balance0Adjusted = balance0 * 1000 - amount0In * swapFee;
-        uint256 balance1Adjusted = balance1 * 1000 - amount1In * swapFee;
+        uint256 balance0Adjusted = balance0 * MAX_FEE - amount0In * swapFee;
+        uint256 balance1Adjusted = balance1 * MAX_FEE - amount1In * swapFee;
         require(
-            MirinMath.sqrt(balance0Adjusted * balance1Adjusted) >= MirinMath.sqrt(uint256(_reserve0) * _reserve1 * 1000000),
+            MirinMath.sqrt(balance0Adjusted * balance1Adjusted) >= MirinMath.sqrt(uint256(_reserve0) * _reserve1 * MAX_FEE * MAX_FEE),
             "MIRIN: LIQUIDITY"
         );
     }
@@ -346,9 +344,9 @@ contract ConstantProductPool is MirinERC20, IPool {
     ) internal view returns (uint256 amountOut) {
         require(amountIn > 0, "MIRIN: INSUFFICIENT_INPUT_AMOUNT");
         require(reserveIn > 0 && reserveOut > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
-        uint256 amountInWithFee = amountIn * (1000 - swapFee);
+        uint256 amountInWithFee = amountIn * (MAX_FEE - swapFee);
         uint256 numerator = amountInWithFee * reserveOut;
-        uint256 denominator = (reserveIn * 1000) + amountInWithFee;
+        uint256 denominator = (reserveIn * MAX_FEE) + amountInWithFee;
         amountOut = numerator / denominator;
     }
 

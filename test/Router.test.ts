@@ -2,6 +2,7 @@ import { ethers } from "hardhat";
 import { expect } from "chai";
 import { prepare, deploy, getBigNumber } from "./utilities"
 import { BigNumber } from 'ethers';
+import { Multicall } from '../typechain/Multicall';
 
 describe("Router", function () {
   let alice, feeTo, weth, sushi, bento, masterDeployer, mirinPoolFactory, router, pool;
@@ -19,7 +20,7 @@ describe("Router", function () {
     weth = await ERC20.deploy("WETH", "ETH", getBigNumber("10000000"));
     sushi = await ERC20.deploy("SUSHI", "SUSHI", getBigNumber("10000000"));
     bento = await Bento.deploy(weth.address);
-    masterDeployer = await Deployer.deploy();
+    masterDeployer = await Deployer.deploy(17, feeTo.address, bento.address);
     mirinPoolFactory = await PoolFactory.deploy();
     router = await SwapRouter.deploy(weth.address, masterDeployer.address, bento.address);
 
@@ -38,8 +39,8 @@ describe("Router", function () {
     await bento.setMasterContractApproval(alice.address, router.address, true, "0", "0x0000000000000000000000000000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000000000000000000000000000");
     // Pool deploy data
     const deployData = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "address", "uint8", "uint8", "address"],
-      [bento.address, weth.address, sushi.address, 30, 17, feeTo.address]
+      ["address", "address", "uint8"],
+      [weth.address, sushi.address, 30]
     );
     // Pool initialize data
     const initData = Pool.interface.encodeFunctionData("init");
@@ -244,6 +245,61 @@ describe("Router", function () {
       // Using 18 decimal precision rather than 36 here to accommodate for 1wei rounding errors
       expect(finalPoolWethBalance.mul(BigNumber.from(10).pow(18)).div(finalTotalSupply)).eq(intermediatePoolWethBalance.mul(BigNumber.from(10).pow(18)).div(intermediateTotalSupply));
       expect(finalPoolSushiBalance.mul(BigNumber.from(10).pow(18)).div(finalTotalSupply)).eq(intermediatePoolSushiBalance.mul(BigNumber.from(10).pow(18)).div(intermediateTotalSupply));
+    });
+
+    it("Should swap some native tokens", async function() {
+      let amountIn = BigNumber.from(10).pow(18);
+      let expectedAmountOut = await pool.getAmountOut(weth.address, amountIn);
+      expect(expectedAmountOut).gt(1);
+      let params = {
+        "tokenIn" : weth.address,
+        "tokenOut" : sushi.address,
+        "pool" : pool.address,
+        "context" : "0x",
+        "recipient" : alice.address,
+        "deadline" : 2 * Date.now(),
+        "amountIn" : amountIn,
+        "amountOutMinimum" : 1
+      };
+
+      let oldAliceWethBalance = await weth.balanceOf(alice.address);
+      let oldAliceSushiBalance = await bento.balanceOf(sushi.address, alice.address);
+      let oldPoolWethBalance = await bento.balanceOf(weth.address, pool.address);
+      let oldPoolSushiBalance = await bento.balanceOf(sushi.address, pool.address);
+      let oldAliceBentoWethBalance = await bento.balanceOf(weth.address, alice.address);
+
+      //multicall
+      await router.multicall([
+        router.interface.encodeFunctionData("depositToBentoBox", [weth.address, amountIn, pool.address]),
+        router.interface.encodeFunctionData("exactInputSingleWithPreFunding", [params])
+      ]);
+
+      expect(await weth.balanceOf(alice.address)).eq(oldAliceWethBalance.sub(amountIn));
+      expect(await bento.balanceOf(sushi.address, alice.address)).eq(oldAliceSushiBalance.add(expectedAmountOut));
+      expect(await bento.balanceOf(weth.address, pool.address)).eq(oldPoolWethBalance.add(amountIn));
+      expect(await bento.balanceOf(sushi.address, pool.address)).eq(oldPoolSushiBalance.sub(expectedAmountOut));
+      expect(await bento.balanceOf(weth.address, alice.address)).eq(oldAliceBentoWethBalance);
+
+      amountIn = expectedAmountOut;
+      expectedAmountOut = await pool.getAmountOut(sushi.address, amountIn);
+      expect(expectedAmountOut).lt(BigNumber.from(10).pow(18));
+      params = {
+        "tokenIn" : sushi.address,
+        "tokenOut" : weth.address,
+        "pool" : pool.address,
+        "context" : "0x",
+        "recipient" : alice.address,
+        "deadline" : 2 * Date.now(),
+        "amountIn" : amountIn,
+        "amountOutMinimum" : expectedAmountOut
+      };
+
+      await router.multicall([
+        router.interface.encodeFunctionData("depositToBentoBox", [sushi.address, amountIn, pool.address]),
+        router.interface.encodeFunctionData("exactInputSingleWithPreFunding", [params])
+      ]);
+      expect(await bento.balanceOf(weth.address, pool.address)).gt(oldPoolWethBalance);
+      expect(await bento.balanceOf(sushi.address, pool.address)).eq(oldPoolSushiBalance);
     });
   });
 })
