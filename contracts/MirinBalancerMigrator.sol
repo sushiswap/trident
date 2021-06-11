@@ -3,7 +3,7 @@
 pragma solidity ^0.8.2;
 
 import "./libraries/MirinLibrary.sol";
-import "./libraries/SafeERC20.sol";
+import "./libraries/TransferHelper.sol";
 
 interface IBFactory {
     function isBPool(address b) external view returns (bool);
@@ -18,7 +18,7 @@ interface IBPool {
 }
 
 contract MirinBalancerMigrator {
-    using SafeERC20 for IERC20;
+    using TransferHelper for IERC20;
 
     address public immutable bFactory;
     address public immutable factory;
