@@ -377,55 +377,6 @@ library MirinMath {
         return sum;
     }
 
-/*    // 1 in fixed 128bit arithmetic
-    uint256 internal constant FP_1 = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
-
-    // power function in fixed 128bit arithmetic
-    function powInt128(uint256 a128, uint8 n) internal pure returns (uint256) {
-        uint256 z = n % 2 != 0 ? a128 : FP_1;
-
-        for (n /= 2; n != 0; n /= 2) {
-            a128 = ((a128 * a128) >> 128 ) + 1;
-
-            if (n % 2 != 0) {
-                z = ((z * a128) >> 128 ) + 1;
-            }
-        }
-        return z;
-    }
-
-    // the place of the most high not-zero bit, starting from 0
-    function msb (uint256 _x) internal pure returns (uint8) {
-        require (_x > 0, "msb() input error");
-        uint8 result = 0;
-
-        if (_x >= 0x100000000000000000000000000000000) { _x >>= 128; result += 128; }
-        if (_x >= 0x10000000000000000) { _x >>= 64; result += 64; }
-        if (_x >= 0x100000000) { _x >>= 32; result += 32; }
-        if (_x >= 0x10000) { _x >>= 16; result += 16; }
-        if (_x >= 0x100) { _x >>= 8; result += 8; }
-        if (_x >= 0x10) { _x >>= 4; result += 4; }
-        if (_x >= 0x4) { _x >>= 2; result += 2; }
-        if (_x >= 0x2) result += 1; // No need to shift _x anymore
-
-        return result;
-    }
-    
-    // power function in fixed 128bit arithmetic
-    function sqrt128(uint256 x128) internal pure returns (uint256) {
-        if (x128 == 0) return 0;
-        x128 <<= 128;
-        uint256 r = FP_1;
-        r = (r + x128 / r) >> 1;
-        r = (r + x128 / r) >> 1;
-        r = (r + x128 / r) >> 1;
-        r = (r + x128 / r) >> 1;
-        r = (r + x128 / r) >> 1;
-        r = (r + x128 / r) >> 1;
-        r = (r + x128 / r) >> 1; // Seven iterations should be enough
-        return r;
-    }*/
-
 
     uint256 internal constant FP_1 = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
