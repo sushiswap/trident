@@ -38,25 +38,29 @@ contract ConstantMeanCurve is IMirinCurve {
         bytes32 data
     ) external pure override returns (uint256) {
         (uint8 weight0, uint8 weight1) = decodeData(data, 0);
-        uint256 maxVal = MirinMath.OPT_EXP_MAX_VAL - 1;
-        uint256 lnR0 = MirinMath.ln(reserve0 * MirinMath.FIXED_1);
-        uint256 lnR1 = MirinMath.ln(reserve1 * MirinMath.FIXED_1);
-        uint256 lnLiq = (lnR0 * weight0 + lnR1 * weight1) / (weight0 + weight1);
-        uint8 loop = uint8(lnLiq / maxVal);
-        uint256 res = lnLiq % maxVal; //lnLiq = maxVal * loop + res
+        (uint256 m0, int256 e0) = MirinMath.fPfromUint(reserve0);
+        (m0, e0) = MirinMath.fPpow(m0, e0, weight0);
+        (uint256 m1, int256 e1) = MirinMath.fPfromUint(reserve1);
+        (m1, e1) = MirinMath.fPpow(m1, e1, weight1);
 
-        uint256 liq = MirinMath.optimalExp(res);
+        (uint256 p, int256 m) = MirinMath.fPmul(m0, e0, m1, e1);
+        (p, m) = MirinMath.fPsqrt(p, m);
+        (p, m) = MirinMath.fPsqrt(p, m);
+        (p, m) = MirinMath.fPsqrt(p, m);
+        (p, m) = MirinMath.fPsqrt(p, m);
+        (p, m) = MirinMath.fPsqrt(p, m);
+        (p, m) = MirinMath.fPsqrt(p, m);
+        (p, m) = MirinMath.fPsqrt(p, m);
 
-        if (loop > 0) {
-            uint256 maxValLiq = MirinMath.optimalExp(maxVal);
-            uint256 limit = type(uint256).max / maxValLiq;
-            for (uint8 i = 0; i < loop; i++) {
-                uint256 t = liq / limit;
-                liq = liq - (limit * t); //liqIni = limit * t + liqRes
-                liq = ((limit * maxValLiq) / MirinMath.FIXED_1) * t + ((liq * maxValLiq) / MirinMath.FIXED_1);
-            }
-        }
-        return liq / MirinMath.FIXED_1;
+        uint256 res = MirinMath.fPtoUint(p, m);
+        // if (reserve0 <= reserve1) {
+        //     require(reserve0 <= res, "reserve0 <= res");
+        //     require(res <= reserve1, "res <= reserve1");
+        // } else {
+        //     require(reserve1 <= res, "reserve1 <= res");
+        //     require(res <= reserve0, "res <= reserve0");
+        // }
+        return res;
     }
 
     function computePrice(

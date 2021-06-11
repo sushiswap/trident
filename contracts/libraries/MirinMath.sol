@@ -376,4 +376,147 @@ library MirinMath {
         }
         return sum;
     }
+
+/*    // 1 in fixed 128bit arithmetic
+    uint256 internal constant FP_1 = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+
+    // power function in fixed 128bit arithmetic
+    function powInt128(uint256 a128, uint8 n) internal pure returns (uint256) {
+        uint256 z = n % 2 != 0 ? a128 : FP_1;
+
+        for (n /= 2; n != 0; n /= 2) {
+            a128 = ((a128 * a128) >> 128 ) + 1;
+
+            if (n % 2 != 0) {
+                z = ((z * a128) >> 128 ) + 1;
+            }
+        }
+        return z;
+    }
+
+    // the place of the most high not-zero bit, starting from 0
+    function msb (uint256 _x) internal pure returns (uint8) {
+        require (_x > 0, "msb() input error");
+        uint8 result = 0;
+
+        if (_x >= 0x100000000000000000000000000000000) { _x >>= 128; result += 128; }
+        if (_x >= 0x10000000000000000) { _x >>= 64; result += 64; }
+        if (_x >= 0x100000000) { _x >>= 32; result += 32; }
+        if (_x >= 0x10000) { _x >>= 16; result += 16; }
+        if (_x >= 0x100) { _x >>= 8; result += 8; }
+        if (_x >= 0x10) { _x >>= 4; result += 4; }
+        if (_x >= 0x4) { _x >>= 2; result += 2; }
+        if (_x >= 0x2) result += 1; // No need to shift _x anymore
+
+        return result;
+    }
+    
+    // power function in fixed 128bit arithmetic
+    function sqrt128(uint256 x128) internal pure returns (uint256) {
+        if (x128 == 0) return 0;
+        x128 <<= 128;
+        uint256 r = FP_1;
+        r = (r + x128 / r) >> 1;
+        r = (r + x128 / r) >> 1;
+        r = (r + x128 / r) >> 1;
+        r = (r + x128 / r) >> 1;
+        r = (r + x128 / r) >> 1;
+        r = (r + x128 / r) >> 1;
+        r = (r + x128 / r) >> 1; // Seven iterations should be enough
+        return r;
+    }*/
+
+
+    uint256 internal constant FP_1 = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+
+    function fPfromUint(uint256 n) internal pure returns (uint256 mant, int256 exp) {
+        unchecked {
+            exp = int256(uint256(msb(n))) - 127;    // No under/overflow because 0 <= msb <= 255
+            mant = exp >= 0 ? n >> uint256(exp) : n << uint256(-exp);   // shifts are not checked by EVM for under/overflow
+        }
+    }
+
+    // Attention!!! overflow is value is more than 2^256 - 1 !!!
+    function fPtoUint(uint256 mant, int256 exp) internal pure returns (uint256 n) {
+        n = exp >= 0 ? mant << uint256(exp) : mant >> uint256(-exp);
+    }
+
+    function fPmul(uint256 m1, int256 e1, uint256 m2, int256 e2) internal pure returns (uint256 m, int256 e) {
+        unchecked {
+            m = m1*m2;
+            e = e1 + e2;
+            if ( (m >> 255) == 0) {
+                m = (m >> 127) + 1; //?
+                e += 127;
+            } else {
+                m = (m >> 128) + 1; //?
+                e += 128;
+            }
+        }
+    }
+
+    function fPpow(uint256 m, int256 e, uint8 n) internal pure returns (uint256 mp, int256 ep) {
+        unchecked {     // No place for under/overcorrection
+            if (n % 2 != 0) {
+                mp = m;
+                ep = e;
+            } else {
+                mp = FP_1;
+                ep = -128;
+            }
+
+            for (n /= 2; n != 0; n /= 2) {
+                (m, e) = fPmul(m, e, m, e);
+
+                if (n % 2 != 0) {
+                    (mp, ep) = fPmul(mp, ep, m, e);
+                }
+            }
+        }
+    }
+
+    /**
+   * Get index of the most significant non-zero bit in binary representation of
+   * x.  Reverts if x is zero.
+   *
+   * @return index of the most significant non-zero bit in binary representation
+   *         of x
+   */
+    function msb (uint256 _x) private pure returns (uint8) {
+        unchecked {
+            //require (_x > 0);
+            uint8 result = 0;
+
+            if (_x >= 0x100000000000000000000000000000000) { _x >>= 128; result += 128; }
+            if (_x >= 0x10000000000000000) { _x >>= 64; result += 64; }
+            if (_x >= 0x100000000) { _x >>= 32; result += 32; }
+            if (_x >= 0x10000) { _x >>= 16; result += 16; }
+            if (_x >= 0x100) { _x >>= 8; result += 8; }
+            if (_x >= 0x10) { _x >>= 4; result += 4; }
+            if (_x >= 0x4) { _x >>= 2; result += 2; }
+            if (_x >= 0x2) result += 1; // No need to shift _x anymore
+
+            return result;
+        }
+    }
+
+    function fPsqrt(uint256 x, int256 shift) internal pure returns (uint256 r, int256 shiftR) {
+        unchecked {
+            if (shift%2 == 0) {
+                x <<= 128;
+                shiftR = (shift - 128)/2;
+            } else {
+                x <<= 127;
+                shiftR = (shift - 127)/2;
+            }
+            r = FP_1;
+            r = (r + x / r) >> 1;
+            r = (r + x / r) >> 1;
+            r = (r + x / r) >> 1;
+            r = (r + x / r) >> 1;
+            r = (r + x / r) >> 1;
+            r = (r + x / r) >> 1;
+            r = (r + x / r) >> 1; // Seven iterations should be enough
+        }
+    }
 }
