@@ -5,12 +5,12 @@ pragma solidity =0.8.2;
 import "./interfaces/IMasterChefV2.sol";
 import "./interfaces/IMirinTwapOracle.sol";
 import "./interfaces/IMirinPool.sol";
-import "./libraries/SafeERC20.sol";
+import "./libraries/TransferHelper.sol";
 import "./libraries/MirinLibrary.sol";
 import "./ERC20.sol";
 
 contract MirinYieldRebalancer is ERC20("SushiRebalancer", "rSUSHI") {
-    using SafeERC20 for IERC20;
+    using TransferHelper for IERC20;
 
     IMasterChefV2 public immutable masterChef;
     IERC20 public immutable sushi;
