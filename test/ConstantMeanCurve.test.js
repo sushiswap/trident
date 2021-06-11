@@ -120,7 +120,7 @@ describe("MirinMath Test2", function () {
         );
 
         randParams();
-        swapFee = WEIGHT_SUM+1;
+        swapFee = 101;
         data = getData();
         await expect(test.computeAmountOut(aIn, rIn, rOut, data, swapFee, 0)).to.be.revertedWith(
             "MIRIN: INVALID_SWAP_FEE"
@@ -219,7 +219,7 @@ describe("MirinMath Test2", function () {
         );
 
         randParams();
-        swapFee = WEIGHT_SUM+1;
+        swapFee = 101;
         data = getData();
         await expect(test.computeAmountIn(aOut, rIn, rOut, data, swapFee, 0)).to.be.revertedWith(
             "MIRIN: INVALID_SWAP_FEE"
