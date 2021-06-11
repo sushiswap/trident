@@ -4,10 +4,10 @@ pragma solidity ^0.8.2;
 
 import "./interfaces/IWETH.sol";
 import "./libraries/MirinLibrary.sol";
-import "./libraries/SafeERC20.sol";
+import "./libraries/TransferHelper.sol";
 
 contract MirinLiquidityManager {
-    using SafeERC20 for IERC20;
+    using TransferHelper for IERC20;
 
     struct AddLiquidityParams {
         address tokenA;
