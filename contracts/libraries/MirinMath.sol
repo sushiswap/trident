@@ -383,24 +383,31 @@ library MirinMath {
     function fPfromUint(uint256 n) internal pure returns (uint256 mant, int256 exp) {
         unchecked {
             exp = int256(uint256(msb(n))) - 127;    // No under/overflow because 0 <= msb <= 255
-            mant = exp >= 0 ? n >> uint256(exp) : n << uint256(-exp);   // shifts are not checked by EVM for under/overflow
+            mant = exp >= 0 ? n >> uint256(exp) : n << uint256(-exp);   // exp >= -127 -> no overshifting
         }
     }
 
-    // Attention!!! overflow is value is more than 2^256 - 1 !!!
     function fPtoUint(uint256 mant, int256 exp) internal pure returns (uint256 n) {
-        n = exp >= 0 ? mant << uint256(exp) : mant >> uint256(-exp);
+        unchecked {
+            if (exp >= 0) {
+                n = mant << uint256(exp);
+                require((n >> uint256(exp)) == mant, "FP to uint overloading");
+            } else 
+                n = mant >> uint256(-exp);
+        }
     }
 
+    // ATTENTION: assumed that e1 and e2 are small enough - no overloading for e calculation
     function fPmul(uint256 m1, int256 e1, uint256 m2, int256 e2) internal pure returns (uint256 m, int256 e) {
         unchecked {
             m = m1*m2;
+            require(m/m1 == m2, "FP internal error 403");
             e = e1 + e2;
             if ( (m >> 255) == 0) {
-                m = (m >> 127) + 1; //?
+                m = (m >> 127) + 1;
                 e += 127;
             } else {
-                m = (m >> 128) + 1; //?
+                m = (m >> 128) + 1;
                 e += 128;
             }
         }
@@ -426,26 +433,28 @@ library MirinMath {
         }
     }
 
+    // Standard implementation - Taken from here: 
+    // https://github.com/abdk-consulting/abdk-libraries-solidity/blob/master/ABDKMathQuad.sol#L1190
     /**
-   * Get index of the most significant non-zero bit in binary representation of
-   * x.  Reverts if x is zero.
-   *
-   * @return index of the most significant non-zero bit in binary representation
-   *         of x
-   */
-    function msb (uint256 _x) private pure returns (uint8) {
+    * Get index of the most significant non-zero bit in binary representation of x
+    *
+    * @return index of the most significant non-zero bit in binary representation
+    *         of x
+    */
+    function msb (uint256 x) private pure returns (uint256) {
         unchecked {
-            //require (_x > 0);
-            uint8 result = 0;
+            //require (x > 0); 0 return is OK for us in this case
 
-            if (_x >= 0x100000000000000000000000000000000) { _x >>= 128; result += 128; }
-            if (_x >= 0x10000000000000000) { _x >>= 64; result += 64; }
-            if (_x >= 0x100000000) { _x >>= 32; result += 32; }
-            if (_x >= 0x10000) { _x >>= 16; result += 16; }
-            if (_x >= 0x100) { _x >>= 8; result += 8; }
-            if (_x >= 0x10) { _x >>= 4; result += 4; }
-            if (_x >= 0x4) { _x >>= 2; result += 2; }
-            if (_x >= 0x2) result += 1; // No need to shift _x anymore
+            uint256 result = 0;
+
+            if (x >= 0x100000000000000000000000000000000) { x >>= 128; result += 128; }
+            if (x >= 0x10000000000000000) { x >>= 64; result += 64; }
+            if (x >= 0x100000000) { x >>= 32; result += 32; }
+            if (x >= 0x10000) { x >>= 16; result += 16; }
+            if (x >= 0x100) { x >>= 8; result += 8; }
+            if (x >= 0x10) { x >>= 4; result += 4; }
+            if (x >= 0x4) { x >>= 2; result += 2; }
+            if (x >= 0x2) result += 1; // No need to shift x anymore
 
             return result;
         }
@@ -453,6 +462,7 @@ library MirinMath {
 
     function fPsqrt(uint256 x, int256 shift) internal pure returns (uint256 r, int256 shiftR) {
         unchecked {
+            require((x >> 128) == 0, "FPsqrt: input value too high");
             if (shift%2 == 0) {
                 x <<= 128;
                 shiftR = (shift - 128)/2;

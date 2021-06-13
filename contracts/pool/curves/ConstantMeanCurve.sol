@@ -51,16 +51,7 @@ contract ConstantMeanCurve is IMirinCurve {
         (p, m) = MirinMath.fPsqrt(p, m);
         (p, m) = MirinMath.fPsqrt(p, m);
         (p, m) = MirinMath.fPsqrt(p, m);
-
-        uint256 res = MirinMath.fPtoUint(p, m);
-        // if (reserve0 <= reserve1) {
-        //     require(reserve0 <= res, "reserve0 <= res");
-        //     require(res <= reserve1, "res <= reserve1");
-        // } else {
-        //     require(reserve1 <= res, "reserve1 <= res");
-        //     require(res <= reserve0, "res <= reserve0");
-        // }
-        return res;
+        return MirinMath.fPtoUint(p, m);
     }
 
     function computePrice(

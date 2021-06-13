@@ -3,7 +3,7 @@ const { ethers } = require("hardhat");
 const { BigNumber, utils } = require("ethers");
 const { Decimal } = require("decimal.js");
 const Decimal18 = Decimal.clone({ precision: 18 });
-const Decimal40 = Decimal.clone({ precision: 40 });
+const Decimal80 = Decimal.clone({ precision: 80 });
 const WEIGHT_SUM = 128;
 
 let aIn, aOut, rIn, rOut, swapFee, wI, wO;
@@ -376,6 +376,7 @@ describe("ConstantMeanCurve additional Test", function () {
         }
     });
 
+    const LIQUIDITY_CALCULATION_PRECISION = 38; // decimal digits
     it("Should compute Liquidity as precisely as possible", async function () {
         const Fixed1 = BigNumber.from(2).pow(127);
         let r0, r1, w0, w1;
@@ -389,20 +390,20 @@ describe("ConstantMeanCurve additional Test", function () {
             w1 = wO;
             data = getData();
 
-            let lnLiq = Decimal40(r0.toHexString())
+            let lnLiq = Decimal80(r0.toHexString())     // ethalon calculatuon with 80 decimal digits precision
                 .ln()
                 .mul(w0)
-                .add(Decimal40(r1.toHexString()).ln().mul(w1))
+                .add(Decimal80(r1.toHexString()).ln().mul(w1))
                 .div(w0 + w1)
                 .mul(Fixed1.toHexString())
                 .floor();
 
             js = lnLiq.div(Fixed1.toHexString()).exp().floor();
-            let js1 = js.mul(1 + Math.pow(10, -8)).floor();
-            let js2 = js.mul(1 - Math.pow(10, -8)).floor();
+            let js1 = js.mul(Decimal80(1).add(Math.pow(10, -LIQUIDITY_CALCULATION_PRECISION))).floor();
+            let js2 = js.mul(Decimal80(1).sub(Math.pow(10, -LIQUIDITY_CALCULATION_PRECISION))).floor();
             con = await test.computeLiquidity(r0, r1, data);
 
-            if (con.gte(Math.pow(10, 10))) {
+            if (con.gte(BigNumber.from(10).pow(LIQUIDITY_CALCULATION_PRECISION + 1))) {
                 expect(con).to.be.lte(BigNumber.from(js1.toHex()));
                 expect(con).to.be.gte(BigNumber.from(js2.toHex()));
             } else {
