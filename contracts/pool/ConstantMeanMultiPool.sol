@@ -116,7 +116,6 @@ contract BToken is BTokenBase, IERC20 {
 }
 
 contract MultiPool is BBronze, BToken, BMath {
-
     struct Record {
         bool bound;   // is token bound to pool
         uint index;   // private
@@ -169,8 +168,8 @@ contract MultiPool is BBronze, BToken, BMath {
 
     bool private _mutex;
     
-    IBentoBoxV1 private immutable bento; 
-    address private _factory;    // BFactory address to push token exitFee to
+    IBentoBoxV1 private immutable bento; // BentoBox vault for token storage
+    address private _factory;    // Factory address to push token exitFee to
     address private _controller; // has CONTROL role
     bool private _publicSwap; // true if PUBLIC can call SWAP functions
 
@@ -184,7 +183,8 @@ contract MultiPool is BBronze, BToken, BMath {
     uint private _totalWeight;
 
     constructor(bytes memory _deployData, address _masterDeployer) public {
-        (address[] memory tokens, uint256 swapFee) = abi.decode(_deployData, (address[], uint256));
+        (address[] memory tokens, uint256 balance, uint256 denorm, uint256 swapFee) 
+        = abi.decode(_deployData, (address[], uint256, uint256, uint256));
         
         require(swapFee >= MIN_FEE, "ERR_MIN_FEE");
         require(swapFee <= MAX_FEE, "ERR_MAX_FEE");
@@ -200,7 +200,7 @@ contract MultiPool is BBronze, BToken, BMath {
                 balance: 0   // and set by `rebind`
             });
             _tokens.push(tokens[i]);
-            rebind(tokens[i], 0, 0);
+            rebind(tokens[i], balance, denorm);
         }
    
         bento = IBentoBoxV1(MasterDeployer(_masterDeployer).bento());
@@ -313,12 +313,11 @@ contract MultiPool is BBronze, BToken, BMath {
         return _controller;
     }
 
-    function rebind(address token, uint balance, uint denorm)
+    function rebind(address token, uint256 balance, uint256 denorm)
         public
         _logs_
         _lock_
     {
-
         require(msg.sender == _controller, "ERR_NOT_CONTROLLER");
         require(_records[token].bound, "ERR_NOT_BOUND");
         require(!_finalized, "ERR_IS_FINALIZED");
@@ -341,7 +340,7 @@ contract MultiPool is BBronze, BToken, BMath {
         uint oldBalance = _records[token].balance;
         _records[token].balance = balance;
         if (balance > oldBalance) {
-            // _pullUnderlying(token, msg.sender, bsub(balance, oldBalance)); - replace after reviewing interaction with SwapRouter transfers
+            _pullUnderlying(token, msg.sender, bsub(balance, oldBalance));
         } else if (balance < oldBalance) {
             // In this case liquidity is being withdrawn, so charge EXIT_FEE
             uint tokenBalanceWithdrawn = bsub(oldBalance, balance);
@@ -471,7 +470,6 @@ contract MultiPool is BBronze, BToken, BMath {
 
     }
 
-
     function swapExactAmountIn(
         address tokenIn,
         uint tokenAmountIn,
@@ -529,7 +527,7 @@ contract MultiPool is BBronze, BToken, BMath {
 
         emit LOG_SWAP(msg.sender, tokenIn, tokenOut, tokenAmountIn, tokenAmountOut);
 
-        //_pullUnderlying(tokenIn, msg.sender, tokenAmountIn);
+        _pullUnderlying(tokenIn, msg.sender, tokenAmountIn);
         _pushUnderlying(tokenOut, msg.sender, tokenAmountOut);
 
         return (tokenAmountOut, spotPriceAfter);
@@ -591,12 +589,11 @@ contract MultiPool is BBronze, BToken, BMath {
 
         emit LOG_SWAP(msg.sender, tokenIn, tokenOut, tokenAmountIn, tokenAmountOut);
 
-        //_pullUnderlying(tokenIn, msg.sender, tokenAmountIn);
+        _pullUnderlying(tokenIn, msg.sender, tokenAmountIn);
         _pushUnderlying(tokenOut, msg.sender, tokenAmountOut);
 
         return (tokenAmountIn, spotPriceAfter);
     }
-
 
     function joinswapExternAmountIn(address tokenIn, uint tokenAmountIn, uint minPoolAmountOut)
         external
@@ -628,7 +625,7 @@ contract MultiPool is BBronze, BToken, BMath {
 
         _mintPoolShare(poolAmountOut);
         _pushPoolShare(msg.sender, poolAmountOut);
-        //_pullUnderlying(tokenIn, msg.sender, tokenAmountIn);
+        _pullUnderlying(tokenIn, msg.sender, tokenAmountIn);
 
         return poolAmountOut;
     }
@@ -664,7 +661,7 @@ contract MultiPool is BBronze, BToken, BMath {
 
         _mintPoolShare(poolAmountOut);
         _pushPoolShare(msg.sender, poolAmountOut);
-        //_pullUnderlying(tokenIn, msg.sender, tokenAmountIn);
+        _pullUnderlying(tokenIn, msg.sender, tokenAmountIn);
 
         return tokenAmountIn;
     }
@@ -745,10 +742,15 @@ contract MultiPool is BBronze, BToken, BMath {
         return poolAmountIn;
     }
 
-
     // ==
-    // 'Underlying' token-manipulation functions make external calls but are NOT locked
+    // 'Underlying' token-manipulation functions through BentoBox make external calls but are NOT locked
     // You must `_lock_` or otherwise ensure reentry-safety
+    function _pullUnderlying(address erc20, address from, uint amount)
+        internal
+    {
+        bento.transfer(IERC20(erc20), from, address(this), bento.toShare(IERC20(erc20), amount, false))
+    }
+    
     function _pushUnderlying(address erc20, address to, uint amount)
         internal
     {
@@ -778,5 +780,4 @@ contract MultiPool is BBronze, BToken, BMath {
     {
         _burn(amount);
     }
-
 }
