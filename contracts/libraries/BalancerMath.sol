@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.6.12;
+pragma solidity ^0.8.2;
 
 abstract contract BColor {
     function getColor()
@@ -10,7 +10,7 @@ abstract contract BColor {
 
 contract BBronze is BColor {
     function getColor()
-        external view override
+        external pure override
         returns (bytes32) {
             return bytes32("BRONZE");
         }
@@ -42,7 +42,6 @@ contract BConst is BBronze {
 }
 
 contract BNum is BConst {
-
     function btoi(uint a)
         internal pure 
         returns (uint)
@@ -117,10 +116,8 @@ contract BNum is BConst {
         returns (uint)
     {
         uint z = n % 2 != 0 ? a : BONE;
-
         for (n /= 2; n != 0; n /= 2) {
             a = bmul(a, a);
-
             if (n % 2 != 0) {
                 z = bmul(z, a);
             }
@@ -162,7 +159,6 @@ contract BNum is BConst {
         uint sum   = term;
         bool negative = false;
 
-
         // term(k) = numer / denom 
         //         = (product(a - i - 1, i=1-->k) * x^k) / (k!)
         // each iteration, multiply previous term by (a-(k-1)) * x / k
@@ -182,10 +178,8 @@ contract BNum is BConst {
                 sum = badd(sum, term);
             }
         }
-
         return sum;
     }
-
 }
 
 contract BMath is BBronze, BConst, BNum {
@@ -439,6 +433,4 @@ contract BMath is BBronze, BConst, BNum {
         poolAmountIn = bdiv(poolAmountInAfterExitFee, bsub(BONE, EXIT_FEE));
         return poolAmountIn;
     }
-
-
 }
