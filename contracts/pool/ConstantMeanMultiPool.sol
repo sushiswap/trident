@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.6.12;
+pragma solidity ^0.8.2;
 
 import "../interfaces/IPool.sol";
 import "../interfaces/IBentoBox.sol";
+import "../interfaces/IMirinCallee.sol";
 import "../libraries/BalancerMath.sol";
 import "hardhat/console.sol";
 import "../deployer/MasterDeployer.sol";
 
 contract BTokenBase is BNum {
-
     mapping(address => uint)                   internal _balance;
     mapping(address => mapping(address=>uint)) internal _allowance;
     uint internal _totalSupply;
@@ -46,8 +46,7 @@ contract BTokenBase is BNum {
     }
 }
 
-contract BToken is BTokenBase, IERC20 {
-
+contract BToken is BTokenBase {
     string  private _name     = "Balancer Pool Token";
     string  private _symbol   = "BPT";
     uint8   private _decimals = 18;
@@ -64,19 +63,19 @@ contract BToken is BTokenBase, IERC20 {
         return _decimals;
     }
 
-    function allowance(address src, address dst) external view override returns (uint) {
+    function allowance(address src, address dst) external view returns (uint) {
         return _allowance[src][dst];
     }
 
-    function balanceOf(address whom) external view override returns (uint) {
+    function balanceOf(address whom) external view returns (uint) {
         return _balance[whom];
     }
 
-    function totalSupply() public view override returns (uint) {
+    function totalSupply() public view returns (uint) {
         return _totalSupply;
     }
 
-    function approve(address dst, uint amt) external override returns (bool) {
+    function approve(address dst, uint amt) external returns (bool) {
         _allowance[msg.sender][dst] = amt;
         emit Approval(msg.sender, dst, amt);
         return true;
@@ -99,15 +98,15 @@ contract BToken is BTokenBase, IERC20 {
         return true;
     }
 
-    function transfer(address dst, uint amt) external override returns (bool) {
+    function transfer(address dst, uint amt) external returns (bool) {
         _move(msg.sender, dst, amt);
         return true;
     }
 
-    function transferFrom(address src, address dst, uint amt) external override returns (bool) {
+    function transferFrom(address src, address dst, uint amt) external returns (bool) {
         require(msg.sender == src || amt <= _allowance[src][msg.sender], "ERR_BTOKEN_BAD_CALLER");
         _move(src, dst, amt);
-        if (msg.sender != src && _allowance[src][msg.sender] != uint256(-1)) {
+        if (msg.sender != src && _allowance[src][msg.sender] != type(uint256).max) {
             _allowance[src][msg.sender] = bsub(_allowance[src][msg.sender], amt);
             emit Approval(msg.sender, dst, _allowance[src][msg.sender]);
         }
@@ -115,7 +114,7 @@ contract BToken is BTokenBase, IERC20 {
     }
 }
 
-contract MultiPool is BBronze, BToken, BMath {
+contract ConstantMeanMultiPool is BBronze, BToken, BMath {
     struct Record {
         bool bound;   // is token bound to pool
         uint index;   // private
@@ -168,9 +167,9 @@ contract MultiPool is BBronze, BToken, BMath {
 
     bool private _mutex;
     
-    IBentoBoxV1 private immutable bento; // BentoBox vault for token storage
-    address private _factory;    // Factory address to push token exitFee to
-    address private _controller; // has CONTROL role
+    IBentoBoxV1 private bento; // BentoBox vault for token storage
+    address private _factory; // Factory address to push token exitFee to
+    address private _controller; // & has CONTROL role.
     bool private _publicSwap; // true if PUBLIC can call SWAP functions
 
     // `setSwapFee` and `finalize` require CONTROL
@@ -179,10 +178,10 @@ contract MultiPool is BBronze, BToken, BMath {
     bool private _finalized;
 
     address[] private _tokens;
-    mapping(address=>Record) private  _records;
+    mapping(address=>Record) private _records;
     uint private _totalWeight;
 
-    constructor(bytes memory _deployData, address _masterDeployer) public {
+    constructor(bytes memory _deployData, address _masterDeployer) {
         (address[] memory tokens, uint256 balance, uint256 denorm, uint256 swapFee) 
         = abi.decode(_deployData, (address[], uint256, uint256, uint256));
         
@@ -467,9 +466,74 @@ contract MultiPool is BBronze, BToken, BMath {
             emit LOG_EXIT(msg.sender, t, tokenAmountOut);
             _pushUnderlying(t, msg.sender, tokenAmountOut);
         }
-
     }
+    
+    /// @dev Swap formatted for SushiSwapV2. 
+    function swap(
+        address tokenIn,
+        address tokenOut,
+        bytes calldata context,
+        address recipient,
+        uint256 amountIn,
+        uint256
+    ) 
+        external
+        _logs_
+        _lock_
+        returns (uint256 tokenAmountOut, uint256 spotPriceAfter)
+    
+    {
+        require(_records[tokenIn].bound, "ERR_NOT_BOUND");
+        require(_records[tokenOut].bound, "ERR_NOT_BOUND");
+        require(_publicSwap, "ERR_SWAP_NOT_PUBLIC");
 
+        Record storage inRecord = _records[address(tokenIn)];
+        Record storage outRecord = _records[address(tokenOut)];
+
+        require(amountIn <= bmul(inRecord.balance, MAX_IN_RATIO), "ERR_MAX_IN_RATIO");
+
+        uint spotPriceBefore = calcSpotPrice(
+                                    inRecord.balance,
+                                    inRecord.denorm,
+                                    outRecord.balance,
+                                    outRecord.denorm,
+                                    _swapFee
+                                );
+        //require(spotPriceBefore <= maxPrice, "ERR_BAD_LIMIT_PRICE");
+
+        tokenAmountOut = calcOutGivenIn(
+                            inRecord.balance,
+                            inRecord.denorm,
+                            outRecord.balance,
+                            outRecord.denorm,
+                            amountIn,
+                            _swapFee
+                        );
+        //require(tokenAmountOut >= minAmountOut, "ERR_LIMIT_OUT");
+
+        inRecord.balance = badd(inRecord.balance, amountIn);
+        outRecord.balance = bsub(outRecord.balance, tokenAmountOut);
+
+        spotPriceAfter = calcSpotPrice(
+                                inRecord.balance,
+                                inRecord.denorm,
+                                outRecord.balance,
+                                outRecord.denorm,
+                                _swapFee
+                            );
+        require(spotPriceAfter >= spotPriceBefore, "ERR_MATH_APPROX");     
+        //require(spotPriceAfter <= maxPrice, "ERR_LIMIT_PRICE");
+        require(spotPriceBefore <= bdiv(amountIn, tokenAmountOut), "ERR_MATH_APPROX");
+
+        emit LOG_SWAP(msg.sender, tokenIn, tokenOut, amountIn, tokenAmountOut);
+
+        _pullUnderlying(tokenIn, msg.sender, amountIn);
+        _pushUnderlying(tokenOut, msg.sender, tokenAmountOut);
+        if (context.length > 0) IMirinCallee(recipient).mirinCall(msg.sender, tokenAmountOut, tokenAmountOut, context);
+
+        return (tokenAmountOut, spotPriceAfter);
+    }
+        
     function swapExactAmountIn(
         address tokenIn,
         uint tokenAmountIn,
@@ -482,7 +546,6 @@ contract MultiPool is BBronze, BToken, BMath {
         _lock_
         returns (uint tokenAmountOut, uint spotPriceAfter)
     {
-
         require(_records[tokenIn].bound, "ERR_NOT_BOUND");
         require(_records[tokenOut].bound, "ERR_NOT_BOUND");
         require(_publicSwap, "ERR_SWAP_NOT_PUBLIC");
@@ -748,7 +811,7 @@ contract MultiPool is BBronze, BToken, BMath {
     function _pullUnderlying(address erc20, address from, uint amount)
         internal
     {
-        bento.transfer(IERC20(erc20), from, address(this), bento.toShare(IERC20(erc20), amount, false))
+        bento.transfer(IERC20(erc20), from, address(this), bento.toShare(IERC20(erc20), amount, false));
     }
     
     function _pushUnderlying(address erc20, address to, uint amount)
