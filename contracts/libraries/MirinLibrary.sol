@@ -56,8 +56,7 @@ library MirinLibrary {
             address token0 = IMirinPool(pool).token0();
             (uint112 reserve0, uint112 reserve1, ) = IMirinPool(pool).getReserves();
             if (pid == LEGACY_POOL_INDEX) {
-                (uint256 reserveIn, uint256 reserveOut) =
-                    tokenA == token0 ? (reserve0, reserve1) : (reserve1, reserve0);
+                (uint256 reserveIn, uint256 reserveOut) = tokenA == token0 ? (reserve0, reserve1) : (reserve1, reserve0);
                 amounts[i + 1] = _getAmountOut(amounts[i], reserveIn, reserveOut);
             } else {
                 address curve = IMirinPool(pool).curve();
@@ -90,8 +89,7 @@ library MirinLibrary {
             address token0 = IMirinPool(pool).token0();
             (uint112 reserve0, uint112 reserve1, ) = IMirinPool(pool).getReserves();
             if (pid == LEGACY_POOL_INDEX) {
-                (uint256 reserveIn, uint256 reserveOut) =
-                    tokenA == token0 ? (reserve0, reserve1) : (reserve1, reserve0);
+                (uint256 reserveIn, uint256 reserveOut) = tokenA == token0 ? (reserve0, reserve1) : (reserve1, reserve0);
                 amounts[i - 1] = _getAmountIn(amounts[i], reserveIn, reserveOut);
             } else {
                 address curve = IMirinPool(pool).curve();

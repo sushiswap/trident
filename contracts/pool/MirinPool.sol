@@ -173,7 +173,7 @@ contract MirinPool is MirinGovernance {
             liquidity = computed - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
-            liquidity = (computed - kLast) * _totalSupply / kLast;
+            liquidity = ((computed - kLast) * _totalSupply) / kLast;
         }
         require(liquidity > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_MINTED");
         _mint(to, liquidity);
@@ -220,7 +220,7 @@ contract MirinPool is MirinGovernance {
 
         uint256 computed =
             IMirinCurve(curve).computeLiquidity(uint112(_reserve0 - amount0), uint112(_reserve1 - amount1), curveData);
-        uint256 liquidityDelta = (kLast - computed) * totalSupply / kLast;
+        uint256 liquidityDelta = ((kLast - computed) * totalSupply) / kLast;
 
         require(liquidityDelta <= liquidity, "MIRIN: LIQUIDITY");
         if (liquidityDelta < liquidity) {

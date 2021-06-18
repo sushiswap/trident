@@ -48,6 +48,8 @@ interface IERC20 {
         bytes32 r,
         bytes32 s
     ) external;
+
+    function decimals() external view returns (uint256);
 }
 
 // File contracts/interfaces/IFlashLoan.sol
@@ -480,7 +482,8 @@ contract MasterContractManager is BoringOwnable, BoringFactory {
     /// @notice user nonces for masterContract approvals
     mapping(address => uint256) public nonces;
 
-    bytes32 private constant DOMAIN_SEPARATOR_SIGNATURE_HASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
+    bytes32 private constant DOMAIN_SEPARATOR_SIGNATURE_HASH =
+        keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
     // See https://eips.ethereum.org/EIPS/eip-191
     string private constant EIP191_PREFIX_FOR_EIP712_STRUCTURED_DATA = "\x19\x01";
     bytes32 private constant APPROVAL_SIGNATURE_HASH =
@@ -621,7 +624,11 @@ contract BaseBoringBatchable {
     // F2: Calls in the batch may be payable, delegatecall operates in the same context, so each call in the batch has access to msg.value
     // C3: The length of the loop is fully under user control, so can't be exploited
     // C7: Delegatecall is only used on the same contract, so it's safe
-    function batch(bytes[] calldata calls, bool revertOnFail) external payable returns (bool[] memory successes, bytes[] memory results) {
+    function batch(bytes[] calldata calls, bool revertOnFail)
+        external
+        payable
+        returns (bool[] memory successes, bytes[] memory results)
+    {
         successes = new bool[](calls.length);
         results = new bytes[](calls.length);
         for (uint256 i = 0; i < calls.length; i++) {
@@ -675,7 +682,13 @@ contract BentoBoxV1 is MasterContractManager, BoringBatchable {
     event LogWithdraw(IERC20 indexed token, address indexed from, address indexed to, uint256 amount, uint256 share);
     event LogTransfer(IERC20 indexed token, address indexed from, address indexed to, uint256 share);
 
-    event LogFlashLoan(address indexed borrower, IERC20 indexed token, uint256 amount, uint256 feeAmount, address indexed receiver);
+    event LogFlashLoan(
+        address indexed borrower,
+        IERC20 indexed token,
+        uint256 amount,
+        uint256 feeAmount,
+        address indexed receiver
+    );
 
     event LogStrategyTargetPercentage(IERC20 indexed token, uint256 targetPercentage);
     event LogStrategyQueued(IERC20 indexed token, IStrategy indexed strategy);

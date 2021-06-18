@@ -7,7 +7,7 @@ import "./interfaces/IMirinTwapOracle.sol";
 import "./interfaces/IMirinPool.sol";
 import "./libraries/SafeERC20.sol";
 import "./libraries/MirinLibrary.sol";
-import "./ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract MirinYieldRebalancer is ERC20("SushiRebalancer", "rSUSHI") {
     using SafeERC20 for IERC20;

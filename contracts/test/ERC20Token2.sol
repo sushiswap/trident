@@ -5,7 +5,6 @@ pragma solidity ^0.8.2;
 import "../pool/MirinERC20.sol";
 
 contract ERC20TestToken is MirinERC20 {
-
     constructor() {
         mint(msg.sender, 1e40);
     }

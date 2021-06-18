@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
  * @author Mudit Gupta
  */
 contract PoolProxy is ERC1967Proxy {
-
     constructor(address _logic, bytes memory _data) payable ERC1967Proxy(_logic, _data) {}
 
     /**
@@ -29,7 +28,11 @@ contract PoolProxy is ERC1967Proxy {
      *
      * Emits an {Upgraded} event.
      */
-    function upgradeToAndCall(address newImplementation, bytes memory data, bool forceCall) external {
+    function upgradeToAndCall(
+        address newImplementation,
+        bytes memory data,
+        bool forceCall
+    ) external {
         if (msg.sender == address(this)) {
             _upgradeToAndCall(newImplementation, data, forceCall);
         } else {
