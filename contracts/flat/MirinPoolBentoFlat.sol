@@ -516,8 +516,10 @@ contract ConstantMeanCurve is IMirinCurve {
 
         uint256 weightRatio = MirinMath.roundDiv(uint256(weightIn), uint256(weightOut));
         uint256 adjustedIn = amountIn * (MirinMath.BASE18 - (uint256(swapFee) * 10**15));
-        uint256 base =
-            MirinMath.ceilDiv(uint256(reserveIn) * MirinMath.BASE18, uint256(reserveIn) * MirinMath.BASE18 + adjustedIn);
+        uint256 base = MirinMath.ceilDiv(
+            uint256(reserveIn) * MirinMath.BASE18,
+            uint256(reserveIn) * MirinMath.BASE18 + adjustedIn
+        );
         if (base == MirinMath.BASE18) {
             base = MirinMath.roundDiv(uint256(reserveIn) * MirinMath.BASE18, uint256(reserveIn) * MirinMath.BASE18 + adjustedIn);
         }
@@ -657,14 +659,13 @@ contract MirinERC20 {
         bytes32 s
     ) external {
         require(deadline >= block.timestamp, "MIRIN: EXPIRED");
-        bytes32 digest =
-            keccak256(
-                abi.encodePacked(
-                    "\x19\x01",
-                    DOMAIN_SEPARATOR,
-                    keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, value, nonces[owner]++, deadline))
-                )
-            );
+        bytes32 digest = keccak256(
+            abi.encodePacked(
+                "\x19\x01",
+                DOMAIN_SEPARATOR,
+                keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, value, nonces[owner]++, deadline))
+            )
+        );
         address recoveredAddress = ecrecover(digest, v, r, s);
         require(recoveredAddress != address(0) && recoveredAddress == owner, "MIRIN: INVALID_SIGNATURE");
         _approve(owner, spender, value);

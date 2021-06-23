@@ -95,8 +95,10 @@ contract ConstantMeanCurve is IMirinCurve {
 
         uint256 weightRatio = MirinMath.roundDiv(uint256(weightIn), uint256(weightOut));
         uint256 adjustedIn = amountIn * (MirinMath.BASE18 - (uint256(swapFee) * 10**15));
-        uint256 base =
-            MirinMath.ceilDiv(uint256(reserveIn) * MirinMath.BASE18, uint256(reserveIn) * MirinMath.BASE18 + adjustedIn);
+        uint256 base = MirinMath.ceilDiv(
+            uint256(reserveIn) * MirinMath.BASE18,
+            uint256(reserveIn) * MirinMath.BASE18 + adjustedIn
+        );
         if (base == MirinMath.BASE18) {
             base = MirinMath.roundDiv(uint256(reserveIn) * MirinMath.BASE18, uint256(reserveIn) * MirinMath.BASE18 + adjustedIn);
         }
@@ -170,8 +172,10 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20, IPool {
     }
 
     constructor(bytes memory _deployData) {
-        (IBentoBoxV1 _bento, IERC20 tokenA, IERC20 tokenB, bytes32 _curveData, uint8 _swapFee, address _swapFeeTo) =
-            abi.decode(_deployData, (IBentoBoxV1, IERC20, IERC20, bytes32, uint8, address));
+        (IBentoBoxV1 _bento, IERC20 tokenA, IERC20 tokenB, bytes32 _curveData, uint8 _swapFee, address _swapFeeTo) = abi.decode(
+            _deployData,
+            (IBentoBoxV1, IERC20, IERC20, bytes32, uint8, address)
+        );
 
         (IERC20 _token0, IERC20 _token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         require(address(_token0) != address(0), "MIRIN: ZERO_ADDRESS");
@@ -409,12 +413,14 @@ contract MirinPoolBento is ConstantMeanCurve, MirinERC20, IPool {
     }
 
     function _balance() private view returns (uint256 balance0, uint256 balance1) {
-        (bool success0, bytes memory data0) =
-            address(bento).staticcall(abi.encodeWithSelector(bento.balanceOf.selector, token0, address(this)));
+        (bool success0, bytes memory data0) = address(bento).staticcall(
+            abi.encodeWithSelector(bento.balanceOf.selector, token0, address(this))
+        );
         require(success0 && data0.length >= 32);
         balance0 = abi.decode(data0, (uint256));
-        (bool success1, bytes memory data1) =
-            address(bento).staticcall(abi.encodeWithSelector(bento.balanceOf.selector, token1, address(this)));
+        (bool success1, bytes memory data1) = address(bento).staticcall(
+            abi.encodeWithSelector(bento.balanceOf.selector, token1, address(this))
+        );
         require(success1 && data1.length >= 32);
         balance1 = abi.decode(data1, (uint256));
     }

@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import { ethers } from "hardhat";
 import { expect } from "chai";
 import { prepare, deploy, getBigNumber } from "./utilities"

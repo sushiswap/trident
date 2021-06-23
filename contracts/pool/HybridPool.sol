@@ -50,8 +50,9 @@ contract HybridPool is MirinERC20, IPool {
     MasterDeployer public immutable masterDeployer;
     IERC20 public immutable token0;
     IERC20 public immutable token1;
-    uint256 public immutable A_PRECISION;
-    uint256 public immutable N_A; // 2 * A
+    uint256 public immutable A;
+    uint256 internal immutable N_A; // 2 * A
+    uint256 internal constant A_PRECISION = 100;
 
     // multipliers for each pooled token's precision to get to POOL_PRECISION_DECIMALS
     // for example, TBTC has 18 decimals, so the multiplier should be 1. WBTC
@@ -78,13 +79,16 @@ contract HybridPool is MirinERC20, IPool {
     /// @dev
     /// Only set immutable variables here. State changes made here will not be used.
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (address tokenA, address tokenB, uint256 _swapFee, uint256 aPrecision) =
-            abi.decode(_deployData, (address, address, uint256, uint256));
+        (address tokenA, address tokenB, uint256 _swapFee, uint256 a) = abi.decode(
+            _deployData,
+            (address, address, uint256, uint256)
+        );
 
         require(tokenA != address(0), "MIRIN: ZERO_ADDRESS");
         require(tokenB != address(0), "MIRIN: ZERO_ADDRESS");
         require(tokenA != tokenB, "MIRIN: IDENTICAL_ADDRESSES");
         require(_swapFee <= MAX_FEE, "MIRIN: INVALID_SWAP_FEE");
+        require(a != 0, "MIRIN: ZERO_A");
 
         (address _token0, address _token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         token0 = IERC20(_token0);
@@ -93,10 +97,10 @@ contract HybridPool is MirinERC20, IPool {
         bento = IBentoBoxV1(MasterDeployer(_masterDeployer).bento());
         barFeeTo = MasterDeployer(_masterDeployer).barFeeTo();
         masterDeployer = MasterDeployer(_masterDeployer);
-        A_PRECISION = aPrecision;
-        N_A = 2 * aPrecision;
-        token0PrecisionMultiplier = uint256(10)**MirinERC20(_token0).decimals();
-        token1PrecisionMultiplier = uint256(10)**MirinERC20(_token1).decimals();
+        A = a;
+        N_A = 2 * a;
+        token0PrecisionMultiplier = uint256(10)**(decimals - MirinERC20(_token0).decimals());
+        token1PrecisionMultiplier = uint256(10)**(decimals - MirinERC20(_token1).decimals());
     }
 
     function init() public {
@@ -108,23 +112,22 @@ contract HybridPool is MirinERC20, IPool {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         uint256 _totalSupply = totalSupply;
         _mintFee(_reserve0, _reserve1, _totalSupply);
-
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
 
-        uint256 computed = MirinMath.sqrt(balance0 * balance1);
+        uint256 newLiq = _computeLiquidity(balance0, balance1);
         if (_totalSupply == 0) {
-            liquidity = computed - MINIMUM_LIQUIDITY;
+            liquidity = newLiq - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
-            uint256 k = MirinMath.sqrt(uint256(_reserve0) * _reserve1);
-            liquidity = ((computed - k) * _totalSupply) / k;
+            uint256 oldLiq = _computeLiquidity(_reserve0, _reserve1);
+            liquidity = ((newLiq - oldLiq) * _totalSupply) / oldLiq;
         }
         require(liquidity > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_MINTED");
         _mint(to, liquidity);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        kLast = computed;
+        kLast = newLiq;
         emit Mint(msg.sender, amount0, amount1, to);
     }
 
@@ -166,7 +169,7 @@ contract HybridPool is MirinERC20, IPool {
             require(tokenOut == address(token1), "Invalid output token");
             _swap(0, amountOut, recipient, context, _reserve0, _reserve1, _blockTimestampLast);
         } else if (tokenIn == address(token1)) {
-            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve0, _reserve1, false);
+            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve1, _reserve0, false);
             require(tokenOut == address(token0), "Invalid output token");
             _swap(amountOut, 0, recipient, context, _reserve0, _reserve1, _blockTimestampLast);
         } else {
@@ -324,7 +327,7 @@ contract HybridPool is MirinERC20, IPool {
         uint256 amount0 = (liquidity * _reserve0) / _totalSupply;
         uint256 amount1 = (liquidity * _reserve1) / _totalSupply;
         if (tokenOut == address(token0)) {
-            amount0 += _getAmountOut(amount1, _reserve0 - amount0, _reserve1 - amount1, false);
+            amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0, false);
             return amount0;
         } else {
             amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1, true);
@@ -407,7 +410,11 @@ contract HybridPool is MirinERC20, IPool {
 
     function getAmountOut(address tokenIn, uint256 amountIn) external view returns (uint256 amountOut) {
         (uint112 _reserve0, uint112 _reserve1, ) = _getReserves();
-        amountOut = _getAmountOut(amountIn, _reserve0, _reserve1, IERC20(tokenIn) == token0);
+        if (IERC20(tokenIn) == token0) {
+            amountOut = _getAmountOut(amountIn, _reserve0, _reserve1, true);
+        } else {
+            amountOut = _getAmountOut(amountIn, _reserve1, _reserve0, false);
+        }
     }
 
     function getOptimalLiquidityInAmounts(liquidityInput[] memory liquidityInputs)
@@ -437,6 +444,7 @@ contract HybridPool is MirinERC20, IPool {
         }
         liquidityOptimal[0] = liquidityAmount({token: liquidityInputs[0].token, amount: amountA});
         liquidityOptimal[1] = liquidityAmount({token: liquidityInputs[1].token, amount: amountB});
+        return liquidityOptimal;
     }
 
     function _getOptimalLiquidityInAmounts(
@@ -487,13 +495,10 @@ contract HybridPool is MirinERC20, IPool {
 
         uint256 prevD;
         uint256 D = s;
-        uint256 xp0xp14 = xp0 * xp1 * 4;
-
         for (uint256 i = 0; i < MAX_LOOP_LIMIT; i++) {
-            uint256 dP = D**3 / xp0xp14;
+            uint256 dP = (((D * D) / xp0) * D) / xp1 / 4;
             prevD = D;
-
-            D = ((s / dP) * D) / ((N_A / A_PRECISION - 1) * D + dP * 3);
+            D = (((N_A * s) / A_PRECISION + 2 * dP) * D) / ((N_A / A_PRECISION - 1) * D + 3 * dP);
             if (D.within1(prevD)) {
                 break;
             }
@@ -503,22 +508,22 @@ contract HybridPool is MirinERC20, IPool {
 
     function _getAmountOut(
         uint256 amountIn,
-        uint256 _reserve0,
-        uint256 _reserve1,
+        uint256 _reserveIn,
+        uint256 _reserveOut,
         bool token0In
     ) public view returns (uint256) {
         uint256 tokenInPrecisionMultiplier = (token0In ? token0PrecisionMultiplier : token1PrecisionMultiplier);
         uint256 tokenOutPrecisionMultiplier = (!token0In ? token0PrecisionMultiplier : token1PrecisionMultiplier);
 
-        uint256 xpIn = _reserve0 * tokenInPrecisionMultiplier;
-        uint256 xpOut = _reserve1 * tokenOutPrecisionMultiplier;
+        uint256 xpIn = _reserveIn * tokenInPrecisionMultiplier;
+        uint256 xpOut = _reserveOut * tokenOutPrecisionMultiplier;
         amountIn *= tokenInPrecisionMultiplier;
 
         uint256 d = _computeLiquidityFromAdjustedBalances(xpIn, xpOut);
         uint256 x = xpIn + amountIn;
         uint256 y = _getY(x, d);
         uint256 dy = xpOut - y - 1;
-        dy = dy - ((dy * swapFee) / 1000);
+        dy = dy - ((dy * swapFee) / MAX_FEE);
         dy /= tokenOutPrecisionMultiplier;
         return dy;
     }
@@ -534,18 +539,17 @@ contract HybridPool is MirinERC20, IPool {
      * @param x the new total amount of FROM token
      * @return the amount of TO token that should remain in the pool
      */
-    function _getY(uint256 x, uint256 d) private pure returns (uint256) {
-        uint256 c = d**2 / (x * 2);
-
-        c = (c * d) / 2;
-        uint256 b = x + d / 2;
+    function _getY(uint256 x, uint256 D) private view returns (uint256) {
+        uint256 c = (D * D) / (x * 2);
+        c = (c * D) / ((N_A * 2) / A_PRECISION);
+        uint256 b = x + ((D * A_PRECISION) / N_A);
         uint256 yPrev;
-        uint256 y = d;
+        uint256 y = D;
 
         // iterative approximation
         for (uint256 i = 0; i < MAX_LOOP_LIMIT; i++) {
             yPrev = y;
-            y = (y * y + c) / (y * 2 + b - d);
+            y = (y * y + c) / (y * 2 + b - D);
             if (y.within1(yPrev)) {
                 break;
             }
@@ -572,11 +576,11 @@ contract HybridPool is MirinERC20, IPool {
     function _getYD(
         uint256 s, //xpOut
         uint256 d
-    ) internal pure returns (uint256) {
-        uint256 c = d**2 / (s * 2);
-        c = (c * d) / 2;
+    ) internal view returns (uint256) {
+        uint256 c = (d * d) / (s * 2);
+        c = (c * d) / ((N_A * 2) / A_PRECISION);
 
-        uint256 b = s + (d * 2);
+        uint256 b = s + ((d * A_PRECISION) / N_A);
         uint256 yPrev;
         uint256 y = d;
         for (uint256 i = 0; i < MAX_LOOP_LIMIT; i++) {

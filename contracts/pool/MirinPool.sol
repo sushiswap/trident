@@ -111,7 +111,9 @@ contract MirinPool is MirinGovernance {
         require(balance0 <= type(uint112).max && balance1 <= type(uint112).max, "MIRIN: OVERFLOW");
         uint32 blockTimestamp = uint32(block.timestamp % 2**32);
         uint32 timeElapsed;
-        unchecked {timeElapsed = blockTimestamp - blockTimestampLast;}
+        unchecked {
+            timeElapsed = blockTimestamp - blockTimestampLast;
+        }
         if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
             bytes32 _curveData = curveData;
             unchecked {
@@ -218,8 +220,11 @@ contract MirinPool is MirinGovernance {
         (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
         _mintFee(_reserve0, _reserve1);
 
-        uint256 computed =
-            IMirinCurve(curve).computeLiquidity(uint112(_reserve0 - amount0), uint112(_reserve1 - amount1), curveData);
+        uint256 computed = IMirinCurve(curve).computeLiquidity(
+            uint112(_reserve0 - amount0),
+            uint112(_reserve1 - amount1),
+            curveData
+        );
         uint256 liquidityDelta = ((kLast - computed) * totalSupply) / kLast;
 
         require(liquidityDelta <= liquidity, "MIRIN: LIQUIDITY");
