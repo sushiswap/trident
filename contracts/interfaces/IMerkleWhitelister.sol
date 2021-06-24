@@ -10,6 +10,8 @@ interface IMerkleWhitelister {
     function isWhitelisted(uint256 index) external view returns (bool);
     /// @dev Claim spot in whitelist for an account. Reverts if the inputs are invalid.
     function joinWhitelist(uint256 index, address account, bytes32[] calldata merkleProof) external;
+    /// @dev Set the merkle root of the merkle tree containing accounts available to join whitelist. 
+    function setMerkleRoot(bytes32 merkleRoot) external;
     /// @dev This event is triggered whenever a {joinWhitelist} call succeeds.
     event JoinWhitelist(uint256 index, address account);
     /// @dev This event is triggered whenever a {setMerkleRoot} call succeeds.
