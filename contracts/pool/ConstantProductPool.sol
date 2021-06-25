@@ -4,19 +4,11 @@ pragma solidity ^0.8.2;
 
 import "../interfaces/IPool.sol";
 import "../interfaces/IBentoBox.sol";
+import "../interfaces/IMirinCallee.sol";
 import "./MirinERC20.sol";
 import "../libraries/MirinMath.sol";
 import "hardhat/console.sol";
 import "../deployer/MasterDeployer.sol";
-
-interface IMirinCallee {
-    function mirinCall(
-        address sender,
-        uint256 amount0,
-        uint256 amount1,
-        bytes calldata data
-    ) external;
-}
 
 contract ConstantProductPool is MirinERC20, IPool {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
