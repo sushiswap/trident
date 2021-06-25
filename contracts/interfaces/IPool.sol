@@ -2,6 +2,7 @@
 
 pragma solidity >=0.5.0;
 pragma experimental ABIEncoderV2;
+
 interface IPool {
     struct liquidityInput {
         address token;
@@ -28,11 +29,11 @@ interface IPool {
         address recipient,
         uint256 amountIn,
         uint256 amountOut
-    ) external returns(uint256 finalAmountOut);
+    ) external returns (uint256 finalAmountOut);
 
-    function getOptimalLiquidityInAmounts(
-        liquidityInput[] calldata liquidityInputs
-    ) external returns(liquidityAmount[] memory liquidityOptimal);
+    function getOptimalLiquidityInAmounts(liquidityInput[] calldata liquidityInputs)
+        external
+        returns (liquidityAmount[] memory liquidityOptimal);
 
     function mint(address to) external returns (uint256 liquidity);
 }

@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import { ethers } from "hardhat"
 const { BigNumber } = require("ethers")
 

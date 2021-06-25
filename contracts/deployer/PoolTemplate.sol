@@ -6,7 +6,6 @@ pragma solidity ^0.8.2;
  * @author Mudit Gupta
  */
 contract PoolTemplate {
-
     uint256 public immutable configValue;
     address public immutable anotherConfigValue;
 

@@ -2,15 +2,27 @@
 
 pragma solidity ^0.8.2;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/IBentoBox.sol";
-import "../interfaces/IMirinCallee.sol";
 import "./MirinERC20.sol";
 import "../libraries/MirinMath.sol";
+import "../libraries/MathUtils.sol";
 import "hardhat/console.sol";
 import "../deployer/MasterDeployer.sol";
 
-contract ConstantProductPool is MirinERC20, IPool {
+interface IMirinCallee {
+    function mirinCall(
+        address sender,
+        uint256 amount0,
+        uint256 amount1,
+        bytes calldata data
+    ) external;
+}
+
+contract HybridPool is MirinERC20, IPool {
+    using MathUtils for uint256;
+
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Swap(
@@ -24,17 +36,29 @@ contract ConstantProductPool is MirinERC20, IPool {
     event Sync(uint112 reserve0, uint112 reserve1);
 
     uint256 internal constant MINIMUM_LIQUIDITY = 10**3;
-
     uint8 internal constant PRECISION = 112;
+
+    // Constant value used as max loop limit
+    uint256 private constant MAX_LOOP_LIMIT = 256;
+
     uint256 internal constant MAX_FEE = 10000; // 100%
     uint256 public immutable swapFee;
 
     address public immutable barFeeTo;
 
-    IBentoBoxV1 private immutable bento;
+    IBentoBoxV1 public immutable bento;
     MasterDeployer public immutable masterDeployer;
     IERC20 public immutable token0;
     IERC20 public immutable token1;
+    uint256 public immutable A;
+    uint256 internal immutable N_A; // 2 * A
+    uint256 internal constant A_PRECISION = 100;
+
+    // multipliers for each pooled token's precision to get to POOL_PRECISION_DECIMALS
+    // for example, TBTC has 18 decimals, so the multiplier should be 1. WBTC
+    // has 8, so the multiplier should be 10 ** 18 / 10 ** 8 => 10 ** 10
+    uint256 public immutable token0PrecisionMultiplier;
+    uint256 public immutable token1PrecisionMultiplier;
 
     uint256 public price0CumulativeLast;
     uint256 public price1CumulativeLast;
@@ -55,20 +79,28 @@ contract ConstantProductPool is MirinERC20, IPool {
     /// @dev
     /// Only set immutable variables here. State changes made here will not be used.
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (IERC20 tokenA, IERC20 tokenB, uint256 _swapFee) = abi.decode(_deployData, (IERC20, IERC20, uint256));
+        (address tokenA, address tokenB, uint256 _swapFee, uint256 a) = abi.decode(
+            _deployData,
+            (address, address, uint256, uint256)
+        );
 
-        require(address(tokenA) != address(0), "MIRIN: ZERO_ADDRESS");
-        require(address(tokenB) != address(0), "MIRIN: ZERO_ADDRESS");
+        require(tokenA != address(0), "MIRIN: ZERO_ADDRESS");
+        require(tokenB != address(0), "MIRIN: ZERO_ADDRESS");
         require(tokenA != tokenB, "MIRIN: IDENTICAL_ADDRESSES");
         require(_swapFee <= MAX_FEE, "MIRIN: INVALID_SWAP_FEE");
+        require(a != 0, "MIRIN: ZERO_A");
 
-        (IERC20 _token0, IERC20 _token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-        token0 = _token0;
-        token1 = _token1;
+        (address _token0, address _token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
+        token0 = IERC20(_token0);
+        token1 = IERC20(_token1);
         swapFee = _swapFee;
         bento = IBentoBoxV1(MasterDeployer(_masterDeployer).bento());
         barFeeTo = MasterDeployer(_masterDeployer).barFeeTo();
         masterDeployer = MasterDeployer(_masterDeployer);
+        A = a;
+        N_A = 2 * a;
+        token0PrecisionMultiplier = uint256(10)**(decimals - MirinERC20(_token0).decimals());
+        token1PrecisionMultiplier = uint256(10)**(decimals - MirinERC20(_token1).decimals());
     }
 
     function init() public {
@@ -80,23 +112,22 @@ contract ConstantProductPool is MirinERC20, IPool {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         uint256 _totalSupply = totalSupply;
         _mintFee(_reserve0, _reserve1, _totalSupply);
-
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
 
-        uint256 computed = MirinMath.sqrt(balance0 * balance1);
+        uint256 newLiq = _computeLiquidity(balance0, balance1);
         if (_totalSupply == 0) {
-            liquidity = computed - MINIMUM_LIQUIDITY;
+            liquidity = newLiq - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
-            uint256 k = MirinMath.sqrt(uint256(_reserve0) * _reserve1);
-            liquidity = ((computed - k) * _totalSupply) / k;
+            uint256 oldLiq = _computeLiquidity(_reserve0, _reserve1);
+            liquidity = ((newLiq - oldLiq) * _totalSupply) / oldLiq;
         }
         require(liquidity > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_MINTED");
         _mint(to, liquidity);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        kLast = computed;
+        kLast = newLiq;
         emit Mint(msg.sender, amount0, amount1, to);
     }
 
@@ -134,11 +165,11 @@ contract ConstantProductPool is MirinERC20, IPool {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
 
         if (tokenIn == address(token0)) {
-            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
+            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve0, _reserve1, true);
             require(tokenOut == address(token1), "Invalid output token");
             _swap(0, amountOut, recipient, context, _reserve0, _reserve1, _blockTimestampLast);
         } else if (tokenIn == address(token1)) {
-            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
+            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve1, _reserve0, false);
             require(tokenOut == address(token0), "Invalid output token");
             _swap(amountOut, 0, recipient, context, _reserve0, _reserve1, _blockTimestampLast);
         } else {
@@ -195,9 +226,13 @@ contract ConstantProductPool is MirinERC20, IPool {
         if (blockTimestamp != _blockTimestampLast && _reserve0 != 0 && _reserve1 != 0) {
             unchecked {
                 uint32 timeElapsed = blockTimestamp - _blockTimestampLast;
-                uint256 price0 = (uint256(_reserve1) << PRECISION) / _reserve0;
+                uint256 xp0 = _reserve0 * token0PrecisionMultiplier;
+                uint256 xp1 = _reserve1 * token1PrecisionMultiplier;
+                uint256 d = _computeLiquidityFromAdjustedBalances(xp0, xp1);
+
+                uint256 price0 = _getYD(xp0, d);
                 price0CumulativeLast += price0 * timeElapsed;
-                uint256 price1 = (uint256(_reserve0) << PRECISION) / _reserve1;
+                uint256 price1 = _getYD(xp1, d);
                 price1CumulativeLast += price1 * timeElapsed;
             }
         }
@@ -215,7 +250,7 @@ contract ConstantProductPool is MirinERC20, IPool {
     ) private returns (uint256 computed) {
         uint256 _kLast = kLast;
         if (_kLast != 0) {
-            computed = MirinMath.sqrt(uint256(_reserve0) * _reserve1);
+            computed = _computeLiquidity(_reserve0, _reserve1);
             if (computed > _kLast) {
                 // barFee % of increase in liquidity
                 // NB It's going to be slihgtly less than barFee % in reality due to the Math
@@ -292,10 +327,10 @@ contract ConstantProductPool is MirinERC20, IPool {
         uint256 amount0 = (liquidity * _reserve0) / _totalSupply;
         uint256 amount1 = (liquidity * _reserve1) / _totalSupply;
         if (tokenOut == address(token0)) {
-            amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0);
+            amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0, false);
             return amount0;
         } else {
-            amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1);
+            amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1, true);
             return amount1;
         }
     }
@@ -317,23 +352,10 @@ contract ConstantProductPool is MirinERC20, IPool {
         uint256 balance0Adjusted = balance0 * MAX_FEE - amount0In * swapFee;
         uint256 balance1Adjusted = balance1 * MAX_FEE - amount1In * swapFee;
         require(
-            MirinMath.sqrt(balance0Adjusted * balance1Adjusted) >=
-                MirinMath.sqrt(uint256(_reserve0) * _reserve1 * MAX_FEE * MAX_FEE),
+            _computeLiquidity(balance0Adjusted, balance1Adjusted) >=
+                _computeLiquidity(uint256(_reserve0) * MAX_FEE, uint256(_reserve1) * MAX_FEE),
             "MIRIN: LIQUIDITY"
         );
-    }
-
-    function _getAmountOut(
-        uint256 amountIn,
-        uint256 reserveIn,
-        uint256 reserveOut
-    ) internal view returns (uint256 amountOut) {
-        require(amountIn > 0, "MIRIN: INSUFFICIENT_INPUT_AMOUNT");
-        require(reserveIn > 0 && reserveOut > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
-        uint256 amountInWithFee = amountIn * (MAX_FEE - swapFee);
-        uint256 numerator = amountInWithFee * reserveOut;
-        uint256 denominator = (reserveIn * MAX_FEE) + amountInWithFee;
-        amountOut = numerator / denominator;
     }
 
     function _transferWithData(
@@ -389,9 +411,9 @@ contract ConstantProductPool is MirinERC20, IPool {
     function getAmountOut(address tokenIn, uint256 amountIn) external view returns (uint256 amountOut) {
         (uint112 _reserve0, uint112 _reserve1, ) = _getReserves();
         if (IERC20(tokenIn) == token0) {
-            amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
+            amountOut = _getAmountOut(amountIn, _reserve0, _reserve1, true);
         } else {
-            amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
+            amountOut = _getAmountOut(amountIn, _reserve1, _reserve0, false);
         }
     }
 
@@ -401,35 +423,173 @@ contract ConstantProductPool is MirinERC20, IPool {
         override
         returns (liquidityAmount[] memory)
     {
-        uint112 _reserve0;
-        uint112 _reserve1;
+        uint256 amountA;
+        uint256 amountB;
         liquidityAmount[] memory liquidityOptimal = new liquidityAmount[](2);
-        liquidityOptimal[0] = liquidityAmount({token: liquidityInputs[0].token, amount: liquidityInputs[0].amountDesired});
-        liquidityOptimal[1] = liquidityAmount({token: liquidityInputs[1].token, amount: liquidityInputs[1].amountDesired});
 
         if (IERC20(liquidityInputs[0].token) == token0) {
-            (_reserve0, _reserve1, ) = _getReserves();
+            (amountA, amountB) = _getOptimalLiquidityInAmounts(
+                liquidityInputs[0].amountDesired,
+                liquidityInputs[0].amountMin,
+                liquidityInputs[1].amountDesired,
+                liquidityInputs[1].amountMin
+            );
         } else {
-            (_reserve1, _reserve0, ) = _getReserves();
+            (amountB, amountA) = _getOptimalLiquidityInAmounts(
+                liquidityInputs[1].amountDesired,
+                liquidityInputs[1].amountMin,
+                liquidityInputs[0].amountDesired,
+                liquidityInputs[0].amountMin
+            );
         }
+        liquidityOptimal[0] = liquidityAmount({token: liquidityInputs[0].token, amount: amountA});
+        liquidityOptimal[1] = liquidityAmount({token: liquidityInputs[1].token, amount: amountB});
+        return liquidityOptimal;
+    }
+
+    function _getOptimalLiquidityInAmounts(
+        uint256 amount0Desired,
+        uint256 amount0Min,
+        uint256 amount1Desired,
+        uint256 amount1Min
+    ) internal view returns (uint256 amount0Optimal, uint256 amount1Optimal) {
+        (uint256 _reserve0, uint256 _reserve1, ) = _getReserves();
 
         if (_reserve0 == 0 && _reserve1 == 0) {
-            return liquidityOptimal;
+            return (amount0Desired, amount1Desired);
         }
 
-        uint256 amountBOptimal = (liquidityInputs[0].amountDesired * _reserve1) / _reserve0;
-        if (amountBOptimal <= liquidityInputs[1].amountDesired) {
-            require(amountBOptimal >= liquidityInputs[1].amountMin, "MIRIN: INSUFFICIENT_B_AMOUNT");
-            liquidityOptimal[0].amount = liquidityInputs[0].amountDesired;
-            liquidityOptimal[1].amount = amountBOptimal;
+        amount1Optimal = (amount0Desired * _reserve1) / _reserve0;
+        if (amount1Optimal <= amount1Desired) {
+            require(amount1Optimal >= amount1Min, "MIRIN: INSUFFICIENT_B_AMOUNT");
+            amount0Optimal = amount0Desired;
         } else {
-            uint256 amountAOptimal = (liquidityInputs[1].amountDesired * _reserve0) / _reserve1;
-            assert(amountAOptimal <= liquidityInputs[0].amountDesired);
-            require(amountAOptimal >= liquidityInputs[0].amountMin, "MIRIN: INSUFFICIENT_A_AMOUNT");
-            liquidityOptimal[0].amount = amountAOptimal;
-            liquidityOptimal[1].amount = liquidityInputs[1].amountDesired;
+            amount0Optimal = (amount1Desired * _reserve0) / _reserve1;
+            assert(amount0Optimal <= amount0Desired);
+            require(amount0Optimal >= amount0Min, "MIRIN: INSUFFICIENT_A_AMOUNT");
+            amount1Optimal = amount1Desired;
+        }
+    }
+
+    /**
+     * @notice Get D, the StableSwap invariant, based on a set of balances and a particular A.
+     * See the StableSwap paper for details
+     *
+     * @dev Originally https://github.com/saddle-finance/saddle-contract/blob/0b76f7fb519e34b878aa1d58cffc8d8dc0572c12/contracts/SwapUtils.sol#L319
+     *
+     * @return the invariant, at the precision of the pool
+     */
+    function _computeLiquidity(uint256 _reserve0, uint256 _reserve1) internal view returns (uint256) {
+        uint256 xp0 = _reserve0 * token0PrecisionMultiplier;
+        uint256 xp1 = _reserve1 * token1PrecisionMultiplier;
+
+        return _computeLiquidityFromAdjustedBalances(xp0, xp1);
+    }
+
+    function _computeLiquidityFromAdjustedBalances(uint256 xp0, uint256 xp1) internal view returns (uint256) {
+        uint256 s = xp0 + xp1;
+
+        if (s == 0) {
+            return 0;
         }
 
-        return liquidityOptimal;
+        uint256 prevD;
+        uint256 D = s;
+        for (uint256 i = 0; i < MAX_LOOP_LIMIT; i++) {
+            uint256 dP = (((D * D) / xp0) * D) / xp1 / 4;
+            prevD = D;
+            D = (((N_A * s) / A_PRECISION + 2 * dP) * D) / ((N_A / A_PRECISION - 1) * D + 3 * dP);
+            if (D.within1(prevD)) {
+                break;
+            }
+        }
+        return D;
+    }
+
+    function _getAmountOut(
+        uint256 amountIn,
+        uint256 _reserveIn,
+        uint256 _reserveOut,
+        bool token0In
+    ) public view returns (uint256) {
+        uint256 tokenInPrecisionMultiplier = (token0In ? token0PrecisionMultiplier : token1PrecisionMultiplier);
+        uint256 tokenOutPrecisionMultiplier = (!token0In ? token0PrecisionMultiplier : token1PrecisionMultiplier);
+
+        uint256 xpIn = _reserveIn * tokenInPrecisionMultiplier;
+        uint256 xpOut = _reserveOut * tokenOutPrecisionMultiplier;
+        amountIn *= tokenInPrecisionMultiplier;
+
+        uint256 d = _computeLiquidityFromAdjustedBalances(xpIn, xpOut);
+        uint256 x = xpIn + amountIn;
+        uint256 y = _getY(x, d);
+        uint256 dy = xpOut - y - 1;
+        dy = dy - ((dy * swapFee) / MAX_FEE);
+        dy /= tokenOutPrecisionMultiplier;
+        return dy;
+    }
+
+    /**
+     * @notice Calculate the new balances of the tokens given the indexes of the token
+     * that is swapped from (FROM) and the token that is swapped to (TO).
+     * This function is used as a helper function to calculate how much TO token
+     * the user should receive on swap.
+     *
+     * @dev Originally https://github.com/saddle-finance/saddle-contract/blob/0b76f7fb519e34b878aa1d58cffc8d8dc0572c12/contracts/SwapUtils.sol#L432
+     *
+     * @param x the new total amount of FROM token
+     * @return the amount of TO token that should remain in the pool
+     */
+    function _getY(uint256 x, uint256 D) private view returns (uint256) {
+        uint256 c = (D * D) / (x * 2);
+        c = (c * D) / ((N_A * 2) / A_PRECISION);
+        uint256 b = x + ((D * A_PRECISION) / N_A);
+        uint256 yPrev;
+        uint256 y = D;
+
+        // iterative approximation
+        for (uint256 i = 0; i < MAX_LOOP_LIMIT; i++) {
+            yPrev = y;
+            y = (y * y + c) / (y * 2 + b - D);
+            if (y.within1(yPrev)) {
+                break;
+            }
+        }
+        return y;
+    }
+
+    /**
+     * @notice Calculate the price of a token in the pool given
+     * precision-adjusted balances and a particular D and precision-adjusted
+     * array of balances.
+     *
+     * @dev This is accomplished via solving the quadratic equation iteratively.
+     * See the StableSwap paper and Curve.fi implementation for further details.
+     *
+     * x_1**2 + x1 * (sum' - (A*n**n - 1) * D / (A * n**n)) = D ** (n + 1) / (n ** (2 * n) * prod' * A)
+     * x_1**2 + b*x_1 = c
+     * x_1 = (x_1**2 + c) / (2*x_1 + b)
+     *
+     * @dev Originally https://github.com/saddle-finance/saddle-contract/blob/0b76f7fb519e34b878aa1d58cffc8d8dc0572c12/contracts/SwapUtils.sol#L276
+     *
+     * @return the price of the token, in the same precision as in xp
+     */
+    function _getYD(
+        uint256 s, //xpOut
+        uint256 d
+    ) internal view returns (uint256) {
+        uint256 c = (d * d) / (s * 2);
+        c = (c * d) / ((N_A * 2) / A_PRECISION);
+
+        uint256 b = s + ((d * A_PRECISION) / N_A);
+        uint256 yPrev;
+        uint256 y = d;
+        for (uint256 i = 0; i < MAX_LOOP_LIMIT; i++) {
+            yPrev = y;
+            y = (y * y + c) / (y * 2 + b - d);
+            if (y.within1(yPrev)) {
+                break;
+            }
+        }
+        return y;
     }
 }

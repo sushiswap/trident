@@ -12,9 +12,9 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract MasterDeployer is Ownable {
     event NewPoolCreated(address indexed poolAddress);
 
-    mapping (address => bool) public whitelistedFactories;
+    mapping(address => bool) public whitelistedFactories;
 
-    mapping (address => bool) public pool;
+    mapping(address => bool) public pool;
 
     uint256 public barFee;
 
@@ -23,7 +23,11 @@ contract MasterDeployer is Ownable {
 
     uint256 internal constant MAX_FEE = 10000; // 100%
 
-    constructor(uint256 _barFee, address _barFeeTo, address _bento) Ownable() {
+    constructor(
+        uint256 _barFee,
+        address _barFeeTo,
+        address _bento
+    ) Ownable() {
         require(_barFee <= MAX_FEE, "INVALID_BAR_FEE");
         require(address(_barFeeTo) != address(0), "ZERO_ADDRESS");
         require(address(_bento) != address(0), "ZERO_ADDRESS");
@@ -33,7 +37,11 @@ contract MasterDeployer is Ownable {
         bento = _bento;
     }
 
-    function deployPool(address _factory, bytes memory _deployData, bytes memory _initData) external returns (address poolAddress) {
+    function deployPool(
+        address _factory,
+        bytes memory _deployData,
+        bytes memory _initData
+    ) external returns (address poolAddress) {
         require(whitelistedFactories[_factory], "Factory not whitelisted");
         address logic = PoolFactory(_factory).deployPoolLogic(_deployData);
         poolAddress = address(new PoolProxy(logic, _initData));
