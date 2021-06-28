@@ -1,3 +1,17 @@
+# Trident: SushiSwap Master Exchange
+TRIDENT 🔱 is a multi-pronged AMM factory & routing system designed for flexible (i) deployments, (ii) curves, & (iii) incentives built on complementary templates & BentoBox integration.
+
+[Describe Master Deployer & Factory System]
+
+Pools:
+- [x] Pair 
+- [x] Multi
+- [ ] Concentrated
+
+Curves:
+- [x] Constant 
+- [x] Hybrid
+
 # Mirin: SushiSwap AMMv3
 MIRIN, a light alcohol particularly used to create sauces in Japanese cuisine, is the name of our proposed upgraded version of the SushiSwap protocol, or Sushi Protocol v3.
 
