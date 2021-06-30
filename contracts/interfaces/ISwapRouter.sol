@@ -3,18 +3,19 @@ pragma solidity >=0.7.5;
 pragma abicoder v2;
 
 interface ISwapRouter {
+    // TODO: Make context optional
+    // Split exact imput and exact output swaps in pool
+
     /// @dev In case of a multi hop swap, the output token for first swap is the input token of the next swap
     struct Path {
         address tokenIn;
         address pool;
-        bytes context;
     }
 
     struct ExactInputSingleParams {
         address tokenIn;
         address tokenOut;
         address pool;
-        bytes context;
         address recipient;
         uint256 deadline;
         uint256 amountIn;
@@ -33,6 +34,36 @@ interface ISwapRouter {
         uint256 deadline;
         uint256 amountIn;
         uint256 amountOutMinimum;
+    }
+
+    struct InitialPath {
+        address tokenIn;
+        address pool;
+        address tokenOut;
+        bool preFunded;
+        uint256 amountIn; // 0 amountIn implies pre-funding
+        bytes context;
+    }
+
+    struct PercentagePath {
+        address tokenIn;
+        address pool;
+        address tokenOut;
+        uint64 balancePercentage; // Multiplied by 10^6
+        bytes context;
+    }
+
+    struct Output {
+        address token;
+        address to;
+        uint256 minAmount;
+    }
+
+    struct ComplexPathParams {
+        uint256 deadline;
+        InitialPath[] initialPath;
+        PercentagePath[] percentagePath;
+        Output[] output;
     }
 
     /// @notice Swaps `amountIn` of one token for as much as possible of another along the specified path

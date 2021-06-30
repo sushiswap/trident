@@ -21,7 +21,6 @@ contract ConstantProductPool is MirinERC20, IPool {
         uint256 amount1Out,
         address indexed to
     );
-    event Sync(uint112 reserve0, uint112 reserve1);
 
     uint256 internal constant MINIMUM_LIQUIDITY = 10**3;
 
@@ -123,7 +122,68 @@ contract ConstantProductPool is MirinERC20, IPool {
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
-    function swap(
+    function swapWithoutContext(
+        address tokenIn,
+        address tokenOut,
+        address recipient,
+        uint256 amountIn,
+        uint256 amountOut
+    ) external override returns (uint256) {
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
+
+        if (tokenIn == address(token0)) {
+            require(tokenOut == address(token1), "Invalid output token");
+            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
+            _swapWithOutData(0, amountOut, recipient, _reserve0, _reserve1, _blockTimestampLast);
+        } else {
+            require(tokenIn == address(token1), "Invalid input token");
+            require(tokenOut == address(token0), "Invalid output token");
+            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
+            _swapWithOutData(amountOut, 0, recipient, _reserve0, _reserve1, _blockTimestampLast);
+        }
+
+        return amountOut;
+    }
+
+    function swapExactIn(
+        address tokenIn,
+        address tokenOut,
+        address recipient,
+        uint256 amountIn
+    ) external override returns (uint256 amountOut) {
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
+
+        if (tokenIn == address(token0)) {
+            require(tokenOut == address(token1), "Invalid output token");
+            amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
+            _swapWithOutData(0, amountOut, recipient, _reserve0, _reserve1, _blockTimestampLast);
+        } else {
+            require(tokenIn == address(token1), "Invalid input token");
+            require(tokenOut == address(token0), "Invalid output token");
+            amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
+            _swapWithOutData(amountOut, 0, recipient, _reserve0, _reserve1, _blockTimestampLast);
+        }
+    }
+
+    function swapExactOut(
+        address tokenIn,
+        address tokenOut,
+        address recipient,
+        uint256 amountOut
+    ) external override {
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
+
+        if (tokenIn == address(token0)) {
+            require(tokenOut == address(token1), "Invalid output token");
+            _swapWithOutData(0, amountOut, recipient, _reserve0, _reserve1, _blockTimestampLast);
+        } else {
+            require(tokenIn == address(token1), "Invalid input token");
+            require(tokenOut == address(token0), "Invalid output token");
+            _swapWithOutData(amountOut, 0, recipient, _reserve0, _reserve1, _blockTimestampLast);
+        }
+    }
+
+    function swapWithContext(
         address tokenIn,
         address tokenOut,
         bytes calldata context,
@@ -136,11 +196,11 @@ contract ConstantProductPool is MirinERC20, IPool {
         if (tokenIn == address(token0)) {
             if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
             require(tokenOut == address(token1), "Invalid output token");
-            _swap(0, amountOut, recipient, context, _reserve0, _reserve1, _blockTimestampLast);
+            _swapWithData(0, amountOut, recipient, context, _reserve0, _reserve1, _blockTimestampLast);
         } else if (tokenIn == address(token1)) {
             if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
             require(tokenOut == address(token0), "Invalid output token");
-            _swap(amountOut, 0, recipient, context, _reserve0, _reserve1, _blockTimestampLast);
+            _swapWithData(amountOut, 0, recipient, context, _reserve0, _reserve1, _blockTimestampLast);
         } else {
             require(tokenIn == address(this), "Invalid input token");
             require(tokenOut == address(token0) || tokenOut == address(token1), "Invalid output token");
@@ -166,7 +226,7 @@ contract ConstantProductPool is MirinERC20, IPool {
         bytes calldata data
     ) external {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
-        _swap(amount0Out, amount1Out, to, data, _reserve0, _reserve1, _blockTimestampLast);
+        _swapWithData(amount0Out, amount1Out, to, data, _reserve0, _reserve1, _blockTimestampLast);
     }
 
     function _getReserves()
@@ -189,10 +249,10 @@ contract ConstantProductPool is MirinERC20, IPool {
         uint112 _reserve0,
         uint112 _reserve1,
         uint32 _blockTimestampLast
-    ) private {
+    ) internal {
         require(balance0 <= type(uint112).max && balance1 <= type(uint112).max, "MIRIN: OVERFLOW");
         uint32 blockTimestamp = uint32(block.timestamp % 2**32);
-        if (blockTimestamp != _blockTimestampLast && _reserve0 != 0 && _reserve1 != 0) {
+        if (blockTimestamp != _blockTimestampLast && _reserve0 != 0) {
             unchecked {
                 uint32 timeElapsed = blockTimestamp - _blockTimestampLast;
                 uint256 price0 = (uint256(_reserve1) << PRECISION) / _reserve0;
@@ -204,8 +264,6 @@ contract ConstantProductPool is MirinERC20, IPool {
         reserve0 = uint112(balance0);
         reserve1 = uint112(balance1);
         blockTimestampLast = blockTimestamp;
-
-        emit Sync(uint112(balance0), uint112(balance1));
     }
 
     function _mintFee(
@@ -347,7 +405,16 @@ contract ConstantProductPool is MirinERC20, IPool {
         if (data.length > 0) IMirinCallee(to).mirinCall(msg.sender, amount0Out, amount1Out, data);
     }
 
-    function _swap(
+    function _transferWithoutData(
+        uint256 amount0Out,
+        uint256 amount1Out,
+        address to
+    ) internal {
+        if (amount0Out > 0) bento.transfer(token0, address(this), to, bento.toShare(token0, amount0Out, false));
+        if (amount1Out > 0) bento.transfer(token1, address(this), to, bento.toShare(token1, amount1Out, false));
+    }
+
+    function _swapWithData(
         uint256 amount0Out,
         uint256 amount1Out,
         address to,
@@ -355,22 +422,44 @@ contract ConstantProductPool is MirinERC20, IPool {
         uint112 _reserve0,
         uint112 _reserve1,
         uint32 _blockTimestampLast
+    ) internal {
+        _transferWithData(amount0Out, amount1Out, to, data);
+        _swap(amount0Out, amount1Out, to, _reserve0, _reserve1, _blockTimestampLast);
+    }
+
+    function _swapWithOutData(
+        uint256 amount0Out,
+        uint256 amount1Out,
+        address to,
+        uint112 _reserve0,
+        uint112 _reserve1,
+        uint32 _blockTimestampLast
+    ) internal {
+        _transferWithoutData(amount0Out, amount1Out, to);
+        _swap(amount0Out, amount1Out, to, _reserve0, _reserve1, _blockTimestampLast);
+    }
+
+    function _swap(
+        uint256 amount0Out,
+        uint256 amount1Out,
+        address to,
+        uint112 _reserve0,
+        uint112 _reserve1,
+        uint32 _blockTimestampLast
     ) internal lock {
         require(amount0Out > 0 || amount1Out > 0, "MIRIN: INSUFFICIENT_OUTPUT_AMOUNT");
         require(amount0Out < _reserve0 && amount1Out < _reserve1, "MIRIN: INSUFFICIENT_LIQUIDITY");
-        require(to != address(token0) && to != address(token1), "MIRIN: INVALID_TO");
-        _transferWithData(amount0Out, amount1Out, to, data);
 
         uint256 amount0In;
         uint256 amount1In;
-        {
-            // scope for _balance{0,1} avoids stack too deep errors
-            (uint256 balance0, uint256 balance1) = _balance();
-            amount0In = balance0 + amount0Out - _reserve0;
-            amount1In = balance1 + amount1Out - _reserve1;
-            _compute(amount0In, amount1In, balance0, balance1, _reserve0, _reserve1);
-            _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        }
+
+        // scope for _balance{0,1} avoids stack too deep errors
+        (uint256 balance0, uint256 balance1) = _balance();
+        amount0In = balance0 + amount0Out - _reserve0;
+        amount1In = balance1 + amount1Out - _reserve1;
+        _compute(amount0In, amount1In, balance0, balance1, _reserve0, _reserve1);
+        _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
+
         emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
     }
 

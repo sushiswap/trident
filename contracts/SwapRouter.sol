@@ -45,7 +45,6 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         address tokenIn,
         address tokenOut,
         address pool,
-        bytes memory context,
         address recipient,
         address payer,
         uint256 amountIn
@@ -53,7 +52,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         // Pay optimisticly.
         pay(tokenIn, payer, pool, amountIn);
 
-        amountOut = exactInputInternalWithoutPay(tokenIn, tokenOut, pool, context, recipient, amountIn);
+        amountOut = exactInputInternalWithoutPay(tokenIn, tokenOut, pool, recipient, amountIn);
     }
 
     /// @dev Performs a single exact input swap
@@ -61,12 +60,11 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         address tokenIn,
         address tokenOut,
         address pool,
-        bytes memory context,
         address recipient,
         uint256 amountIn
     ) internal returns (uint256 amountOut) {
         require(MasterDeployer(masterDeployer).pool(pool), "Not official pool");
-        amountOut = IPool(pool).swap(tokenIn, tokenOut, context, recipient, amountIn, 0);
+        amountOut = IPool(pool).swapExactIn(tokenIn, tokenOut, recipient, amountIn);
     }
 
     /// @param token The token to pay
@@ -99,7 +97,6 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
             params.tokenIn,
             params.tokenOut,
             params.pool,
-            params.context,
             params.recipient,
             msg.sender,
             params.amountIn
@@ -125,7 +122,6 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
                 params.path[i].tokenIn,
                 isLastPool ? params.tokenOut : params.path[i + 1].tokenIn,
                 params.path[i].pool,
-                params.path[i].context,
                 isLastPool ? params.recipient : address(this),
                 payer,
                 amount
@@ -135,6 +131,48 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         }
 
         require(amount >= params.amountOutMinimum, "Too little received");
+    }
+
+    function complexPath(ComplexPathParams memory params)
+        external
+        payable
+        checkDeadline(params.deadline)
+    {
+        for (uint256 i; i < params.initialPath.length; i++) {
+            if (!params.initialPath[i].preFunded) {
+                pay(params.initialPath[i].tokenIn, msg.sender, params.initialPath[i].pool, params.initialPath[i].amountIn);
+            }
+            IPool(params.initialPath[i].pool).swapWithContext(
+                params.initialPath[i].tokenIn,
+                params.initialPath[i].tokenOut,
+                params.initialPath[i].context,
+                address(this),
+                params.initialPath[i].amountIn,
+                0
+            );
+        }
+
+        for (uint256 i; i < params.percentagePath.length; i++) {
+            uint256 balanceShares = IBentoBoxV1(bento).balanceOf(IERC20(params.percentagePath[i].tokenIn), address(this));
+            uint256 balanceAmount = IBentoBoxV1(bento).toAmount(IERC20(params.percentagePath[i].tokenIn), balanceShares, false);
+            uint256 transferAmount = (balanceAmount * params.percentagePath[i].balancePercentage) / uint256(10)**6;
+            pay(params.percentagePath[i].tokenIn, address(this), params.percentagePath[i].pool, transferAmount);
+            IPool(params.percentagePath[i].pool).swapWithContext(
+                params.percentagePath[i].tokenIn,
+                params.percentagePath[i].tokenOut,
+                params.percentagePath[i].context,
+                address(this),
+                transferAmount,
+                0
+            );
+        }
+
+        for (uint256 i; i < params.output.length; i++) {
+            uint256 balanceShares = IBentoBoxV1(bento).balanceOf(IERC20(params.output[i].token), address(this));
+            uint256 balanceAmount = IBentoBoxV1(bento).toAmount(IERC20(params.output[i].token), balanceShares, false);
+            require(balanceAmount >= params.output[i].minAmount, "Too little received");
+            pay(params.output[i].token, address(this), params.output[i].to, balanceShares);
+        }
     }
 
     function exactInputSingleWithPreFunding(ExactInputSingleParams calldata params)
@@ -147,7 +185,6 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
             params.tokenIn,
             params.tokenOut,
             params.pool,
-            params.context,
             params.recipient,
             params.amountIn
         );
@@ -167,7 +204,6 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
             params.path[0].tokenIn,
             params.path.length > 1 ? params.path[1].tokenIn : params.tokenOut,
             params.path[0].pool,
-            params.path[0].context,
             params.path.length > 1 ? address(this) : params.recipient,
             params.amountIn
         );
@@ -180,7 +216,6 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
                 params.path[i].tokenIn,
                 isLastPool ? params.path[i + 1].tokenIn : params.tokenOut,
                 params.path[i].pool,
-                params.path[i].context,
                 isLastPool ? params.recipient : address(this),
                 payer,
                 amount
