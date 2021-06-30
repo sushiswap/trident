@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.2;
 
+import "../base/Multicall.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/IBentoBox.sol";
 import "../interfaces/IMirinCallee.sol";
@@ -10,7 +11,7 @@ import "../libraries/MirinMath.sol";
 import "hardhat/console.sol";
 import "../deployer/MasterDeployer.sol";
 
-contract ConstantProductPool is MirinERC20, IPool {
+contract ConstantProductPool is Multicall, MirinERC20, IPool {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Swap(
