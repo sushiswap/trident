@@ -68,10 +68,6 @@ contract ConstantProductPool is MirinERC20, IPool {
         bento = IBentoBoxV1(MasterDeployer(_masterDeployer).bento());
         barFeeTo = MasterDeployer(_masterDeployer).barFeeTo();
         masterDeployer = MasterDeployer(_masterDeployer);
-    }
-
-    function init() public {
-        require(totalSupply == 0);
         unlocked = 1;
     }
 

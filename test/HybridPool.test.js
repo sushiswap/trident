@@ -42,10 +42,8 @@ describe("Router", function () {
       ["address", "address", "uint8", "uint256"],
       [usdt.address, usdc.address, 30, 200000]
     );
-    // Pool initialize data
-    const initData = Pool.interface.encodeFunctionData("init");
     pool = await Pool.attach(
-      (await (await masterDeployer.deployPool(mirinPoolFactory.address, deployData, initData)).wait()).events[1].args[0]
+      (await (await masterDeployer.deployPool(mirinPoolFactory.address, deployData)).wait()).events[0].args[0]
     );
   })
 
