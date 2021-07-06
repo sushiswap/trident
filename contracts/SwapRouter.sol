@@ -52,18 +52,6 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         // Pay optimisticly.
         pay(tokenIn, payer, pool, amountIn);
 
-        amountOut = exactInputInternalWithoutPay(tokenIn, tokenOut, pool, recipient, amountIn);
-    }
-
-    /// @dev Performs a single exact input swap
-    function exactInputInternalWithoutPay(
-        address tokenIn,
-        address tokenOut,
-        address pool,
-        address recipient,
-        uint256 amountIn
-    ) internal returns (uint256 amountOut) {
-        require(MasterDeployer(masterDeployer).pool(pool), "Not official pool");
         amountOut = IPool(pool).swapExactIn(tokenIn, tokenOut, recipient, amountIn);
     }
 
@@ -133,11 +121,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         require(amount >= params.amountOutMinimum, "Too little received");
     }
 
-    function complexPath(ComplexPathParams memory params)
-        external
-        payable
-        checkDeadline(params.deadline)
-    {
+    function complexPath(ComplexPathParams memory params) external payable checkDeadline(params.deadline) {
         for (uint256 i; i < params.initialPath.length; i++) {
             if (!params.initialPath[i].preFunded) {
                 pay(params.initialPath[i].tokenIn, msg.sender, params.initialPath[i].pool, params.initialPath[i].amountIn);
@@ -181,13 +165,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         checkDeadline(params.deadline)
         returns (uint256 amountOut)
     {
-        amountOut = exactInputInternalWithoutPay(
-            params.tokenIn,
-            params.tokenOut,
-            params.pool,
-            params.recipient,
-            params.amountIn
-        );
+        amountOut = IPool(params.pool).swapExactIn(params.tokenIn, params.tokenOut, params.recipient, params.amountIn);
 
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
@@ -200,10 +178,9 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
     {
         address payer = msg.sender;
 
-        amount = exactInputInternalWithoutPay(
+        amount = IPool(params.path[0].pool).swapExactIn(
             params.path[0].tokenIn,
             params.path.length > 1 ? params.path[1].tokenIn : params.tokenOut,
-            params.path[0].pool,
             params.path.length > 1 ? address(this) : params.recipient,
             params.amountIn
         );

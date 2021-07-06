@@ -26,7 +26,9 @@ contract ConstantProductPool is MirinERC20, IPool {
 
     uint8 internal constant PRECISION = 112;
     uint256 internal constant MAX_FEE = 10000; // 100%
+    uint256 internal constant MAX_FEE_SQUARE = 100000000;
     uint256 public immutable swapFee;
+    uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
 
     address public immutable barFeeTo;
 
@@ -65,6 +67,7 @@ contract ConstantProductPool is MirinERC20, IPool {
         token0 = _token0;
         token1 = _token1;
         swapFee = _swapFee;
+        MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
         bento = IBentoBoxV1(MasterDeployer(_masterDeployer).bento());
         barFeeTo = MasterDeployer(_masterDeployer).barFeeTo();
         masterDeployer = MasterDeployer(_masterDeployer);
@@ -367,14 +370,9 @@ contract ConstantProductPool is MirinERC20, IPool {
         uint112 _reserve0,
         uint112 _reserve1
     ) internal view {
-        require(amount0In > 0 || amount1In > 0, "MIRIN: INSUFFICIENT_INPUT_AMOUNT");
         uint256 balance0Adjusted = balance0 * MAX_FEE - amount0In * swapFee;
         uint256 balance1Adjusted = balance1 * MAX_FEE - amount1In * swapFee;
-        require(
-            MirinMath.sqrt(balance0Adjusted * balance1Adjusted) >=
-                MirinMath.sqrt(uint256(_reserve0) * _reserve1 * MAX_FEE * MAX_FEE),
-            "MIRIN: LIQUIDITY"
-        );
+        require(balance0Adjusted * balance1Adjusted >= uint256(_reserve0) * _reserve1 * MAX_FEE_SQUARE, "MIRIN: LIQUIDITY");
     }
 
     function _getAmountOut(
@@ -382,12 +380,8 @@ contract ConstantProductPool is MirinERC20, IPool {
         uint256 reserveIn,
         uint256 reserveOut
     ) internal view returns (uint256 amountOut) {
-        require(amountIn > 0, "MIRIN: INSUFFICIENT_INPUT_AMOUNT");
-        require(reserveIn > 0 && reserveOut > 0, "MIRIN: INSUFFICIENT_LIQUIDITY");
-        uint256 amountInWithFee = amountIn * (MAX_FEE - swapFee);
-        uint256 numerator = amountInWithFee * reserveOut;
-        uint256 denominator = (reserveIn * MAX_FEE) + amountInWithFee;
-        amountOut = numerator / denominator;
+        uint256 amountInWithFee = amountIn * MAX_FEE_MINUS_SWAP_FEE;
+        amountOut = (amountInWithFee * reserveOut) / (reserveIn * MAX_FEE + amountInWithFee);
     }
 
     function _transferWithData(
@@ -418,7 +412,7 @@ contract ConstantProductPool is MirinERC20, IPool {
         uint112 _reserve0,
         uint112 _reserve1,
         uint32 _blockTimestampLast
-    ) internal {
+    ) internal lock {
         _transferWithData(amount0Out, amount1Out, to, data);
         _swap(amount0Out, amount1Out, to, _reserve0, _reserve1, _blockTimestampLast);
     }
@@ -430,7 +424,7 @@ contract ConstantProductPool is MirinERC20, IPool {
         uint112 _reserve0,
         uint112 _reserve1,
         uint32 _blockTimestampLast
-    ) internal {
+    ) internal lock {
         _transferWithoutData(amount0Out, amount1Out, to);
         _swap(amount0Out, amount1Out, to, _reserve0, _reserve1, _blockTimestampLast);
     }
@@ -442,17 +436,10 @@ contract ConstantProductPool is MirinERC20, IPool {
         uint112 _reserve0,
         uint112 _reserve1,
         uint32 _blockTimestampLast
-    ) internal lock {
-        require(amount0Out > 0 || amount1Out > 0, "MIRIN: INSUFFICIENT_OUTPUT_AMOUNT");
-        require(amount0Out < _reserve0 && amount1Out < _reserve1, "MIRIN: INSUFFICIENT_LIQUIDITY");
-
-        uint256 amount0In;
-        uint256 amount1In;
-
-        // scope for _balance{0,1} avoids stack too deep errors
+    ) internal {
         (uint256 balance0, uint256 balance1) = _balance();
-        amount0In = balance0 + amount0Out - _reserve0;
-        amount1In = balance1 + amount1Out - _reserve1;
+        uint256 amount0In = balance0 + amount0Out - _reserve0;
+        uint256 amount1In = balance1 + amount1Out - _reserve1;
         _compute(amount0In, amount1In, balance0, balance1, _reserve0, _reserve1);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
 
