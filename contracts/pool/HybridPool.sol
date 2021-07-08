@@ -154,7 +154,29 @@ contract HybridPool is MirinERC20, IPool {
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
-    function swap(
+    function swapWithoutContext(
+        address tokenIn,
+        address tokenOut,
+        address recipient,
+        uint256 amountIn,
+        uint256 amountOut
+    ) external override returns (uint256 finalAmountOut) {}
+
+    function swapExactIn(
+        address tokenIn,
+        address tokenOut,
+        address recipient,
+        uint256 amountIn
+    ) external override returns (uint256 finalAmountOut) {}
+
+    function swapExactOut(
+        address tokenIn,
+        address tokenOut,
+        address recipient,
+        uint256 amountOut
+    ) external override {}
+
+    function swapWithContext(
         address tokenIn,
         address tokenOut,
         bytes calldata context,

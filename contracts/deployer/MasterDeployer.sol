@@ -2,8 +2,7 @@
 
 pragma solidity ^0.8.2;
 
-import "./PoolProxy.sol";
-import "./PoolFactory.sol";
+import "../interfaces/IPoolFactory.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
@@ -13,8 +12,6 @@ contract MasterDeployer is Ownable {
     event NewPoolCreated(address indexed poolAddress);
 
     mapping(address => bool) public whitelistedFactories;
-
-    mapping(address => bool) public pool;
 
     uint256 public barFee;
 
@@ -37,15 +34,9 @@ contract MasterDeployer is Ownable {
         bento = _bento;
     }
 
-    function deployPool(
-        address _factory,
-        bytes memory _deployData,
-        bytes memory _initData
-    ) external returns (address poolAddress) {
+    function deployPool(address _factory, bytes calldata _deployData) external returns (address poolAddress) {
         require(whitelistedFactories[_factory], "Factory not whitelisted");
-        address logic = PoolFactory(_factory).deployPoolLogic(_deployData);
-        poolAddress = address(new PoolProxy(logic, _initData));
-        pool[poolAddress] = true;
+        poolAddress = IPoolFactory(_factory).deployPool(_deployData);
         emit NewPoolCreated(poolAddress);
     }
 

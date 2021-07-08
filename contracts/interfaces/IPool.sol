@@ -22,7 +22,29 @@ interface IPool {
         uint256 amount;
     }
 
-    function swap(
+    function swapWithoutContext(
+        address tokenIn,
+        address tokenOut,
+        address recipient,
+        uint256 amountIn,
+        uint256 amountOut
+    ) external returns (uint256 finalAmountOut);
+
+    function swapExactIn(
+        address tokenIn,
+        address tokenOut,
+        address recipient,
+        uint256 amountIn
+    ) external returns (uint256 finalAmountOut);
+
+    function swapExactOut(
+        address tokenIn,
+        address tokenOut,
+        address recipient,
+        uint256 amountOut
+    ) external;
+
+    function swapWithContext(
         address tokenIn,
         address tokenOut,
         bytes calldata context,

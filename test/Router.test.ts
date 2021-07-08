@@ -44,10 +44,8 @@ describe("Router", function () {
       ["address", "address", "uint8"],
       [weth.address, sushi.address, 30]
     );
-    // Pool initialize data
-    const initData = Pool.interface.encodeFunctionData("init");
     pool = await Pool.attach(
-      (await (await masterDeployer.deployPool(mirinPoolFactory.address, deployData, initData)).wait()).events[1].args[0]
+      (await (await masterDeployer.deployPool(mirinPoolFactory.address, deployData)).wait()).events[0].args[0]
     );
   })
 
@@ -142,7 +140,6 @@ describe("Router", function () {
         "tokenIn" : weth.address,
         "tokenOut" : sushi.address,
         "pool" : pool.address,
-        "context" : "0x",
         "recipient" : alice.address,
         "deadline" : 2 * Date.now(),
         "amountIn" : amountIn,
@@ -165,7 +162,6 @@ describe("Router", function () {
         "tokenIn" : sushi.address,
         "tokenOut" : weth.address,
         "pool" : pool.address,
-        "context" : "0x",
         "recipient" : alice.address,
         "deadline" : 2 * Date.now(),
         "amountIn" : amountIn,
@@ -185,9 +181,9 @@ describe("Router", function () {
       expect(expectedAmountOutSingleHop).gt(1);
       let params = {
         "path" : [
-          {"tokenIn" : weth.address, "pool" : pool.address, "context" : "0x"},
-          {"tokenIn" : sushi.address, "pool" : pool.address, "context" : "0x"},
-          {"tokenIn" : weth.address, "pool" : pool.address, "context" : "0x"},
+          {"tokenIn" : weth.address, "pool" : pool.address},
+          {"tokenIn" : sushi.address, "pool" : pool.address},
+          {"tokenIn" : weth.address, "pool" : pool.address},
         ],
         "tokenOut" : sushi.address,
         "recipient" : alice.address,
@@ -257,7 +253,6 @@ describe("Router", function () {
         "tokenIn" : weth.address,
         "tokenOut" : sushi.address,
         "pool" : pool.address,
-        "context" : "0x",
         "recipient" : alice.address,
         "deadline" : 2 * Date.now(),
         "amountIn" : amountIn,
@@ -289,7 +284,6 @@ describe("Router", function () {
         "tokenIn" : sushi.address,
         "tokenOut" : weth.address,
         "pool" : pool.address,
-        "context" : "0x",
         "recipient" : alice.address,
         "deadline" : 2 * Date.now(),
         "amountIn" : amountIn,
