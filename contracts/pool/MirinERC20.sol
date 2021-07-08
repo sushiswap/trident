@@ -47,7 +47,9 @@ contract MirinERC20 {
 
     function _burn(address from, uint256 value) internal {
         balanceOf[from] -= value;
-        unchecked { totalSupply -= value; }
+        unchecked {
+            totalSupply -= value;
+        }
         emit Transfer(from, address(0), value);
     }
 
@@ -66,7 +68,9 @@ contract MirinERC20 {
         uint256 value
     ) private {
         balanceOf[from] -= value;
-        unchecked { balanceOf[to] += value; }
+        unchecked {
+            balanceOf[to] += value;
+        }
         emit Transfer(from, to, value);
     }
 

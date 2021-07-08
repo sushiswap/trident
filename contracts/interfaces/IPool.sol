@@ -26,6 +26,7 @@ interface IPool {
         address tokenIn,
         address tokenOut,
         address recipient,
+        bool unwrapBento,
         uint256 amountIn,
         uint256 amountOut
     ) external returns (uint256 finalAmountOut);
@@ -34,6 +35,7 @@ interface IPool {
         address tokenIn,
         address tokenOut,
         address recipient,
+        bool unwrapBento,
         uint256 amountIn
     ) external returns (uint256 finalAmountOut);
 
@@ -41,6 +43,7 @@ interface IPool {
         address tokenIn,
         address tokenOut,
         address recipient,
+        bool unwrapBento,
         uint256 amountOut
     ) external;
 
@@ -49,6 +52,7 @@ interface IPool {
         address tokenOut,
         bytes calldata context,
         address recipient,
+        bool unwrapBento,
         uint256 amountIn,
         uint256 amountOut
     ) external returns (uint256 finalAmountOut);

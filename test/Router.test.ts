@@ -166,6 +166,7 @@ describe("Router", function () {
         "tokenOut" : sushi.address,
         "pool" : pool.address,
         "recipient" : alice.address,
+        "unwrapBento": false,
         "deadline" : 2 * Date.now(),
         "amountIn" : amountIn,
         "amountOutMinimum" : 1
@@ -188,6 +189,7 @@ describe("Router", function () {
         "tokenOut" : weth.address,
         "pool" : pool.address,
         "recipient" : alice.address,
+        "unwrapBento": true,
         "deadline" : 2 * Date.now(),
         "amountIn" : amountIn,
         "amountOutMinimum" : expectedAmountOut
@@ -213,6 +215,7 @@ describe("Router", function () {
         ],
         "tokenOut" : sushi.address,
         "recipient" : alice.address,
+        "unwrapBento": false,
         "deadline" : 2 * Date.now(),
         "amountIn" : amountIn,
         "amountOutMinimum" : 1
@@ -280,6 +283,7 @@ describe("Router", function () {
         "tokenOut" : sushi.address,
         "pool" : pool.address,
         "recipient" : alice.address,
+        "unwrapBento": true,
         "deadline" : 2 * Date.now(),
         "amountIn" : amountIn,
         "amountOutMinimum" : 1
@@ -292,7 +296,7 @@ describe("Router", function () {
       let oldAliceBentoWethBalance = await bento.balanceOf(weth.address, alice.address);
       let oldAliceBentoSushiBalance = await bento.balanceOf(sushi.address, alice.address);
 
-      await router.exactInputSingleWithNativeTokenSupport(params, true, true);
+      await router.exactInputSingleWithNativeToken(params);
 
       expect(await weth.balanceOf(alice.address)).eq(oldAliceWethBalance.sub(amountIn));
       expect(await sushi.balanceOf(alice.address)).eq(oldAliceSushiBalance.add(expectedAmountOut));
@@ -309,6 +313,7 @@ describe("Router", function () {
         "tokenOut" : weth.address,
         "pool" : pool.address,
         "recipient" : alice.address,
+        "unwrapBento": false,
         "deadline" : 2 * Date.now(),
         "amountIn" : amountIn,
         "amountOutMinimum" : expectedAmountOut
@@ -319,34 +324,11 @@ describe("Router", function () {
       oldAliceBentoWethBalance = await bento.balanceOf(weth.address, alice.address);
       oldAliceBentoSushiBalance = await bento.balanceOf(sushi.address, alice.address);
 
-      await router.exactInputSingleWithNativeTokenSupport(params, true, false);
+      await router.exactInputSingleWithNativeToken(params);
       expect(await weth.balanceOf(alice.address)).eq(oldAliceWethBalance);
       expect(await sushi.balanceOf(alice.address)).eq(oldAliceSushiBalance.sub(amountIn));
       expect(await bento.balanceOf(sushi.address, alice.address)).eq(oldAliceBentoSushiBalance);
       expect(await bento.balanceOf(weth.address, alice.address)).eq(oldAliceBentoWethBalance.add(expectedAmountOut));
-
-      amountIn = expectedAmountOut;
-      expectedAmountOut = await pool.getAmountOut(sushi.address, amountIn);
-      params = {
-        "tokenIn" : sushi.address,
-        "tokenOut" : weth.address,
-        "pool" : pool.address,
-        "recipient" : alice.address,
-        "deadline" : 2 * Date.now(),
-        "amountIn" : amountIn,
-        "amountOutMinimum" : expectedAmountOut
-      };
-
-      oldAliceWethBalance = await weth.balanceOf(alice.address);
-      oldAliceSushiBalance = await sushi.balanceOf(alice.address,);
-      oldAliceBentoWethBalance = await bento.balanceOf(weth.address, alice.address);
-      oldAliceBentoSushiBalance = await bento.balanceOf(sushi.address, alice.address);
-
-      await router.exactInputSingleWithNativeTokenSupport(params, false, true);
-      expect(await weth.balanceOf(alice.address)).eq(oldAliceWethBalance.add(expectedAmountOut));
-      expect(await sushi.balanceOf(alice.address)).eq(oldAliceSushiBalance);
-      expect(await bento.balanceOf(sushi.address, alice.address)).eq(oldAliceBentoSushiBalance.sub(amountIn));
-      expect(await bento.balanceOf(weth.address, alice.address)).eq(oldAliceBentoWethBalance);
     });
   });
 })
