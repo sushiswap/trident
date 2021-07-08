@@ -126,6 +126,7 @@ contract ConstantProductPool is Multicall, MirinERC20, IPool {
         address tokenIn,
         address tokenOut,
         address recipient,
+        bool unwrapBento,
         uint256 amountIn,
         uint256 amountOut
     ) external override returns (uint256) {
@@ -134,12 +135,12 @@ contract ConstantProductPool is Multicall, MirinERC20, IPool {
         if (tokenIn == address(token0)) {
             require(tokenOut == address(token1), "Invalid output token");
             if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
-            _swapWithOutData(0, amountOut, recipient, _reserve0, _reserve1, _blockTimestampLast);
+            _swapWithOutData(0, amountOut, recipient, unwrapBento, _reserve0, _reserve1, _blockTimestampLast);
         } else {
             require(tokenIn == address(token1), "Invalid input token");
             require(tokenOut == address(token0), "Invalid output token");
             if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
-            _swapWithOutData(amountOut, 0, recipient, _reserve0, _reserve1, _blockTimestampLast);
+            _swapWithOutData(amountOut, 0, recipient, unwrapBento, _reserve0, _reserve1, _blockTimestampLast);
         }
 
         return amountOut;
@@ -149,6 +150,7 @@ contract ConstantProductPool is Multicall, MirinERC20, IPool {
         address tokenIn,
         address tokenOut,
         address recipient,
+        bool unwrapBento,
         uint256 amountIn
     ) external override returns (uint256 amountOut) {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
@@ -156,12 +158,12 @@ contract ConstantProductPool is Multicall, MirinERC20, IPool {
         if (tokenIn == address(token0)) {
             require(tokenOut == address(token1), "Invalid output token");
             amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
-            _swapWithOutData(0, amountOut, recipient, _reserve0, _reserve1, _blockTimestampLast);
+            _swapWithOutData(0, amountOut, recipient, unwrapBento, _reserve0, _reserve1, _blockTimestampLast);
         } else {
             require(tokenIn == address(token1), "Invalid input token");
             require(tokenOut == address(token0), "Invalid output token");
             amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
-            _swapWithOutData(amountOut, 0, recipient, _reserve0, _reserve1, _blockTimestampLast);
+            _swapWithOutData(amountOut, 0, recipient, unwrapBento, _reserve0, _reserve1, _blockTimestampLast);
         }
     }
 
@@ -169,17 +171,18 @@ contract ConstantProductPool is Multicall, MirinERC20, IPool {
         address tokenIn,
         address tokenOut,
         address recipient,
+        bool unwrapBento,
         uint256 amountOut
     ) external override {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
 
         if (tokenIn == address(token0)) {
             require(tokenOut == address(token1), "Invalid output token");
-            _swapWithOutData(0, amountOut, recipient, _reserve0, _reserve1, _blockTimestampLast);
+            _swapWithOutData(0, amountOut, recipient, unwrapBento, _reserve0, _reserve1, _blockTimestampLast);
         } else {
             require(tokenIn == address(token1), "Invalid input token");
             require(tokenOut == address(token0), "Invalid output token");
-            _swapWithOutData(amountOut, 0, recipient, _reserve0, _reserve1, _blockTimestampLast);
+            _swapWithOutData(amountOut, 0, recipient, unwrapBento, _reserve0, _reserve1, _blockTimestampLast);
         }
     }
 
@@ -188,6 +191,7 @@ contract ConstantProductPool is Multicall, MirinERC20, IPool {
         address tokenOut,
         bytes calldata context,
         address recipient,
+        bool unwrapBento,
         uint256 amountIn,
         uint256 amountOut
     ) public override returns (uint256) {
@@ -196,11 +200,11 @@ contract ConstantProductPool is Multicall, MirinERC20, IPool {
         if (tokenIn == address(token0)) {
             if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
             require(tokenOut == address(token1), "Invalid output token");
-            _swapWithData(0, amountOut, recipient, context, _reserve0, _reserve1, _blockTimestampLast);
+            _swapWithData(0, amountOut, recipient, unwrapBento, context, _reserve0, _reserve1, _blockTimestampLast);
         } else if (tokenIn == address(token1)) {
             if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
             require(tokenOut == address(token0), "Invalid output token");
-            _swapWithData(amountOut, 0, recipient, context, _reserve0, _reserve1, _blockTimestampLast);
+            _swapWithData(amountOut, 0, recipient, unwrapBento, context, _reserve0, _reserve1, _blockTimestampLast);
         } else {
             require(tokenIn == address(this), "Invalid input token");
             require(tokenOut == address(token0) || tokenOut == address(token1), "Invalid output token");
@@ -226,7 +230,7 @@ contract ConstantProductPool is Multicall, MirinERC20, IPool {
         bytes calldata data
     ) external {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
-        _swapWithData(amount0Out, amount1Out, to, data, _reserve0, _reserve1, _blockTimestampLast);
+        _swapWithData(amount0Out, amount1Out, to, false, data, _reserve0, _reserve1, _blockTimestampLast);
     }
 
     function _getReserves()
@@ -312,7 +316,8 @@ contract ConstantProductPool is Multicall, MirinERC20, IPool {
                 amount1 = finalAmountOut;
             }
 
-            _transferWithData(amount0, amount1, to, data);
+            _transferWithoutData(amount0, amount1, to, false);
+            if (data.length > 0) IMirinCallee(to).mirinCall(msg.sender, amount0, amount1, data);
 
             liquidity = balanceOf[address(this)];
             require(liquidity >= amountIn, "Insufficient liquidity burned");
@@ -323,7 +328,8 @@ contract ConstantProductPool is Multicall, MirinERC20, IPool {
                 amount1 = amountOut;
             }
 
-            _transferWithData(amount0, amount1, to, data);
+            _transferWithoutData(amount0, amount1, to, false);
+            if (data.length > 0) IMirinCallee(to).mirinCall(msg.sender, amount0, amount1, data);
             finalAmountOut = amountOut;
 
             liquidity = balanceOf[address(this)];
@@ -385,36 +391,40 @@ contract ConstantProductPool is Multicall, MirinERC20, IPool {
         amountOut = (amountInWithFee * reserveOut) / (reserveIn * MAX_FEE + amountInWithFee);
     }
 
-    function _transferWithData(
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address to,
-        bytes calldata data
-    ) internal {
-        if (amount0Out > 0) bento.transfer(token0, address(this), to, bento.toShare(token0, amount0Out, false));
-        if (amount1Out > 0) bento.transfer(token1, address(this), to, bento.toShare(token1, amount1Out, false));
-        if (data.length > 0) IMirinCallee(to).mirinCall(msg.sender, amount0Out, amount1Out, data);
-    }
-
     function _transferWithoutData(
         uint256 amount0Out,
         uint256 amount1Out,
-        address to
+        address to,
+        bool unwrapBento
     ) internal {
-        if (amount0Out > 0) bento.transfer(token0, address(this), to, bento.toShare(token0, amount0Out, false));
-        if (amount1Out > 0) bento.transfer(token1, address(this), to, bento.toShare(token1, amount1Out, false));
+        if (amount0Out > 0) {
+            if (unwrapBento) {
+                IBentoBoxV1(bento).withdraw(token0, address(this), to, amount0Out, 0);
+            } else {
+                bento.transfer(token0, address(this), to, bento.toShare(token0, amount0Out, false));
+            }
+        }
+        if (amount1Out > 0) {
+            if (unwrapBento) {
+                IBentoBoxV1(bento).withdraw(token1, address(this), to, amount1Out, 0);
+            } else {
+                bento.transfer(token1, address(this), to, bento.toShare(token1, amount1Out, false));
+            }
+        }
     }
 
     function _swapWithData(
         uint256 amount0Out,
         uint256 amount1Out,
         address to,
+        bool unwrapBento,
         bytes calldata data,
         uint112 _reserve0,
         uint112 _reserve1,
         uint32 _blockTimestampLast
     ) internal lock {
-        _transferWithData(amount0Out, amount1Out, to, data);
+        _transferWithoutData(amount0Out, amount1Out, to, unwrapBento);
+        if (data.length > 0) IMirinCallee(to).mirinCall(msg.sender, amount0Out, amount1Out, data);
         _swap(amount0Out, amount1Out, to, _reserve0, _reserve1, _blockTimestampLast);
     }
 
@@ -422,11 +432,12 @@ contract ConstantProductPool is Multicall, MirinERC20, IPool {
         uint256 amount0Out,
         uint256 amount1Out,
         address to,
+        bool unwrapBento,
         uint112 _reserve0,
         uint112 _reserve1,
         uint32 _blockTimestampLast
     ) internal lock {
-        _transferWithoutData(amount0Out, amount1Out, to);
+        _transferWithoutData(amount0Out, amount1Out, to, unwrapBento);
         _swap(amount0Out, amount1Out, to, _reserve0, _reserve1, _blockTimestampLast);
     }
 

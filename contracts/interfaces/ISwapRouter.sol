@@ -17,6 +17,7 @@ interface ISwapRouter {
         address tokenOut;
         address pool;
         address recipient;
+        bool unwrapBento;
         uint256 deadline;
         uint256 amountIn;
         uint256 amountOutMinimum;
@@ -31,6 +32,7 @@ interface ISwapRouter {
         Path[] path;
         address tokenOut;
         address recipient;
+        bool unwrapBento;
         uint256 deadline;
         uint256 amountIn;
         uint256 amountOutMinimum;
@@ -56,6 +58,7 @@ interface ISwapRouter {
     struct Output {
         address token;
         address to;
+        bool unwrapBento;
         uint256 minAmount;
     }
 
