@@ -40,14 +40,14 @@ contract MirinERC20 {
     event Transfer(address indexed from, address indexed to, uint256 value);
 
     function _mint(address to, uint256 value) internal {
-        totalSupply = totalSupply + value;
-        balanceOf[to] = balanceOf[to] + value;
+        totalSupply += value;
+        balanceOf[to] += value;
         emit Transfer(address(0), to, value);
     }
 
     function _burn(address from, uint256 value) internal {
-        balanceOf[from] = balanceOf[from] - value;
-        totalSupply = totalSupply - value;
+        balanceOf[from] -= value;
+        unchecked { totalSupply -= value; }
         emit Transfer(from, address(0), value);
     }
 
@@ -55,7 +55,7 @@ contract MirinERC20 {
         address owner,
         address spender,
         uint256 value
-    ) internal {
+    ) private {
         allowance[owner][spender] = value;
         emit Approval(owner, spender, value);
     }
@@ -64,9 +64,9 @@ contract MirinERC20 {
         address from,
         address to,
         uint256 value
-    ) internal {
-        balanceOf[from] = balanceOf[from] - value;
-        balanceOf[to] = balanceOf[to] + value;
+    ) private {
+        balanceOf[from] -= value;
+        unchecked { balanceOf[to] += value; }
         emit Transfer(from, to, value);
     }
 
@@ -74,9 +74,9 @@ contract MirinERC20 {
         address from,
         address to,
         uint256 value
-    ) internal {
+    ) private {
         if (allowance[from][msg.sender] != type(uint256).max) {
-            allowance[from][msg.sender] = allowance[from][msg.sender] - value;
+            allowance[from][msg.sender] -= value;
         }
         _transfer(from, to, value);
     }
