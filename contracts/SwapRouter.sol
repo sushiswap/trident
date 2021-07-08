@@ -81,14 +81,10 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         checkDeadline(params.deadline)
         returns (uint256 amountOut)
     {
-        amountOut = exactInputInternal(
-            params.tokenIn,
-            params.tokenOut,
-            params.pool,
-            params.recipient,
-            msg.sender,
-            params.amountIn
-        );
+        pay(params.tokenIn, msg.sender, params.pool, params.amountIn);
+
+        amountOut = IPool(params.pool).swapExactIn(params.tokenIn, params.tokenOut, params.recipient, params.amountIn);
+
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
 
@@ -100,22 +96,27 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         returns (uint256 amount)
     {
         amount = params.amountIn;
-        address payer = msg.sender;
+
+        // Pay the first pool directly
+        pay(params.path[0].tokenIn, msg.sender, params.path[0].pool, amount);
 
         for (uint256 i; i < params.path.length; i++) {
-            bool isLastPool = params.path.length == i + 1;
-
-            // the outputs of prior swaps become the inputs to subsequent ones
-            amount = exactInputInternal(
-                params.path[i].tokenIn,
-                isLastPool ? params.tokenOut : params.path[i + 1].tokenIn,
-                params.path[i].pool,
-                isLastPool ? params.recipient : address(this),
-                payer,
-                amount
-            );
-
-            payer = address(this);
+            if (params.path.length == i + 1) {
+                // last hop
+                amount = IPool(params.path[i].pool).swapExactIn(
+                    params.path[i].tokenIn,
+                    params.tokenOut,
+                    params.recipient,
+                    amount
+                );
+            } else {
+                amount = IPool(params.path[i].pool).swapExactIn(
+                    params.path[i].tokenIn,
+                    params.path[i + 1].tokenIn,
+                    params.path[i + 1].pool,
+                    amount
+                );
+            }
         }
 
         require(amount >= params.amountOutMinimum, "Too little received");
@@ -159,46 +160,61 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         }
     }
 
-    function exactInputSingleWithPreFunding(ExactInputSingleParams calldata params)
-        external
-        payable
-        checkDeadline(params.deadline)
-        returns (uint256 amountOut)
-    {
-        amountOut = IPool(params.pool).swapExactIn(params.tokenIn, params.tokenOut, params.recipient, params.amountIn);
+    function exactInputSingleWithNativeTokenSupport(
+        ExactInputSingleParams calldata params,
+        bool nativeERC20Input,
+        bool nativeERC20Output
+    ) external payable checkDeadline(params.deadline) returns (uint256 amountOut) {
+        if (nativeERC20Input) {
+            IBentoBoxV1(bento).deposit(IERC20(params.tokenIn), msg.sender, params.pool, params.amountIn, 0);
+        } else {
+            pay(params.tokenIn, msg.sender, params.pool, params.amountIn);
+        }
+
+        if (nativeERC20Output) {
+            amountOut = IPool(params.pool).swapExactIn(params.tokenIn, params.tokenOut, address(this), params.amountIn);
+            IBentoBoxV1(bento).withdraw(IERC20(params.tokenOut), address(this), params.recipient, amountOut, 0);
+        } else {
+            amountOut = IPool(params.pool).swapExactIn(params.tokenIn, params.tokenOut, params.recipient, params.amountIn);
+        }
 
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
 
-    function exactInputWithPreFunding(ExactInputParams memory params)
-        external
-        payable
-        checkDeadline(params.deadline)
-        returns (uint256 amount)
-    {
-        address payer = msg.sender;
+    function exactInputWithNativeTokenSupport(
+        ExactInputParams memory params,
+        bool nativeERC20Input,
+        bool nativeERC20Output
+    ) external payable checkDeadline(params.deadline) returns (uint256 amount) {
+        amount = params.amountIn;
 
-        amount = IPool(params.path[0].pool).swapExactIn(
-            params.path[0].tokenIn,
-            params.path.length > 1 ? params.path[1].tokenIn : params.tokenOut,
-            params.path.length > 1 ? address(this) : params.recipient,
-            params.amountIn
-        );
+        if (nativeERC20Input) {
+            IBentoBoxV1(bento).deposit(IERC20(params.path[0].tokenIn), msg.sender, params.path[0].pool, amount, 0);
+        } else {
+            pay(params.path[0].tokenIn, msg.sender, params.path[0].pool, amount);
+        }
 
-        for (uint256 i = 1; i < params.path.length; i++) {
-            bool isLastPool = params.path.length == i + 1;
+        for (uint256 i; i < params.path.length; i++) {
+            if (params.path.length == i + 1) {
+                // last hop
+                amount = IPool(params.path[i].pool).swapExactIn(
+                    params.path[i].tokenIn,
+                    params.tokenOut,
+                    nativeERC20Output ? address(this) : params.recipient,
+                    amount
+                );
+            } else {
+                amount = IPool(params.path[i].pool).swapExactIn(
+                    params.path[i].tokenIn,
+                    params.path[i + 1].tokenIn,
+                    params.path[i + 1].pool,
+                    amount
+                );
+            }
+        }
 
-            // the outputs of prior swaps become the inputs to subsequent ones
-            amount = exactInputInternal(
-                params.path[i].tokenIn,
-                isLastPool ? params.path[i + 1].tokenIn : params.tokenOut,
-                params.path[i].pool,
-                isLastPool ? params.recipient : address(this),
-                payer,
-                amount
-            );
-
-            payer = address(this);
+        if (nativeERC20Output) {
+            IBentoBoxV1(bento).withdraw(IERC20(params.tokenOut), address(this), params.recipient, amount, 0);
         }
 
         require(amount >= params.amountOutMinimum, "Too little received");
