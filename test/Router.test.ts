@@ -9,6 +9,73 @@ import { Multicall } from '../typechain/Multicall';
 describe("Router", function () {
   let alice, feeTo, weth, sushi, bento, masterDeployer, mirinPoolFactory, router, pool, dai, daiSushiPool, daiWethPool;
 
+  const testSwap = async (hopNumber, fromBentoBox, toBentoBox) => {
+      await prepare(this, ["ERC20Mock", "BentoBoxV1", "MasterDeployer", "ConstantProductPoolFactory", "SwapRouter", "ConstantProductPool"]);
+      const mapping = ["weth", "sushi", "fei", "usdt", "woofy", "mim", "ampl", "mana", "iron", "tbtc"]
+      await deploy(this, [
+        ["weth", this.ERC20Mock, ["WETH", "ETH", getBigNumber("10000000")]],
+        ["sushi", this.ERC20Mock, ["SUSHI", "SUSHI", getBigNumber("10000000")]],
+        ["fei", this.ERC20Mock, ["FEI", "FEI", getBigNumber("10000000")]],
+        ["usdt", this.ERC20Mock, ["USDT", "USDT", getBigNumber("10000000")]],
+        ["woofy", this.ERC20Mock, ["WOOFY", "WOOFY", getBigNumber("10000000")]],
+        ["mim", this.ERC20Mock, ["MIM", "MIM", getBigNumber("10000000")]],
+        ["ampl", this.ERC20Mock, ["AMPL", "AMPL", getBigNumber("10000000")]],
+        ["mana", this.ERC20Mock, ["MANA", "MANA", getBigNumber("10000000")]],
+        ["iron", this.ERC20Mock, ["IRON", "IRON", getBigNumber("10000000")]],
+        ["tbtc", this.ERC20Mock, ["TBTC", "TBTC", getBigNumber("10000000")]],
+      ])
+      await deploy(this, [
+        ["bento", this.BentoBoxV1, [this.weth.address]]
+      ])
+      await deploy(this, [
+        ["masterDeployer", this.MasterDeployer, [17, this.bob.address, this.bento.address]],
+        ["mirinPoolFactory", this.ConstantProductPoolFactory]
+      ])
+      await deploy(this, [
+        ["router", this.SwapRouter, [this.weth.address, this.masterDeployer.address, this.bento.address]]
+      ])
+      await this.masterDeployer.addToWhitelist(this.mirinPoolFactory.address);
+      await this.bento.whitelistMasterContract(this.router.address, true);
+      await this.bento.setMasterContractApproval(this.alice.address, this.router.address, true, "0", "0x0000000000000000000000000000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000000000000000000000000000");
+      for (let i in mapping) {
+        await this[mapping[i]].approve(this.bento.address, BigNumber.from(10).pow(30))
+        await this.bento.deposit(this[mapping[i]].address, alice.address, alice.address, BigNumber.from(10).pow(20), 0);
+      }
+      let pools = []
+      for (let i = 0; i < (mapping.length - 1); i++) {
+        const deployData = ethers.utils.defaultAbiCoder.encode(
+          ["address", "address", "uint8"],
+          [this[mapping[i]].address, this[mapping[i + 1]].address, 30]
+        );
+        const initData = this.ConstantProductPool.interface.encodeFunctionData("init");
+        pools.push(this.ConstantProductPool.attach(
+        (await (await this.masterDeployer.deployPool(this.mirinPoolFactory.address, deployData, initData)).wait()).events[1].args[0]
+        ));
+        await this.bento.transfer(this[mapping[i]].address, alice.address, pools[i].address, BigNumber.from(10).pow(19));
+        await this.bento.transfer(this[mapping[i + 1]].address, alice.address, pools[i].address, BigNumber.from(10).pow(19));
+        await pools[i].mint(alice.address);
+      }
+      let amountIn = getBigNumber("1");
+      let path = []
+      for(let i = 0; i <= hopNumber; i++){
+        path.push({"tokenIn" : this[mapping[i]].address, "pool" : pools[i].address, "context" : "0x"})
+      }
+      let params = {
+        "path" : path,
+        "tokenOut" : this[mapping[hopNumber + 1]].address,
+        "recipient" : this.alice.address,
+        "deadline" : 2 * Date.now(),
+        "amountIn" : amountIn,
+        "amountOutMinimum" : 1
+      };
+
+      let oldAlice0Balance = await this.bento.balanceOf(this[mapping[0]].address, alice.address);
+
+      await this.router.exactInput(params);
+      expect(await this.bento.balanceOf(this[mapping[0]].address, alice.address)).eq(oldAlice0Balance.sub(amountIn));
+
+  }
+
   before(async function () {
     [alice, feeTo] = await ethers.getSigners();
 
@@ -86,6 +153,10 @@ describe("Router", function () {
       await daiWethPool.mint(alice.address);
       expect(await daiWethPool.totalSupply()).gt(1);
     });
+
+    it("Should work with test Swap", async function() {
+      await testSwap(0, false, false);
+    })
 
     it("Should add balanced liquidity", async function() {
       let initialTotalSupply = await pool.totalSupply();
