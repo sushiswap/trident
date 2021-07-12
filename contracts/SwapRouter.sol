@@ -285,8 +285,9 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
 
     function _preFundedExactInput(ExactInputParams memory params) internal returns (uint256 amount) {
         amount = params.amountIn;
+        uint256 lenMinusOne = params.path.length - 1;
 
-        for (uint256 i = 0; i < params.path.length - 1; i++) {
+        for (uint256 i = 0; i < lenMinusOne; i++) {
             amount = IPool(params.path[i].pool).swapExactIn(
                 params.path[i].tokenIn,
                 params.path[i + 1].tokenIn,
@@ -297,8 +298,8 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         }
 
         // last hop
-        amount = IPool(params.path[params.path.length - 1].pool).swapExactIn(
-            params.path[params.path.length - 1].tokenIn,
+        amount = IPool(params.path[lenMinusOne].pool).swapExactIn(
+            params.path[lenMinusOne].tokenIn,
             params.tokenOut,
             params.recipient,
             params.unwrapBento,
@@ -310,31 +311,29 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
 
     function _preFundedExactInputWithContext(ExactInputParamsWithContext memory params) internal returns (uint256 amount) {
         amount = params.amountIn;
+        uint256 lenMinusOne = params.path.length - 1;
 
-        for (uint256 i; i < params.path.length; i++) {
-            if (params.path.length == i + 1) {
-                // last hop
-                amount = IPool(params.path[i].pool).swapWithContext(
-                    params.path[i].tokenIn,
-                    params.tokenOut,
-                    params.path[i].context,
-                    params.recipient,
-                    params.unwrapBento,
-                    amount,
-                    0
-                );
-            } else {
-                amount = IPool(params.path[i].pool).swapWithContext(
-                    params.path[i].tokenIn,
-                    params.path[i + 1].tokenIn,
-                    params.path[i].context,
-                    params.path[i + 1].pool,
-                    false,
-                    amount,
-                    0
-                );
-            }
+        for (uint256 i; i < lenMinusOne; i++) {
+            amount = IPool(params.path[i].pool).swapWithContext(
+                params.path[i].tokenIn,
+                params.path[i + 1].tokenIn,
+                params.path[i].context,
+                params.path[i + 1].pool,
+                false,
+                amount,
+                0
+            );
         }
+
+        amount = IPool(params.path[lenMinusOne].pool).swapWithContext(
+            params.path[lenMinusOne].tokenIn,
+            params.tokenOut,
+            params.path[lenMinusOne].context,
+            params.recipient,
+            params.unwrapBento,
+            amount,
+            0
+        );
 
         require(amount >= params.amountOutMinimum, "Too little received");
     }
