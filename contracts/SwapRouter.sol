@@ -64,21 +64,19 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         return _preFundedExactInput(params);
     }
 
-    function exactInputSingleWithNativeToken(ExactInputSingleParamsWithContext calldata params)
+    function exactInputSingleWithNativeToken(ExactInputSingleParams calldata params)
         external
         payable
         checkDeadline(params.deadline)
         returns (uint256 amountOut)
     {
         _depositToBentoBox(params.tokenIn, params.pool, params.amountIn);
-        amountOut = IPool(params.pool).swapWithContext(
+        amountOut = IPool(params.pool).swapExactIn(
             params.tokenIn,
             params.tokenOut,
-            params.context,
             params.recipient,
             params.unwrapBento,
-            params.amountIn,
-            0
+            params.amountIn
         );
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
@@ -132,12 +130,14 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         returns (uint256 amountOut)
     {
         _depositToBentoBox(params.tokenIn, params.pool, params.amountIn);
-        amountOut = IPool(params.pool).swapExactIn(
+        amountOut = IPool(params.pool).swapWithContext(
             params.tokenIn,
             params.tokenOut,
+            params.context,
             params.recipient,
             params.unwrapBento,
-            params.amountIn
+            params.amountIn,
+            0
         );
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
@@ -373,7 +373,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
             IBentoBoxV1(bento).deposit{value: amount}(IERC20(address(0)), address(this), recipient, amount, 0);
         } else {
             // Deposit ERC20 token to bentobox
-            IBentoBoxV1(bento).deposit{value: amount}(IERC20(token), msg.sender, recipient, amount, 0);
+            IBentoBoxV1(bento).deposit(IERC20(token), msg.sender, recipient, amount, 0);
         }
     }
 }
