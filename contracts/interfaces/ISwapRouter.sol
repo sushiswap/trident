@@ -4,12 +4,17 @@ pragma abicoder v2;
 
 interface ISwapRouter {
     // TODO: Make context optional
-    // Split exact imput and exact output swaps in pool
 
     /// @dev In case of a multi hop swap, the output token for first swap is the input token of the next swap
     struct Path {
         address tokenIn;
         address pool;
+    }
+
+    struct PathWithContext {
+        address tokenIn;
+        address pool;
+        bytes context;
     }
 
     struct ExactInputSingleParams {
@@ -23,13 +28,30 @@ interface ISwapRouter {
         uint256 amountOutMinimum;
     }
 
-    /// @notice Swaps `amountIn` of one token for as much as possible of another token
-    /// @param params The parameters necessary for the swap, encoded as `ExactInputSingleParams` in calldata
-    /// @return amountOut The amount of the received token
-    function exactInputSingle(ExactInputSingleParams calldata params) external payable returns (uint256 amountOut);
+    struct ExactInputSingleParamsWithContext {
+        address tokenIn;
+        address tokenOut;
+        address pool;
+        address recipient;
+        bool unwrapBento;
+        uint256 deadline;
+        uint256 amountIn;
+        uint256 amountOutMinimum;
+        bytes context;
+    }
 
     struct ExactInputParams {
         Path[] path;
+        address tokenOut;
+        address recipient;
+        bool unwrapBento;
+        uint256 deadline;
+        uint256 amountIn;
+        uint256 amountOutMinimum;
+    }
+
+    struct ExactInputParamsWithContext {
+        PathWithContext[] path;
         address tokenOut;
         address recipient;
         bool unwrapBento;
@@ -68,9 +90,4 @@ interface ISwapRouter {
         PercentagePath[] percentagePath;
         Output[] output;
     }
-
-    /// @notice Swaps `amountIn` of one token for as much as possible of another along the specified path
-    /// @param params The parameters necessary for the multi-hop swap, encoded as `ExactInputParams` in calldata
-    /// @return amountOut The amount of the received token
-    function exactInput(ExactInputParams calldata params) external payable returns (uint256 amountOut);
 }

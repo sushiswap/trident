@@ -200,6 +200,32 @@ describe("Router", function () {
       expect(await bento.balanceOf(sushi.address, alice.address)).eq(oldAliceSushiBalance);
       expect(await bento.balanceOf(weth.address, pool.address)).gt(oldPoolWethBalance);
       expect(await bento.balanceOf(sushi.address, pool.address)).eq(oldPoolSushiBalance);
+
+      amountIn = expectedAmountOut;
+      expectedAmountOut = await pool.getAmountOut(weth.address, amountIn);
+      params = {
+        "tokenIn" : weth.address,
+        "tokenOut" : sushi.address,
+        "pool" : pool.address,
+        "recipient" : alice.address,
+        "unwrapBento": false,
+        "deadline" : 2 * Date.now(),
+        "amountIn" : amountIn,
+        "amountOutMinimum" : expectedAmountOut,
+        "context": "0x"
+      };
+
+      oldAliceWethBalance = await bento.balanceOf(weth.address, alice.address);
+      oldAliceSushiBalance = await bento.balanceOf(sushi.address, alice.address);
+      oldPoolWethBalance = await bento.balanceOf(weth.address, pool.address);
+      oldPoolSushiBalance = await bento.balanceOf(sushi.address, pool.address);
+
+      await router.exactInputSingleWithContext(params, { gasLimit : 1000000});
+
+      expect(await bento.balanceOf(weth.address, alice.address)).lt(oldAliceWethBalance);
+      expect(await bento.balanceOf(sushi.address, alice.address)).gt(oldAliceSushiBalance);
+      expect(await bento.balanceOf(weth.address, pool.address)).gt(oldPoolWethBalance);
+      expect(await bento.balanceOf(sushi.address, pool.address)).lt(oldPoolSushiBalance);
     });
 
     it("Should handle multi hop swaps", async function() {
