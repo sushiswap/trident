@@ -286,26 +286,24 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
     function _preFundedExactInput(ExactInputParams memory params) internal returns (uint256 amount) {
         amount = params.amountIn;
 
-        for (uint256 i; i < params.path.length; i++) {
-            if (params.path.length == i + 1) {
-                // last hop
-                amount = IPool(params.path[i].pool).swapExactIn(
-                    params.path[i].tokenIn,
-                    params.tokenOut,
-                    params.recipient,
-                    params.unwrapBento,
-                    amount
-                );
-            } else {
-                amount = IPool(params.path[i].pool).swapExactIn(
-                    params.path[i].tokenIn,
-                    params.path[i + 1].tokenIn,
-                    params.path[i + 1].pool,
-                    false,
-                    amount
-                );
-            }
+        for (uint256 i = 0; i < params.path.length - 1; i++) {
+            amount = IPool(params.path[i].pool).swapExactIn(
+                params.path[i].tokenIn,
+                params.path[i + 1].tokenIn,
+                params.path[i + 1].pool,
+                false,
+                amount
+            );
         }
+
+        // last hop
+        amount = IPool(params.path[params.path.length - 1].pool).swapExactIn(
+            params.path[params.path.length - 1].tokenIn,
+            params.tokenOut,
+            params.recipient,
+            params.unwrapBento,
+            amount
+        );
 
         require(amount >= params.amountOutMinimum, "Too little received");
     }
