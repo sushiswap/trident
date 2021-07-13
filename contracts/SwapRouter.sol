@@ -47,12 +47,11 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         returns (uint256 amountOut)
     {
         pay(params.tokenIn, msg.sender, params.pool, params.amountIn);
-        amountOut = IPool(params.pool).swapExactIn(
+        amountOut = IPool(params.pool).swapWithoutContext(
             params.tokenIn,
             params.tokenOut,
             params.recipient,
-            params.unwrapBento,
-            params.amountIn
+            params.unwrapBento
         );
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
@@ -71,12 +70,11 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         returns (uint256 amountOut)
     {
         _depositToBentoBox(params.tokenIn, params.pool, params.amountIn);
-        amountOut = IPool(params.pool).swapExactIn(
+        amountOut = IPool(params.pool).swapWithoutContext(
             params.tokenIn,
             params.tokenOut,
             params.recipient,
-            params.unwrapBento,
-            params.amountIn
+            params.unwrapBento
         );
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
@@ -105,8 +103,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
             params.context,
             params.recipient,
             params.unwrapBento,
-            params.amountIn,
-            0
+            params.amountIn
         );
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
@@ -136,8 +133,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
             params.context,
             params.recipient,
             params.unwrapBento,
-            params.amountIn,
-            0
+            params.amountIn
         );
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
@@ -164,8 +160,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
                 params.initialPath[i].context,
                 address(this),
                 false,
-                params.initialPath[i].amountIn,
-                0
+                params.initialPath[i].amountIn
             );
         }
 
@@ -180,8 +175,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
                 params.percentagePath[i].context,
                 address(this),
                 false,
-                transferAmount,
-                0
+                transferAmount
             );
         }
 
@@ -288,22 +282,20 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         uint256 lenMinusOne = params.path.length - 1;
 
         for (uint256 i = 0; i < lenMinusOne; i++) {
-            amount = IPool(params.path[i].pool).swapExactIn(
+            amount = IPool(params.path[i].pool).swapWithoutContext(
                 params.path[i].tokenIn,
                 params.path[i + 1].tokenIn,
                 params.path[i + 1].pool,
-                false,
-                amount
+                false
             );
         }
 
         // last hop
-        amount = IPool(params.path[lenMinusOne].pool).swapExactIn(
+        amount = IPool(params.path[lenMinusOne].pool).swapWithoutContext(
             params.path[lenMinusOne].tokenIn,
             params.tokenOut,
             params.recipient,
-            params.unwrapBento,
-            amount
+            params.unwrapBento
         );
 
         require(amount >= params.amountOutMinimum, "Too little received");
@@ -320,8 +312,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
                 params.path[i].context,
                 params.path[i + 1].pool,
                 false,
-                amount,
-                0
+                amount
             );
         }
 
@@ -331,8 +322,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
             params.path[lenMinusOne].context,
             params.recipient,
             params.unwrapBento,
-            amount,
-            0
+            amount
         );
 
         require(amount >= params.amountOutMinimum, "Too little received");

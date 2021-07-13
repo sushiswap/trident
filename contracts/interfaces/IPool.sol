@@ -26,26 +26,8 @@ interface IPool {
         address tokenIn,
         address tokenOut,
         address recipient,
-        bool unwrapBento,
-        uint256 amountIn,
-        uint256 amountOut
+        bool unwrapBento
     ) external returns (uint256 finalAmountOut);
-
-    function swapExactIn(
-        address tokenIn,
-        address tokenOut,
-        address recipient,
-        bool unwrapBento,
-        uint256 amountIn
-    ) external returns (uint256 finalAmountOut);
-
-    function swapExactOut(
-        address tokenIn,
-        address tokenOut,
-        address recipient,
-        bool unwrapBento,
-        uint256 amountOut
-    ) external;
 
     function swapWithContext(
         address tokenIn,
@@ -53,8 +35,7 @@ interface IPool {
         bytes calldata context,
         address recipient,
         bool unwrapBento,
-        uint256 amountIn,
-        uint256 amountOut
+        uint256 amountIn
     ) external returns (uint256 finalAmountOut);
 
     function getOptimalLiquidityInAmounts(liquidityInput[] calldata liquidityInputs)
