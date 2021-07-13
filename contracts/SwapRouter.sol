@@ -47,12 +47,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         returns (uint256 amountOut)
     {
         pay(params.tokenIn, msg.sender, params.pool, params.amountIn);
-        amountOut = IPool(params.pool).swapWithoutContext(
-            params.tokenIn,
-            params.tokenOut,
-            params.recipient,
-            params.unwrapBento
-        );
+        amountOut = IPool(params.pool).swapWithoutContext(params.tokenIn, params.tokenOut, params.recipient, params.unwrapBento);
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
 
@@ -70,12 +65,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         returns (uint256 amountOut)
     {
         _depositToBentoBox(params.tokenIn, params.pool, params.amountIn);
-        amountOut = IPool(params.pool).swapWithoutContext(
-            params.tokenIn,
-            params.tokenOut,
-            params.recipient,
-            params.unwrapBento
-        );
+        amountOut = IPool(params.pool).swapWithoutContext(params.tokenIn, params.tokenOut, params.recipient, params.unwrapBento);
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
 
