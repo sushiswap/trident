@@ -23,7 +23,8 @@ abstract contract ConstantProductConcentratedPool is Multicall, TridentNFT, IPoo
     );
 
     uint256 internal constant MINIMUM_LIQUIDITY = 10**3;
-
+    
+    int24 public immutable tackSpacing;
     uint8 internal constant PRECISION = 112;
     uint256 internal constant MAX_FEE = 10000; // 100%
     uint256 internal constant MAX_FEE_SQUARE = 100000000;
@@ -52,11 +53,16 @@ abstract contract ConstantProductConcentratedPool is Multicall, TridentNFT, IPoo
         _;
         unlocked = 1;
     }
+    
+    struct Tack { // cf. Tick
+        int24 lastTack;
+        int24 nextTack;
+    }
 
     /// @dev
     /// Only set immutable variables here. State changes made here will not be used.
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (IERC20 tokenA, IERC20 tokenB, uint256 _swapFee) = abi.decode(_deployData, (IERC20, IERC20, uint256));
+        (IERC20 tokenA, IERC20 tokenB, uint256 _swapFee, int24 _tackSpacing) = abi.decode(_deployData, (IERC20, IERC20, uint256, int24));
 
         require(address(tokenA) != address(0), "MIRIN: ZERO_ADDRESS");
         require(address(tokenB) != address(0), "MIRIN: ZERO_ADDRESS");
@@ -68,6 +74,7 @@ abstract contract ConstantProductConcentratedPool is Multicall, TridentNFT, IPoo
         token1 = _token1;
         swapFee = _swapFee;
         MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
+        tackSpacing = _tackSpacing;
         bento = IBentoBoxV1(MasterDeployer(_masterDeployer).bento());
         barFeeTo = MasterDeployer(_masterDeployer).barFeeTo();
         masterDeployer = MasterDeployer(_masterDeployer);
@@ -375,7 +382,7 @@ abstract contract ConstantProductConcentratedPool is Multicall, TridentNFT, IPoo
             require(finalAmountOut <= allowedAmountOut, "Insufficient liquidity burned");
         }
 
-        _poolBurn(loPt, hiPt, address(this), liquidity);
+        _swapBurn(loPt, hiPt, address(this), liquidity);
 
         (uint256 balance0, uint256 balance1) = _balance();
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
