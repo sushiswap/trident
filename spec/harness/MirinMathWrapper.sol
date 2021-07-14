@@ -11,6 +11,6 @@ contract MirinMathWrapper {
     //MirinMath public mirinMath;
 
     function sqrt(uint256 a) public view returns (uint256) {
-        MirinMath.sqrt(a);
+        return MirinMath.sqrt(a);
     }
 }
