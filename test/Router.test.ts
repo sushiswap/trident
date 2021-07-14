@@ -74,7 +74,7 @@ describe("Router", function () {
         "path" : path,
         "tokenOut" : that[mapping[hopNumber + 1]].address,
         "recipient" : that.alice.address,
-        "unwrapBento": toBentoBox,
+        "unwrapBento": !toBentoBox,
         "deadline" : 2 * Date.now(),
         "amountIn" : amountIn,
         "amountOutMinimum" : 1
@@ -88,15 +88,26 @@ describe("Router", function () {
       if(fromBentoBox) {
         await that.router.exactInput(params)
         expect(await that.bento.balanceOf(that[mapping[0]].address, alice.address)).eq(oldAlice0Balance.sub(amountIn));
-        expect(await that.bento.balanceOf(that[mapping[hopNumber + 1]].address, alice.address)).gt(oldAlice1Balance);
         expect(await that[mapping[0]].balanceOf(alice.address)).eq(oldWallet0Balance);
-        expect(await that[mapping[hopNumber + 1]].balanceOf(alice.address)).eq(oldWallet1Balance);
+        if (toBentoBox) {
+          expect(await that.bento.balanceOf(that[mapping[hopNumber + 1]].address, alice.address)).gt(oldAlice1Balance);
+          expect(await that[mapping[hopNumber + 1]].balanceOf(alice.address)).eq(oldWallet1Balance);
+        } else {
+          expect(await that[mapping[hopNumber + 1]].balanceOf(alice.address)).gt(oldWallet1Balance);
+          expect(await that.bento.balanceOf(that[mapping[hopNumber + 1]].address, alice.address)).eq(oldAlice1Balance);
+        }
+        
       } else {
         await that.router.exactInputWithNativeToken(params)
         expect(await that[mapping[0]].balanceOf(alice.address)).eq(oldWallet0Balance.sub(amountIn));
-        expect(await that[mapping[hopNumber + 1]].balanceOf(alice.address)).gt(oldWallet1Balance);
         expect(await that.bento.balanceOf(that[mapping[0]].address, alice.address)).eq(oldAlice0Balance);
-        expect(await that.bento.balanceOf(that[mapping[hopNumber + 1]].address, alice.address)).eq(oldAlice1Balance);
+        if (toBentoBox) {
+          expect(await that.bento.balanceOf(that[mapping[hopNumber + 1]].address, alice.address)).gt(oldAlice1Balance);
+          expect(await that[mapping[hopNumber + 1]].balanceOf(alice.address)).eq(oldWallet1Balance);
+        } else {
+          expect(await that[mapping[hopNumber + 1]].balanceOf(alice.address)).gt(oldWallet1Balance);
+          expect(await that.bento.balanceOf(that[mapping[hopNumber + 1]].address, alice.address)).eq(oldAlice1Balance);
+        }
       }      
   }
 
