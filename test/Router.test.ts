@@ -1,6 +1,6 @@
 // @ts-nocheck
 
-import { ethers } from "hardhat";
+import { ethers, deployments } from "hardhat";
 import { expect } from "chai";
 import { prepare, deploy, getBigNumber } from "./utilities"
 import { BigNumber } from 'ethers';
@@ -9,9 +9,11 @@ import { Multicall } from '../typechain/Multicall';
 describe("Router", function () {
   let alice, feeTo, weth, sushi, bento, masterDeployer, mirinPoolFactory, router, pool, dai, daiSushiPool, daiWethPool;
 
-  const testSwap = async (hopNumber, fromBentoBox, toBentoBox) => {
-      await prepare(this, ["ERC20Mock", "BentoBoxV1", "MasterDeployer", "ConstantProductPoolFactory", "SwapRouter", "ConstantProductPool"]);
-      const mapping = ["weth", "sushi", "fei", "usdt", "woofy", "mim", "ampl", "mana", "iron", "tbtc"]
+  const mapping = ["weth", "sushi", "fei", "usdt", "woofy", "mim", "ampl", "mana", "iron", "tbtc"]
+
+  const setupTest = deployments.createFixture(async ({deployments, getNamedAccounts, ethers}, options) => {
+    await deployments.fixture(); // ensure you start from a fresh deployments
+    await prepare(this, ["ERC20Mock", "BentoBoxV1", "MasterDeployer", "ConstantProductPoolFactory", "SwapRouter", "ConstantProductPool"]);
       await deploy(this, [
         ["weth", this.ERC20Mock, ["WETH", "ETH", getBigNumber("10000000")]],
         ["sushi", this.ERC20Mock, ["SUSHI", "SUSHI", getBigNumber("10000000")]],
@@ -41,39 +43,61 @@ describe("Router", function () {
         await this[mapping[i]].approve(this.bento.address, BigNumber.from(10).pow(30))
         await this.bento.deposit(this[mapping[i]].address, alice.address, alice.address, BigNumber.from(10).pow(20), 0);
       }
-      let pools = []
+      this.pools = []
       for (let i = 0; i < (mapping.length - 1); i++) {
         const deployData = ethers.utils.defaultAbiCoder.encode(
           ["address", "address", "uint8"],
           [this[mapping[i]].address, this[mapping[i + 1]].address, 30]
         );
-        const initData = this.ConstantProductPool.interface.encodeFunctionData("init");
-        pools.push(this.ConstantProductPool.attach(
-        (await (await this.masterDeployer.deployPool(this.mirinPoolFactory.address, deployData, initData)).wait()).events[1].args[0]
+        this.pools.push(this.ConstantProductPool.attach(
+        (await (await this.masterDeployer.deployPool(this.mirinPoolFactory.address, deployData)).wait()).events[0].args[0]
         ));
-        await this.bento.transfer(this[mapping[i]].address, alice.address, pools[i].address, BigNumber.from(10).pow(19));
-        await this.bento.transfer(this[mapping[i + 1]].address, alice.address, pools[i].address, BigNumber.from(10).pow(19));
-        await pools[i].mint(alice.address);
+        await this.bento.transfer(this[mapping[i]].address, alice.address, this.pools[i].address, BigNumber.from(10).pow(19));
+        await this.bento.transfer(this[mapping[i + 1]].address, alice.address, this.pools[i].address, BigNumber.from(10).pow(19));
+        await this.pools[i].mint(alice.address);
       }
+    return this
+  })
+
+  const testSwap = async (hopNumber, fromBentoBox, toBentoBox) => {
+      
+      const that = await setupTest();
+
       let amountIn = getBigNumber("1");
       let path = []
+
       for(let i = 0; i <= hopNumber; i++){
-        path.push({"tokenIn" : this[mapping[i]].address, "pool" : pools[i].address, "context" : "0x"})
+        path.push({"tokenIn" : that[mapping[i]].address, "pool" : that.pools[i].address, "context" : "0x"})
       }
+
       let params = {
         "path" : path,
-        "tokenOut" : this[mapping[hopNumber + 1]].address,
-        "recipient" : this.alice.address,
+        "tokenOut" : that[mapping[hopNumber + 1]].address,
+        "recipient" : that.alice.address,
+        "unwrapBento": toBentoBox,
         "deadline" : 2 * Date.now(),
         "amountIn" : amountIn,
         "amountOutMinimum" : 1
       };
 
-      let oldAlice0Balance = await this.bento.balanceOf(this[mapping[0]].address, alice.address);
+      let oldAlice0Balance = await that.bento.balanceOf(that[mapping[0]].address, alice.address);
+      let oldAlice1Balance = await that.bento.balanceOf(that[mapping[hopNumber + 1]].address, alice.address);
+      let oldWallet0Balance = await that[mapping[0]].balanceOf(alice.address);
+      let oldWallet1Balance = await that[mapping[hopNumber + 1]].balanceOf(alice.address);
 
-      await this.router.exactInput(params);
-      expect(await this.bento.balanceOf(this[mapping[0]].address, alice.address)).eq(oldAlice0Balance.sub(amountIn));
-
+      if(fromBentoBox) {
+        await that.router.exactInput(params)
+        expect(await that.bento.balanceOf(that[mapping[0]].address, alice.address)).eq(oldAlice0Balance.sub(amountIn));
+        expect(await that.bento.balanceOf(that[mapping[hopNumber + 1]].address, alice.address)).gt(oldAlice1Balance);
+        expect(await that[mapping[0]].balanceOf(alice.address)).eq(oldWallet0Balance);
+        expect(await that[mapping[hopNumber + 1]].balanceOf(alice.address)).eq(oldWallet1Balance);
+      } else {
+        await that.router.exactInputWithNativeToken(params)
+        expect(await that[mapping[0]].balanceOf(alice.address)).eq(oldWallet0Balance.sub(amountIn));
+        expect(await that[mapping[hopNumber + 1]].balanceOf(alice.address)).gt(oldWallet1Balance);
+        expect(await that.bento.balanceOf(that[mapping[0]].address, alice.address)).eq(oldAlice0Balance);
+        expect(await that.bento.balanceOf(that[mapping[hopNumber + 1]].address, alice.address)).eq(oldAlice1Balance);
+      }      
   }
 
   before(async function () {
@@ -155,7 +179,7 @@ describe("Router", function () {
     });
 
     it("Should work with test Swap", async function() {
-      await testSwap(0, false, false);
+      await testSwap(0, true, false);
     })
 
     it("Should add balanced liquidity", async function() {
