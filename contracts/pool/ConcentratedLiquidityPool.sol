@@ -25,6 +25,8 @@ abstract contract ConstantProductConcentratedPool is Multicall, TridentNFT, IPoo
     uint256 internal constant MINIMUM_LIQUIDITY = 10**3;
     
     int24 public immutable tackSpacing;
+    int24 public currentTack;
+    
     uint8 internal constant PRECISION = 112;
     uint256 internal constant MAX_FEE = 10000; // 100%
     uint256 internal constant MAX_FEE_SQUARE = 100000000;
@@ -56,7 +58,9 @@ abstract contract ConstantProductConcentratedPool is Multicall, TridentNFT, IPoo
     
     struct Tack { // cf. Tick
         int24 lastTack;
+        uint256 lastTackLiquidity;
         int24 nextTack;
+        uint256 nextTackLiquidity;
     }
 
     /// @dev
