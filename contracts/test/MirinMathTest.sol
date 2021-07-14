@@ -5,6 +5,7 @@ pragma solidity ^0.8.2;
 import "../libraries/MirinMath.sol";
 
 contract MirinMathTest {
+/*
     function _floorLog2(uint256 _n) public pure returns (uint8) {
         return MirinMath.floorLog2(_n);
     }
@@ -24,4 +25,5 @@ contract MirinMathTest {
     function _optimalExp(uint256 x) public pure returns (uint256) {
         return MirinMath.optimalExp(x);
     }
+*/
 }
