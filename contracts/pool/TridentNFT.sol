@@ -36,6 +36,11 @@ contract TridentNFT {
         return (sig == 0x80ac58cd || sig == 0x5b5e139f); // ERC-165
     }
     
+    function getRangeById(uint256 tokenId) public view returns (uint256 loPt, uint256 hiPt) {
+        loPt = ranges[tokenId].loPt;
+        hiPt = ranges[tokenId].hiPt;
+    }
+    
     function approve(address spender, uint256 tokenId) external {
         address owner = ownerOf[tokenId];
         require(msg.sender == owner || isApprovedForAll[owner][msg.sender], "!owner/operator");
@@ -61,7 +66,7 @@ contract TridentNFT {
             uint256 tokenId = totalSupply;
             ranges[tokenId].loPt = loPt;
             ranges[tokenId].hiPt = hiPt;
-            emit Transfer(address(0), to, tokenId); // notices opening position for an account
+            emit Transfer(address(0), to, tokenId); // notices opening position
         }
     }
 
@@ -78,11 +83,11 @@ contract TridentNFT {
         }
         if (triPts[loPt][hiPt].balanceOf[from] == 0) {
             totalSupply--;
-            emit Transfer(from, address(0), tokenId); // notices closing position for an account
+            emit Transfer(from, address(0), tokenId); // notices closing position
         }
     }
     
-    function _poolBurn(
+    function _swapBurn(
         uint256 hiPt, 
         uint256 loPt, 
         address from, 
@@ -92,10 +97,6 @@ contract TridentNFT {
         unchecked {
             triPts[loPt][hiPt].totalSupply -= value;
         }
-        if (triPts[loPt][hiPt].balanceOf[from] == 0) {
-            totalSupply--;
-            emit Transfer(from, address(0), 1); // notices closing position for an account
-        }
     }
 
     function transfer(address to, uint256 tokenId) external {
@@ -104,6 +105,9 @@ contract TridentNFT {
         balanceOf[to]++; 
         getApproved[tokenId] = address(0);
         ownerOf[tokenId] = to;
+        (uint256 loPt, uint256 hiPt) = getRangeById(tokenId);
+        triPts[loPt][hiPt].balanceOf[to] = triPts[loPt][hiPt].balanceOf[msg.sender];
+        triPts[loPt][hiPt].balanceOf[msg.sender] = 0;
         emit Transfer(msg.sender, to, tokenId); 
     }
     
@@ -114,6 +118,9 @@ contract TridentNFT {
         balanceOf[to]++; 
         getApproved[tokenId] = address(0);
         ownerOf[tokenId] = to;
+        (uint256 loPt, uint256 hiPt) = getRangeById(tokenId);
+        triPts[loPt][hiPt].balanceOf[to] = triPts[loPt][hiPt].balanceOf[owner];
+        triPts[loPt][hiPt].balanceOf[owner] = 0;
         emit Transfer(owner, to, tokenId); 
     }
 }
