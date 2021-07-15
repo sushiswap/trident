@@ -6,158 +6,11 @@ import "../base/Multicall.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/IBentoBox.sol";
 import "../interfaces/IMirinCallee.sol";
+import "./TridentNFT.sol";
 import "../libraries/MirinMath.sol";
 import "../deployer/MasterDeployer.sol";
 
-/// @notice Virtual NFTs for `Tripoint` liquidity positions on extended ERC20 interface.
-/// @author Ross Campbell
-contract TriPtToken {
-    string public constant name = "Trident";
-    string public constant symbol = "TRIDENT";
-    uint8 public decimals;
-
-    uint256 public totalSupply; // tracks total unique liquidity `triPts` 
-    mapping(address => uint256) public balanceOf; // tracks `triPts` held by an account
-    mapping(address => mapping(address => uint256)) public allowance;
-
-    bytes32 public immutable DOMAIN_SEPARATOR;
-    // keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
-    bytes32 public constant PERMIT_TYPEHASH = 0x6e71edae12b1b97f4d1f60370fef10105fa2faae0126114a169c64845d6126c9;
-    mapping(address => uint256) public nonces;
-    
-    mapping(uint256 => mapping(uint256 => Tripoint)) public triPts; // tracks liquidity updates in `Tripoint` range
-
-    struct Tripoint { // virtual pool in liquidity `triPts` range (lo| |hi)
-        uint112 reserve0; // last token0 balance
-        uint112 reserve1; // last token1 balance
-        uint256 totalSupply; // total for pool providers
-        mapping(address => uint256) balanceOf; // account provider balance
-    }
-
-    constructor() {
-        uint256 chainId;
-        assembly {
-            chainId := chainid()
-        }
-        DOMAIN_SEPARATOR = keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes(name)),
-                keccak256(bytes("1")),
-                chainId,
-                address(this)
-            )
-        );
-    }
-
-    event Approval(address indexed owner, address indexed spender, uint256 value);
-    event Transfer(address indexed from, address indexed to, uint256 value);
-
-    function _mint(
-        uint256 loPt, 
-        uint256 hiPt, 
-        address to, 
-        uint256 value
-    ) internal {
-        triPts[loPt][hiPt].totalSupply += value;
-        triPts[loPt][hiPt].balanceOf[to] += value;
-        if (triPts[loPt][hiPt].balanceOf[to] == 0) {
-            totalSupply++;
-            emit Transfer(address(0), to, 1); // notices opening position for an account
-        }
-    }
-
-    function _burn(
-        uint256 hiPt, 
-        uint256 loPt, 
-        address from, 
-        uint256 value
-    ) internal {
-        triPts[loPt][hiPt].balanceOf[from] -= value;
-        unchecked {
-            triPts[loPt][hiPt].totalSupply -= value;
-        }
-        if (triPts[loPt][hiPt].balanceOf[from] == 0) {
-            totalSupply--;
-            emit Transfer(from, address(0), 1); // notices closing position for an account
-        }
-    }
-
-    function _approve(
-        address owner,
-        address spender,
-        uint256 value
-    ) private {
-        allowance[owner][spender] = value;
-        emit Approval(owner, spender, value);
-    }
-
-    function _transfer(
-        address from,
-        address to,
-        uint256 value
-    ) private {
-        balanceOf[from] -= value;
-        unchecked {
-            balanceOf[to] += value;
-        }
-        emit Transfer(from, to, value);
-    }
-
-    function _transferFrom(
-        address from,
-        address to,
-        uint256 value
-    ) private {
-        if (allowance[from][msg.sender] != type(uint256).max) {
-            allowance[from][msg.sender] -= value;
-        }
-        _transfer(from, to, value);
-    }
-
-    function approve(address spender, uint256 value) external returns (bool) {
-        _approve(msg.sender, spender, value);
-        return true;
-    }
-
-    function transfer(address to, uint256 value) external returns (bool) {
-        _transfer(msg.sender, to, value);
-        return true;
-    }
-
-    function transferFrom(
-        address from,
-        address to,
-        uint256 value
-    ) external returns (bool) {
-        _transferFrom(from, to, value);
-        return true;
-    }
-
-    function permit(
-        address owner,
-        address spender,
-        uint256 value,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external {
-        require(deadline >= block.timestamp, "MIRIN: EXPIRED");
-        bytes32 digest = keccak256(
-            abi.encodePacked(
-                "\x19\x01",
-                DOMAIN_SEPARATOR,
-                keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, value, nonces[owner]++, deadline))
-            )
-        );
-        address recoveredAddress = ecrecover(digest, v, r, s);
-        require(recoveredAddress != address(0) && recoveredAddress == owner, "MIRIN: INVALID_SIGNATURE");
-        _approve(owner, spender, value);
-    }
-}
-
-abstract contract ConstantProductConcentratedPool is Multicall, TriPtToken, IPool {
+abstract contract ConstantProductConcentratedPool is Multicall, TridentNFT, IPool {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Swap(
@@ -170,7 +23,10 @@ abstract contract ConstantProductConcentratedPool is Multicall, TriPtToken, IPoo
     );
 
     uint256 internal constant MINIMUM_LIQUIDITY = 10**3;
-
+    
+    int24 public immutable tackSpacing;
+    int24 public currentTack;
+    
     uint8 internal constant PRECISION = 112;
     uint256 internal constant MAX_FEE = 10000; // 100%
     uint256 internal constant MAX_FEE_SQUARE = 100000000;
@@ -199,11 +55,18 @@ abstract contract ConstantProductConcentratedPool is Multicall, TriPtToken, IPoo
         _;
         unlocked = 1;
     }
+    
+    struct Tack { // cf. Tick
+        int24 lastTack;
+        uint256 lastTackLiquidity;
+        int24 nextTack;
+        uint256 nextTackLiquidity;
+    }
 
     /// @dev
     /// Only set immutable variables here. State changes made here will not be used.
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (IERC20 tokenA, IERC20 tokenB, uint256 _swapFee) = abi.decode(_deployData, (IERC20, IERC20, uint256));
+        (IERC20 tokenA, IERC20 tokenB, uint256 _swapFee, int24 _tackSpacing) = abi.decode(_deployData, (IERC20, IERC20, uint256, int24));
 
         require(address(tokenA) != address(0), "MIRIN: ZERO_ADDRESS");
         require(address(tokenB) != address(0), "MIRIN: ZERO_ADDRESS");
@@ -215,6 +78,7 @@ abstract contract ConstantProductConcentratedPool is Multicall, TriPtToken, IPoo
         token1 = _token1;
         swapFee = _swapFee;
         MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
+        tackSpacing = _tackSpacing;
         bento = IBentoBoxV1(MasterDeployer(_masterDeployer).bento());
         barFeeTo = MasterDeployer(_masterDeployer).barFeeTo();
         masterDeployer = MasterDeployer(_masterDeployer);
@@ -249,7 +113,9 @@ abstract contract ConstantProductConcentratedPool is Multicall, TriPtToken, IPoo
         emit Mint(msg.sender, amount0, amount1, to);
     }
     
-    function burn(uint256 loPt, uint256 hiPt, address to) public lock returns (uint256 amount0, uint256 amount1) {
+    function burn(uint256 tokenId, address to) public lock returns (uint256 amount0, uint256 amount1) {
+        uint256 loPt = ranges[tokenId].loPt;
+        uint256 hiPt = ranges[tokenId].hiPt;
         (uint112 _triPtReserve0, uint112 _triPtreserve1) = _getTriPtReserves(loPt, hiPt); // gas savings
         uint256 _totalSupply = triPts[loPt][hiPt].totalSupply; // gas savings
         _mintFee(loPt, hiPt, _triPtReserve0, _triPtreserve1, _totalSupply);
@@ -259,7 +125,7 @@ abstract contract ConstantProductConcentratedPool is Multicall, TriPtToken, IPoo
         amount0 = (liquidity * _triPtReserve0) / _totalSupply;
         amount1 = (liquidity * _triPtreserve1) / _totalSupply;
 
-        _burn(loPt, hiPt, address(this), liquidity);
+        _burn(tokenId, address(this), liquidity);
 
         bento.transfer(token0, address(this), to, amount0);
         bento.transfer(token1, address(this), to, amount1);
@@ -271,7 +137,7 @@ abstract contract ConstantProductConcentratedPool is Multicall, TriPtToken, IPoo
         kLast = MirinMath.sqrt(balance0 * balance1);
         emit Burn(msg.sender, amount0, amount1, to);
     }
-    // TO-DO: abstract lo/pt params (rn for testing format) -- need to calculate range, crossed liquidity
+
     function swapWithoutContext(
         uint256 loPt,
         uint256 hiPt,
@@ -470,7 +336,7 @@ abstract contract ConstantProductConcentratedPool is Multicall, TriPtToken, IPoo
             }
         }
     }
-    // TO-DO
+    // TO-DO - read range internally
     function _burnLiquiditySingle(
         uint256 loPt,
         uint256 hiPt,
@@ -520,7 +386,7 @@ abstract contract ConstantProductConcentratedPool is Multicall, TriPtToken, IPoo
             require(finalAmountOut <= allowedAmountOut, "Insufficient liquidity burned");
         }
 
-        _burn(loPt, hiPt, address(this), liquidity);
+        _swapBurn(loPt, hiPt, address(this), liquidity);
 
         (uint256 balance0, uint256 balance1) = _balance();
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
@@ -528,7 +394,7 @@ abstract contract ConstantProductConcentratedPool is Multicall, TriPtToken, IPoo
         kLast = MirinMath.sqrt(balance0 * balance1);
         emit Burn(msg.sender, amount0, amount1, to);
     }
-    // TO-DO
+    
     function _getOutAmountForBurn(
         address tokenOut,
         uint256 liquidity,
@@ -674,7 +540,7 @@ abstract contract ConstantProductConcentratedPool is Multicall, TriPtToken, IPoo
             amountOut = _getAmountOut(amountIn, _triPtreserve1, _triPtReserve0);
         }
     }
-    // TO-DO
+    
     function getOptimalLiquidityInAmounts(liquidityInput[] memory liquidityInputs)
         external
         view
