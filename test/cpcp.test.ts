@@ -1,11 +1,12 @@
 import { ethers } from "hardhat";
 import { getBigNumber } from "./utilities"
 
-describe.only("Constant product concentrated pool", function () {
+describe.only("Constant product concentrated pool (cpcp)", function () {
 
   let alice, weth, dai, daiWethPool: any;
 
   before(async function () {
+
     [alice] = await ethers.getSigners();
 
     const ERC20 = await ethers.getContractFactory("ERC20Mock");

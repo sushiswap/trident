@@ -48,19 +48,23 @@ contract Cpcp {
 
   function mint(int24 lowerOld, int24 lower, int24 upperOld, int24 upper, uint112 amount) public {
 
-    updateLinkedList(lowerOld, lower, upperOld, upper, amount);
-
-    updateNearestTickPointer(lower, upper, nearestTick, sqrtPriceX96);
-
-    getAssets(lower, upper, sqrtPriceX96, amount);
-
-  }
-
-  function getAssets(int24 lower, int24 upper, uint160 _sqrtPriceX96, uint112 liquidityAmount) internal {
-
     uint160 priceLower = TickMath.getSqrtRatioAtTick(lower);
     
     uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper);
+
+    uint160 currentPrice = sqrtPriceX96;
+
+    if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += amount;
+
+    updateLinkedList(lowerOld, lower, upperOld, upper, amount);
+
+    updateNearestTickPointer(lower, upper, nearestTick, currentPrice);
+    
+    getAssets(priceLower, priceUpper, currentPrice, amount);
+
+  }
+
+  function getAssets(uint160 priceLower, uint160 priceUpper, uint160 _sqrtPriceX96, uint112 liquidityAmount) internal {
 
     uint256 token0amount = 0;
 
