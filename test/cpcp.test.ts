@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 import { getBigNumber } from "./utilities"
 
-describe.only("Constant product concentrated pool", function () {
+describe("Constant product concentrated pool", function () {
 
   let alice, weth, dai, daiWethPool;
 
