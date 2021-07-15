@@ -15,8 +15,6 @@ contract Cpcp {
   }
 
   mapping(int24 => Tick) public ticks;
-
-  int24 public currentTick;
   
   uint112 public liquidity;
 
