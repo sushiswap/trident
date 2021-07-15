@@ -2,8 +2,9 @@ pragma solidity ^0.8.2;
 pragma abicoder v2;
 
 import "../../contracts/SwapRouter.sol";
+
 contract SwapRouterHarness is SwapRouter {
-    //fields of the SwapRouter structs
+    // fields of the SwapRouter structs
     bytes public contextHarness;
     address public tokenInHarness;
     address public tokenOutHarness;
@@ -21,9 +22,8 @@ contract SwapRouterHarness is SwapRouter {
     constructor(address _WETH, address _masterDeployer, address _bento)
         SwapRouter(_WETH, _masterDeployer, _bento) public { }
 
-    
     function exactInputSingle(ExactInputSingleParams calldata params)
-        external
+        public
         payable
         override
         checkDeadline(params.deadline)

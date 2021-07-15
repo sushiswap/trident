@@ -17,8 +17,7 @@
 */
 
 methods {
-    //global variables use to create SwapRouter structs
-    poolHarness() returns (address) envfree
+    // global variables use to create SwapRouter structs
     contextHarness() returns (bytes) envfree
     tokenInHarness() returns (address) envfree
     tokenOutHarness() returns (address) envfree
@@ -42,7 +41,7 @@ rule exactInputSingleCanBeHarnessed() {
 
     calldataarg args;
 
-    exactInputSingle(args);
+    exactInputSingle(e, args);
 
     assert true;
 }

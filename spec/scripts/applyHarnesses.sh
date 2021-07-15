@@ -6,8 +6,10 @@ perl -0777 -i -pe 's/uint256\[\] calldata amounts,\s+bytes calldata data\s+\) pu
 perl -0777 -i -pe 's/external payable returns \(bool /external virtual payable returns \(bool /g' contracts/flat/BentoBoxV1Flat.sol
 perl -0777 -i -pe 's/public payable returns \(address /public virtual payable returns \(address /g' contracts/flat/BentoBoxV1Flat.sol
 perl -0777 -i -pe 's/        external\n        payable/        external\n        virtual\n        payable/g' contracts/flat/BentoBoxV1Flat.sol # for batch
-perl -0777 -i -pe 's/external payable returns/external virtual payable returns/g' contracts/SwapRouter.sol
 
+# virtualize functions for SwapRouter
+perl -0777 -i -pe 's/external payable returns/external virtual payable returns/g' contracts/SwapRouter.sol
+perl -0777 -i -pe 's/        external\n        payable/        public\n        virtual\n        payable/g' contracts/SwapRouter.sol # for ExactSingleInput and others ...
 
 # remove hardhat console
 perl -0777 -i -pe 's/import \"hardhat/\/\/ import \"hardhat/g' contracts/SwapRouter.sol

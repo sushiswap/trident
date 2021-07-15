@@ -19,6 +19,12 @@ using SimpleBentoBox as bentoBox
 */
 
 methods {
+    // MirinERC20 (permit)
+    ecrecover(bytes32 digest, uint8 v, bytes32 r, bytes32 s) 
+              returns (address) => NONDET
+
+    // ConstantProductPool (swap, swapWithContext) -> IMirinCallee (mirinCall)
+    mirinCall(address sender, uint256 amount0Out, uint256 amount1Out, bytes data) => NONDET
 }
 
 ////////////////////////////////////////////////////////////////////////////
