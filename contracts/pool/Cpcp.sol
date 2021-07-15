@@ -2,6 +2,7 @@
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../libraries/TickMath.sol";
+import "hardhat/console.sol";
 
 pragma solidity ^0.8.2;
 
@@ -67,26 +68,25 @@ contract Cpcp {
     uint256 token0amount = 0;
 
     uint256 token1amount = 0;
-
-    if (priceUpper < _sqrtPriceX96) {
-
+    
+    // todo use the fullmath library here to deal fith over flows
+    if (priceUpper < _sqrtPriceX96) { // todo, think about edgecases here <= vs <
       // only supply token1 (token1 is Y)
       token1amount = liquidityAmount * uint256(priceUpper - priceLower);
     
-    } else if (priceLower <= _sqrtPriceX96) {
-
+    } else if (_sqrtPriceX96 < priceLower) {
       // only supply token0 (token0 is X)
       token0amount = (liquidityAmount * uint256(priceUpper - priceLower) / priceLower ) / priceUpper;
 
     } else {
+      
+      token0amount = ((uint256(liquidityAmount) << 96) * uint256(priceUpper - _sqrtPriceX96) / _sqrtPriceX96) / priceUpper;
 
-      token1amount = liquidityAmount * uint256(_sqrtPriceX96 - priceLower);
-
-      token0amount = (liquidityAmount * uint256(priceUpper - _sqrtPriceX96) / _sqrtPriceX96) / priceUpper;
+      token1amount = liquidityAmount * uint256(_sqrtPriceX96 - priceLower) / 0x1000000000000000000000000;
 
     }
-
-    if (token0amount > 0) token0.transferFrom(msg.sender, address(this), token0amount);
+    
+    if (token0amount > 0) token0.transferFrom(msg.sender, address(this), token0amount); // ! this will be in bento shares eventually
 
     if (token1amount > 0) token1.transferFrom(msg.sender, address(this), token1amount);
     
@@ -106,9 +106,9 @@ contract Cpcp {
 
   function updateLinkedList(int24 lowerOld, int24 lower, int24 upperOld, int24 upper, uint112 amount) internal {
     
-    require(lower % 2 == 0, "Lower even");
+    require(uint24(lower) % 2 == 0, "Lower even");
 
-    require(upper % 2 == 1, "Upper odd");
+    require(uint24(upper) % 2 == 1, "Upper odd");
 
     if (ticks[lower].exists) {
       
