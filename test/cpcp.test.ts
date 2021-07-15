@@ -1,9 +1,9 @@
 import { ethers } from "hardhat";
 import { getBigNumber } from "./utilities"
 
-describe("Constant product concentrated pool", function () {
+describe.only("Constant product concentrated pool", function () {
 
-  let alice, weth, dai, daiWethPool;
+  let alice, weth, dai, daiWethPool: any;
 
   before(async function () {
     [alice] = await ethers.getSigners();
@@ -19,8 +19,14 @@ describe("Constant product concentrated pool", function () {
       [weth.address, dai.address]
     );
 
-    console.log(await CPCP.deploy(deployData));
+    daiWethPool = await CPCP.deploy(deployData);
 
-  })
+  });
+
+  it.only('Should initialize correctly', async () => {
+
+    console.log(daiWethPool.address);
+
+  });
 
 });

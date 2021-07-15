@@ -11,6 +11,6 @@ contract ConcentratedLiquidityPoolFactory {
     // Consider deploying via an upgradable proxy to allow upgrading pools in the future
     
     function deployPool(bytes memory _deployData) external returns (address) {
-        return address(new ConcentratedLiquidityPool(_deployData, msg.sender));
+        // return address(new ConcentratedLiquidityPool(_deployData, msg.sender));
     }
 }
