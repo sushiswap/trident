@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.2;
 
-import "../base/Multicall.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/IBentoBox.sol";
 import "../interfaces/IMirinCallee.sol";
@@ -96,7 +95,7 @@ contract ConstantProductPool is MirinERC20, IPool {
         emit Mint(msg.sender, amount0, amount1, to);
     }
 
-    function burn(address to) public lock returns (uint256 amount0, uint256 amount1) {
+    function burn(address to, bool unwrapBento) public lock returns (uint256 amount0, uint256 amount1) {
         (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
         uint256 _totalSupply = totalSupply;
         _mintFee(_reserve0, _reserve1, _totalSupply);
@@ -108,11 +107,45 @@ contract ConstantProductPool is MirinERC20, IPool {
 
         _burn(address(this), liquidity);
 
-        bento.transfer(token0, address(this), to, amount0);
-        bento.transfer(token1, address(this), to, amount1);
+        _transferWithoutData(amount0, amount1, to, unwrapBento);
 
         balance0 -= amount0;
         balance1 -= amount1;
+
+        _update(balance0, balance1);
+        kLast = MirinMath.sqrt(balance0 * balance1);
+        emit Burn(msg.sender, amount0, amount1, to);
+    }
+
+    function burnLiquiditySingle(
+        address tokenOut,
+        address to,
+        bool unwrapBento
+    ) public lock returns (uint256 amount0, uint256 amount1) {
+        (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
+        uint256 _totalSupply = totalSupply;
+        _mintFee(_reserve0, _reserve1, _totalSupply);
+
+        uint256 liquidity = balanceOf[address(this)];
+        (uint256 balance0, uint256 balance1) = _balance();
+        amount0 = (liquidity * balance0) / _totalSupply;
+        amount1 = (liquidity * balance1) / _totalSupply;
+
+        _burn(address(this), liquidity);
+
+        if (tokenOut == address(token0)) {
+            // Swap token1 for token0
+            // Calculate amountOut as if the user first withdrew balanced liquidity and then swapped token1 for token0
+            amount0 += _getAmountOut(amount1, _reserve0 - amount0, _reserve1 - amount1);
+            _transfer(token0, amount0, to, unwrapBento);
+            balance0 -= amount0;
+        } else {
+            // Swap token0 for token1
+            require(tokenOut == address(token1), "Invalid output token");
+            amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1);
+            _transfer(token1, amount1, to, unwrapBento);
+            balance1 -= amount1;
+        }
 
         _update(balance0, balance1);
         kLast = MirinMath.sqrt(balance0 * balance1);
@@ -157,17 +190,14 @@ contract ConstantProductPool is MirinERC20, IPool {
         (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
 
         if (tokenIn == address(token0)) {
-            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
             require(tokenOut == address(token1), "Invalid output token");
+            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
             _swapWithData(0, amountOut, recipient, unwrapBento, context, _reserve0, _reserve1);
-        } else if (tokenIn == address(token1)) {
-            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
-            require(tokenOut == address(token0), "Invalid output token");
-            _swapWithData(amountOut, 0, recipient, unwrapBento, context, _reserve0, _reserve1);
         } else {
-            require(tokenIn == address(this), "Invalid input token");
-            require(tokenOut == address(token0) || tokenOut == address(token1), "Invalid output token");
-            amountOut = _burnLiquiditySingle(amountIn, amountOut, tokenOut, recipient, context, _reserve0, _reserve1);
+            require(tokenIn == address(token1), "Invalid input token");
+            require(tokenOut == address(token0), "Invalid output token");
+            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
+            _swapWithData(amountOut, 0, recipient, unwrapBento, context, _reserve0, _reserve1);
         }
     }
 
@@ -182,7 +212,7 @@ contract ConstantProductPool is MirinERC20, IPool {
     }
 
     function _update(uint256 balance0, uint256 balance1) internal {
-        require(balance0 <= type(uint128).max && balance1 <= type(uint128).max, "MIRIN: OVERFLOW");
+        require(balance0 < type(uint128).max && balance1 < type(uint128).max, "MIRIN: OVERFLOW");
         reserve0 = uint128(balance0);
         reserve1 = uint128(balance1);
     }
@@ -191,7 +221,7 @@ contract ConstantProductPool is MirinERC20, IPool {
         uint128 _reserve0,
         uint128 _reserve1,
         uint256 _totalSupply
-    ) private returns (uint256 computed) {
+    ) internal returns (uint256 computed) {
         uint256 _kLast = kLast;
         if (_kLast != 0) {
             computed = MirinMath.sqrt(uint256(_reserve0) * _reserve1);
@@ -204,79 +234,6 @@ contract ConstantProductPool is MirinERC20, IPool {
                     _mint(barFeeTo, liquidity);
                 }
             }
-        }
-    }
-
-    function _burnLiquiditySingle(
-        uint256 amountIn,
-        uint256 amountOut,
-        address tokenOut,
-        address to,
-        bytes calldata data,
-        uint128 _reserve0,
-        uint128 _reserve1
-    ) internal returns (uint256 finalAmountOut) {
-        uint256 _totalSupply = totalSupply;
-        _mintFee(_reserve0, _reserve1, _totalSupply);
-
-        uint256 amount0;
-        uint256 amount1;
-        uint256 liquidity;
-
-        if (amountIn > 0) {
-            finalAmountOut = _getOutAmountForBurn(tokenOut, amountIn, _totalSupply, _reserve0, _reserve1);
-
-            if (tokenOut == address(token0)) {
-                amount0 = finalAmountOut;
-            } else {
-                amount1 = finalAmountOut;
-            }
-
-            _transferWithoutData(amount0, amount1, to, false);
-            if (data.length > 0) IMirinCallee(to).mirinCall(msg.sender, amount0, amount1, data);
-
-            liquidity = balanceOf[address(this)];
-            require(liquidity >= amountIn, "Insufficient liquidity burned");
-        } else {
-            if (tokenOut == address(token0)) {
-                amount0 = amountOut;
-            } else {
-                amount1 = amountOut;
-            }
-
-            _transferWithoutData(amount0, amount1, to, false);
-            if (data.length > 0) IMirinCallee(to).mirinCall(msg.sender, amount0, amount1, data);
-            finalAmountOut = amountOut;
-
-            liquidity = balanceOf[address(this)];
-            uint256 allowedAmountOut = _getOutAmountForBurn(tokenOut, liquidity, _totalSupply, _reserve0, _reserve1);
-            require(finalAmountOut <= allowedAmountOut, "Insufficient liquidity burned");
-        }
-
-        _burn(address(this), liquidity);
-
-        (uint256 balance0, uint256 balance1) = _balance();
-        _update(balance0, balance1);
-
-        kLast = MirinMath.sqrt(balance0 * balance1);
-        emit Burn(msg.sender, amount0, amount1, to);
-    }
-
-    function _getOutAmountForBurn(
-        address tokenOut,
-        uint256 liquidity,
-        uint256 _totalSupply,
-        uint128 _reserve0,
-        uint128 _reserve1
-    ) internal view returns (uint256 amount) {
-        uint256 amount0 = (liquidity * _reserve0) / _totalSupply;
-        uint256 amount1 = (liquidity * _reserve1) / _totalSupply;
-        if (tokenOut == address(token0)) {
-            amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0);
-            return amount0;
-        } else {
-            amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1);
-            return amount1;
         }
     }
 
@@ -371,14 +328,11 @@ contract ConstantProductPool is MirinERC20, IPool {
         emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
     }
 
-    // force balances to match reserves
-    function skim(address to) external lock {
-        (uint256 balance0, uint256 balance1) = _balance();
-        bento.transfer(token0, address(this), to, bento.toShare(token0, balance0 - reserve0, false));
-        bento.transfer(token1, address(this), to, bento.toShare(token1, balance1 - reserve1, false));
-    }
-
-    function getAmountOut(address tokenIn, uint256 amountIn) external view returns (uint256 amountOut) {
+    function getAmountOut(
+        address tokenIn,
+        address, /*tokenOut*/
+        uint256 amountIn
+    ) external view returns (uint256 amountOut) {
         (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
         if (IERC20(tokenIn) == token0) {
             amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
@@ -393,33 +347,30 @@ contract ConstantProductPool is MirinERC20, IPool {
         override
         returns (liquidityAmount[] memory)
     {
+        if (IERC20(liquidityInputs[0].token) == token1) {
+            // Swap tokens to be in order
+            (liquidityInputs[0], liquidityInputs[1]) = (liquidityInputs[1], liquidityInputs[0]);
+        }
         uint128 _reserve0;
         uint128 _reserve1;
         liquidityAmount[] memory liquidityOptimal = new liquidityAmount[](2);
         liquidityOptimal[0] = liquidityAmount({token: liquidityInputs[0].token, amount: liquidityInputs[0].amountDesired});
         liquidityOptimal[1] = liquidityAmount({token: liquidityInputs[1].token, amount: liquidityInputs[1].amountDesired});
 
-        if (IERC20(liquidityInputs[0].token) == token0) {
-            (_reserve0, _reserve1) = (reserve0, reserve1);
-        } else {
-            (_reserve1, _reserve0) = (reserve0, reserve1);
-        }
+        (_reserve0, _reserve1) = (reserve0, reserve1);
 
-        if (_reserve0 == 0 && _reserve1 == 0) {
+        if (_reserve0 == 0) {
             return liquidityOptimal;
         }
 
-        uint256 amountBOptimal = (liquidityInputs[0].amountDesired * _reserve1) / _reserve0;
-        if (amountBOptimal <= liquidityInputs[1].amountDesired) {
-            require(amountBOptimal >= liquidityInputs[1].amountMin, "MIRIN: INSUFFICIENT_B_AMOUNT");
-            liquidityOptimal[0].amount = liquidityInputs[0].amountDesired;
-            liquidityOptimal[1].amount = amountBOptimal;
+        uint256 amount1Optimal = (liquidityInputs[0].amountDesired * _reserve1) / _reserve0;
+        if (amount1Optimal <= liquidityInputs[1].amountDesired) {
+            require(amount1Optimal >= liquidityInputs[1].amountMin, "INSUFFICIENT_B_AMOUNT");
+            liquidityOptimal[1].amount = amount1Optimal;
         } else {
-            uint256 amountAOptimal = (liquidityInputs[1].amountDesired * _reserve0) / _reserve1;
-            assert(amountAOptimal <= liquidityInputs[0].amountDesired);
-            require(amountAOptimal >= liquidityInputs[0].amountMin, "MIRIN: INSUFFICIENT_A_AMOUNT");
-            liquidityOptimal[0].amount = amountAOptimal;
-            liquidityOptimal[1].amount = liquidityInputs[1].amountDesired;
+            uint256 amount0Optimal = (liquidityInputs[1].amountDesired * _reserve0) / _reserve1;
+            require(amount0Optimal >= liquidityInputs[0].amountMin, "INSUFFICIENT_A_AMOUNT");
+            liquidityOptimal[0].amount = amount0Optimal;
         }
 
         return liquidityOptimal;
