@@ -14,6 +14,14 @@ rule sqrtLowerScope(uint256 x) {
     assert(result <= max_uint64);
 }
 
+rule multiplication(uint256 x, uint256 y) {
+    require(x * y <= max_uint256);
+    uint256 result_x = sqrt(x);
+    uint256 result_y = sqrt(y);
+    uint256 result_xy = sqrt(x * y);
+    assert(result_x * result_y == result_xy, "Multiplication rule violated");
+}
+
 rule inverseWithinScope(uint256 x) {
     uint256 result = sqrt(x);  // I was hoping this would display the actual value in the Verification Report
     
