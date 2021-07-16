@@ -9,8 +9,10 @@ import "../interfaces/IMirinCallee.sol";
 import "./TridentNFT.sol";
 import "../libraries/MirinMath.sol";
 import "../deployer/MasterDeployer.sol";
+import "../libraries/TickMath.sol";
+import "hardhat/console.sol";
 
-abstract contract ConstantProductConcentratedPool is Multicall, TridentNFT, IPool {
+abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Swap(
@@ -23,10 +25,7 @@ abstract contract ConstantProductConcentratedPool is Multicall, TridentNFT, IPoo
     );
 
     uint256 internal constant MINIMUM_LIQUIDITY = 10**3;
-    
-    int24 public immutable tackSpacing;
-    int24 public currentTack;
-    
+
     uint8 internal constant PRECISION = 112;
     uint256 internal constant MAX_FEE = 10000; // 100%
     uint256 internal constant MAX_FEE_SQUARE = 100000000;
@@ -39,6 +38,12 @@ abstract contract ConstantProductConcentratedPool is Multicall, TridentNFT, IPoo
     MasterDeployer public immutable masterDeployer;
     IERC20 public immutable token0;
     IERC20 public immutable token1;
+    
+    int24 public immutable tickSpacing;
+    int24 public nearestTick;
+    
+    uint112 public liquidity;
+    uint160 public sqrtPriceX96;
 
     uint256 public price0CumulativeLast;
     uint256 public price1CumulativeLast;
@@ -47,6 +52,14 @@ abstract contract ConstantProductConcentratedPool is Multicall, TridentNFT, IPoo
     uint112 internal reserve0;
     uint112 internal reserve1;
     uint32 internal blockTimestampLast;
+    
+    mapping(int24 => Tick) public ticks;
+    struct Tick {
+        int24 previousTick;
+        int24 nextTick;
+        uint112 liquidity;
+        bool exists; // might not be necessary
+    }
 
     uint256 private unlocked = 1;
     modifier lock() {
@@ -56,17 +69,10 @@ abstract contract ConstantProductConcentratedPool is Multicall, TridentNFT, IPoo
         unlocked = 1;
     }
     
-    struct Tack { // cf. Tick
-        int24 lastTack;
-        uint256 lastTackLiquidity;
-        int24 nextTack;
-        uint256 nextTackLiquidity;
-    }
-
     /// @dev
     /// Only set immutable variables here. State changes made here will not be used.
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (IERC20 tokenA, IERC20 tokenB, uint256 _swapFee, int24 _tackSpacing) = abi.decode(_deployData, (IERC20, IERC20, uint256, int24));
+        (IERC20 tokenA, IERC20 tokenB, uint256 _swapFee, int24 _tickSpacing, uint160 _sqrtPriceX96) = abi.decode(_deployData, (IERC20, IERC20, uint256, int24, uint160));
 
         require(address(tokenA) != address(0), "MIRIN: ZERO_ADDRESS");
         require(address(tokenB) != address(0), "MIRIN: ZERO_ADDRESS");
@@ -78,36 +84,49 @@ abstract contract ConstantProductConcentratedPool is Multicall, TridentNFT, IPoo
         token1 = _token1;
         swapFee = _swapFee;
         MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
-        tackSpacing = _tackSpacing;
+        tickSpacing = _tickSpacing;
+        ticks[TickMath.MIN_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint112(0), true);
+        ticks[TickMath.MAX_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint112(0), true);
+        nearestTick = TickMath.MIN_TICK;
         bento = IBentoBoxV1(MasterDeployer(_masterDeployer).bento());
         barFeeTo = MasterDeployer(_masterDeployer).barFeeTo();
         masterDeployer = MasterDeployer(_masterDeployer);
         unlocked = 1;
     }
 
-    function mint(uint256 loPt, uint256 hiPt, address to) public lock returns (uint256 liquidity) {
+    function mint(int24 lowerOld, int24 lower, int24 upperOld, int24 upper) public lock returns (uint256 amount) {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
-        (uint112 _triPtReserve0, uint112 _triPtReserve1) = _getTriPtReserves(loPt, hiPt); // gas savings
-        
-        uint256 _totalSupply = triPts[loPt][hiPt].totalSupply; // gas savings
-        _mintFee(loPt, hiPt, _triPtReserve0, _triPtReserve1, _totalSupply);
 
+        uint256 _totalSupply = tickPools[lower][upper].totalSupply; // gas savings
+        uint112 _rangeLiquidity = tickPools[lower][upper].liquidity; // gas savings
+        _mintFee(lower, upper, _rangeLiquidity, _totalSupply);
+        
         (uint256 balance0, uint256 balance1) = _balance(); // gas savings
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
-        uint256 triPtbalance0 = _triPtReserve0 + amount0;
-        uint256 triPtbalance1 = _triPtReserve1 + amount1;
-
-        uint256 computed = MirinMath.sqrt(triPtbalance0 * triPtbalance1);
+        
+        uint256 computed = MirinMath.sqrt(amount0 * amount1);
         if (_totalSupply == 0) {
-            liquidity = computed - MINIMUM_LIQUIDITY;
-            _mint(loPt, hiPt, address(0), MINIMUM_LIQUIDITY);
+            amount = computed - MINIMUM_LIQUIDITY;
+            _mint(lower, upper, address(0), MINIMUM_LIQUIDITY);
         } else {
-            uint256 k = MirinMath.sqrt(uint256(_triPtReserve0) * _triPtReserve1);
-            liquidity = ((computed - k) * _totalSupply) / k;
+            uint256 k = _rangeLiquidity;
+            amount = ((computed - k) * _totalSupply) / k;
         }
-        require(liquidity > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_MINTED");
-        _mint(loPt, hiPt, to, liquidity);
+        require(amount > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_MINTED");
+        
+        int160 priceLower = TickMath.getSqrtRatioAtTick(lower);
+        uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper);
+        uint160 currentPrice = sqrtPriceX96; // gas savings
+      
+        if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += amount;
+        tickPools[lower][upper].liquidity += amount;
+
+        updateLinkedList(lowerOld, lower, upperOld, upper, amount);
+        updateNearestTickPointer(lower, upper, nearestTick, currentPrice);
+        getAssets(priceLower, priceUpper, currentPrice, amount);
+        
+        _mint(loPt, hiPt, to, amount);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         kLast = MirinMath.sqrt(balance0 * balance1);
         emit Mint(msg.sender, amount0, amount1, to);
@@ -577,5 +596,52 @@ abstract contract ConstantProductConcentratedPool is Multicall, TridentNFT, IPoo
         }
 
         return liquidityOptimal;
+    }
+    
+    function getAssets(uint160 priceLower, uint160 priceUpper, uint160 _sqrtPriceX96, uint112 liquidityAmount) internal {
+        uint256 token0amount = 0;
+        uint256 token1amount = 0;
+        // to-do use the fullmath library here to deal fith over flows
+        if (priceUpper < _sqrtPriceX96) { // todo, think about edgecases here <= vs <
+        // only supply token1 (token1 is Y)
+            token1amount = liquidityAmount * uint256(priceUpper - priceLower);
+        } else if (_sqrtPriceX96 < priceLower) {
+        // only supply token0 (token0 is X)
+            token0amount = (liquidityAmount * uint256(priceUpper - priceLower) / priceLower ) / priceUpper;
+        } else {
+            token0amount = ((uint256(liquidityAmount) << 96) * uint256(priceUpper - _sqrtPriceX96) / _sqrtPriceX96) / priceUpper;
+            token1amount = liquidityAmount * uint256(_sqrtPriceX96 - priceLower) / 0x1000000000000000000000000;
+        }
+        if (token0amount > 0) token0.transferFrom(msg.sender, address(this), token0amount); // ! this will be in bento shares eventually
+        if (token1amount > 0) token1.transferFrom(msg.sender, address(this), token1amount);
+    }
+
+    function updateNearestTickPointer(int24 lower, int24 upper, int24 currentNearestTick, uint160 _sqrtPriceX96) internal  {
+        int24 actualNearestTick = TickMath.getTickAtSqrtRatio(_sqrtPriceX96);
+        if (currentNearestTick < lower && lower <= actualNearestTick) currentNearestTick = lower;
+        if (currentNearestTick < upper && upper <= actualNearestTick) currentNearestTick = upper;
+        nearestTick = currentNearestTick;
+    }
+
+    function updateLinkedList(int24 lowerOld, int24 lower, int24 upperOld, int24 upper, uint112 amount) internal {
+        require(uint24(lower) % 2 == 0, "Lower even");
+        require(uint24(upper) % 2 == 1, "Upper odd");
+
+        if (ticks[lower].exists) {
+            ticks[lower].liquidity += amount;
+        } else {
+            Tick storage old = ticks[lowerOld];
+            require(old.exists && old.nextTick > lower && lowerOld < lower, "Bad ticks");
+            ticks[lower] = Tick(lowerOld, old.nextTick, amount, true);
+            old.nextTick = lower;
+        }
+        if (ticks[upper].exists) {
+            ticks[upper].liquidity += amount;
+        } else {
+        Tick storage old = ticks[upperOld];
+        require(old.exists && old.nextTick > upper && upperOld < upper, "Bad ticks");
+        ticks[upper] = Tick(upperOld, old.nextTick, amount, true);
+        old.nextTick = upper;
+        }
     }
 }
