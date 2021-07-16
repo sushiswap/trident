@@ -9,6 +9,7 @@ perl -0777 -i -pe 's/        external\n        payable/        external\n       
 
 # virtualize functions for SwapRouter
 perl -0777 -i -pe 's/external payable returns/external virtual payable returns/g' contracts/SwapRouter.sol
+perl -0777 -i -pe 's/external payable /public virtual payable /g' contracts/SwapRouter.sol
 perl -0777 -i -pe 's/        external\n        payable/        public\n        virtual\n        payable/g' contracts/SwapRouter.sol # for ExactSingleInput and others ...
 
 # remove hardhat console

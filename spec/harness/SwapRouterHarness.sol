@@ -40,4 +40,49 @@ contract SwapRouterHarness is SwapRouter {
 
         super.exactInputSingle(params);
     }
+
+    function exactInput(ExactInputParams memory params) public payable override checkDeadline(params.deadline) returns (uint256 amount) 
+    {
+        require(params.deadline == deadlineHarness);
+        require(params.path[0].tokenIn == tokenInHarness);
+        require(params.path[0].pool == poolHarness);
+
+        super.exactInput(params);
+    }
+
+    function exactInputSingleWithNativeToken(ExactInputSingleParams calldata params)
+        public
+        payable
+        checkDeadline(params.deadline)
+        returns (uint256 amountOut)
+    {
+        require(params.tokenIn == tokenInHarness);
+        require(params.tokenOut == tokenOutHarness);
+        require(params.recipient == recipientHarness);
+        require(params.unwrapBento == unwrapBentoHarness);
+        require(params.amountIn == amountInHarness);
+        require(params.pool == poolHarness);
+
+        super.exactInputSingleWithNativeToken(params);
+    }
+
+    function exactInputWithNativeToken(ExactInputParams memory params)
+        public
+        payable
+        checkDeadline(params.deadline)
+        returns (uint256 amount)
+    {
+        require(params.deadline == deadlineHarness);
+        require(params.path[0].tokenIn == tokenInHarness);
+        require(params.path[0].pool == poolHarness);
+
+        super.exactInputWithNativeToken(params);
+    }
+
+    function exactInputSingleWithContext(ExactInputSingleParamsWithContext calldata params)
+        public
+        payable
+        checkDeadline(params.deadline)
+        returns (uint256 amountOut)
+    {
 }
