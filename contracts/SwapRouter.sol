@@ -219,6 +219,58 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         liquidity = IPool(pool).mint(to);
     }
 
+    function burnLiquidity(
+        address pool,
+        address to,
+        bool unwrapBento,
+        uint256 deadline,
+        uint256 liquidity,
+        IPool.liquidityAmount[] memory minWithdrawals
+    ) external checkDeadline(deadline) {
+        require(IERC20(pool).transferFrom(msg.sender, pool, liquidity));
+        IPool.liquidityAmount[] memory withdrawnLiquidity = IPool(pool).burn(to, unwrapBento);
+        for (uint256 i; i < minWithdrawals.length; i++) {
+            uint256 j;
+            for (; j < withdrawnLiquidity.length; j++) {
+                if (withdrawnLiquidity[j].token == minWithdrawals[i].token) {
+                    require(withdrawnLiquidity[j].amount >= minWithdrawals[i].amount, "Too little received");
+                    break;
+                }
+            }
+            // A token that is present in `minWithdrawals` is missing from `withdrawnLiquidity`.
+            require(j < withdrawnLiquidity.length, "Incorrect token withdrawn");
+        }
+    }
+
+    function burnLiquiditySingle(
+        address pool,
+        address tokenOut,
+        address to,
+        bool unwrapBento,
+        uint256 deadline,
+        uint256 liquidity,
+        uint256 minWithdrawal
+    ) external checkDeadline(deadline) {
+        // Use liquidity = 0 for pre funding
+        require(IERC20(pool).transferFrom(msg.sender, pool, liquidity));
+        uint256 withdrawn = IPool(pool).burnLiquiditySingle(tokenOut, to, unwrapBento);
+        require(withdrawn >= minWithdrawal, "Too little received");
+    }
+
+    function usePermit(
+        address token,
+        address holder,
+        address spender,
+        uint256 nonce,
+        uint256 expiry,
+        bool allowed,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external {
+        IERC20PermitAllowed(token).permit(holder, spender, nonce, expiry, allowed, v, r, s);
+    }
+
     function depositToBentoBox(
         address token,
         uint256 amount,
@@ -328,7 +380,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         address recipient,
         uint256 value
     ) internal {
-        if (token == WETH && address(this).balance >= value) {
+        if (token == address(0) || (token == WETH && address(this).balance >= value)) {
             // Deposit eth into recipient bentobox
             IBentoBoxV1(bento).deposit{value: value}(IERC20(address(0)), address(this), recipient, value, 0);
         } else {
@@ -345,7 +397,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         address recipient,
         uint256 amount
     ) internal {
-        if ((token == WETH || token == address(0)) && address(this).balance >= amount) {
+        if (token == address(0) || (token == WETH && address(this).balance >= amount)) {
             // Deposit eth into recipient bentobox
             IBentoBoxV1(bento).deposit{value: amount}(IERC20(address(0)), address(this), recipient, amount, 0);
         } else {

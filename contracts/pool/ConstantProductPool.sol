@@ -22,18 +22,17 @@ contract ConstantProductPool is MirinERC20, IPool {
         address indexed to
     );
 
-    uint256 internal constant MINIMUM_LIQUIDITY = 10**3;
+    uint256 internal constant MINIMUM_LIQUIDITY = 1000;
 
-    uint8 internal constant PRECISION = 112;
     uint256 internal constant MAX_FEE = 10000; // 100%
     uint256 internal constant MAX_FEE_SQUARE = 100000000;
     uint256 public immutable swapFee;
     uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
 
-    address public immutable barFeeTo;
+    address internal immutable barFeeTo;
+    IBentoBoxV1 internal immutable bento;
+    MasterDeployer internal immutable masterDeployer;
 
-    IBentoBoxV1 private immutable bento;
-    MasterDeployer public immutable masterDeployer;
     IERC20 public immutable token0;
     IERC20 public immutable token1;
 
@@ -45,14 +44,14 @@ contract ConstantProductPool is MirinERC20, IPool {
     uint256 private unlocked = 1;
     modifier lock() {
         require(unlocked == 1, "MIRIN: LOCKED");
-        unlocked = 0;
+        unlocked = 2;
         _;
         unlocked = 1;
     }
 
     /// @dev
     /// Only set immutable variables here. State changes made here will not be used.
-    constructor(bytes memory _deployData, address _masterDeployer) {
+    constructor(bytes memory _deployData, address _masterDeployer) MirinERC20() {
         (IERC20 tokenA, IERC20 tokenB, uint256 _swapFee) = abi.decode(_deployData, (IERC20, IERC20, uint256));
 
         require(address(tokenA) != address(0), "MIRIN: ZERO_ADDRESS");
@@ -95,15 +94,15 @@ contract ConstantProductPool is MirinERC20, IPool {
         emit Mint(msg.sender, amount0, amount1, to);
     }
 
-    function burn(address to, bool unwrapBento) public lock returns (uint256 amount0, uint256 amount1) {
+    function burn(address to, bool unwrapBento) public override lock returns (liquidityAmount[] memory withdrawnAmounts) {
         (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
         uint256 _totalSupply = totalSupply;
         _mintFee(_reserve0, _reserve1, _totalSupply);
 
         uint256 liquidity = balanceOf[address(this)];
         (uint256 balance0, uint256 balance1) = _balance();
-        amount0 = (liquidity * balance0) / _totalSupply;
-        amount1 = (liquidity * balance1) / _totalSupply;
+        uint256 amount0 = (liquidity * balance0) / _totalSupply;
+        uint256 amount1 = (liquidity * balance1) / _totalSupply;
 
         _burn(address(this), liquidity);
 
@@ -114,6 +113,11 @@ contract ConstantProductPool is MirinERC20, IPool {
 
         _update(balance0, balance1);
         kLast = MirinMath.sqrt(balance0 * balance1);
+
+        withdrawnAmounts = new liquidityAmount[](2);
+        withdrawnAmounts[0] = liquidityAmount({token: address(token0), amount: amount0});
+        withdrawnAmounts[1] = liquidityAmount({token: address(token1), amount: amount1});
+
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
@@ -121,15 +125,15 @@ contract ConstantProductPool is MirinERC20, IPool {
         address tokenOut,
         address to,
         bool unwrapBento
-    ) public lock returns (uint256 amount0, uint256 amount1) {
+    ) public override lock returns (uint256 amount) {
         (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
         uint256 _totalSupply = totalSupply;
         _mintFee(_reserve0, _reserve1, _totalSupply);
 
         uint256 liquidity = balanceOf[address(this)];
         (uint256 balance0, uint256 balance1) = _balance();
-        amount0 = (liquidity * balance0) / _totalSupply;
-        amount1 = (liquidity * balance1) / _totalSupply;
+        uint256 amount0 = (liquidity * balance0) / _totalSupply;
+        uint256 amount1 = (liquidity * balance1) / _totalSupply;
 
         _burn(address(this), liquidity);
 
@@ -139,12 +143,14 @@ contract ConstantProductPool is MirinERC20, IPool {
             amount0 += _getAmountOut(amount1, _reserve0 - amount0, _reserve1 - amount1);
             _transfer(token0, amount0, to, unwrapBento);
             balance0 -= amount0;
+            amount = amount0;
         } else {
             // Swap token0 for token1
             require(tokenOut == address(token1), "Invalid output token");
             amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1);
             _transfer(token1, amount1, to, unwrapBento);
             balance1 -= amount1;
+            amount = amount1;
         }
 
         _update(balance0, balance1);

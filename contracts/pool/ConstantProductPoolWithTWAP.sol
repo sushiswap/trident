@@ -122,6 +122,14 @@ contract ConstantProductPoolWithTWAP is MirinERC20, IPool {
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
+    function burn(address to, bool unwrapBento) external override returns (liquidityAmount[] memory withdrawnAmounts) {}
+
+    function burnLiquiditySingle(
+        address tokenOut,
+        address to,
+        bool unwrapBento
+    ) external override returns (uint256 amount) {}
+
     function swapWithoutContext(
         address tokenIn,
         address tokenOut,

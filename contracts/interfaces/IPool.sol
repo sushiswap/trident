@@ -43,4 +43,8 @@ interface IPool {
         returns (liquidityAmount[] memory liquidityOptimal);
 
     function mint(address to) external returns (uint256 liquidity);
+
+    function burn(address to, bool unwrapBento) external returns (liquidityAmount[] memory withdrawnAmounts);
+
+    function burnLiquiditySingle(address tokenOut, address to, bool unwrapBento) external returns (uint256 amount);
 }
