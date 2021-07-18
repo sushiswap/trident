@@ -36,12 +36,16 @@ methods {
     exactInputSingle((address, address, address, address, bool, uint256, uint256, uint256))
 }
 
+// This is just to check that the harness is working correctly
 rule exactInputSingleCanBeHarnessed() {
     env e;
+
+    address tokenInHarness = tokenInHarness();
+    address tokenOutHarness = tokenOutHarness();
 
     calldataarg args;
 
     exactInputSingle(e, args);
 
-    assert true;
+    assert false;
 }
