@@ -1,8 +1,7 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { BigNumber } = require("ethers");
-const { prepare, deploy, getBigNumber } = require("./utilities");
-
+import { BigNumber } from '@ethersproject/bignumber';
+import { ethers } from 'hardhat'
+import { expect } from 'chai'
+import { getBigNumber } from './utilities'
 
 describe("Router", function () {
   let alice, feeTo, usdt, usdc, bento, masterDeployer, mirinPoolFactory, router, pool;
