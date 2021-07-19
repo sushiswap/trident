@@ -6,7 +6,7 @@ const { getBigNumber } = require("./utilities");
 describe("MirinMath", function () {
 
     before(async function () {
-        const MirinMathContract = await ethers.getContractFactory("MirinMathTest");
+        const MirinMathContract = await ethers.getContractFactory("MirinMathConsumerMock");
         MirinMath = await MirinMathContract.deploy();
     });
 
