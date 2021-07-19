@@ -1,8 +1,5 @@
-// @ts-nocheck
-
-const { ethers } = require("hardhat")
-
-const { BigNumber } = ethers
+import { BigNumber } from "@ethersproject/bignumber"
+import { ethers } from "hardhat"
 
 export async function advanceBlock() {
   return ethers.provider.send("evm_mine", [])
