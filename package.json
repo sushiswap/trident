@@ -56,7 +56,6 @@
     "hardhat-log-remover": "^2.0.0",
     "hardhat-preprocessor": "^0.1.0",
     "hardhat-spdx-license-identifier": "^2.0.0",
-    "hardhat-typechain": "^0.3.0",
     "hardhat-watcher": "^2.0.0",
     "prettier": "^2.0.0",
     "prettier-plugin-solidity": "^1.0.0-beta.16",
