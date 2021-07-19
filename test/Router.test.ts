@@ -1,10 +1,9 @@
 // @ts-nocheck
 
+import { BigNumber } from 'ethers';
 import { ethers } from "hardhat";
 import { expect } from "chai";
-import { prepare, deploy, getBigNumber } from "./utilities"
-import { BigNumber } from 'ethers';
-import { Multicall } from '../typechain/Multicall';
+import { getBigNumber } from "./utilities"
 
 describe("Router", function () {
   let alice, feeTo, weth, sushi, bento, masterDeployer, mirinPoolFactory, router, pool, dai, daiSushiPool, daiWethPool;
