@@ -12,7 +12,6 @@ import "solidity-coverage";
 import "@tenderly/hardhat-tenderly";
 import "@typechain/hardhat";
 
-
 import { HardhatUserConfig, task } from "hardhat/config";
 
 import { removeConsoleLog } from "hardhat-preprocessor";
@@ -64,12 +63,10 @@ const config: HardhatUserConfig = {
       tags: ["local"],
     },
     hardhat: {
-      // Seems to be a bug with this, even when false it complains about being unauthenticated.
-      // Reported to HardHat team and fix is incoming
-      // forking: {
-      //   enabled: process.env.FORKING === "true",
-      //   url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
-      // },
+      forking: {
+        enabled: process.env.FORKING === "true",
+        url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
+      },
       allowUnlimitedContractSize: true,
       live: false,
       saveDeployments: true,
@@ -142,7 +139,7 @@ const config: HardhatUserConfig = {
           },
         },
       },
-    ]
+    ],
   },
   tenderly: {
     project: process.env.TENDERLY_PROJECT || "",
@@ -156,7 +153,7 @@ const config: HardhatUserConfig = {
     },
   },
   mocha: {
-    timeout: 300000
+    timeout: 300000,
   },
 };
 
