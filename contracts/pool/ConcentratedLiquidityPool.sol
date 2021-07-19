@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.2;
 
-import "../base/Multicall.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/IBentoBox.sol";
 import "../interfaces/IMirinCallee.sol";
@@ -94,7 +93,7 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
         unlocked = 1;
     }
 
-    function mint(int24 lowerOld, int24 lower, int24 upperOld, int24 upper) public lock returns (uint256 amount) {
+    function mint(int24 lowerOld, int24 lower, int24 upperOld, int24 upper, address recipient) public lock returns (uint256 amount) {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
 
         uint256 _totalSupply = tickPools[lower][upper].totalSupply; // gas savings
@@ -105,18 +104,17 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
         
-        uint256 computed = MirinMath.sqrt(amount0 * amount1);
+        uint256 computed = _rangeLiquidity + MirinMath.sqrt(amount0 * amount1);
         if (_totalSupply == 0) {
             amount = computed - MINIMUM_LIQUIDITY;
             _mint(lower, upper, address(0), MINIMUM_LIQUIDITY);
         } else {
-            uint256 k = _rangeLiquidity;
-            amount = ((computed - k) * _totalSupply) / k;
+            amount = ((computed - _rangeLiquidity) * _totalSupply) / _rangeLiquidity;
         }
         require(amount > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_MINTED");
         
-        int160 priceLower = TickMath.getSqrtRatioAtTick(lower);
-        uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper);
+        int160 priceLower = TickMath.getSqrtRatioAtTick(lower); // gas savings
+        uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper); // gas savings
         uint160 currentPrice = sqrtPriceX96; // gas savings
       
         if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += amount;
@@ -126,35 +124,37 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
         updateNearestTickPointer(lower, upper, nearestTick, currentPrice);
         getAssets(priceLower, priceUpper, currentPrice, amount);
         
-        _mint(loPt, hiPt, to, amount);
+        _mint(lower, upper, recipient, amount);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         kLast = MirinMath.sqrt(balance0 * balance1);
-        emit Mint(msg.sender, amount0, amount1, to);
+        emit Mint(msg.sender, amount0, amount1, recipient);
     }
     
-    function burn(uint256 tokenId, address to) public lock returns (uint256 amount0, uint256 amount1) {
-        uint256 loPt = ranges[tokenId].loPt;
-        uint256 hiPt = ranges[tokenId].hiPt;
-        (uint112 _triPtReserve0, uint112 _triPtreserve1) = _getTriPtReserves(loPt, hiPt); // gas savings
-        uint256 _totalSupply = triPts[loPt][hiPt].totalSupply; // gas savings
-        _mintFee(loPt, hiPt, _triPtReserve0, _triPtreserve1, _totalSupply);
+    function burn(uint256 tokenId, address recipient) public lock returns (uint256 amount0, uint256 amount1) {
+        uint256 lower = ranges[tokenId].lower;
+        uint256 upper = ranges[tokenId].upper;
 
-        uint256 liquidity = triPts[loPt][hiPt].balanceOf[address(this)]; // gas savings
-        
-        amount0 = (liquidity * _triPtReserve0) / _totalSupply;
-        amount1 = (liquidity * _triPtreserve1) / _totalSupply;
+        uint256 _totalSupply = tickPools[lower][upper].totalSupply; // gas savings
+        uint112 _rangeLiquidity = tickPools[lower][upper].liquidity; // gas savings
+        _mintFee(lower, upper, _rangeLiquidity, _totalSupply);
+
+        uint256 liquidity = tickPools[lower][upper].balanceOf[address(this)]; // gas savings
+        (uint256 balance0, uint256 balance1) = _balance(); // gas savings
+        amount0 = (liquidity * balance0) / _totalSupply;
+        amount1 = (liquidity * balance1) / _totalSupply;
 
         _burn(tokenId, address(this), liquidity);
 
-        bento.transfer(token0, address(this), to, amount0);
-        bento.transfer(token1, address(this), to, amount1);
+        bento.transfer(token0, address(this), recipient, amount0);
+        bento.transfer(token1, address(this), recipient, amount1);
 
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
-        (uint256 balance0, uint256 balance1) = _balance(); // gas savings
+        balance0 -= amount0;
+        balance1 -= amount1;
 
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         kLast = MirinMath.sqrt(balance0 * balance1);
-        emit Burn(msg.sender, amount0, amount1, to);
+        emit Burn(msg.sender, amount0, amount1, recipient);
     }
 
     function swapWithoutContext(
@@ -297,18 +297,6 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
         _reserve0 = reserve0;
         _reserve1 = reserve1;
         _blockTimestampLast = blockTimestampLast;
-    }
-    
-    function _getTriPtReserves(uint256 loPt, uint256 hiPt)
-        internal
-        view
-        returns (
-            uint112 _triPtReserve0,
-            uint112 _triPtreserve1
-        )
-    {
-        _triPtReserve0 = triPts[loPt][hiPt].reserve0;
-        _triPtreserve1 = triPts[loPt][hiPt].reserve1;
     }
 
     function _update(
