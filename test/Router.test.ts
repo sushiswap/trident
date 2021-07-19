@@ -66,7 +66,7 @@ describe("Router", function () {
     );
   })
 
-  describe("Pool", function() {
+  describe("ConstantProductPool", function() {
     it("Pool should have correct tokens", async function() {
       expect(await pool.token0()).eq(weth.address);
       expect(await pool.token1()).eq(sushi.address);
