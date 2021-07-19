@@ -45,7 +45,7 @@ methods {
         returns (uint256) envfree => DISPATCHER(true)
     toShare(address token, uint256 amount, bool roundUp) 
         returns (uint256) envfree => DISPATCHER(true)
-    transer(address, address, address, uint256) envfree => DISPATCHER(true)
+    transfer(address, address, address, uint256) envfree => DISPATCHER(true)
     registerProtocol() => NONDET
 
     // ERC20
