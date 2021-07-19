@@ -1,5 +1,5 @@
 {
-  "name": "hardhat-template",
+  "name": "@sushiswap/trident",
   "scripts": {
     "build": "hardhat compile",
     "console": "hardhat console",
