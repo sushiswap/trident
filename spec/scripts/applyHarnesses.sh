@@ -16,3 +16,17 @@ perl -0777 -i -pe 's/        external\n        payable/        public\n        v
 perl -0777 -i -pe 's/import \"hardhat/\/\/ import \"hardhat/g' contracts/SwapRouter.sol
 perl -0777 -i -pe 's/import \"hardhat/\/\/ import \"hardhat/g' contracts/pool/HybridPool.sol
 perl -0777 -i -pe 's/import \"hardhat/\/\/ import \"hardhat/g' contracts/pool/ConstantProductPool.sol
+
+# add import for Simplifications and Simplifications object in ConstantProductPool
+perl -0777 -i -pe 's/import \"..\/deployer\/MasterDeployer.sol\";/import \"..\/deployer\/MasterDeployer.sol\";\nimport \"..\/..\/spec\/harness\/Simplifications.sol\";/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/address public immutable barFeeTo;/address public immutable barFeeTo;\n    Simplifications public simplified;/g' contracts/pool/ConstantProductPool.sol
+
+# simplifying sqrt MirinMath.sqrt\(balance0 \* balance1\); in ConstantProductPool
+perl -0777 -i -pe 's/MirinMath.sqrt\(/simplified.sqrt\(/g' contracts/pool/ConstantProductPool.sol
+
+# _balance: internal -> public
+perl -0777 -i -pe 's/_balance\(\) internal view/_balance\(\) public view/g' contracts/pool/ConstantProductPool.sol
+
+# reserve: internal -> public
+perl -0777 -i -pe 's/uint112 internal reserve0;/uint112 public reserve0;/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/uint112 internal reserve1;/uint112 public reserve1;/g' contracts/pool/ConstantProductPool.sol
