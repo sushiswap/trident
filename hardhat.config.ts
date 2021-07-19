@@ -290,6 +290,10 @@ const config: HardhatUserConfig = {
     project: process.env.TENDERLY_PROJECT || "",
     username: process.env.TENDERLY_USERNAME || "",
   },
+  typechain: {
+    outDir: "types",
+    target: "ethers-v5",
+  },
   watcher: {
     compile: {
       tasks: ["compile"],
