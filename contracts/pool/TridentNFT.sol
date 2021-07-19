@@ -3,12 +3,12 @@
 pragma solidity ^0.8.2;
 
 contract TridentNFT {
-    uint256 public totalSupply; // tracks total unique liquidity `triPts` 
+    uint256 public totalSupply; // tracks total unique liquidity range positions
     string constant public name = "TridentNFT";
     string constant public symbol = "tNFT";
-    string constant public baseURI = "PLACEHOLDER"; // WIP - make chain-based, auto-generative image re: positions?
+    string constant public baseURI = "";
     
-    mapping(address => uint256) public balanceOf; // tracks `triPts` held by an account
+    mapping(address => uint256) public balanceOf; // tracks liquidity range positions held by an account
     mapping(uint256 => address) public getApproved;
     mapping(uint256 => address) public ownerOf;
     mapping(uint256 => string) public tokenURI;
@@ -18,7 +18,7 @@ contract TridentNFT {
     event ApprovalForAll(address indexed approver, address indexed operator, bool approved);
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     
-    mapping(int24 => mapping(int24 => TickPool) public tickPools;
+    mapping(int24 => mapping(int24 => TickPool)) public tickPools;
     struct TickPool { // virtual pool for concentrated liquidity in tick range
         uint112 liquidity; // last range liquidity 
         uint256 totalSupply; // total range mint for pool range providers
@@ -31,9 +31,9 @@ contract TridentNFT {
         int24 upper; 
     }
     
-    function getRangeById(uint256 tokenId) public view returns (int24 loPt, int24 hiPt) {
-        loPt = ranges[tokenId].loPt;
-        hiPt = ranges[tokenId].hiPt;
+    function getRangeById(uint256 tokenId) public view returns (int24 lower, int24 upper) {
+        lower = ranges[tokenId].lower;
+        upper = ranges[tokenId].upper;
     }
 
     function supportsInterface(bytes4 sig) external pure returns (bool) {
@@ -55,17 +55,17 @@ contract TridentNFT {
     function _mint(
         int24 lower, 
         int24 upper, 
-        address to, 
+        address recipient, 
         uint256 amount
     ) internal {
         tickPools[lower][upper].totalSupply += amount;
-        tickPools[lower][upper].balanceOf[to] += amount;
-        if (tickPools[lower][upper].balanceOf[to] == 0) {
+        tickPools[lower][upper].balanceOf[recipient] += amount;
+        if (tickPools[lower][upper].balanceOf[recipient] == 0) {
             totalSupply++;
             uint256 tokenId = totalSupply;
-            ranges[tokenId].lower = loPt;
-            ranges[tokenId].upper = hiPt;
-            emit Transfer(address(0), to, tokenId); // notices opening position
+            ranges[tokenId].lower = lower;
+            ranges[tokenId].upper = upper;
+            emit Transfer(address(0), recipient, tokenId); // notices opening position
         }
     }
 
@@ -98,28 +98,28 @@ contract TridentNFT {
         }
     }
 
-    function transfer(address to, uint256 tokenId) external {
+    function transfer(address recipient, uint256 tokenId) external {
         require(msg.sender == ownerOf[tokenId], '!owner');
         balanceOf[msg.sender]--; 
-        balanceOf[to]++; 
+        balanceOf[recipient]++; 
         getApproved[tokenId] = address(0);
-        ownerOf[tokenId] = to;
+        ownerOf[tokenId] = recipient;
         (int24 lower, int24 upper) = getRangeById(tokenId);
-        tickPools[lower][upper].balanceOf[to] = tickPools[lower][upper].balanceOf[msg.sender]; // update recipient balance
+        tickPools[lower][upper].balanceOf[recipient] = tickPools[lower][upper].balanceOf[msg.sender]; // update recipient balance
         tickPools[lower][upper].balanceOf[msg.sender] = 0; // nullify sender balance
-        emit Transfer(msg.sender, to, tokenId); 
+        emit Transfer(msg.sender, recipient, tokenId); 
     }
     
-    function transferFrom(address, address to, uint256 tokenId) external {
+    function transferFrom(address, address recipient, uint256 tokenId) external {
         address owner = ownerOf[tokenId];
         require(msg.sender == owner || msg.sender == getApproved[tokenId] || isApprovedForAll[owner][msg.sender], '!owner/spender/operator');
         balanceOf[owner]--; 
-        balanceOf[to]++; 
+        balanceOf[recipient]++; 
         getApproved[tokenId] = address(0);
-        ownerOf[tokenId] = to;
-        (int24 loPt, int24 hiPt) = getRangeById(tokenId);
-        tickPools[lower][upper].balanceOf[to] = tickPools[lower][upper].balanceOf[owner]; // update recipient balance
+        ownerOf[tokenId] = recipient;
+        (int24 lower, int24 upper) = getRangeById(tokenId);
+        tickPools[lower][upper].balanceOf[recipient] = tickPools[lower][upper].balanceOf[owner]; // update recipient balance
         tickPools[lower][upper].balanceOf[owner] = 0; // nullify sender balance
-        emit Transfer(owner, to, tokenId); 
+        emit Transfer(owner, recipient, tokenId); 
     }
 }
