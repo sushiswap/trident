@@ -249,6 +249,15 @@ const config: HardhatUserConfig = {
       saveDeployments: true,
     },
   },
+  paths: {
+    artifacts: "artifacts",
+    cache: "cache",
+    deploy: "deploy",
+    deployments: "deployments",
+    imports: "imports",
+    sources: "contracts",
+    tests: "test",
+  },
   preprocess: {
     eachLine: removeConsoleLog(
       (bre) =>
