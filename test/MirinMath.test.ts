@@ -1,7 +1,6 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { BigNumber } = require("ethers");
-const { getBigNumber } = require("./utilities");
+import { BigNumber } from '@ethersproject/bignumber';
+import { ethers } from 'hardhat'
+import { expect } from 'chai'
 
 describe("MirinMath", function () {
 
