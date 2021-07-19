@@ -2,8 +2,10 @@ pragma solidity >=0.5.0;
 pragma experimental ABIEncoderV2;
 
 import "../../contracts/interfaces/IPool.sol";
-contract SymbolicPool is IPool {
+import "../../contracts/interfaces/IBentoBox.sol";
 
+contract SymbolicPool is IPool {
+    address public bento;
 
     function swapWithoutContext(address tokenIn, address tokenOut, address recipient, bool unwrapBento, uint256 amountIn, uint256 amountOut) external override returns(uint256 finalAmountOut) {
 
