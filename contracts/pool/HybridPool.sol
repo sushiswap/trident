@@ -154,30 +154,20 @@ contract HybridPool is MirinERC20, IPool {
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
+    function burn(address to, bool unwrapBento) external override returns (liquidityAmount[] memory withdrawnAmounts) {}
+
+    function burnLiquiditySingle(
+        address tokenOut,
+        address to,
+        bool unwrapBento
+    ) external override returns (uint256 amount) {}
+
     function swapWithoutContext(
         address tokenIn,
         address tokenOut,
         address recipient,
-        bool unwrapBento,
-        uint256 amountIn,
-        uint256 amountOut
+        bool unwrapBento
     ) external override returns (uint256 finalAmountOut) {}
-
-    function swapExactIn(
-        address tokenIn,
-        address tokenOut,
-        address recipient,
-        bool unwrapBento,
-        uint256 amountIn
-    ) external override returns (uint256 finalAmountOut) {}
-
-    function swapExactOut(
-        address tokenIn,
-        address tokenOut,
-        address recipient,
-        bool unwrapBento,
-        uint256 amountOut
-    ) external override {}
 
     function swapWithContext(
         address tokenIn,
@@ -185,9 +175,8 @@ contract HybridPool is MirinERC20, IPool {
         bytes calldata context,
         address recipient,
         bool unwrapBento,
-        uint256 amountIn,
-        uint256 amountOut
-    ) public override returns (uint256) {
+        uint256 amountIn
+    ) public override returns (uint256 amountOut) {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
 
         if (tokenIn == address(token0)) {
@@ -212,8 +201,6 @@ contract HybridPool is MirinERC20, IPool {
                 _blockTimestampLast
             );
         }
-
-        return amountOut;
     }
 
     function swap(
@@ -393,16 +380,16 @@ contract HybridPool is MirinERC20, IPool {
     ) internal {
         if (amount0Out > 0) {
             if (unwrapBento) {
-                IBentoBoxV1(bento).withdraw(token0, address(this), to, amount0Out, 0);
+                bento.withdraw(token0, address(this), to, 0, amount0Out);
             } else {
-                bento.transfer(token0, address(this), to, bento.toShare(token0, amount0Out, false));
+                bento.transfer(token0, address(this), to, amount0Out);
             }
         }
         if (amount1Out > 0) {
             if (unwrapBento) {
-                IBentoBoxV1(bento).withdraw(token1, address(this), to, amount1Out, 0);
+                bento.withdraw(token1, address(this), to, 0, amount1Out);
             } else {
-                bento.transfer(token1, address(this), to, bento.toShare(token1, amount1Out, false));
+                bento.transfer(token1, address(this), to, amount1Out);
             }
         }
         if (data.length > 0) IMirinCallee(to).mirinCall(msg.sender, amount0Out, amount1Out, data);
@@ -434,13 +421,6 @@ contract HybridPool is MirinERC20, IPool {
             _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         }
         emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
-    }
-
-    // force balances to match reserves
-    function skim(address to) external lock {
-        (uint256 balance0, uint256 balance1) = _balance();
-        bento.transfer(token0, address(this), to, bento.toShare(token0, balance0 - reserve0, false));
-        bento.transfer(token1, address(this), to, bento.toShare(token1, balance1 - reserve1, false));
     }
 
     function sync() external lock {

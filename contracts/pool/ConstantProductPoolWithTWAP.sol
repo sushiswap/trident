@@ -1,7 +1,8 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.2;
 
+import "../base/Multicall.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/IBentoBox.sol";
 import "../interfaces/IMirinCallee.sol";
@@ -10,7 +11,7 @@ import "../libraries/MirinMath.sol";
 import "hardhat/console.sol";
 import "../deployer/MasterDeployer.sol";
 
-contract ConstantProductPool is MirinERC20, IPool {
+contract ConstantProductPoolWithTWAP is MirinERC20, IPool {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Swap(
@@ -24,6 +25,7 @@ contract ConstantProductPool is MirinERC20, IPool {
 
     uint256 internal constant MINIMUM_LIQUIDITY = 1000;
 
+    uint8 internal constant PRECISION = 112;
     uint256 internal constant MAX_FEE = 10000; // 100%
     uint256 internal constant MAX_FEE_SQUARE = 100000000;
     uint256 public immutable swapFee;
@@ -32,14 +34,16 @@ contract ConstantProductPool is MirinERC20, IPool {
     address internal immutable barFeeTo;
     IBentoBoxV1 internal immutable bento;
     MasterDeployer internal immutable masterDeployer;
-
     IERC20 public immutable token0;
     IERC20 public immutable token1;
 
+    uint256 public price0CumulativeLast;
+    uint256 public price1CumulativeLast;
     uint256 public kLast;
 
-    uint128 internal reserve0;
-    uint128 internal reserve1;
+    uint112 internal reserve0;
+    uint112 internal reserve1;
+    uint32 internal blockTimestampLast;
 
     uint256 private unlocked = 1;
     modifier lock() {
@@ -71,7 +75,7 @@ contract ConstantProductPool is MirinERC20, IPool {
     }
 
     function mint(address to) public override lock returns (uint256 liquidity) {
-        (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         uint256 _totalSupply = totalSupply;
         _mintFee(_reserve0, _reserve1, _totalSupply);
 
@@ -89,7 +93,7 @@ contract ConstantProductPool is MirinERC20, IPool {
         }
         require(liquidity > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_MINTED");
         _mint(to, liquidity);
-        _update(balance0, balance1);
+        _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         kLast = computed;
         emit Mint(msg.sender, amount0, amount1, to);
     }
@@ -100,7 +104,7 @@ contract ConstantProductPool is MirinERC20, IPool {
         lock
         returns (liquidityAmount[] memory withdrawnAmounts)
     {
-        (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         uint256 _totalSupply = totalSupply;
         _mintFee(_reserve0, _reserve1, _totalSupply);
 
@@ -116,7 +120,7 @@ contract ConstantProductPool is MirinERC20, IPool {
         balance0 -= amount0;
         balance1 -= amount1;
 
-        _update(balance0, balance1);
+        _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         kLast = MirinMath.sqrt(balance0 * balance1);
 
         withdrawnAmounts = new liquidityAmount[](2);
@@ -131,7 +135,7 @@ contract ConstantProductPool is MirinERC20, IPool {
         address to,
         bool unwrapBento
     ) public override lock returns (uint256 amount) {
-        (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         uint256 _totalSupply = totalSupply;
         _mintFee(_reserve0, _reserve1, _totalSupply);
 
@@ -158,7 +162,7 @@ contract ConstantProductPool is MirinERC20, IPool {
             amount = amount1;
         }
 
-        _update(balance0, balance1);
+        _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         kLast = MirinMath.sqrt(balance0 * balance1);
         emit Burn(msg.sender, amount0, amount1, to);
     }
@@ -169,7 +173,7 @@ contract ConstantProductPool is MirinERC20, IPool {
         address recipient,
         bool unwrapBento
     ) external override lock returns (uint256 amountOut) {
-        (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
 
         if (tokenIn == address(token0)) {
@@ -177,7 +181,7 @@ contract ConstantProductPool is MirinERC20, IPool {
             uint256 amountIn = balance0 - _reserve0;
             amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
             _transfer(token1, amountOut, recipient, unwrapBento);
-            _update(balance0, balance1 - amountOut);
+            _update(balance0, balance1 - amountOut, _reserve0, _reserve1, _blockTimestampLast);
             emit Swap(msg.sender, amountIn, 0, 0, amountOut, recipient);
         } else {
             require(tokenIn == address(token1), "Invalid input token");
@@ -185,7 +189,7 @@ contract ConstantProductPool is MirinERC20, IPool {
             uint256 amountIn = balance1 - _reserve1;
             amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
             _transfer(token0, amountOut, recipient, unwrapBento);
-            _update(balance0 - amountOut, balance1);
+            _update(balance0 - amountOut, balance1, _reserve0, _reserve1, _blockTimestampLast);
             emit Swap(msg.sender, 0, amountIn, amountOut, 0, recipient);
         }
     }
@@ -198,17 +202,17 @@ contract ConstantProductPool is MirinERC20, IPool {
         bool unwrapBento,
         uint256 amountIn
     ) public override lock returns (uint256 amountOut) {
-        (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
 
         if (tokenIn == address(token0)) {
             require(tokenOut == address(token1), "Invalid output token");
             if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
-            _swapWithData(0, amountOut, recipient, unwrapBento, context, _reserve0, _reserve1);
+            _swapWithData(0, amountOut, recipient, unwrapBento, context, _reserve0, _reserve1, _blockTimestampLast);
         } else {
             require(tokenIn == address(token1), "Invalid input token");
             require(tokenOut == address(token0), "Invalid output token");
             if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
-            _swapWithData(amountOut, 0, recipient, unwrapBento, context, _reserve0, _reserve1);
+            _swapWithData(amountOut, 0, recipient, unwrapBento, context, _reserve0, _reserve1, _blockTimestampLast);
         }
     }
 
@@ -218,19 +222,50 @@ contract ConstantProductPool is MirinERC20, IPool {
         address to,
         bytes calldata data
     ) external lock {
-        (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
-        _swapWithData(amount0Out, amount1Out, to, false, data, _reserve0, _reserve1);
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
+        _swapWithData(amount0Out, amount1Out, to, false, data, _reserve0, _reserve1, _blockTimestampLast);
     }
 
-    function _update(uint256 balance0, uint256 balance1) internal {
-        require(balance0 < type(uint128).max && balance1 < type(uint128).max, "MIRIN: OVERFLOW");
-        reserve0 = uint128(balance0);
-        reserve1 = uint128(balance1);
+    function _getReserves()
+        internal
+        view
+        returns (
+            uint112 _reserve0,
+            uint112 _reserve1,
+            uint32 _blockTimestampLast
+        )
+    {
+        _reserve0 = reserve0;
+        _reserve1 = reserve1;
+        _blockTimestampLast = blockTimestampLast;
+    }
+
+    function _update(
+        uint256 balance0,
+        uint256 balance1,
+        uint112 _reserve0,
+        uint112 _reserve1,
+        uint32 _blockTimestampLast
+    ) internal {
+        require(balance0 <= type(uint112).max && balance1 <= type(uint112).max, "MIRIN: OVERFLOW");
+        uint32 blockTimestamp = uint32(block.timestamp % 2**32);
+        if (blockTimestamp != _blockTimestampLast && _reserve0 != 0) {
+            unchecked {
+                uint32 timeElapsed = blockTimestamp - _blockTimestampLast;
+                uint256 price0 = (uint256(_reserve1) << PRECISION) / _reserve0;
+                price0CumulativeLast += price0 * timeElapsed;
+                uint256 price1 = (uint256(_reserve0) << PRECISION) / _reserve1;
+                price1CumulativeLast += price1 * timeElapsed;
+            }
+        }
+        reserve0 = uint112(balance0);
+        reserve1 = uint112(balance1);
+        blockTimestampLast = blockTimestamp;
     }
 
     function _mintFee(
-        uint128 _reserve0,
-        uint128 _reserve1,
+        uint112 _reserve0,
+        uint112 _reserve1,
         uint256 _totalSupply
     ) internal returns (uint256 computed) {
         uint256 _kLast = kLast;
@@ -258,8 +293,8 @@ contract ConstantProductPool is MirinERC20, IPool {
         uint256 amount1In,
         uint256 balance0,
         uint256 balance1,
-        uint128 _reserve0,
-        uint128 _reserve1
+        uint112 _reserve0,
+        uint112 _reserve1
     ) internal view {
         uint256 balance0Adjusted = balance0 * MAX_FEE - amount0In * swapFee;
         uint256 balance1Adjusted = balance1 * MAX_FEE - amount1In * swapFee;
@@ -319,26 +354,29 @@ contract ConstantProductPool is MirinERC20, IPool {
         address to,
         bool unwrapBento,
         bytes calldata data,
-        uint128 _reserve0,
-        uint128 _reserve1
+        uint112 _reserve0,
+        uint112 _reserve1,
+        uint32 _blockTimestampLast
     ) internal {
         _transferWithoutData(amount0Out, amount1Out, to, unwrapBento);
         if (data.length > 0) IMirinCallee(to).mirinCall(msg.sender, amount0Out, amount1Out, data);
-        _swap(amount0Out, amount1Out, to, _reserve0, _reserve1);
+        _swap(amount0Out, amount1Out, to, _reserve0, _reserve1, _blockTimestampLast);
     }
 
     function _swap(
         uint256 amount0Out,
         uint256 amount1Out,
         address to,
-        uint128 _reserve0,
-        uint128 _reserve1
+        uint112 _reserve0,
+        uint112 _reserve1,
+        uint32 _blockTimestampLast
     ) internal {
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 amount0In = balance0 + amount0Out - _reserve0;
         uint256 amount1In = balance1 + amount1Out - _reserve1;
         _compute(amount0In, amount1In, balance0, balance1, _reserve0, _reserve1);
-        _update(balance0, balance1);
+        _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
+
         emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
     }
 
@@ -347,7 +385,7 @@ contract ConstantProductPool is MirinERC20, IPool {
         address, /*tokenOut*/
         uint256 amountIn
     ) external view returns (uint256 amountOut) {
-        (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
+        (uint112 _reserve0, uint112 _reserve1, ) = _getReserves();
         if (IERC20(tokenIn) == token0) {
             amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
         } else {
@@ -365,8 +403,8 @@ contract ConstantProductPool is MirinERC20, IPool {
             // Swap tokens to be in order
             (liquidityInputs[0], liquidityInputs[1]) = (liquidityInputs[1], liquidityInputs[0]);
         }
-        uint128 _reserve0;
-        uint128 _reserve1;
+        uint112 _reserve0;
+        uint112 _reserve1;
         liquidityAmount[] memory liquidityOptimal = new liquidityAmount[](2);
         liquidityOptimal[0] = liquidityAmount({
             token: liquidityInputs[0].token,
