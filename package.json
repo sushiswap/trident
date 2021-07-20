@@ -30,6 +30,17 @@
     "lint": "yarn prettier && solhint -c .solhint.json contracts/**/*.sol",
     "prepare": "husky install"
   },
+  "lint-staged": {
+    "*.ts": [
+      "prettier --write"
+    ],
+    "*.sol": [
+      "solhint -c .solhint.json",
+      "prettier --write",
+      "yarn test"
+    ],
+    "*.md": "prettier --write"
+  },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.0",
     "@nomiclabs/hardhat-etherscan": "^2.0.0",
@@ -58,6 +69,8 @@
     "hardhat-preprocessor": "^0.1.0",
     "hardhat-spdx-license-identifier": "^2.0.0",
     "hardhat-watcher": "^2.0.0",
+    "husky": "^7.0.0",
+    "lint-staged": "^11.0.1",
     "prettier": "^2.0.0",
     "prettier-plugin-solidity": "^1.0.0-beta.16",
     "solhint": "^3.0.0",
@@ -66,7 +79,6 @@
     "ts-generator": "^0.1.0",
     "ts-node": "^10.0.0",
     "typechain": "^5.0.0",
-    "typescript": "^4.0.0",
-    "husky": "^7.0.0"
+    "typescript": "^4.0.0"
   }
 }
