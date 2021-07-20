@@ -35,7 +35,7 @@ contract MasterDeployer is Ownable {
     }
 
     function deployPool(address _factory, bytes calldata _deployData) external returns (address poolAddress) {
-        require(whitelistedFactories[_factory], "Factory not whitelisted");
+        require(whitelistedFactories[_factory], "FACTORY_NOT_WHITELISTED");
         poolAddress = IPoolFactory(_factory).deployPool(_deployData);
         emit NewPoolCreated(poolAddress);
     }
