@@ -154,30 +154,20 @@ contract HybridPool is MirinERC20, IPool {
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
+    function burn(address to, bool unwrapBento) external override returns (liquidityAmount[] memory withdrawnAmounts) {}
+
+    function burnLiquiditySingle(
+        address tokenOut,
+        address to,
+        bool unwrapBento
+    ) external override returns (uint256 amount) {}
+
     function swapWithoutContext(
         address tokenIn,
         address tokenOut,
         address recipient,
-        bool unwrapBento,
-        uint256 amountIn,
-        uint256 amountOut
+        bool unwrapBento
     ) external override returns (uint256 finalAmountOut) {}
-
-    function swapExactIn(
-        address tokenIn,
-        address tokenOut,
-        address recipient,
-        bool unwrapBento,
-        uint256 amountIn
-    ) external override returns (uint256 finalAmountOut) {}
-
-    function swapExactOut(
-        address tokenIn,
-        address tokenOut,
-        address recipient,
-        bool unwrapBento,
-        uint256 amountOut
-    ) external override {}
 
     function swapWithContext(
         address tokenIn,
@@ -185,9 +175,8 @@ contract HybridPool is MirinERC20, IPool {
         bytes calldata context,
         address recipient,
         bool unwrapBento,
-        uint256 amountIn,
-        uint256 amountOut
-    ) public override returns (uint256) {
+        uint256 amountIn
+    ) public override returns (uint256 amountOut) {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
 
         if (tokenIn == address(token0)) {
@@ -212,8 +201,6 @@ contract HybridPool is MirinERC20, IPool {
                 _blockTimestampLast
             );
         }
-
-        return amountOut;
     }
 
     function swap(

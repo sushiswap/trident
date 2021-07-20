@@ -1,5 +1,5 @@
 {
-  "name": "hardhat-template",
+  "name": "@sushiswap/trident",
   "scripts": {
     "build": "hardhat compile",
     "console": "hardhat console",
@@ -27,46 +27,58 @@
     "test:coverage": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" hardhat coverage",
     "test:gas": "cross-env REPORT_GAS=true yarn test",
     "prettier": "prettier --write 'test/**/*.{js,ts}' && prettier --write contracts/**/*.sol",
-    "lint": "yarn prettier && solhint -c .solhint.json contracts/**/*.sol"
+    "lint": "yarn prettier && solhint -c .solhint.json contracts/**/*.sol",
+    "prepare": "husky install"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "prettier --write"
+    ],
+    "*.sol": [
+      "solhint -c .solhint.json",
+      "prettier --write",
+      "yarn test"
+    ],
+    "*.md": "prettier --write"
   },
   "devDependencies": {
-    "@nomiclabs/hardhat-ethers": "^2.0.2",
-    "@nomiclabs/hardhat-etherscan": "^2.1.3",
+    "@nomiclabs/hardhat-ethers": "^2.0.0",
+    "@nomiclabs/hardhat-etherscan": "^2.0.0",
     "@nomiclabs/hardhat-solhint": "^2.0.0",
-    "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "@nomiclabs/hardhat-waffle": "^2.0.0",
     "@openzeppelin/contracts": "=4.1.0",
-    "@tenderly/hardhat-tenderly": "^1.0.12",
-    "@typechain/ethers-v5": "^7.0.1",
-    "@types/chai": "^4.2.00",
-    "@types/mocha": "^8.2.2",
-    "@types/node": "^15.12.4",
-    "chai": "^4.3.4",
-    "cross-env": "^7.0.3",
-    "decimal.js": "^10.2.1",
+    "@sushiswap/prettier-config": "^0.1.0",
+    "@tenderly/hardhat-tenderly": "^1.0.0",
+    "@typechain/ethers-v5": "^7.0.0",
+    "@typechain/hardhat": "^2.0.0",
+    "@types/chai": "^4.0.0",
+    "@types/mocha": "^8.0.0",
+    "@types/node": "^16.0.0",
+    "chai": "^4.0.0",
+    "cross-env": "^7.0.0",
+    "decimal.js": "^10.0.0",
     "dotenv": "^10.0.0",
-    "ethereum-waffle": "^3.4.0",
-    "ethers": "^5.3.1",
-    "hardhat": "^2.4.0",
-    "hardhat-deploy": "^0.8.8",
+    "ethereum-waffle": "^3.0.0",
+    "ethers": "^5.0.0",
+    "hardhat": "^2.0.0",
+    "hardhat-deploy": "^0.8.0",
     "hardhat-deploy-ethers": "^0.3.0-beta.10",
-    "hardhat-gas-reporter": "^1.0.4",
+    "hardhat-gas-reporter": "^1.0.0",
     "hardhat-interface-generator": "^0.0.6",
-    "hardhat-log-remover": "^2.0.2",
-    "hardhat-preprocessor": "^0.1.4",
-    "hardhat-spdx-license-identifier": "^2.0.3",
-    "hardhat-typechain": "^0.3.5",
-    "hardhat-watcher": "^2.1.1",
-    "prettier": "^2.3.1",
-    "prettier-plugin-solidity": "^1.0.0-beta.13",
-    "solhint": "^3.3.6",
+    "hardhat-log-remover": "^2.0.0",
+    "hardhat-preprocessor": "^0.1.0",
+    "hardhat-spdx-license-identifier": "^2.0.0",
+    "hardhat-watcher": "^2.0.0",
+    "husky": "^7.0.0",
+    "lint-staged": "^11.0.1",
+    "prettier": "^2.0.0",
+    "prettier-plugin-solidity": "^1.0.0-beta.16",
+    "solhint": "^3.0.0",
     "solhint-plugin-prettier": "^0.0.5",
-    "solidity-coverage": "^0.7.16",
-    "ts-generator": "^0.1.1",
+    "solidity-coverage": "^0.7.0",
+    "ts-generator": "^0.1.0",
     "ts-node": "^10.0.0",
     "typechain": "^5.0.0",
-    "typescript": "^4.3.4"
-  },
-  "dependencies": {
-    "@typechain/hardhat": "^2.0.2"
+    "typescript": "^4.0.0"
   }
 }
