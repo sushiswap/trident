@@ -9,7 +9,7 @@ artifacts/
 deployments/
 
 # Typechain
-typechain/
+types/
 
 # Env
 .env
