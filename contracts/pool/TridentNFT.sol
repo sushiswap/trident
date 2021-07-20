@@ -20,6 +20,8 @@ contract TridentNFT {
     
     mapping(int24 => mapping(int24 => TickPool)) public tickPools;
     struct TickPool { // virtual pool for concentrated liquidity in tick range
+        uint112 reserve0;
+        uint112 reserve1;
         uint112 liquidity; // last range liquidity 
         uint256 totalSupply; // total range mint for pool range providers
         mapping(address => uint256) balanceOf; // account provider range mint balance
