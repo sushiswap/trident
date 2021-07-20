@@ -5,26 +5,13 @@ module.exports = {
     // free to add to the default config which is required above.
     overrides: [
         {
-            files: ["contracts/**/*.sol"],
+            files: '*.sol',
             options: {
-                printWidth: 130,
-                tabWidth: 4,
-                useTabs: false,
-                singleQuote: false,
-                bracketSpacing: false,
-                explicitTypes: "always",
-            },
-        },
-        {
-            files: ["**/*.js"],
-            options: {
-                printWidth: 120,
-                tabWidth: 4,
-                useTabs: false,
-                singleQuote: false,
-                bracketSpacing: true,
-                arrowParens: "avoid",
-                explicitTypes: "always",
+            printWidth: 120,
+            tabWidth: 4,
+            singleQuote: false,
+            bracketSpacing: false,
+            explicitTypes: 'always',
             },
         },
     ],
