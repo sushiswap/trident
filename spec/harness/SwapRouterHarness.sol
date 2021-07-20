@@ -19,8 +19,10 @@ contract SwapRouterHarness is SwapRouter {
     uint256 public toHarness;
     uint256 public minAmountHarness;
 
-    constructor(address _WETH, address _masterDeployer, address _bento)
-        SwapRouter(_WETH, _masterDeployer, _bento) public { }
+    IERC20 public tokenA;
+
+    constructor(address WETH, address masterDeployer, address bento)
+        SwapRouter(WETH, masterDeployer, bento) public { }
 
     function exactInputSingle(ExactInputSingleParams calldata params)
         public
@@ -41,7 +43,7 @@ contract SwapRouterHarness is SwapRouter {
         super.exactInputSingle(params);
     }
 
-    function exactInput(ExactInputParams memory params) public payable override checkDeadline(params.deadline) returns (uint256 amount) 
+    /*function exactInput(ExactInputParams memory params) public payable override checkDeadline(params.deadline) returns (uint256 amount) 
     {
         require(params.deadline == deadlineHarness);
         require(params.path[0].tokenIn == tokenInHarness);
@@ -85,4 +87,16 @@ contract SwapRouterHarness is SwapRouter {
         checkDeadline(params.deadline)
         returns (uint256 amountOut)
     {
+        require(params.tokenIn == tokenInHarness);
+        require(params.tokenOut == tokenOutHarness);
+        require(params.context == contextHarness);
+        require(params.recipient == recipientHarness);
+        require(params.unwrapBento == unwrapBentoHarness);
+        require(params.amountIn == amountInHarness);
+        require(params.pool == poolHarness);
+
+        super.exactInputSingleWithContext(params);
+    }*/
+
+
 }
