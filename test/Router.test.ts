@@ -158,7 +158,7 @@ describe("Router", function () {
 
     it("Should swap some tokens", async function() {
       let amountIn = BigNumber.from(10).pow(18);
-      let expectedAmountOut = await pool.getAmountOut(weth.address, amountIn);
+      let expectedAmountOut = await pool.getAmountOut(weth.address, sushi.address, amountIn);
       expect(expectedAmountOut).gt(1);
       let params = {
         "tokenIn" : weth.address,
@@ -181,7 +181,7 @@ describe("Router", function () {
       expect(await bento.balanceOf(sushi.address, pool.address)).eq(oldPoolSushiBalance.sub(expectedAmountOut));
 
       amountIn = expectedAmountOut;
-      expectedAmountOut = await pool.getAmountOut(sushi.address, amountIn);
+      expectedAmountOut = await pool.getAmountOut(sushi.address, weth.address, amountIn);
       expect(expectedAmountOut).lt(BigNumber.from(10).pow(18));
       params = {
         "tokenIn" : sushi.address,
@@ -201,7 +201,7 @@ describe("Router", function () {
       expect(await bento.balanceOf(sushi.address, pool.address)).eq(oldPoolSushiBalance);
 
       amountIn = expectedAmountOut;
-      expectedAmountOut = await pool.getAmountOut(weth.address, amountIn);
+      expectedAmountOut = await pool.getAmountOut(weth.address, sushi.address, amountIn);
       params = {
         "tokenIn" : weth.address,
         "tokenOut" : sushi.address,
@@ -229,7 +229,7 @@ describe("Router", function () {
 
     it("Should handle multi hop swaps", async function() {
       let amountIn = BigNumber.from(10).pow(18);
-      let expectedAmountOutSingleHop = await pool.getAmountOut(weth.address, amountIn);
+      let expectedAmountOutSingleHop = await pool.getAmountOut(weth.address, sushi.address, amountIn);
       expect(expectedAmountOutSingleHop).gt(1);
       let params = {
         "path" : [
@@ -301,7 +301,7 @@ describe("Router", function () {
 
     it("Should swap some native tokens", async function() {
       let amountIn = BigNumber.from(10).pow(18);
-      let expectedAmountOut = await pool.getAmountOut(weth.address, amountIn);
+      let expectedAmountOut = await pool.getAmountOut(weth.address, sushi.address, amountIn);
       expect(expectedAmountOut).gt(1);
       let params = {
         "tokenIn" : weth.address,
@@ -331,7 +331,7 @@ describe("Router", function () {
       expect(await bento.balanceOf(sushi.address, pool.address)).eq(oldPoolSushiBalance.sub(expectedAmountOut));
 
       amountIn = expectedAmountOut;
-      expectedAmountOut = await pool.getAmountOut(sushi.address, amountIn);
+      expectedAmountOut = await pool.getAmountOut(sushi.address, weth.address, amountIn);
       expect(expectedAmountOut).lt(BigNumber.from(10).pow(18));
       params = {
         "tokenIn" : sushi.address,

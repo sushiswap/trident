@@ -7,7 +7,6 @@ pragma solidity ^0.8.2;
  * @author Andre Cronje, LevX
  */
 library MirinMath {
-
     // computes square roots using the babylonian method
     // https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Babylonian_method
     // credit for this implementation goes to
@@ -55,5 +54,4 @@ library MirinMath {
         uint256 r1 = x / r;
         return (r < r1 ? r : r1);
     }
-
 }
