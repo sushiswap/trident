@@ -11,6 +11,7 @@ import "hardhat-watcher";
 import "solidity-coverage";
 import "@tenderly/hardhat-tenderly";
 import "@typechain/hardhat";
+import "hardhat-tracer"
 
 import { HardhatUserConfig, task } from "hardhat/config";
 
