@@ -9,7 +9,6 @@ import "./interfaces/IBentoBox.sol";
 
 import "./base/Multicall.sol";
 import "./base/SelfPermit.sol";
-import "./deployer/MasterDeployer.sol";
 
 import "./libraries/TransferHelper.sol";
 
@@ -17,16 +16,10 @@ import "hardhat/console.sol";
 
 contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
     address public immutable WETH;
-    address public immutable masterDeployer;
-    address public immutable bento;
+    IBentoBoxV1 public immutable bento;
 
-    constructor(
-        address _WETH,
-        address _masterDeployer,
-        address _bento
-    ) {
+    constructor(address _WETH, IBentoBoxV1 _bento) {
         WETH = _WETH;
-        masterDeployer = _masterDeployer;
         bento = _bento;
         IBentoBoxV1(_bento).registerProtocol();
     }
@@ -47,11 +40,22 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         returns (uint256 amountOut)
     {
         pay(params.tokenIn, msg.sender, params.pool, params.amountIn);
-        amountOut = IPool(params.pool).swapWithoutContext(params.tokenIn, params.tokenOut, params.recipient, params.unwrapBento);
+        amountOut = IPool(params.pool).swapWithoutContext(
+            params.tokenIn,
+            params.tokenOut,
+            params.recipient,
+            params.unwrapBento
+        );
+        amountOut = bento.toAmount(IERC20(params.tokenOut), amountOut, false);
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
 
-    function exactInput(ExactInputParams memory params) external payable checkDeadline(params.deadline) returns (uint256 amount) {
+    function exactInput(ExactInputParams memory params)
+        external
+        payable
+        checkDeadline(params.deadline)
+        returns (uint256 amount)
+    {
         amount = params.amountIn;
         // Pay the first pool directly
         pay(params.path[0].tokenIn, msg.sender, params.path[0].pool, amount);
@@ -65,7 +69,13 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         returns (uint256 amountOut)
     {
         _depositToBentoBox(params.tokenIn, params.pool, params.amountIn);
-        amountOut = IPool(params.pool).swapWithoutContext(params.tokenIn, params.tokenOut, params.recipient, params.unwrapBento);
+        amountOut = IPool(params.pool).swapWithoutContext(
+            params.tokenIn,
+            params.tokenOut,
+            params.recipient,
+            params.unwrapBento
+        );
+        amountOut = bento.toAmount(IERC20(params.tokenOut), amountOut, false);
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
 
@@ -87,14 +97,16 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         returns (uint256 amountOut)
     {
         pay(params.tokenIn, msg.sender, params.pool, params.amountIn);
+        uint256 amountIn = bento.toShare(IERC20(params.tokenIn), params.amountIn, false);
         amountOut = IPool(params.pool).swapWithContext(
             params.tokenIn,
             params.tokenOut,
             params.context,
             params.recipient,
             params.unwrapBento,
-            params.amountIn
+            amountIn
         );
+        amountOut = bento.toAmount(IERC20(params.tokenOut), amountOut, false);
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
 
@@ -117,14 +129,16 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         returns (uint256 amountOut)
     {
         _depositToBentoBox(params.tokenIn, params.pool, params.amountIn);
+        uint256 amountIn = bento.toShare(IERC20(params.tokenIn), params.amountIn, false);
         amountOut = IPool(params.pool).swapWithContext(
             params.tokenIn,
             params.tokenOut,
             params.context,
             params.recipient,
             params.unwrapBento,
-            params.amountIn
+            amountIn
         );
+        amountOut = bento.toAmount(IERC20(params.tokenOut), amountOut, false);
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
 
@@ -142,41 +156,50 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
     function complexPath(ComplexPathParams memory params) external payable checkDeadline(params.deadline) {
         for (uint256 i; i < params.initialPath.length; i++) {
             if (!params.initialPath[i].preFunded) {
-                pay(params.initialPath[i].tokenIn, msg.sender, params.initialPath[i].pool, params.initialPath[i].amountIn);
+                pay(
+                    params.initialPath[i].tokenIn,
+                    msg.sender,
+                    params.initialPath[i].pool,
+                    params.initialPath[i].amountIn
+                );
             }
+            uint256 amountIn = bento.toShare(
+                IERC20(params.initialPath[i].tokenIn),
+                params.initialPath[i].amountIn,
+                false
+            );
             IPool(params.initialPath[i].pool).swapWithContext(
                 params.initialPath[i].tokenIn,
                 params.initialPath[i].tokenOut,
                 params.initialPath[i].context,
                 address(this),
                 false,
-                params.initialPath[i].amountIn
+                amountIn
             );
         }
 
         for (uint256 i; i < params.percentagePath.length; i++) {
-            uint256 balanceShares = IBentoBoxV1(bento).balanceOf(IERC20(params.percentagePath[i].tokenIn), address(this));
-            uint256 balanceAmount = IBentoBoxV1(bento).toAmount(IERC20(params.percentagePath[i].tokenIn), balanceShares, false);
-            uint256 transferAmount = (balanceAmount * params.percentagePath[i].balancePercentage) / uint256(10)**6;
-            pay(params.percentagePath[i].tokenIn, address(this), params.percentagePath[i].pool, transferAmount);
+            uint256 balanceShares = bento.balanceOf(IERC20(params.percentagePath[i].tokenIn), address(this));
+            uint256 transferShares = (balanceShares * params.percentagePath[i].balancePercentage) / uint256(10)**6;
+            payInShares(params.percentagePath[i].tokenIn, address(this), params.percentagePath[i].pool, transferShares);
             IPool(params.percentagePath[i].pool).swapWithContext(
                 params.percentagePath[i].tokenIn,
                 params.percentagePath[i].tokenOut,
                 params.percentagePath[i].context,
                 address(this),
                 false,
-                transferAmount
+                transferShares
             );
         }
 
         for (uint256 i; i < params.output.length; i++) {
-            uint256 balanceShares = IBentoBoxV1(bento).balanceOf(IERC20(params.output[i].token), address(this));
-            uint256 balanceAmount = IBentoBoxV1(bento).toAmount(IERC20(params.output[i].token), balanceShares, false);
+            uint256 balanceShares = bento.balanceOf(IERC20(params.output[i].token), address(this));
+            uint256 balanceAmount = bento.toAmount(IERC20(params.output[i].token), balanceShares, false);
             require(balanceAmount >= params.output[i].minAmount, "Too little received");
             if (params.output[i].unwrapBento) {
-                IBentoBoxV1(bento).withdraw(IERC20(params.output[i].token), address(this), params.output[i].to, 0, balanceShares);
+                bento.withdraw(IERC20(params.output[i].token), address(this), params.output[i].to, 0, balanceShares);
             } else {
-                pay(params.output[i].token, address(this), params.output[i].to, balanceShares);
+                payInShares(params.output[i].token, address(this), params.output[i].to, balanceShares);
             }
         }
     }
@@ -192,8 +215,8 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
             if (liquidityInput[i].native) {
                 _depositToBentoBox(liquidityInput[i].token, pool, liquidityInput[i].amount);
             } else {
-                uint256 shares = IBentoBoxV1(bento).toShare(IERC20(liquidityInput[i].token), liquidityInput[i].amount, false);
-                IBentoBoxV1(bento).transfer(IERC20(liquidityInput[i].token), msg.sender, pool, shares);
+                uint256 shares = bento.toShare(IERC20(liquidityInput[i].token), liquidityInput[i].amount, false);
+                bento.transfer(IERC20(liquidityInput[i].token), msg.sender, pool, shares);
             }
         }
         liquidity = IPool(pool).mint(to);
@@ -201,19 +224,30 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
     }
 
     function addLiquidityBalanced(
-        IPool.liquidityInput[] calldata liquidityInput,
+        IPool.liquidityInput[] memory liquidityInput,
         address pool,
         address to,
         uint256 deadline
     ) external checkDeadline(deadline) returns (IPool.liquidityAmount[] memory liquidityOptimal, uint256 liquidity) {
+        for (uint256 i; i < liquidityInput.length; i++) {
+            liquidityInput[i].amountDesired = bento.toShare(
+                IERC20(liquidityInput[i].token),
+                liquidityInput[i].amountDesired,
+                false
+            );
+        }
         liquidityOptimal = IPool(pool).getOptimalLiquidityInAmounts(liquidityInput);
         for (uint256 i; i < liquidityOptimal.length; i++) {
-            require(liquidityOptimal[i].amount >= liquidityInput[i].amountMin, "Amount not Optimal");
+            uint256 underlyingAmount = bento.toAmount(
+                IERC20(liquidityOptimal[i].token),
+                liquidityOptimal[i].amount,
+                false
+            );
+            require(underlyingAmount >= liquidityInput[i].amountMin, "Amount not Optimal");
             if (liquidityInput[i].native) {
-                _depositToBentoBox(liquidityOptimal[i].token, pool, liquidityOptimal[i].amount);
+                _depositSharesToBentoBox(liquidityOptimal[i].token, pool, liquidityOptimal[i].amount);
             } else {
-                uint256 shares = IBentoBoxV1(bento).toShare(IERC20(liquidityOptimal[i].token), liquidityOptimal[i].amount, false);
-                IBentoBoxV1(bento).transfer(IERC20(liquidityOptimal[i].token), msg.sender, pool, shares);
+                bento.transfer(IERC20(liquidityOptimal[i].token), msg.sender, pool, liquidityOptimal[i].amount);
             }
         }
         liquidity = IPool(pool).mint(to);
@@ -233,7 +267,12 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
             uint256 j;
             for (; j < withdrawnLiquidity.length; j++) {
                 if (withdrawnLiquidity[j].token == minWithdrawals[i].token) {
-                    require(withdrawnLiquidity[j].amount >= minWithdrawals[i].amount, "Too little received");
+                    uint256 underlyingAmount = bento.toAmount(
+                        IERC20(withdrawnLiquidity[j].token),
+                        withdrawnLiquidity[j].amount,
+                        false
+                    );
+                    require(underlyingAmount >= minWithdrawals[i].amount, "Too little received");
                     break;
                 }
             }
@@ -254,21 +293,8 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         // Use liquidity = 0 for pre funding
         require(IERC20(pool).transferFrom(msg.sender, pool, liquidity));
         uint256 withdrawn = IPool(pool).burnLiquiditySingle(tokenOut, to, unwrapBento);
+        withdrawn = bento.toAmount(IERC20(tokenOut), withdrawn, false);
         require(withdrawn >= minWithdrawal, "Too little received");
-    }
-
-    function usePermit(
-        address token,
-        address holder,
-        address spender,
-        uint256 nonce,
-        uint256 expiry,
-        bool allowed,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external {
-        IERC20PermitAllowed(token).permit(holder, spender, nonce, expiry, allowed, v, r, s);
     }
 
     function depositToBentoBox(
@@ -276,7 +302,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         uint256 amount,
         address recipient
     ) external payable {
-        IBentoBoxV1(bento).deposit{value: address(this).balance}(IERC20(token), msg.sender, recipient, amount, 0);
+        bento.deposit{value: address(this).balance}(IERC20(token), msg.sender, recipient, amount, 0);
     }
 
     function sweepBentoBoxToken(
@@ -284,11 +310,11 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         uint256 amountMinimum,
         address recipient
     ) external payable {
-        uint256 balanceShares = IBentoBoxV1(bento).balanceOf(IERC20(token), address(this));
-        require(IBentoBoxV1(bento).toAmount(IERC20(token), balanceShares, false) >= amountMinimum, "Insufficient token");
+        uint256 balanceShares = bento.balanceOf(IERC20(token), address(this));
+        require(bento.toAmount(IERC20(token), balanceShares, false) >= amountMinimum, "Insufficient token");
 
         if (balanceShares > 0) {
-            IBentoBoxV1(bento).withdraw(IERC20(token), address(this), recipient, 0, balanceShares);
+            bento.withdraw(IERC20(token), address(this), recipient, 0, balanceShares);
         }
     }
 
@@ -320,10 +346,10 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
     }
 
     function _preFundedExactInput(ExactInputParams memory params) internal returns (uint256 amount) {
-        amount = params.amountIn;
+        amount = bento.toShare(IERC20(params.path[0].tokenIn), params.amountIn, false);
         uint256 lenMinusOne = params.path.length - 1;
 
-        for (uint256 i = 0; i < lenMinusOne; i++) {
+        for (uint256 i; i < lenMinusOne; i++) {
             amount = IPool(params.path[i].pool).swapWithoutContext(
                 params.path[i].tokenIn,
                 params.path[i + 1].tokenIn,
@@ -340,11 +366,15 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
             params.unwrapBento
         );
 
+        amount = bento.toAmount(IERC20(params.path[lenMinusOne].tokenIn), amount, false);
         require(amount >= params.amountOutMinimum, "Too little received");
     }
 
-    function _preFundedExactInputWithContext(ExactInputParamsWithContext memory params) internal returns (uint256 amount) {
-        amount = params.amountIn;
+    function _preFundedExactInputWithContext(ExactInputParamsWithContext memory params)
+        internal
+        returns (uint256 amount)
+    {
+        amount = bento.toShare(IERC20(params.path[0].tokenIn), params.amountIn, false);
         uint256 lenMinusOne = params.path.length - 1;
 
         for (uint256 i; i < lenMinusOne; i++) {
@@ -367,6 +397,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
             amount
         );
 
+        amount = bento.toAmount(IERC20(params.path[lenMinusOne].tokenIn), amount, false);
         require(amount >= params.amountOutMinimum, "Too little received");
     }
 
@@ -382,10 +413,25 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
     ) internal {
         if (token == address(0) || (token == WETH && address(this).balance >= value)) {
             // Deposit eth into recipient bentobox
-            IBentoBoxV1(bento).deposit{value: value}(IERC20(address(0)), address(this), recipient, value, 0);
+            bento.deposit{value: value}(IERC20(address(0)), address(this), recipient, value, 0);
         } else {
             // Process payment via bentobox
-            IBentoBoxV1(bento).transfer(IERC20(token), payer, recipient, IBentoBoxV1(bento).toShare(IERC20(token), value, false));
+            bento.transfer(IERC20(token), payer, recipient, bento.toShare(IERC20(token), value, false));
+        }
+    }
+
+    function payInShares(
+        address token,
+        address payer,
+        address recipient,
+        uint256 value
+    ) internal {
+        if (token == address(0) || (token == WETH && address(this).balance >= value)) {
+            // Deposit eth into recipient bentobox
+            bento.deposit{value: value}(IERC20(address(0)), address(this), recipient, 0, value);
+        } else {
+            // Process payment via bentobox
+            bento.transfer(IERC20(token), payer, recipient, value);
         }
     }
 
@@ -399,10 +445,24 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
     ) internal {
         if (token == address(0) || (token == WETH && address(this).balance >= amount)) {
             // Deposit eth into recipient bentobox
-            IBentoBoxV1(bento).deposit{value: amount}(IERC20(address(0)), address(this), recipient, amount, 0);
+            bento.deposit{value: amount}(IERC20(address(0)), address(this), recipient, amount, 0);
         } else {
             // Deposit ERC20 token to bentobox
-            IBentoBoxV1(bento).deposit(IERC20(token), msg.sender, recipient, amount, 0);
+            bento.deposit(IERC20(token), msg.sender, recipient, amount, 0);
+        }
+    }
+
+    function _depositSharesToBentoBox(
+        address token,
+        address recipient,
+        uint256 amount
+    ) internal {
+        if (token == address(0) || (token == WETH && address(this).balance >= amount)) {
+            // Deposit eth into recipient bentobox
+            bento.deposit{value: amount}(IERC20(address(0)), address(this), recipient, 0, amount);
+        } else {
+            // Deposit ERC20 token to bentobox
+            bento.deposit(IERC20(token), msg.sender, recipient, 0, amount);
         }
     }
 }

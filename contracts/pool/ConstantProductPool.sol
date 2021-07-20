@@ -94,7 +94,12 @@ contract ConstantProductPool is MirinERC20, IPool {
         emit Mint(msg.sender, amount0, amount1, to);
     }
 
-    function burn(address to, bool unwrapBento) public override lock returns (liquidityAmount[] memory withdrawnAmounts) {
+    function burn(address to, bool unwrapBento)
+        public
+        override
+        lock
+        returns (liquidityAmount[] memory withdrawnAmounts)
+    {
         (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
         uint256 _totalSupply = totalSupply;
         _mintFee(_reserve0, _reserve1, _totalSupply);
@@ -258,7 +263,10 @@ contract ConstantProductPool is MirinERC20, IPool {
     ) internal view {
         uint256 balance0Adjusted = balance0 * MAX_FEE - amount0In * swapFee;
         uint256 balance1Adjusted = balance1 * MAX_FEE - amount1In * swapFee;
-        require(balance0Adjusted * balance1Adjusted >= uint256(_reserve0) * _reserve1 * MAX_FEE_SQUARE, "MIRIN: LIQUIDITY");
+        require(
+            balance0Adjusted * balance1Adjusted >= uint256(_reserve0) * _reserve1 * MAX_FEE_SQUARE,
+            "MIRIN: LIQUIDITY"
+        );
     }
 
     function _getAmountOut(
@@ -277,9 +285,9 @@ contract ConstantProductPool is MirinERC20, IPool {
         bool unwrapBento
     ) internal {
         if (unwrapBento) {
-            IBentoBoxV1(bento).withdraw(token, address(this), to, amount, 0);
+            bento.withdraw(token, address(this), to, 0, amount);
         } else {
-            bento.transfer(token, address(this), to, bento.toShare(token, amount, false));
+            bento.transfer(token, address(this), to, amount);
         }
     }
 
@@ -291,16 +299,16 @@ contract ConstantProductPool is MirinERC20, IPool {
     ) internal {
         if (amount0Out > 0) {
             if (unwrapBento) {
-                IBentoBoxV1(bento).withdraw(token0, address(this), to, amount0Out, 0);
+                bento.withdraw(token0, address(this), to, 0, amount0Out);
             } else {
-                bento.transfer(token0, address(this), to, bento.toShare(token0, amount0Out, false));
+                bento.transfer(token0, address(this), to, amount0Out);
             }
         }
         if (amount1Out > 0) {
             if (unwrapBento) {
-                IBentoBoxV1(bento).withdraw(token1, address(this), to, amount1Out, 0);
+                bento.withdraw(token1, address(this), to, 0, amount1Out);
             } else {
-                bento.transfer(token1, address(this), to, bento.toShare(token1, amount1Out, false));
+                bento.transfer(token1, address(this), to, amount1Out);
             }
         }
     }
@@ -360,8 +368,14 @@ contract ConstantProductPool is MirinERC20, IPool {
         uint128 _reserve0;
         uint128 _reserve1;
         liquidityAmount[] memory liquidityOptimal = new liquidityAmount[](2);
-        liquidityOptimal[0] = liquidityAmount({token: liquidityInputs[0].token, amount: liquidityInputs[0].amountDesired});
-        liquidityOptimal[1] = liquidityAmount({token: liquidityInputs[1].token, amount: liquidityInputs[1].amountDesired});
+        liquidityOptimal[0] = liquidityAmount({
+            token: liquidityInputs[0].token,
+            amount: liquidityInputs[0].amountDesired
+        });
+        liquidityOptimal[1] = liquidityAmount({
+            token: liquidityInputs[1].token,
+            amount: liquidityInputs[1].amountDesired
+        });
 
         (_reserve0, _reserve1) = (reserve0, reserve1);
 

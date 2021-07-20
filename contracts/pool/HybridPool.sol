@@ -380,16 +380,16 @@ contract HybridPool is MirinERC20, IPool {
     ) internal {
         if (amount0Out > 0) {
             if (unwrapBento) {
-                IBentoBoxV1(bento).withdraw(token0, address(this), to, amount0Out, 0);
+                bento.withdraw(token0, address(this), to, 0, amount0Out);
             } else {
-                bento.transfer(token0, address(this), to, bento.toShare(token0, amount0Out, false));
+                bento.transfer(token0, address(this), to, amount0Out);
             }
         }
         if (amount1Out > 0) {
             if (unwrapBento) {
-                IBentoBoxV1(bento).withdraw(token1, address(this), to, amount1Out, 0);
+                bento.withdraw(token1, address(this), to, 0, amount1Out);
             } else {
-                bento.transfer(token1, address(this), to, bento.toShare(token1, amount1Out, false));
+                bento.transfer(token1, address(this), to, amount1Out);
             }
         }
         if (data.length > 0) IMirinCallee(to).mirinCall(msg.sender, amount0Out, amount1Out, data);
@@ -421,13 +421,6 @@ contract HybridPool is MirinERC20, IPool {
             _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         }
         emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
-    }
-
-    // force balances to match reserves
-    function skim(address to) external lock {
-        (uint256 balance0, uint256 balance1) = _balance();
-        bento.transfer(token0, address(this), to, bento.toShare(token0, balance0 - reserve0, false));
-        bento.transfer(token1, address(this), to, bento.toShare(token1, balance1 - reserve1, false));
     }
 
     function sync() external lock {
