@@ -6,24 +6,22 @@ import "contracts/flat/BentoBoxV1Flat.sol";
 contract SimpleBentoBox is BentoBoxV1 {
 	using BoringMath for uint256;
 
-	uint256 private constant RATIO = 1;
+	uint256 private constant RATIO = 2;
 
 	function toShare(IERC20 token, uint256 amount, bool roundUp) external override view returns (uint256 share) {
 		// if (RATIO == 1)
-			return amount; 
-        // if (amount == 0)
-		// 	return 0;
-	    // if (roundUp)
-		// 	return (amount.add(1)) / RATIO;
-		// else 
-		// 	return amount / RATIO; 
+		//	return amount; 
+        if (roundUp)
+		 	return (amount.add(1)) / RATIO;
+		else 
+		 	return amount / RATIO; 
     }
 
     function toAmount(IERC20 token, uint256 share, bool roundUp) external override view returns (uint256 amount) {
-		if (RATIO == 1)
-			return share; 
+		//if (RATIO == 1)
+		//	return share; 
 		
-        // return share.mul(RATIO);
+        return share.mul(RATIO);
     }
 
 	function assumeRatio(IERC20 token_, uint ratio) external view {
