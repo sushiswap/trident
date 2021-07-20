@@ -43,11 +43,11 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
     
     uint112 public liquidity;
     uint160 public sqrtPriceX96;
-
+    /// @dev placeholding below price variables for now....
     uint256 public price0CumulativeLast;
     uint256 public price1CumulativeLast;
     uint256 public kLast;
-
+    /// @dev placeholding below liquidity variables for now....
     uint112 internal reserve0;
     uint112 internal reserve1;
     uint32 internal blockTimestampLast;
@@ -93,9 +93,9 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
         unlocked = 1;
     }
 
-    function mint(int24 lowerOld, int24 lower, int24 upperOld, int24 upper, address recipient) public lock returns (uint256 amount) {
+    function mint(int24 lowerOld, int24 lower, int24 upperOld, int24 upper, address recipient) public lock returns (uint112 amount) {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
-
+        /// @dev replicating v2-style LP through `TridentNFT` which has erc20-like values in struct (totalSupply, balanceOf)....
         uint256 _totalSupply = tickPools[lower][upper].totalSupply; // gas savings
         uint112 _rangeLiquidity = tickPools[lower][upper].liquidity; // gas savings
         _mintFee(lower, upper, _rangeLiquidity, _totalSupply);
@@ -104,62 +104,72 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
         
-        uint256 computed = _rangeLiquidity + MirinMath.sqrt(amount0 * amount1);
+        uint112 addedLiquidity = uint112(MirinMath.sqrt(amount0 * amount1));
+        uint112 computed = _rangeLiquidity + addedLiquidity;
         if (_totalSupply == 0) {
-            amount = computed - MINIMUM_LIQUIDITY;
+            amount = computed - uint112(MINIMUM_LIQUIDITY);
             _mint(lower, upper, address(0), MINIMUM_LIQUIDITY);
         } else {
-            amount = ((computed - _rangeLiquidity) * _totalSupply) / _rangeLiquidity;
+            amount = ((computed - _rangeLiquidity) * uint112(_totalSupply)) / _rangeLiquidity;
         }
         require(amount > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_MINTED");
         
-        int160 priceLower = TickMath.getSqrtRatioAtTick(lower); // gas savings
+        _mint(lower, upper, recipient, amount);
+        /// @dev placeholding below price updating for now....
+        _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
+        kLast = MirinMath.sqrt(balance0 * balance1);
+        
+        /// @dev CPCP hooks for Tick link listing....
+        uint160 priceLower = TickMath.getSqrtRatioAtTick(lower); // gas savings
         uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper); // gas savings
         uint160 currentPrice = sqrtPriceX96; // gas savings
       
-        if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += amount;
-        tickPools[lower][upper].liquidity += amount;
+        if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += uint112(addedLiquidity);
+        tickPools[lower][upper].liquidity += uint112(addedLiquidity);
+        /// @dev temporary range reserve tracking values to make other functions easier to test
+        tickPools[lower][upper].reserve0 += uint112(amount0);
+        tickPools[lower][upper].reserve1 += uint112(amount1);
 
-        updateLinkedList(lowerOld, lower, upperOld, upper, amount);
+        updateLinkedList(lowerOld, lower, upperOld, upper, addedLiquidity);
         updateNearestTickPointer(lower, upper, nearestTick, currentPrice);
-        getAssets(priceLower, priceUpper, currentPrice, amount);
+        getAssets(priceLower, priceUpper, currentPrice, addedLiquidity);
         
-        _mint(lower, upper, recipient, amount);
-        _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        kLast = MirinMath.sqrt(balance0 * balance1);
         emit Mint(msg.sender, amount0, amount1, recipient);
-    }
+    } 
     
+    /// @dev This function triggers a burn of TridentNFT to unlock provided liquidity and fees - TO-DO: selective burn within position.
     function burn(uint256 tokenId, address recipient) public lock returns (uint256 amount0, uint256 amount1) {
-        uint256 lower = ranges[tokenId].lower;
-        uint256 upper = ranges[tokenId].upper;
-
+        int24 lower = ranges[tokenId].lower;
+        int24 upper = ranges[tokenId].upper;
+        /// @dev replicating v2-style LP through `TridentNFT` which has erc20-like values in struct (totalSupply, balanceOf)....
         uint256 _totalSupply = tickPools[lower][upper].totalSupply; // gas savings
         uint112 _rangeLiquidity = tickPools[lower][upper].liquidity; // gas savings
         _mintFee(lower, upper, _rangeLiquidity, _totalSupply);
 
-        uint256 liquidity = tickPools[lower][upper].balanceOf[address(this)]; // gas savings
-        (uint256 balance0, uint256 balance1) = _balance(); // gas savings
-        amount0 = (liquidity * balance0) / _totalSupply;
-        amount1 = (liquidity * balance1) / _totalSupply;
+        uint256 liquidityToBurn = tickPools[lower][upper].balanceOf[address(this)]; // gas savings
+        uint256 balance0 = tickPools[lower][upper].reserve0;
+        uint256 balance1 = tickPools[lower][upper].reserve1;
+        
+        amount0 = (liquidityToBurn * balance0) / _totalSupply;
+        amount1 = (liquidityToBurn * balance1) / _totalSupply;
 
-        _burn(tokenId, address(this), liquidity);
+        _burn(tokenId, address(this), liquidityToBurn);
 
         bento.transfer(token0, address(this), recipient, amount0);
         bento.transfer(token1, address(this), recipient, amount1);
-
+        /// @dev placeholding below price updating for now....
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
-        balance0 -= amount0;
-        balance1 -= amount1;
-
+        (balance0, balance1) = _balance();
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         kLast = MirinMath.sqrt(balance0 * balance1);
         emit Burn(msg.sender, amount0, amount1, recipient);
     }
 
     function swapWithoutContext(
-        uint256 loPt,
-        uint256 hiPt,
+        int24 lowerOld, 
+        int24 lower, 
+        int24 upperOld, 
+        int24 upper,
         address tokenIn,
         address tokenOut,
         address recipient,
@@ -168,25 +178,27 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
         uint256 amountOut
     ) external returns (uint256) {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
-        (uint112 _triPtReserve0, uint112 _triPtreserve1) = _getTriPtReserves(loPt, hiPt); // gas savings
+        (uint112 _rangeReserve0, uint112 _rangeReserve1) = _getRangeReserves(lower, upper); // gas savings
 
         if (tokenIn == address(token0)) {
             require(tokenOut == address(token1), "Invalid output token");
-            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _triPtReserve0, _triPtreserve1);
-            _swapWithOutData(0, amountOut, recipient, unwrapBento, _reserve0, _reserve1, _triPtReserve0, _triPtreserve1, _blockTimestampLast);
+            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _rangeReserve0, _rangeReserve1);
+            _swapWithOutData(0, amountOut, recipient, unwrapBento, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
         } else {
             require(tokenIn == address(token1), "Invalid input token");
             require(tokenOut == address(token0), "Invalid output token");
-            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _triPtreserve1, _triPtReserve0);
-            _swapWithOutData(amountOut, 0, recipient, unwrapBento, _reserve0, _reserve1, _triPtReserve0, _triPtreserve1, _blockTimestampLast);
+            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _rangeReserve1, _rangeReserve0);
+            _swapWithOutData(amountOut, 0, recipient, unwrapBento, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
         }
 
         return amountOut;
     }
 
     function swapExactIn(
-        uint256 loPt,
-        uint256 hiPt,
+        int24 lowerOld, 
+        int24 lower, 
+        int24 upperOld, 
+        int24 upper,
         address tokenIn,
         address tokenOut,
         address recipient,
@@ -194,23 +206,25 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
         uint256 amountIn
     ) external returns (uint256 amountOut) {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
-        (uint112 _triPtReserve0, uint112 _triPtreserve1) = _getTriPtReserves(loPt, hiPt); // gas savings
+        (uint112 _rangeReserve0, uint112 _rangeReserve1) = _getRangeReserves(lower, upper); // gas savings
 
         if (tokenIn == address(token0)) {
             require(tokenOut == address(token1), "Invalid output token");
-            amountOut = _getAmountOut(amountIn, _triPtReserve0, _triPtreserve1);
-            _swapWithOutData(0, amountOut, recipient, unwrapBento, _reserve0, _reserve1, _triPtReserve0, _triPtreserve1, _blockTimestampLast);
+            amountOut = _getAmountOut(amountIn, _rangeReserve0, _rangeReserve1);
+            _swapWithOutData(0, amountOut, recipient, unwrapBento, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
         } else {
             require(tokenIn == address(token1), "Invalid input token");
             require(tokenOut == address(token0), "Invalid output token");
-            amountOut = _getAmountOut(amountIn, _triPtreserve1, _triPtReserve0);
-            _swapWithOutData(amountOut, 0, recipient, unwrapBento, _reserve0, _reserve1, _triPtReserve0, _triPtreserve1, _blockTimestampLast);
+            amountOut = _getAmountOut(amountIn, _rangeReserve1, _rangeReserve0);
+            _swapWithOutData(amountOut, 0, recipient, unwrapBento, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
         }
     }
 
     function swapExactOut(
-        uint256 loPt,
-        uint256 hiPt,
+        int24 lowerOld, 
+        int24 lower, 
+        int24 upperOld, 
+        int24 upper,
         address tokenIn,
         address tokenOut,
         address recipient,
@@ -218,21 +232,23 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
         uint256 amountOut
     ) external {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
-        (uint112 _triPtReserve0, uint112 _triPtreserve1) = _getTriPtReserves(loPt, hiPt); // gas savings
+        (uint112 _rangeReserve0, uint112 _rangeReserve1) = _getRangeReserves(lower, upper); // gas savings
 
         if (tokenIn == address(token0)) {
             require(tokenOut == address(token1), "Invalid output token");
-           _swapWithOutData(0, amountOut, recipient, unwrapBento, _reserve0, _reserve1, _triPtReserve0, _triPtreserve1, _blockTimestampLast);
+           _swapWithOutData(0, amountOut, recipient, unwrapBento, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
         } else {
             require(tokenIn == address(token1), "Invalid input token");
             require(tokenOut == address(token0), "Invalid output token");
-            _swapWithOutData(amountOut, 0, recipient, unwrapBento, _reserve0, _reserve1, _triPtReserve0, _triPtreserve1, _blockTimestampLast);
+            _swapWithOutData(amountOut, 0, recipient, unwrapBento, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
         }
     }
 
     function swapWithContext(
-        uint256 loPt,
-        uint256 hiPt,
+        int24 lowerOld, 
+        int24 lower, 
+        int24 upperOld, 
+        int24 upper,
         address tokenIn,
         address tokenOut,
         bytes calldata context,
@@ -242,22 +258,24 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
         uint256 amountOut
     ) public returns (uint256) {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
-        (uint112 _triPtReserve0, uint112 _triPtreserve1) = _getTriPtReserves(loPt, hiPt); // gas savings
+        (uint112 _rangeReserve0, uint112 _rangeReserve1) = _getRangeReserves(lower, upper); // gas savings
 
         if (tokenIn == address(token0)) {
-            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _triPtReserve0, _triPtreserve1);
+            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _rangeReserve0, _rangeReserve1);
             require(tokenOut == address(token1), "Invalid output token");
-            _swapWithData(0, amountOut, recipient, unwrapBento, context, _reserve0, _reserve1, _triPtReserve0, _triPtreserve1, _blockTimestampLast);
+            _swapWithData(0, amountOut, recipient, unwrapBento, context, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
         } else if (tokenIn == address(token1)) {
-            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _triPtreserve1, _triPtReserve0);
+            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _rangeReserve1, _rangeReserve0);
             require(tokenOut == address(token0), "Invalid output token");
-            _swapWithData(amountOut, 0, recipient, unwrapBento, context, _reserve0, _reserve1, _triPtReserve0, _triPtreserve1, _blockTimestampLast);
+            _swapWithData(amountOut, 0, recipient, unwrapBento, context, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
         } else {
             require(tokenIn == address(this), "Invalid input token");
             require(tokenOut == address(token0) || tokenOut == address(token1), "Invalid output token");
             amountOut = _burnLiquiditySingle(
-                loPt,
-                hiPt,
+                lowerOld,
+                lower,
+                upperOld,
+                upper,
                 amountIn,
                 amountOut,
                 tokenOut,
@@ -273,16 +291,18 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
     }
 
     function swap(
-        uint256 loPt,
-        uint256 hiPt,
+        int24 lowerOld, 
+        int24 lower, 
+        int24 upperOld, 
+        int24 upper,
         uint256 amount0Out,
         uint256 amount1Out,
         address to,
         bytes calldata data
     ) external {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
-        (uint112 _triPtReserve0, uint112 _triPtreserve1) = _getTriPtReserves(loPt, hiPt); // gas savings
-        _swapWithData(amount0Out, amount1Out, to, false, data, _reserve0, _reserve1, _triPtReserve0, _triPtreserve1, _blockTimestampLast);
+        (uint112 _rangeReserve0, uint112 _rangeReserve1) = _getRangeReserves(lower, upper); // gas savings
+        _swapWithData(amount0Out, amount1Out, to, false, data, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
     }
 
     function _getReserves()
@@ -297,6 +317,18 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
         _reserve0 = reserve0;
         _reserve1 = reserve1;
         _blockTimestampLast = blockTimestampLast;
+    }
+    
+    function _getRangeReserves(int24 lower, int24 upper)
+        internal
+        view
+        returns (
+            uint112 _rangeReserve0,
+            uint112 _rangeReserve1
+        )
+    {
+        _rangeReserve0 = tickPools[lower][upper].reserve0;
+        _rangeReserve1 = tickPools[lower][upper].reserve1;
     }
 
     function _update(
@@ -323,30 +355,30 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
     }
 
     function _mintFee(
-        uint256 loPt,
-        uint256 hiPt,
-        uint112 _reserve0,
-        uint112 _reserve1,
+        int24 lower, 
+        int24 upper,
+        uint112 _liquidity,
         uint256 _totalSupply
-    ) private returns (uint256 computed) {
+    ) private {
         uint256 _kLast = kLast;
         if (_kLast != 0) {
-            computed = MirinMath.sqrt(uint256(_reserve0) * _reserve1);
-            if (computed > _kLast) {
+            if (_liquidity > _kLast) {
                 // barFee % of increase in liquidity
-                // NB It's going to be slihgtly less than barFee % in reality due to the Math
+                // NB It's going to be slightly less than barFee % in reality due to the Math
                 uint256 barFee = MasterDeployer(masterDeployer).barFee();
-                uint256 liquidity = (_totalSupply * (computed - _kLast) * barFee) / computed / MAX_FEE;
+                uint256 liquidity = (_totalSupply * (_liquidity - _kLast) * barFee) / _liquidity / MAX_FEE;
                 if (liquidity > 0) {
-                    _mint(loPt, hiPt, barFeeTo, liquidity);
+                    _mint(lower, upper, barFeeTo, liquidity);
                 }
             }
         }
     }
-    // TO-DO - read range internally
+    
     function _burnLiquiditySingle(
-        uint256 loPt,
-        uint256 hiPt,
+        int24 lowerOld, 
+        int24 lower, 
+        int24 upperOld, 
+        int24 upper,
         uint256 amountIn,
         uint256 amountOut,
         address tokenOut,
@@ -357,7 +389,8 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
         uint32 _blockTimestampLast
     ) internal returns (uint256 finalAmountOut) {
         uint256 _totalSupply = totalSupply;
-        _mintFee(loPt, hiPt, _reserve0, _reserve1, _totalSupply);
+        uint112 reserveLiquidity = uint112(MirinMath.sqrt(_reserve0 * _reserve1));
+        _mintFee(lower, upper, reserveLiquidity, _totalSupply);
 
         uint256 amount0;
         uint256 amount1;
@@ -393,7 +426,7 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
             require(finalAmountOut <= allowedAmountOut, "Insufficient liquidity burned");
         }
 
-        _swapBurn(loPt, hiPt, address(this), liquidity);
+        _swapBurn(lower, upper, address(this), liquidity);
 
         (uint256 balance0, uint256 balance1) = _balance();
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
@@ -477,13 +510,13 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
         bytes calldata data,
         uint112 _reserve0,
         uint112 _reserve1,
-        uint112 _triPtReserve0,
-        uint112 _triPtreserve1,
+        uint112 _rangeReserve0,
+        uint112 _rangeReserve1,
         uint32 _blockTimestampLast
     ) internal lock {
         _transferWithoutData(amount0Out, amount1Out, to, unwrapBento);
         if (data.length > 0) IMirinCallee(to).mirinCall(msg.sender, amount0Out, amount1Out, data);
-        _swap(amount0Out, amount1Out, to, _reserve0, _reserve1, _triPtReserve0, _triPtreserve1, _blockTimestampLast);
+        _swap(amount0Out, amount1Out, to, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
     }
 
     function _swapWithOutData(
@@ -493,12 +526,12 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
         bool unwrapBento,
         uint112 _reserve0,
         uint112 _reserve1,
-        uint112 _triPtReserve0,
-        uint112 _triPtreserve1,
+        uint112 _rangeReserve0,
+        uint112 _rangeReserve1,
         uint32 _blockTimestampLast
     ) internal lock {
         _transferWithoutData(amount0Out, amount1Out, to, unwrapBento);
-        _swap(amount0Out, amount1Out, to, _reserve0, _reserve1, _triPtReserve0, _triPtreserve1, _blockTimestampLast);
+        _swap(amount0Out, amount1Out, to, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
     }
 
     function _swap(
@@ -507,16 +540,16 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
         address to,
         uint112 _reserve0,
         uint112 _reserve1,
-        uint112 _triPtReserve0,
-        uint112 _triPtreserve1,
+        uint112 _rangeReserve0,
+        uint112 _rangeReserve1,
         uint32 _blockTimestampLast
     ) internal {
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 amount0In = balance0 + amount0Out - _reserve0;
         uint256 amount1In = balance1 + amount1Out - _reserve1;
-        uint256 triPtbalance0 = _triPtReserve0 + amount0In;
-        uint256 triPtbalance1 = _triPtreserve1 + amount1In;
-        _compute(amount0In, amount1In, triPtbalance0, triPtbalance1, _triPtReserve0, _triPtreserve1);
+        uint256 triPtbalance0 = _rangeReserve0 + amount0In;
+        uint256 triPtbalance1 = _rangeReserve1 + amount1In;
+        _compute(amount0In, amount1In, triPtbalance0, triPtbalance1, _rangeReserve0, _rangeReserve1);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
 
         emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
@@ -535,16 +568,16 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
     }
 
     function getAmountOut(
-        uint256 loPt,
-        uint256 hiPt,
+        int24 lower,
+        int24 upper,
         address tokenIn, 
         uint256 amountIn
     ) external view returns (uint256 amountOut) {
-        (uint112 _triPtReserve0, uint112 _triPtreserve1) = _getTriPtReserves(loPt, hiPt); // gas savings
+        (uint112 _rangeReserve0, uint112 _rangeReserve1) = _getRangeReserves(lower, upper); // gas savings
         if (IERC20(tokenIn) == token0) {
-            amountOut = _getAmountOut(amountIn, _triPtReserve0, _triPtreserve1);
+            amountOut = _getAmountOut(amountIn, _rangeReserve0, _rangeReserve1);
         } else {
-            amountOut = _getAmountOut(amountIn, _triPtreserve1, _triPtReserve0);
+            amountOut = _getAmountOut(amountIn, _rangeReserve1, _rangeReserve0);
         }
     }
     
@@ -600,8 +633,6 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
             token0amount = ((uint256(liquidityAmount) << 96) * uint256(priceUpper - _sqrtPriceX96) / _sqrtPriceX96) / priceUpper;
             token1amount = liquidityAmount * uint256(_sqrtPriceX96 - priceLower) / 0x1000000000000000000000000;
         }
-        if (token0amount > 0) token0.transferFrom(msg.sender, address(this), token0amount); // ! this will be in bento shares eventually
-        if (token1amount > 0) token1.transferFrom(msg.sender, address(this), token1amount);
     }
 
     function updateNearestTickPointer(int24 lower, int24 upper, int24 currentNearestTick, uint160 _sqrtPriceX96) internal  {
