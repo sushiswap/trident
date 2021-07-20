@@ -55,6 +55,15 @@ const config: HardhatUserConfig = {
     carol: {
       default: 3,
     },
+    dave: {
+      default: 4
+    },
+    eve: {
+      default: 5
+    },
+    feeTo: {
+      default: 6
+    },
   },
   networks: {
     localhost: {
@@ -281,6 +290,15 @@ const config: HardhatUserConfig = {
           optimizer: {
             enabled: true,
             runs: 99999,
+          },
+        },
+      },
+      {
+        version: "0.4.19",
+        settings: {
+          optimizer: {
+            enabled: false,
+            runs: 200,
           },
         },
       },
