@@ -11,7 +11,10 @@ import "hardhat-watcher";
 import "solidity-coverage";
 import "@tenderly/hardhat-tenderly";
 import "@typechain/hardhat";
+<<<<<<< HEAD
 import "hardhat-tracer"
+=======
+>>>>>>> upstream/master
 
 import { HardhatUserConfig, task } from "hardhat/config";
 
@@ -268,7 +271,7 @@ const config: HardhatUserConfig = {
   solidity: {
     compilers: [
       {
-        version: "0.8.2",
+        version: "0.8.6",
         settings: {
           optimizer: {
             enabled: true,

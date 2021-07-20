@@ -47,13 +47,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         returns (uint256 amountOut)
     {
         pay(params.tokenIn, msg.sender, params.pool, params.amountIn);
-        amountOut = IPool(params.pool).swapExactIn(
-            params.tokenIn,
-            params.tokenOut,
-            params.recipient,
-            params.unwrapBento,
-            params.amountIn
-        );
+        amountOut = IPool(params.pool).swapWithoutContext(params.tokenIn, params.tokenOut, params.recipient, params.unwrapBento);
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
 
@@ -71,13 +65,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         returns (uint256 amountOut)
     {
         _depositToBentoBox(params.tokenIn, params.pool, params.amountIn);
-        amountOut = IPool(params.pool).swapExactIn(
-            params.tokenIn,
-            params.tokenOut,
-            params.recipient,
-            params.unwrapBento,
-            params.amountIn
-        );
+        amountOut = IPool(params.pool).swapWithoutContext(params.tokenIn, params.tokenOut, params.recipient, params.unwrapBento);
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
 
@@ -105,8 +93,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
             params.context,
             params.recipient,
             params.unwrapBento,
-            params.amountIn,
-            0
+            params.amountIn
         );
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
@@ -136,8 +123,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
             params.context,
             params.recipient,
             params.unwrapBento,
-            params.amountIn,
-            0
+            params.amountIn
         );
         require(amountOut >= params.amountOutMinimum, "Too little received");
     }
@@ -164,8 +150,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
                 params.initialPath[i].context,
                 address(this),
                 false,
-                params.initialPath[i].amountIn,
-                0
+                params.initialPath[i].amountIn
             );
         }
 
@@ -180,8 +165,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
                 params.percentagePath[i].context,
                 address(this),
                 false,
-                transferAmount,
-                0
+                transferAmount
             );
         }
 
@@ -233,6 +217,58 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
             }
         }
         liquidity = IPool(pool).mint(to);
+    }
+
+    function burnLiquidity(
+        address pool,
+        address to,
+        bool unwrapBento,
+        uint256 deadline,
+        uint256 liquidity,
+        IPool.liquidityAmount[] memory minWithdrawals
+    ) external checkDeadline(deadline) {
+        require(IERC20(pool).transferFrom(msg.sender, pool, liquidity));
+        IPool.liquidityAmount[] memory withdrawnLiquidity = IPool(pool).burn(to, unwrapBento);
+        for (uint256 i; i < minWithdrawals.length; i++) {
+            uint256 j;
+            for (; j < withdrawnLiquidity.length; j++) {
+                if (withdrawnLiquidity[j].token == minWithdrawals[i].token) {
+                    require(withdrawnLiquidity[j].amount >= minWithdrawals[i].amount, "Too little received");
+                    break;
+                }
+            }
+            // A token that is present in `minWithdrawals` is missing from `withdrawnLiquidity`.
+            require(j < withdrawnLiquidity.length, "Incorrect token withdrawn");
+        }
+    }
+
+    function burnLiquiditySingle(
+        address pool,
+        address tokenOut,
+        address to,
+        bool unwrapBento,
+        uint256 deadline,
+        uint256 liquidity,
+        uint256 minWithdrawal
+    ) external checkDeadline(deadline) {
+        // Use liquidity = 0 for pre funding
+        require(IERC20(pool).transferFrom(msg.sender, pool, liquidity));
+        uint256 withdrawn = IPool(pool).burnLiquiditySingle(tokenOut, to, unwrapBento);
+        require(withdrawn >= minWithdrawal, "Too little received");
+    }
+
+    function usePermit(
+        address token,
+        address holder,
+        address spender,
+        uint256 nonce,
+        uint256 expiry,
+        bool allowed,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external {
+        IERC20PermitAllowed(token).permit(holder, spender, nonce, expiry, allowed, v, r, s);
     }
 
     function depositToBentoBox(
@@ -288,22 +324,20 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         uint256 lenMinusOne = params.path.length - 1;
 
         for (uint256 i = 0; i < lenMinusOne; i++) {
-            amount = IPool(params.path[i].pool).swapExactIn(
+            amount = IPool(params.path[i].pool).swapWithoutContext(
                 params.path[i].tokenIn,
                 params.path[i + 1].tokenIn,
                 params.path[i + 1].pool,
-                false,
-                amount
+                false
             );
         }
 
         // last hop
-        amount = IPool(params.path[lenMinusOne].pool).swapExactIn(
+        amount = IPool(params.path[lenMinusOne].pool).swapWithoutContext(
             params.path[lenMinusOne].tokenIn,
             params.tokenOut,
             params.recipient,
-            params.unwrapBento,
-            amount
+            params.unwrapBento
         );
 
         require(amount >= params.amountOutMinimum, "Too little received");
@@ -320,8 +354,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
                 params.path[i].context,
                 params.path[i + 1].pool,
                 false,
-                amount,
-                0
+                amount
             );
         }
 
@@ -331,8 +364,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
             params.path[lenMinusOne].context,
             params.recipient,
             params.unwrapBento,
-            amount,
-            0
+            amount
         );
 
         require(amount >= params.amountOutMinimum, "Too little received");
@@ -348,7 +380,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         address recipient,
         uint256 value
     ) internal {
-        if (token == WETH && address(this).balance >= value) {
+        if (token == address(0) || (token == WETH && address(this).balance >= value)) {
             // Deposit eth into recipient bentobox
             IBentoBoxV1(bento).deposit{value: value}(IERC20(address(0)), address(this), recipient, value, 0);
         } else {
@@ -365,7 +397,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         address recipient,
         uint256 amount
     ) internal {
-        if ((token == WETH || token == address(0)) && address(this).balance >= amount) {
+        if (token == address(0) || (token == WETH && address(this).balance >= amount)) {
             // Deposit eth into recipient bentobox
             IBentoBoxV1(bento).deposit{value: amount}(IERC20(address(0)), address(this), recipient, amount, 0);
         } else {
