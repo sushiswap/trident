@@ -4,37 +4,79 @@ pragma solidity ^0.8.2;
 
 import "../interfaces/IPool.sol";
 import "../interfaces/IBentoBox.sol";
-import "../interfaces/IMirinCallee.sol";
+import "../interfaces/ITridentCallee.sol";
 import "./TridentNFT.sol";
+import "./MirinERC20.sol";
 import "../libraries/MirinMath.sol";
-import "../deployer/MasterDeployer.sol";
 import "../libraries/TickMath.sol";
 import "hardhat/console.sol";
+import "../deployer/MasterDeployer.sol";
 
-abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
+library ConcentratedMath {
+    function log_2 (uint256 x) internal pure returns (uint256) {
+        unchecked {
+            require (x > 0);
+
+            uint256 msb = 0;
+            uint256 xc = x;
+            if (xc >= 0x10000000000000000) { xc >>= 64; msb += 64; }
+            if (xc >= 0x100000000) { xc >>= 32; msb += 32; }
+            if (xc >= 0x10000) { xc >>= 16; msb += 16; }
+            if (xc >= 0x100) { xc >>= 8; msb += 8; }
+            if (xc >= 0x10) { xc >>= 4; msb += 4; }
+            if (xc >= 0x4) { xc >>= 2; msb += 2; }
+            if (xc >= 0x2) msb += 1;  // No need to shift xc anymore
+
+            uint256 result = msb - 64 << 64;
+            uint256 ux = uint256 (uint256 (x)) << uint256 (127 - msb);
+            for (uint256 bit = 0x8000000000000000; bit > 0; bit >>= 1) {
+                ux *= ux;
+                uint256 b = ux >> 255;
+                ux >>= 127 + b;
+                result += bit * uint256 (b);
+            }
+
+            return uint256 (result);
+        }
+    }
+
+    function ln (uint256 x) internal pure returns (uint256) {
+        unchecked {
+            require (x > 0);
+
+            return (log_2 (x) * 0xB17217F7D1CF79ABC9E3B39803F2F6AF >> 128);
+        }
+    }
+    
+    function pow(uint256 a, uint256 b) internal returns (uint256) { 
+        return a**b;
+    }
+    
+    function calcTick(uint256 rp) internal returns (uint256) {
+        return ln(rp) * 2 / ln(10001);
+    }
+    
+    function calcSqrtPrice(uint256 i) internal returns (uint256) {
+        return pow(10001, i / 2);
+    }
+}
+
+/// @dev This pool swaps between bento shares. It does not care about underlying amounts.
+contract ConcentratedLiquidityPool is MirinERC20, IPool {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
-    event Swap(
-        address indexed sender,
-        uint256 amount0In,
-        uint256 amount1In,
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address indexed to
-    );
 
-    uint256 internal constant MINIMUM_LIQUIDITY = 10**3;
+    uint256 internal constant MINIMUM_LIQUIDITY = 1000;
 
-    uint8 internal constant PRECISION = 112;
     uint256 internal constant MAX_FEE = 10000; // 100%
     uint256 internal constant MAX_FEE_SQUARE = 100000000;
     uint256 public immutable swapFee;
     uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
 
-    address public immutable barFeeTo;
+    address internal immutable barFeeTo;
+    IBentoBoxV1 internal immutable bento;
+    MasterDeployer internal immutable masterDeployer;
 
-    IBentoBoxV1 private immutable bento;
-    MasterDeployer public immutable masterDeployer;
     IERC20 public immutable token0;
     IERC20 public immutable token1;
     
@@ -43,34 +85,32 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
     
     uint112 public liquidity;
     uint160 public sqrtPriceX96;
-    /// @dev placeholding below price variables for now....
-    uint256 public price0CumulativeLast;
-    uint256 public price1CumulativeLast;
+
     uint256 public kLast;
-    /// @dev placeholding below liquidity variables for now....
-    uint112 internal reserve0;
-    uint112 internal reserve1;
-    uint32 internal blockTimestampLast;
+
+    uint128 internal reserve0;
+    uint128 internal reserve1;
     
     mapping(int24 => Tick) public ticks;
     struct Tick {
         int24 previousTick;
         int24 nextTick;
-        uint112 liquidity;
+        uint128 reserve0;
+        uint128 reserve1;
         bool exists; // might not be necessary
     }
 
     uint256 private unlocked = 1;
     modifier lock() {
         require(unlocked == 1, "MIRIN: LOCKED");
-        unlocked = 0;
+        unlocked = 2;
         _;
         unlocked = 1;
     }
-    
+
     /// @dev
     /// Only set immutable variables here. State changes made here will not be used.
-    constructor(bytes memory _deployData, address _masterDeployer) {
+    constructor(bytes memory _deployData, address _masterDeployer) MirinERC20() {
         (IERC20 tokenA, IERC20 tokenB, uint256 _swapFee, int24 _tickSpacing, uint160 _sqrtPriceX96) = abi.decode(_deployData, (IERC20, IERC20, uint256, int24, uint160));
 
         require(address(tokenA) != address(0), "MIRIN: ZERO_ADDRESS");
@@ -83,392 +123,256 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
         token1 = _token1;
         swapFee = _swapFee;
         MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
-        tickSpacing = _tickSpacing;
-        ticks[TickMath.MIN_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint112(0), true);
-        ticks[TickMath.MAX_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint112(0), true);
-        nearestTick = TickMath.MIN_TICK;
         bento = IBentoBoxV1(MasterDeployer(_masterDeployer).bento());
         barFeeTo = MasterDeployer(_masterDeployer).barFeeTo();
         masterDeployer = MasterDeployer(_masterDeployer);
+        tickSpacing = _tickSpacing;
+        ticks[TickMath.MIN_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), uint128(0), true);
+        ticks[TickMath.MAX_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), uint128(0), true);
+        nearestTick = TickMath.MIN_TICK;
         unlocked = 1;
     }
 
-    function mint(int24 lowerOld, int24 lower, int24 upperOld, int24 upper, address recipient) public lock returns (uint112 amount) {
-        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
-        /// @dev replicating v2-style LP through `TridentNFT` which has erc20-like values in struct (totalSupply, balanceOf)....
-        uint256 _totalSupply = tickPools[lower][upper].totalSupply; // gas savings
-        uint112 _rangeLiquidity = tickPools[lower][upper].liquidity; // gas savings
-        _mintFee(lower, upper, _rangeLiquidity, _totalSupply);
-        
-        (uint256 balance0, uint256 balance1) = _balance(); // gas savings
+    function mint(address to) public override lock returns (uint256 liquidity) {
+        (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
+        uint256 _totalSupply = totalSupply;
+        _mintFee(_reserve0, _reserve1, _totalSupply);
+
+        (uint256 balance0, uint256 balance1) = _balance();
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
-        
-        uint112 addedLiquidity = uint112(MirinMath.sqrt(amount0 * amount1));
-        uint112 computed = _rangeLiquidity + addedLiquidity;
+
+        uint256 computed = MirinMath.sqrt(balance0 * balance1);
         if (_totalSupply == 0) {
-            amount = computed - uint112(MINIMUM_LIQUIDITY);
-            _mint(lower, upper, address(0), MINIMUM_LIQUIDITY);
+            liquidity = computed - MINIMUM_LIQUIDITY;
+            _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
-            amount = ((computed - _rangeLiquidity) * uint112(_totalSupply)) / _rangeLiquidity;
+            uint256 k = MirinMath.sqrt(uint256(_reserve0) * _reserve1);
+            liquidity = ((computed - k) * _totalSupply) / k;
         }
-        require(amount > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_MINTED");
-        
-        _mint(lower, upper, recipient, amount);
-        /// @dev placeholding below price updating for now....
-        _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
+        require(liquidity > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_MINTED");
+        _mint(to, liquidity);
+        _update(balance0, balance1);
+        kLast = computed;
+        emit Mint(msg.sender, amount0, amount1, to);
+    }
+
+    function burn(address to, bool unwrapBento)
+        public
+        override
+        lock
+        returns (liquidityAmount[] memory withdrawnAmounts)
+    {
+        (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
+        uint256 _totalSupply = totalSupply;
+        _mintFee(_reserve0, _reserve1, _totalSupply);
+
+        uint256 liquidity = balanceOf[address(this)];
+        (uint256 balance0, uint256 balance1) = _balance();
+        uint256 amount0 = (liquidity * balance0) / _totalSupply;
+        uint256 amount1 = (liquidity * balance1) / _totalSupply;
+
+        _burn(address(this), liquidity);
+
+        _transfer(token0, amount0, to, unwrapBento);
+        _transfer(token1, amount1, to, unwrapBento);
+
+        balance0 -= amount0;
+        balance1 -= amount1;
+
+        _update(balance0, balance1);
         kLast = MirinMath.sqrt(balance0 * balance1);
-        
-        /// @dev CPCP hooks for Tick link listing....
-        uint160 priceLower = TickMath.getSqrtRatioAtTick(lower); // gas savings
-        uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper); // gas savings
-        uint160 currentPrice = sqrtPriceX96; // gas savings
-      
-        if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += uint112(addedLiquidity);
-        tickPools[lower][upper].liquidity += uint112(addedLiquidity);
-        /// @dev temporary range reserve tracking values to make other functions easier to test
-        tickPools[lower][upper].reserve0 += uint112(amount0);
-        tickPools[lower][upper].reserve1 += uint112(amount1);
 
-        updateLinkedList(lowerOld, lower, upperOld, upper, addedLiquidity);
-        updateNearestTickPointer(lower, upper, nearestTick, currentPrice);
-        getAssets(priceLower, priceUpper, currentPrice, addedLiquidity);
-        
-        emit Mint(msg.sender, amount0, amount1, recipient);
-    } 
-    
-    /// @dev This function triggers a burn of TridentNFT to unlock provided liquidity and fees - TO-DO: selective burn within position.
-    function burn(uint256 tokenId, address recipient) public lock returns (uint256 amount0, uint256 amount1) {
-        int24 lower = ranges[tokenId].lower;
-        int24 upper = ranges[tokenId].upper;
-        /// @dev replicating v2-style LP through `TridentNFT` which has erc20-like values in struct (totalSupply, balanceOf)....
-        uint256 _totalSupply = tickPools[lower][upper].totalSupply; // gas savings
-        uint112 _rangeLiquidity = tickPools[lower][upper].liquidity; // gas savings
-        _mintFee(lower, upper, _rangeLiquidity, _totalSupply);
+        withdrawnAmounts = new liquidityAmount[](2);
+        withdrawnAmounts[0] = liquidityAmount({token: address(token0), amount: amount0});
+        withdrawnAmounts[1] = liquidityAmount({token: address(token1), amount: amount1});
 
-        uint256 liquidityToBurn = tickPools[lower][upper].balanceOf[address(this)]; // gas savings
-        uint256 balance0 = tickPools[lower][upper].reserve0;
-        uint256 balance1 = tickPools[lower][upper].reserve1;
-        
-        amount0 = (liquidityToBurn * balance0) / _totalSupply;
-        amount1 = (liquidityToBurn * balance1) / _totalSupply;
+        emit Burn(msg.sender, amount0, amount1, to);
+    }
 
-        _burn(tokenId, address(this), liquidityToBurn);
+    function burnLiquiditySingle(
+        address tokenOut,
+        address to,
+        bool unwrapBento
+    ) public override lock returns (uint256 amount) {
+        (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
+        uint256 _totalSupply = totalSupply;
+        _mintFee(_reserve0, _reserve1, _totalSupply);
 
-        bento.transfer(token0, address(this), recipient, amount0);
-        bento.transfer(token1, address(this), recipient, amount1);
-        /// @dev placeholding below price updating for now....
-        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
-        (balance0, balance1) = _balance();
-        _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
+        uint256 liquidity = balanceOf[address(this)];
+        (uint256 balance0, uint256 balance1) = _balance();
+        uint256 amount0 = (liquidity * balance0) / _totalSupply;
+        uint256 amount1 = (liquidity * balance1) / _totalSupply;
+
+        _burn(address(this), liquidity);
+
+        if (tokenOut == address(token0)) {
+            // Swap token1 for token0
+            // Calculate amountOut as if the user first withdrew balanced liquidity and then swapped token1 for token0
+            amount0 += _getAmountOut(amount1, _reserve0 - amount0, _reserve1 - amount1);
+            _transfer(token0, amount0, to, unwrapBento);
+            balance0 -= amount0;
+            amount = amount0;
+        } else {
+            // Swap token0 for token1
+            require(tokenOut == address(token1), "Invalid output token");
+            amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1);
+            _transfer(token1, amount1, to, unwrapBento);
+            balance1 -= amount1;
+            amount = amount1;
+        }
+
+        _update(balance0, balance1);
         kLast = MirinMath.sqrt(balance0 * balance1);
-        emit Burn(msg.sender, amount0, amount1, recipient);
+        emit Burn(msg.sender, amount0, amount1, to);
     }
 
     function swapWithoutContext(
-        int24 lowerOld, 
-        int24 lower, 
-        int24 upperOld, 
-        int24 upper,
         address tokenIn,
         address tokenOut,
         address recipient,
-        bool unwrapBento,
-        uint256 amountIn,
-        uint256 amountOut
-    ) external returns (uint256) {
-        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
-        (uint112 _rangeReserve0, uint112 _rangeReserve1) = _getRangeReserves(lower, upper); // gas savings
+        bool unwrapBento
+    ) external override lock returns (uint256 amountOut) {
+        (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
+        (uint256 balance0, uint256 balance1) = _balance();
+        uint256 amountIn;
 
         if (tokenIn == address(token0)) {
             require(tokenOut == address(token1), "Invalid output token");
-            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _rangeReserve0, _rangeReserve1);
-            _swapWithOutData(0, amountOut, recipient, unwrapBento, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
+            amountIn = balance0 - _reserve0;
+            amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
+            _transfer(token1, amountOut, recipient, unwrapBento);
+            _update(balance0, balance1 - amountOut);
         } else {
             require(tokenIn == address(token1), "Invalid input token");
             require(tokenOut == address(token0), "Invalid output token");
-            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _rangeReserve1, _rangeReserve0);
-            _swapWithOutData(amountOut, 0, recipient, unwrapBento, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
+            amountIn = balance1 - _reserve1;
+            amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
+            _transfer(token0, amountOut, recipient, unwrapBento);
+            _update(balance0 - amountOut, balance1);
         }
-
-        return amountOut;
-    }
-
-    function swapExactIn(
-        int24 lowerOld, 
-        int24 lower, 
-        int24 upperOld, 
-        int24 upper,
-        address tokenIn,
-        address tokenOut,
-        address recipient,
-        bool unwrapBento,
-        uint256 amountIn
-    ) external returns (uint256 amountOut) {
-        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
-        (uint112 _rangeReserve0, uint112 _rangeReserve1) = _getRangeReserves(lower, upper); // gas savings
-
-        if (tokenIn == address(token0)) {
-            require(tokenOut == address(token1), "Invalid output token");
-            amountOut = _getAmountOut(amountIn, _rangeReserve0, _rangeReserve1);
-            _swapWithOutData(0, amountOut, recipient, unwrapBento, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
-        } else {
-            require(tokenIn == address(token1), "Invalid input token");
-            require(tokenOut == address(token0), "Invalid output token");
-            amountOut = _getAmountOut(amountIn, _rangeReserve1, _rangeReserve0);
-            _swapWithOutData(amountOut, 0, recipient, unwrapBento, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
-        }
-    }
-
-    function swapExactOut(
-        int24 lowerOld, 
-        int24 lower, 
-        int24 upperOld, 
-        int24 upper,
-        address tokenIn,
-        address tokenOut,
-        address recipient,
-        bool unwrapBento,
-        uint256 amountOut
-    ) external {
-        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
-        (uint112 _rangeReserve0, uint112 _rangeReserve1) = _getRangeReserves(lower, upper); // gas savings
-
-        if (tokenIn == address(token0)) {
-            require(tokenOut == address(token1), "Invalid output token");
-           _swapWithOutData(0, amountOut, recipient, unwrapBento, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
-        } else {
-            require(tokenIn == address(token1), "Invalid input token");
-            require(tokenOut == address(token0), "Invalid output token");
-            _swapWithOutData(amountOut, 0, recipient, unwrapBento, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
-        }
+        emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
 
     function swapWithContext(
-        int24 lowerOld, 
-        int24 lower, 
-        int24 upperOld, 
-        int24 upper,
         address tokenIn,
         address tokenOut,
         bytes calldata context,
         address recipient,
         bool unwrapBento,
-        uint256 amountIn,
-        uint256 amountOut
-    ) public returns (uint256) {
-        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
-        (uint112 _rangeReserve0, uint112 _rangeReserve1) = _getRangeReserves(lower, upper); // gas savings
-
+        uint256 amountIn
+    ) public override lock returns (uint256 amountOut) {
+        (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
+   
         if (tokenIn == address(token0)) {
-            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _rangeReserve0, _rangeReserve1);
             require(tokenOut == address(token1), "Invalid output token");
-            _swapWithData(0, amountOut, recipient, unwrapBento, context, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
-        } else if (tokenIn == address(token1)) {
-            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _rangeReserve1, _rangeReserve0);
-            require(tokenOut == address(token0), "Invalid output token");
-            _swapWithData(amountOut, 0, recipient, unwrapBento, context, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
+            
+            amountOut = _computeRange(amountIn, true);
+            _processSwap(tokenIn, tokenOut, recipient, amountIn, amountOut, context, unwrapBento);
+
+            (uint256 balance0, uint256 balance1) = _balance();
+            require(balance0 - _reserve0 >= amountIn, "Insuffficient amount in");
+
+            _update(balance0, balance1 - amountOut);
         } else {
-            require(tokenIn == address(this), "Invalid input token");
-            require(tokenOut == address(token0) || tokenOut == address(token1), "Invalid output token");
-            amountOut = _burnLiquiditySingle(
-                lowerOld,
-                lower,
-                upperOld,
-                upper,
-                amountIn,
-                amountOut,
-                tokenOut,
-                recipient,
-                context,
-                _reserve0,
-                _reserve1,
-                _blockTimestampLast
-            );
+            require(tokenIn == address(token1), "Invalid input token");
+            require(tokenOut == address(token0), "Invalid output token");
+
+            amountOut = _computeRange(amountIn, true);
+            _processSwap(tokenIn, tokenOut, recipient, amountIn, amountOut, context, unwrapBento);
+
+            (uint256 balance0, uint256 balance1) = _balance();
+            require(balance1 - _reserve1 >= amountIn, "Insuffficient amount in");
+
+            _update(balance0 - amountOut, balance1);
         }
 
-        return amountOut;
-    }
-
-    function swap(
-        int24 lowerOld, 
-        int24 lower, 
-        int24 upperOld, 
-        int24 upper,
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address to,
-        bytes calldata data
-    ) external {
-        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
-        (uint112 _rangeReserve0, uint112 _rangeReserve1) = _getRangeReserves(lower, upper); // gas savings
-        _swapWithData(amount0Out, amount1Out, to, false, data, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
-    }
-
-    function _getReserves()
-        internal
-        view
-        returns (
-            uint112 _reserve0,
-            uint112 _reserve1,
-            uint32 _blockTimestampLast
-        )
-    {
-        _reserve0 = reserve0;
-        _reserve1 = reserve1;
-        _blockTimestampLast = blockTimestampLast;
+        emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
     
-    function _getRangeReserves(int24 lower, int24 upper)
-        internal
-        view
-        returns (
-            uint112 _rangeReserve0,
-            uint112 _rangeReserve1
-        )
-    {
-        _rangeReserve0 = tickPools[lower][upper].reserve0;
-        _rangeReserve1 = tickPools[lower][upper].reserve1;
-    }
-
-    function _update(
-        uint256 balance0,
-        uint256 balance1,
-        uint112 _reserve0,
-        uint112 _reserve1,
-        uint32 _blockTimestampLast
-    ) internal {
-        require(balance0 <= type(uint112).max && balance1 <= type(uint112).max, "MIRIN: OVERFLOW");
-        uint32 blockTimestamp = uint32(block.timestamp % 2**32);
-        if (blockTimestamp != _blockTimestampLast && _reserve0 != 0) {
-            unchecked {
-                uint32 timeElapsed = blockTimestamp - _blockTimestampLast;
-                uint256 price0 = (uint256(_reserve1) << PRECISION) / _reserve0;
-                price0CumulativeLast += price0 * timeElapsed;
-                uint256 price1 = (uint256(_reserve0) << PRECISION) / _reserve1;
-                price1CumulativeLast += price1 * timeElapsed;
+    function _computeRange(uint256 amountIn, bool token0) internal returns (uint256 delta) {
+        /// @dev using sarang's tick cross/swap formula
+        uint256 nearestTickReserve0 = ticks[nearestTick].reserve0;
+        uint256 nearestTickReserve1 = ticks[nearestTick].reserve1;
+        
+        uint256 delta_y = amountIn;
+        uint256 nearestTickLiquidity = MirinMath.sqrt(nearestTickReserve0 * nearestTickReserve1);
+        uint256 delta_sqrt_price = delta_y / nearestTickLiquidity;
+        uint256 sqrt_price = MirinMath.sqrt(nearestTickReserve1 / nearestTickReserve0);
+        
+        uint256 tick_start = ConcentratedMath.calcTick(sqrt_price);
+        uint256 tick_finish = ConcentratedMath.calcTick(sqrt_price + delta_sqrt_price);
+        uint256 diff = tick_finish - tick_start;
+        uint256 delta_x = 0;
+        
+        for (uint256 i = 0; i < diff; i++) {
+            // calculate the delta_sqrt_price
+            uint256 tick_sqrt_price = ConcentratedMath.calcSqrtPrice(tick_start + 1);
+            delta_sqrt_price = tick_sqrt_price - sqrt_price;
+            uint256 inverse_delta_sqrt_price = (1 / sqrt_price) - (1 / tick_sqrt_price);
+            
+            // check how much y is left to swap
+            if (delta_y - (delta_sqrt_price * nearestTickLiquidity) > 0) {
+                delta_y -= (delta_sqrt_price * nearestTickLiquidity);
+                delta_x += (nearestTickLiquidity * inverse_delta_sqrt_price);
+            } else {
+                // delta_y is exhausted for the integer value of tick
+            }
+            
+            if (delta_y > 0) {
+                delta_sqrt_price = delta_y / nearestTickLiquidity;
+                uint256 fractional_tick = ConcentratedMath.calcTick(sqrt_price + delta_sqrt_price);
+                tick_sqrt_price = ConcentratedMath.calcSqrtPrice(fractional_tick);
+                inverse_delta_sqrt_price = (1 / sqrt_price) - (1 / tick_sqrt_price);
+                delta_x += (nearestTickLiquidity * inverse_delta_sqrt_price);
             }
         }
-        reserve0 = uint112(balance0);
-        reserve1 = uint112(balance1);
-        blockTimestampLast = blockTimestamp;
+        
+        return delta_x;
+    }
+
+    function _processSwap(
+        address tokenIn,
+        address tokenOut,
+        address to,
+        uint256 amountIn,
+        uint256 amountOut,
+        bytes calldata data,
+        bool unwrapBento
+    ) internal {
+        _transfer(IERC20(tokenOut), amountOut, to, unwrapBento);
+        if (data.length > 0) ITridentCallee(to).tridentCallback(tokenIn, tokenOut, amountIn, amountOut, data);
+    }
+
+    function _update(uint256 balance0, uint256 balance1) internal {
+        require(balance0 < type(uint128).max && balance1 < type(uint128).max, "MIRIN: OVERFLOW");
+        reserve0 = uint128(balance0);
+        reserve1 = uint128(balance1);
     }
 
     function _mintFee(
-        int24 lower, 
-        int24 upper,
-        uint112 _liquidity,
+        uint128 _reserve0,
+        uint128 _reserve1,
         uint256 _totalSupply
-    ) private {
+    ) internal returns (uint256 computed) {
         uint256 _kLast = kLast;
         if (_kLast != 0) {
-            if (_liquidity > _kLast) {
+            computed = MirinMath.sqrt(uint256(_reserve0) * _reserve1);
+            if (computed > _kLast) {
                 // barFee % of increase in liquidity
-                // NB It's going to be slightly less than barFee % in reality due to the Math
+                // NB It's going to be slihgtly less than barFee % in reality due to the Math
                 uint256 barFee = MasterDeployer(masterDeployer).barFee();
-                uint256 liquidity = (_totalSupply * (_liquidity - _kLast) * barFee) / _liquidity / MAX_FEE;
+                uint256 liquidity = (_totalSupply * (computed - _kLast) * barFee) / computed / MAX_FEE;
                 if (liquidity > 0) {
-                    _mint(lower, upper, barFeeTo, liquidity);
+                    _mint(barFeeTo, liquidity);
                 }
             }
-        }
-    }
-    
-    function _burnLiquiditySingle(
-        int24 lowerOld, 
-        int24 lower, 
-        int24 upperOld, 
-        int24 upper,
-        uint256 amountIn,
-        uint256 amountOut,
-        address tokenOut,
-        address to,
-        bytes calldata data,
-        uint112 _reserve0,
-        uint112 _reserve1,
-        uint32 _blockTimestampLast
-    ) internal returns (uint256 finalAmountOut) {
-        uint256 _totalSupply = totalSupply;
-        uint112 reserveLiquidity = uint112(MirinMath.sqrt(_reserve0 * _reserve1));
-        _mintFee(lower, upper, reserveLiquidity, _totalSupply);
-
-        uint256 amount0;
-        uint256 amount1;
-        uint256 liquidity;
-
-        if (amountIn > 0) {
-            finalAmountOut = _getOutAmountForBurn(tokenOut, amountIn, _totalSupply, _reserve0, _reserve1);
-
-            if (tokenOut == address(token0)) {
-                amount0 = finalAmountOut;
-            } else {
-                amount1 = finalAmountOut;
-            }
-
-            _transferWithoutData(amount0, amount1, to, false);
-            if (data.length > 0) IMirinCallee(to).mirinCall(msg.sender, amount0, amount1, data);
-
-            liquidity = balanceOf[address(this)];
-            require(liquidity >= amountIn, "Insufficient liquidity burned");
-        } else {
-            if (tokenOut == address(token0)) {
-                amount0 = amountOut;
-            } else {
-                amount1 = amountOut;
-            }
-
-            _transferWithoutData(amount0, amount1, to, false);
-            if (data.length > 0) IMirinCallee(to).mirinCall(msg.sender, amount0, amount1, data);
-            finalAmountOut = amountOut;
-
-            liquidity = balanceOf[address(this)];
-            uint256 allowedAmountOut = _getOutAmountForBurn(tokenOut, liquidity, _totalSupply, _reserve0, _reserve1);
-            require(finalAmountOut <= allowedAmountOut, "Insufficient liquidity burned");
-        }
-
-        _swapBurn(lower, upper, address(this), liquidity);
-
-        (uint256 balance0, uint256 balance1) = _balance();
-        _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-
-        kLast = MirinMath.sqrt(balance0 * balance1);
-        emit Burn(msg.sender, amount0, amount1, to);
-    }
-    
-    function _getOutAmountForBurn(
-        address tokenOut,
-        uint256 liquidity,
-        uint256 _totalSupply,
-        uint112 _reserve0,
-        uint112 _reserve1
-    ) internal view returns (uint256 amount) {
-        uint256 amount0 = (liquidity * _reserve0) / _totalSupply;
-        uint256 amount1 = (liquidity * _reserve1) / _totalSupply;
-        if (tokenOut == address(token0)) {
-            amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0);
-            return amount0;
-        } else {
-            amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1);
-            return amount1;
         }
     }
 
     function _balance() internal view returns (uint256 balance0, uint256 balance1) {
         balance0 = bento.balanceOf(token0, address(this));
         balance1 = bento.balanceOf(token1, address(this));
-    }
-
-    function _compute(
-        uint256 amount0In,
-        uint256 amount1In,
-        uint256 balance0,
-        uint256 balance1,
-        uint112 _reserve0,
-        uint112 _reserve1
-    ) internal view {
-        uint256 balance0Adjusted = balance0 * MAX_FEE - amount0In * swapFee;
-        uint256 balance1Adjusted = balance1 * MAX_FEE - amount1In * swapFee;
-        require(balance0Adjusted * balance1Adjusted >= uint256(_reserve0) * _reserve1 * MAX_FEE_SQUARE, "MIRIN: LIQUIDITY");
     }
 
     function _getAmountOut(
@@ -480,187 +384,70 @@ abstract contract ConcentratedLiquidityPool is TridentNFT, IPool {
         amountOut = (amountInWithFee * reserveOut) / (reserveIn * MAX_FEE + amountInWithFee);
     }
 
-    function _transferWithoutData(
-        uint256 amount0Out,
-        uint256 amount1Out,
+    function _transfer(
+        IERC20 token,
+        uint256 amount,
         address to,
         bool unwrapBento
     ) internal {
-        if (amount0Out > 0) {
-            if (unwrapBento) {
-                IBentoBoxV1(bento).withdraw(token0, address(this), to, amount0Out, 0);
-            } else {
-                bento.transfer(token0, address(this), to, bento.toShare(token0, amount0Out, false));
-            }
+        if (unwrapBento) {
+            bento.withdraw(token, address(this), to, 0, amount);
+        } else {
+            bento.transfer(token, address(this), to, amount);
         }
-        if (amount1Out > 0) {
-            if (unwrapBento) {
-                IBentoBoxV1(bento).withdraw(token1, address(this), to, amount1Out, 0);
-            } else {
-                bento.transfer(token1, address(this), to, bento.toShare(token1, amount1Out, false));
-            }
-        }
-    }
-
-    function _swapWithData(
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address to,
-        bool unwrapBento,
-        bytes calldata data,
-        uint112 _reserve0,
-        uint112 _reserve1,
-        uint112 _rangeReserve0,
-        uint112 _rangeReserve1,
-        uint32 _blockTimestampLast
-    ) internal lock {
-        _transferWithoutData(amount0Out, amount1Out, to, unwrapBento);
-        if (data.length > 0) IMirinCallee(to).mirinCall(msg.sender, amount0Out, amount1Out, data);
-        _swap(amount0Out, amount1Out, to, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
-    }
-
-    function _swapWithOutData(
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address to,
-        bool unwrapBento,
-        uint112 _reserve0,
-        uint112 _reserve1,
-        uint112 _rangeReserve0,
-        uint112 _rangeReserve1,
-        uint32 _blockTimestampLast
-    ) internal lock {
-        _transferWithoutData(amount0Out, amount1Out, to, unwrapBento);
-        _swap(amount0Out, amount1Out, to, _reserve0, _reserve1, _rangeReserve0, _rangeReserve1, _blockTimestampLast);
-    }
-
-    function _swap(
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address to,
-        uint112 _reserve0,
-        uint112 _reserve1,
-        uint112 _rangeReserve0,
-        uint112 _rangeReserve1,
-        uint32 _blockTimestampLast
-    ) internal {
-        (uint256 balance0, uint256 balance1) = _balance();
-        uint256 amount0In = balance0 + amount0Out - _reserve0;
-        uint256 amount1In = balance1 + amount1Out - _reserve1;
-        uint256 triPtbalance0 = _rangeReserve0 + amount0In;
-        uint256 triPtbalance1 = _rangeReserve1 + amount1In;
-        _compute(amount0In, amount1In, triPtbalance0, triPtbalance1, _rangeReserve0, _rangeReserve1);
-        _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-
-        emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
-    }
-
-    // force balances to match reserves
-    function skim(address to) external lock {
-        (uint256 balance0, uint256 balance1) = _balance();
-        bento.transfer(token0, address(this), to, bento.toShare(token0, balance0 - reserve0, false));
-        bento.transfer(token1, address(this), to, bento.toShare(token1, balance1 - reserve1, false));
-    }
-
-    function sync() external lock {
-        (uint256 balance0, uint256 balance1) = _balance();
-        _update(balance0, balance1, reserve0, reserve1, blockTimestampLast);
     }
 
     function getAmountOut(
-        int24 lower,
-        int24 upper,
-        address tokenIn, 
+        address tokenIn,
+        address, /*tokenOut*/
         uint256 amountIn
     ) external view returns (uint256 amountOut) {
-        (uint112 _rangeReserve0, uint112 _rangeReserve1) = _getRangeReserves(lower, upper); // gas savings
+        (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
         if (IERC20(tokenIn) == token0) {
-            amountOut = _getAmountOut(amountIn, _rangeReserve0, _rangeReserve1);
+            amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
         } else {
-            amountOut = _getAmountOut(amountIn, _rangeReserve1, _rangeReserve0);
+            amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
         }
     }
-    
+
     function getOptimalLiquidityInAmounts(liquidityInput[] memory liquidityInputs)
         external
         view
         override
         returns (liquidityAmount[] memory)
     {
-        uint112 _reserve0;
-        uint112 _reserve1;
-        liquidityAmount[] memory liquidityOptimal = new liquidityAmount[](2);
-        liquidityOptimal[0] = liquidityAmount({token: liquidityInputs[0].token, amount: liquidityInputs[0].amountDesired});
-        liquidityOptimal[1] = liquidityAmount({token: liquidityInputs[1].token, amount: liquidityInputs[1].amountDesired});
-
-        if (IERC20(liquidityInputs[0].token) == token0) {
-            (_reserve0, _reserve1, ) = _getReserves();
-        } else {
-            (_reserve1, _reserve0, ) = _getReserves();
+        if (IERC20(liquidityInputs[0].token) == token1) {
+            // Swap tokens to be in order
+            (liquidityInputs[0], liquidityInputs[1]) = (liquidityInputs[1], liquidityInputs[0]);
         }
+        uint128 _reserve0;
+        uint128 _reserve1;
+        liquidityAmount[] memory liquidityOptimal = new liquidityAmount[](2);
+        liquidityOptimal[0] = liquidityAmount({
+            token: liquidityInputs[0].token,
+            amount: liquidityInputs[0].amountDesired
+        });
+        liquidityOptimal[1] = liquidityAmount({
+            token: liquidityInputs[1].token,
+            amount: liquidityInputs[1].amountDesired
+        });
 
-        if (_reserve0 == 0 && _reserve1 == 0) {
+        (_reserve0, _reserve1) = (reserve0, reserve1);
+
+        if (_reserve0 == 0) {
             return liquidityOptimal;
         }
 
-        uint256 amountBOptimal = (liquidityInputs[0].amountDesired * _reserve1) / _reserve0;
-        if (amountBOptimal <= liquidityInputs[1].amountDesired) {
-            require(amountBOptimal >= liquidityInputs[1].amountMin, "MIRIN: INSUFFICIENT_B_AMOUNT");
-            liquidityOptimal[0].amount = liquidityInputs[0].amountDesired;
-            liquidityOptimal[1].amount = amountBOptimal;
+        uint256 amount1Optimal = (liquidityInputs[0].amountDesired * _reserve1) / _reserve0;
+        if (amount1Optimal <= liquidityInputs[1].amountDesired) {
+            require(amount1Optimal >= liquidityInputs[1].amountMin, "INSUFFICIENT_B_AMOUNT");
+            liquidityOptimal[1].amount = amount1Optimal;
         } else {
-            uint256 amountAOptimal = (liquidityInputs[1].amountDesired * _reserve0) / _reserve1;
-            assert(amountAOptimal <= liquidityInputs[0].amountDesired);
-            require(amountAOptimal >= liquidityInputs[0].amountMin, "MIRIN: INSUFFICIENT_A_AMOUNT");
-            liquidityOptimal[0].amount = amountAOptimal;
-            liquidityOptimal[1].amount = liquidityInputs[1].amountDesired;
+            uint256 amount0Optimal = (liquidityInputs[1].amountDesired * _reserve0) / _reserve1;
+            require(amount0Optimal >= liquidityInputs[0].amountMin, "INSUFFICIENT_A_AMOUNT");
+            liquidityOptimal[0].amount = amount0Optimal;
         }
 
         return liquidityOptimal;
-    }
-    
-    function getAssets(uint160 priceLower, uint160 priceUpper, uint160 _sqrtPriceX96, uint112 liquidityAmount) internal {
-        uint256 token0amount = 0;
-        uint256 token1amount = 0;
-        // to-do use the fullmath library here to deal fith over flows
-        if (priceUpper < _sqrtPriceX96) { // todo, think about edgecases here <= vs <
-        // only supply token1 (token1 is Y)
-            token1amount = liquidityAmount * uint256(priceUpper - priceLower);
-        } else if (_sqrtPriceX96 < priceLower) {
-        // only supply token0 (token0 is X)
-            token0amount = (liquidityAmount * uint256(priceUpper - priceLower) / priceLower ) / priceUpper;
-        } else {
-            token0amount = ((uint256(liquidityAmount) << 96) * uint256(priceUpper - _sqrtPriceX96) / _sqrtPriceX96) / priceUpper;
-            token1amount = liquidityAmount * uint256(_sqrtPriceX96 - priceLower) / 0x1000000000000000000000000;
-        }
-    }
-
-    function updateNearestTickPointer(int24 lower, int24 upper, int24 currentNearestTick, uint160 _sqrtPriceX96) internal  {
-        int24 actualNearestTick = TickMath.getTickAtSqrtRatio(_sqrtPriceX96);
-        if (currentNearestTick < lower && lower <= actualNearestTick) currentNearestTick = lower;
-        if (currentNearestTick < upper && upper <= actualNearestTick) currentNearestTick = upper;
-        nearestTick = currentNearestTick;
-    }
-
-    function updateLinkedList(int24 lowerOld, int24 lower, int24 upperOld, int24 upper, uint112 amount) internal {
-        require(uint24(lower) % 2 == 0, "Lower even");
-        require(uint24(upper) % 2 == 1, "Upper odd");
-
-        if (ticks[lower].exists) {
-            ticks[lower].liquidity += amount;
-        } else {
-            Tick storage old = ticks[lowerOld];
-            require(old.exists && old.nextTick > lower && lowerOld < lower, "Bad ticks");
-            ticks[lower] = Tick(lowerOld, old.nextTick, amount, true);
-            old.nextTick = lower;
-        }
-        if (ticks[upper].exists) {
-            ticks[upper].liquidity += amount;
-        } else {
-        Tick storage old = ticks[upperOld];
-        require(old.exists && old.nextTick > upper && upperOld < upper, "Bad ticks");
-        ticks[upper] = Tick(upperOld, old.nextTick, amount, true);
-        old.nextTick = upper;
-        }
     }
 }
