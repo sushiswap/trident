@@ -35,8 +35,6 @@ methods {
     toHarness() returns (uint256) envfree
     minAmountHarness() returns (uint256) envfree
 
-    deposit(address,address,address,uint256,uint256) returns (uint256 amountOut, uint256 shareOut) => NONDET;
-
     // signatures
     exactInputSingle((address, address, address, address, bool, uint256, uint256, uint256))
 
@@ -46,6 +44,7 @@ methods {
     toShare(address token, uint256 amount, bool roundUp) 
         returns (uint256) envfree => DISPATCHER(true)
     transfer(address, address, address, uint256) envfree => DISPATCHER(true)
+    deposit(address,address,address,uint256,uint256) returns (uint256 amountOut, uint256 shareOut) => DISPATCHER(true)
     registerProtocol() => NONDET
 
     // ERC20
@@ -54,7 +53,7 @@ methods {
     permit(address from, address to, uint amount, uint deadline, uint8 v, bytes32 r, bytes32 s) => NONDET
 
     //IPool
-    swapWithoutContext(address tokenIn, address tokenOut, address recipient, bool unwrapBento, uint256 amountIn, uint256 amountOut) returns (uint256) => DISPATCHER(true)
+    swapWithoutContext(address tokenIn, address tokenOut, address recipient, bool unwrapBento) returns (uint256) => DISPATCHER(true)
     swapExactIn(address tokenIn,address tokenOut,address recipient,bool unwrapBento,uint256 amountIn) returns (uint256) => DISPATCHER(true)
     swapExactOut(address tokenIn,address tokenOut,address recipient,bool unwrapBento,uint256 amountOut) => DISPATCHER(true)
     swapWithContext(address tokenIn,address tokenOut,bytes context,address recipient,bool unwrapBento,uint256 amountIn,uint256 amountOut) returns (uint256) => DISPATCHER(true)
@@ -80,7 +79,7 @@ methods {
     assert _minAmount < minAmount_ && _deadline < deadline_;
 }*/
 
-invariant swapRouterTokenBalanceShouldBeZero(env e)
+/*invariant swapRouterTokenBalanceShouldBeZero(env e)
     tokenA.balanceOf(e, currentContract) == 0
 
 rule swapRouterBalanceShouldBeZero(method f) filtered { f -> f.selector != complexPath((uint256,(address,address,address,bool,uint256,bytes)[],(address,address,address,uint64,bytes)[],(address,address,bool,uint256)[])).selector } {
@@ -92,4 +91,22 @@ rule swapRouterBalanceShouldBeZero(method f) filtered { f -> f.selector != compl
     f(e,args);
 
     assert bento.balanceOf(e,tokenA,currentContract) == 0;
+    
+}*/
+
+rule inverseOfSwapping() {
+    env e;
+    calldataarg args;
+
+    address _tokenIn = tokenInHarness();
+    address tokenOut_ = tokenOutHarness();
+
+    uint256 _amountOut = exactInputSingle(e, args);
+
+    _tokenIn = tokenOutHarness();
+    tokenOut_ = tokenInHarness();
+
+    uint256 amountOut_ = exactInputSingle(e, args);
+
+    assert _amountOut == amountOut_;
 }
