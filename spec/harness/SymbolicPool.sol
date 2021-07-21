@@ -22,53 +22,37 @@ contract SymbolicPool is IPool, MirinERC20 {
     IERC20[] public tokens;
 
     // the amount of holding the pool has for each token[i]
-    mapping(address => uint256) public reserves; 
+    mapping(IERC20 => uint256) public reserves; 
 
-    // a symbolic representation of amountOut for a particular set of
-    //    (tokenIn, tokenOut, reserve[tokenIn], reserve[tokenOut], amountIn)
-    mapping (address => mapping (address => mapping (uint256 => mapping( uint256 => mapping( uint256 => uint256))))) computedAmountOut; 
+    
+    // a symbolic representation of fixed conversion ratio between each two tokens
+    mapping (IERC20 => mapping (IERC20 => uint256)) public rates; 
+    
+     
 
-
-    // a symbolic representation of amountOut for a particular set of
-    //    (tokenIn, tokenOut, reserve[tokenIn], reserve[tokenOut], amountOut)
-    mapping (address => mapping (address => mapping (uint256 => mapping( uint256 => mapping( uint256 => uint256))))) computedAmountIn; 
-
-    // a function to correlate between the two different mappings  
-    function assumptionValidAmountInAmountOut(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut) public view {
-        uint256 amountInFromMapping = computedAmountOut[tokenIn][tokenOut][reserves[tokenIn]][reserves[tokenOut]][amountOut];
-        require (amountIn == amountInFromMapping);
-        require (computedAmountIn[tokenIn][tokenOut][reserves[tokenIn]][reserves[tokenOut]][amountInFromMapping] == amountOut);
+    
+    function swapWithoutContext(address tokenIn, address tokenOut, address recipient, bool unwrapBento) external override returns(uint256 finalAmountOut) {
+        IERC20 _tokenIn = IERC20(tokenIn);
+        uint256 amountIn = bento.balanceOf(_tokenIn,address(this)) - reserves[_tokenIn];
+        return basicSwap(_tokenIn, IERC20(tokenOut), recipient, amountIn);
     }
 
-    function swapWithoutContext(address tokenIn, address tokenOut, address recipient, bool unwrapBento, uint256 amountIn, uint256 amountOut) external override returns(uint256 finalAmountOut) {
-       return basicSwap(tokenIn, tokenOut, recipient, amountIn);
-    }
-
-    function swapExactIn(address tokenIn, address tokenOut, address recipient, bool unwrapBento, uint256 amountIn) external override returns(uint256 finalAmountOut) {
-        return basicSwap(tokenIn, tokenOut, recipient, amountIn);
-    }
-
-    function swapExactOut(address tokenIn, address tokenOut, address recipient, bool unwrapBento, uint256 amountOut) external override {
-        uint256 amountIn = computedAmountIn[tokenIn][tokenOut][reserves[tokenIn]][reserves[tokenOut]][amountOut];
-        assumptionValidAmountInAmountOut(tokenIn, tokenOut, amountIn, amountOut);
-        basicSwap(tokenIn, tokenOut, recipient, amountIn);
-    }
-
-    function swapWithContext(address tokenIn, address tokenOut, bytes calldata context, address recipient, bool unwrapBento, uint256 amountIn, uint256 amountOut) external override returns(uint256 finalAmountOut) {
+    function swapWithContext(address tokenIn, address tokenOut, bytes calldata context, address recipient, bool unwrapBento, uint256 amountIn) external override returns(uint256 finalAmountOut) {
         //todo - add call to another contract
-        return basicSwap(tokenIn, tokenOut, recipient,amountIn);
+        return basicSwap(IERC20(tokenIn), IERC20(tokenOut), recipient,amountIn);
     }
 
-    function basicSwap(address tokenIn, address tokenOut, address recipient, uint256 amountIn) internal  returns(uint256 finalAmountOut) {
+    function basicSwap(IERC20 tokenIn, IERC20 tokenOut, address recipient, uint256 amountIn) internal  returns(uint256 finalAmountOut) {
         // checking swapRouter, it should pass in amountIn of tokenIn
-        assert ( bento.balanceOf(IERC20(tokenIn),address(this)) - reserves[tokenIn] >= amountIn );
+        assert ( bento.balanceOf(tokenIn,address(this)) - reserves[tokenIn] >= amountIn );
 
         // a symbolic value representing the computed amountOut which is a function of the current reserve state and amountIn
-        finalAmountOut = computedAmountOut[tokenIn][tokenOut][reserves[tokenIn]][reserves[tokenOut]][amountIn];
+        finalAmountOut = rates[tokenIn][tokenOut]*amountIn;
         //assumption - finalAmoutOut is not zero for non zero amountIn
-        require (finalAmountOut != 0 || amountIn == 0);
+        require (rates[tokenIn][tokenOut] != 0);
         // transfer to  recipient
-        bento.transfer(IERC20(tokenOut), address(this), recipient, finalAmountOut);
+        bento.transfer(tokenOut, address(this), recipient, finalAmountOut);
+        update();
 
     }
 
@@ -76,9 +60,44 @@ contract SymbolicPool is IPool, MirinERC20 {
 
     }
 
-    
+      
+    // a basic one to one mapping
     function mint(address to) external override returns(uint256 liquidity) {
-    
+        for( uint i = 0 ; i < tokens.length ; i++) 
+           liquidity += bento.balanceOf(IERC20(tokens[i]),address(this)) - reserves[tokens[i]];
+        _mint(to, liquidity);
+        update(); 
     }
 
+    // returns amount of share in bentobox
+    function burn(address to, bool unwrapBento) external override returns (liquidityAmount[] memory withdrawnAmounts) {
+        //how much liquidity passed to the pool for burning
+        uint256 liquidity = balanceOf[address(this)];
+        _burn(address(this), liquidity);
+        uint256 split = liquidity / tokens.length; 
+        withdrawnAmounts = new liquidityAmount[](tokens.length);
+        for( uint i = 0 ; i < tokens.length ; i++) {
+            bento.transfer(tokens[i], address(this), to, split);
+            withdrawnAmounts[i] = liquidityAmount({token: address(tokens[i]), amount: split});
+        }
+        update();
+    }
+
+    function burnLiquiditySingle(address tokenOut, address to, bool unwrapBento) external override returns (uint256 amount) {
+        uint256 amount = balanceOf[address(this)];
+        _burn(address(this), amount);
+        bento.transfer(IERC20(tokenOut), address(this), to, amount);
+        update();
+    }
+
+    function update() internal {
+        for( uint i = 0 ; i < tokens.length ; i++) {
+            reserves[tokens[i]] = bento.balanceOf(tokens[i],address(this));
+        }
+    }
+
+    function tokensLength() public returns (uint256) {
+        return tokens.length;
+    }
+    
 }
