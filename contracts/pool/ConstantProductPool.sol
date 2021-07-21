@@ -119,7 +119,6 @@ contract ConstantProductPool is MirinERC20, IPool {
         _update(balance0, balance1);
         kLast = MirinMath.sqrt(balance0 * balance1);
 
-        withdrawnAmounts = new liquidityAmount[](2);
         withdrawnAmounts[0] = liquidityAmount({token: address(token0), amount: amount0});
         withdrawnAmounts[1] = liquidityAmount({token: address(token1), amount: amount1});
 
