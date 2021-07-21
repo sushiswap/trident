@@ -2,6 +2,7 @@ pragma solidity ^0.8.2;
 pragma abicoder v2;
 
 import "../../contracts/SwapRouter.sol";
+import "../../contracts/interfaces/IBentoBox.sol";
 
 contract SwapRouterHarness is SwapRouter {
     // fields of the SwapRouter structs
@@ -21,8 +22,8 @@ contract SwapRouterHarness is SwapRouter {
 
     IERC20 public tokenA;
 
-    constructor(address WETH, address masterDeployer, address bento)
-        SwapRouter(WETH, masterDeployer, bento) public { }
+    constructor(address WETH, IBentoBoxV1 bento)
+        SwapRouter(WETH, bento) public { }
 
     function exactInputSingle(ExactInputSingleParams calldata params)
         public
