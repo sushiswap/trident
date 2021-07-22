@@ -3,14 +3,21 @@
 pragma solidity ^0.8.2;
 
 import "./HybridPool.sol";
+import "./PairPoolDeployer.sol";
 
 /**
  * @author Mudit Gupta
  */
-contract HybridPoolFactory {
-    // Consider deploying via an upgradable proxy to allow upgrading pools in the future
+contract HybridPoolFactory is PairPoolDeployer {
+    constructor(address _masterDeployer) PairPoolDeployer(_masterDeployer) {}
 
     function deployPool(bytes memory _deployData) external returns (address) {
-        return address(new HybridPool(_deployData, msg.sender));
+        (address tokenA, address tokenB, , ) = abi.decode(_deployData, (address, address, uint256, uint256));
+        return
+            _deployPool(
+                address(tokenA),
+                address(tokenB),
+                abi.encodePacked(type(HybridPool).creationCode, abi.encode(_deployData, masterDeployer))
+            );
     }
 }

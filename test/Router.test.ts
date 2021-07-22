@@ -37,7 +37,7 @@ describe("Router", function () {
     dai = await ERC20.deploy("SUSHI", "SUSHI", getBigNumber("10000000"));
     bento = await Bento.deploy(weth.address);
     masterDeployer = await Deployer.deploy(17, feeTo.address, bento.address);
-    mirinPoolFactory = await PoolFactory.deploy();
+    mirinPoolFactory = await PoolFactory.deploy(masterDeployer.address);
     router = await SwapRouter.deploy(weth.address, bento.address);
 
     // Whitelist pool factory in master deployer

@@ -3,14 +3,24 @@
 pragma solidity ^0.8.2;
 
 import "./ConstantProductPoolWithTWAP.sol";
+import "./PairPoolDeployer.sol";
 
 /**
  * @author Mudit Gupta
  */
-contract ConstantProductPoolWithTWAPFactory {
-    // Consider deploying via an upgradable proxy to allow upgrading pools in the future
+contract ConstantProductPoolWithTWAPFactory is PairPoolDeployer {
+    constructor(address _masterDeployer) PairPoolDeployer(_masterDeployer) {}
 
     function deployPool(bytes memory _deployData) external returns (address) {
-        return address(new ConstantProductPoolWithTWAP(_deployData, msg.sender));
+        (IERC20 tokenA, IERC20 tokenB, ) = abi.decode(_deployData, (IERC20, IERC20, uint256));
+        return
+            _deployPool(
+                address(tokenA),
+                address(tokenB),
+                abi.encodePacked(
+                    type(ConstantProductPoolWithTWAP).creationCode,
+                    abi.encode(_deployData, masterDeployer)
+                )
+            );
     }
 }
