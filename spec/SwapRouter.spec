@@ -21,21 +21,6 @@ using SymbolicPool as pool
 */
 
 methods {
-    // global variables use to create SwapRouter structs
-    contextHarness() returns (bytes) envfree
-    tokenInHarness() returns (address) envfree
-    tokenOutHarness() returns (address) envfree
-    poolHarness() returns (address) envfree
-    recipientHarness() returns (address) envfree
-    unwrapBentoHarness() returns (bool) envfree
-    deadlineHarness() returns (uint256) envfree
-    amountInHarness() returns (uint256) envfree
-    amountOutMinimumHarness() returns (uint256) envfree
-    preFundedHarness() returns (bool) envfree
-    balancePercentageHarness() returns (uint64) envfree
-    toHarness() returns (uint256) envfree
-    minAmountHarness() returns (uint256) envfree
-
     // signatures
     exactInputSingle((address, address, address, address, bool, uint256, uint256, uint256))
 
@@ -49,10 +34,10 @@ methods {
     registerProtocol() => NONDET
 
     // ERC20
-    pool.balanceOf(address) returns (uint256) envfree => DISPATCHER(true)
     transfer(address, uint256) => DISPATCHER(true) 
     transferFrom(address, address, uint256) => DISPATCHER(true) 
     permit(address from, address to, uint amount, uint deadline, uint8 v, bytes32 r, bytes32 s) => NONDET
+    totalSupply() => DISPATCHER(true)
 
     //IPool
     swapWithContext(address tokenIn, address tokenOut, bytes context, address recipient, bool unwrapBento, uint256 amountIn) returns (uint256) => DISPATCHER(true)
@@ -64,31 +49,15 @@ methods {
 
 
     // Symbolic Pool helper
+    pool.balanceOf(address) returns (uint256) envfree => DISPATCHER(true)
     pool.tokensLength() returns (uint256) envfree
     pool.tokens(uint256 i) returns (address) envfree
-
+    pool.rates(address,address) returns (uint256) envfree
     tokenBalanceOf(address, address) returns (uint256) envfree
 
 }
 
-// This is just to check that the harness is working correctly
-/*rule exactInputSingleCanBeHarnessed() {
-    env e;
-
-    calldataarg args;
-
-    uint256 _minAmount = minAmountHarness();
-    uint256 _deadline = deadlineHarness();
-
-    exactInputSingle(e, args);
-
-    uint256 minAmount_ = minAmountHarness();
-    uint256 deadline_ = deadlineHarness();
-
-    assert _minAmount < minAmount_ && _deadline < deadline_;
-}*/
-
-/*invariant swapRouterTokenBalanceShouldBeZero(env e)
+invariant swapRouterTokenBalanceShouldBeZero(env e)
     tokenA.balanceOf(e, currentContract) == 0
 
 rule swapRouterBalanceShouldBeZero(method f) filtered { f -> f.selector != complexPath((uint256,(address,address,address,bool,uint256,bytes)[],(address,address,address,uint64,bytes)[],(address,address,bool,uint256)[])).selector } {
@@ -99,25 +68,23 @@ rule swapRouterBalanceShouldBeZero(method f) filtered { f -> f.selector != compl
 
     f(e,args);
 
-    assert bento.balanceOf(e,tokenA,currentContract) == 0;
-    
-}*/
+    assert bento.balanceOf(e,tokenA,currentContract) == 0;    
+}
 
-rule inverseOfSwapping() {
+rule inverseOfSwapping(address tokenIn, address tokenOut, uint256 amountIn) {
+    require(pool.rates(tokenIn,tokenOut) == 1);
+
     env e;
-    calldataarg args;
+    address _pool;
+    address recipient;
+    bool unwrapBento;
+    uint256 deadline;
+    uint256 amountOutMinimum;
+    
+    uint256 _amountOut = callExactInputSingle(e, tokenIn, tokenOut, _pool, recipient, unwrapBento, deadline, amountIn, amountOutMinimum);
+    uint256 amountOut_ = callExactInputSingle(e, tokenOut, tokenIn, _pool, recipient, unwrapBento, deadline, _amountOut, amountOutMinimum);
 
-    address _tokenIn = tokenInHarness();
-    address tokenOut_ = tokenOutHarness();
-
-    uint256 _amountOut = exactInputSingle(e, args);
-
-    _tokenIn = tokenOutHarness();
-    tokenOut_ = tokenInHarness();
-
-    uint256 amountOut_ = exactInputSingle(e, args);
-
-    assert _amountOut != amountOut_;
+    assert _amountOut == amountOut_;
 }
 /*
 rule sanity(method f) {
