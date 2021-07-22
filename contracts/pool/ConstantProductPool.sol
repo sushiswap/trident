@@ -146,7 +146,7 @@ contract ConstantProductPool is MirinERC20, IPool {
         if (tokenOut == address(token0)) {
             // Swap token1 for token0
             // Calculate amountOut as if the user first withdrew balanced liquidity and then swapped token1 for token0
-            amount0 += _getAmountOut(amount1, _reserve0 - amount0, _reserve1 - amount1);
+            amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0);
             _transfer(token0, amount0, to, unwrapBento);
             balance0 -= amount0;
             amount = amount0;
