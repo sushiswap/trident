@@ -20,6 +20,8 @@ contract MasterDeployer is Ownable {
 
     uint256 internal constant MAX_FEE = 10000; // 100%
 
+    address[] public pools;
+
     constructor(
         uint256 _barFee,
         address _barFeeTo,
@@ -37,6 +39,7 @@ contract MasterDeployer is Ownable {
     function deployPool(address _factory, bytes calldata _deployData) external returns (address poolAddress) {
         require(whitelistedFactories[_factory], "Factory not whitelisted");
         poolAddress = IPoolFactory(_factory).deployPool(_deployData);
+        pools.push(poolAddress);
         emit NewPoolCreated(poolAddress);
     }
 
@@ -51,5 +54,9 @@ contract MasterDeployer is Ownable {
     function setBarFee(uint256 _barFee) external onlyOwner {
         require(_barFee <= MAX_FEE, "INVALID_BAR_FEE");
         barFee = _barFee;
+    }
+
+    function poolsCount() external view returns (uint256) {
+        return pools.length;
     }
 }
