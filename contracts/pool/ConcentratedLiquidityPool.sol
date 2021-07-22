@@ -62,7 +62,7 @@ library ConcentratedMath {
 }
 
 /// @dev This pool swaps between bento shares. It does not care about underlying amounts.
-contract ConcentratedLiquidityPool is MirinERC20, IPool {
+contract ConcentratedLiquidityPool is IPool, TridentNFT {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
 
@@ -95,8 +95,8 @@ contract ConcentratedLiquidityPool is MirinERC20, IPool {
     struct Tick {
         int24 previousTick;
         int24 nextTick;
-        uint128 reserve0;
-        uint128 reserve1;
+        uint128 reserve0; // might reduce to liquidity figure
+        uint128 reserve1; // might reduce to liquidity figure
         bool exists; // might not be necessary
     }
 
@@ -110,7 +110,7 @@ contract ConcentratedLiquidityPool is MirinERC20, IPool {
 
     /// @dev
     /// Only set immutable variables here. State changes made here will not be used.
-    constructor(bytes memory _deployData, address _masterDeployer) MirinERC20() {
+    constructor(bytes memory _deployData, address _masterDeployer) TridentNFT() {
         (IERC20 tokenA, IERC20 tokenB, uint256 _swapFee, int24 _tickSpacing, uint160 _sqrtPriceX96) = abi.decode(_deployData, (IERC20, IERC20, uint256, int24, uint160));
 
         require(address(tokenA) != address(0), "MIRIN: ZERO_ADDRESS");
@@ -133,27 +133,48 @@ contract ConcentratedLiquidityPool is MirinERC20, IPool {
         unlocked = 1;
     }
 
-    function mint(address to) public override lock returns (uint256 liquidity) {
+    function mint(int24 lowerOld, int24 lower, int24 upperOld, int24 upper, address recipient) public lock returns (uint256 liquidity) {
         (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
-        uint256 _totalSupply = totalSupply;
-        _mintFee(_reserve0, _reserve1, _totalSupply);
+        
+        /// @dev replicating v2-style LP through `TridentNFT` which has erc20-like values in struct (totalSupply, balanceOf)....
+        uint112 _rangeReserve0 = tickPools[lower][upper].reserve0; // gas savings
+        uint112 _rangeReserve1 = tickPools[lower][upper].reserve1; // gas savings
+        uint256 _totalSupply = tickPools[lower][upper].totalSupply; // gas savings
+        _mintFee(lower, upper, _rangeReserve0, _rangeReserve1, _totalSupply);
 
-        (uint256 balance0, uint256 balance1) = _balance();
+        (uint256 balance0, uint256 balance1) = _balance(); // gas savings
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
 
-        uint256 computed = MirinMath.sqrt(balance0 * balance1);
+        uint256 rangeLiquidity = MirinMath.sqrt(_rangeReserve0 * _rangeReserve0);
+        uint256 addedLiquidity = MirinMath.sqrt(amount0 * amount1);
+        uint256 computed = rangeLiquidity + addedLiquidity;
         if (_totalSupply == 0) {
             liquidity = computed - MINIMUM_LIQUIDITY;
-            _mint(address(0), MINIMUM_LIQUIDITY);
+            _mint(lower, upper, address(0), MINIMUM_LIQUIDITY);
         } else {
-            uint256 k = MirinMath.sqrt(uint256(_reserve0) * _reserve1);
-            liquidity = ((computed - k) * _totalSupply) / k;
+            liquidity = ((computed - rangeLiquidity) * _totalSupply) / rangeLiquidity;
         }
         require(liquidity > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_MINTED");
-        _mint(to, liquidity);
+        _mint(lower, upper, to, liquidity);
         _update(balance0, balance1);
-        kLast = computed;
+        kLast = MirinMath.sqrt(balance0 * balance1);
+        
+        /// @dev CPCP hooks for gasper's Tick link-listing....
+        uint160 priceLower = TickMath.getSqrtRatioAtTick(lower); // gas savings
+        uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper); // gas savings
+        uint160 currentPrice = sqrtPriceX96; // gas savings
+      
+        if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += uint112(addedLiquidity);
+        tickPools[lower][upper].liquidity += uint112(addedLiquidity);
+        /// @dev temporary range reserve tracking values to make other functions easier to test
+        tickPools[lower][upper].reserve0 += uint112(amount0);
+        tickPools[lower][upper].reserve1 += uint112(amount1);
+
+        updateLinkedList(lowerOld, lower, upperOld, upper, addedLiquidity);
+        updateNearestTickPointer(lower, upper, nearestTick, currentPrice);
+        getAssets(priceLower, priceUpper, currentPrice, addedLiquidity);
+        
         emit Mint(msg.sender, amount0, amount1, to);
     }
 
@@ -190,43 +211,6 @@ contract ConcentratedLiquidityPool is MirinERC20, IPool {
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
-    function burnLiquiditySingle(
-        address tokenOut,
-        address to,
-        bool unwrapBento
-    ) public override lock returns (uint256 amount) {
-        (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
-        uint256 _totalSupply = totalSupply;
-        _mintFee(_reserve0, _reserve1, _totalSupply);
-
-        uint256 liquidity = balanceOf[address(this)];
-        (uint256 balance0, uint256 balance1) = _balance();
-        uint256 amount0 = (liquidity * balance0) / _totalSupply;
-        uint256 amount1 = (liquidity * balance1) / _totalSupply;
-
-        _burn(address(this), liquidity);
-
-        if (tokenOut == address(token0)) {
-            // Swap token1 for token0
-            // Calculate amountOut as if the user first withdrew balanced liquidity and then swapped token1 for token0
-            amount0 += _getAmountOut(amount1, _reserve0 - amount0, _reserve1 - amount1);
-            _transfer(token0, amount0, to, unwrapBento);
-            balance0 -= amount0;
-            amount = amount0;
-        } else {
-            // Swap token0 for token1
-            require(tokenOut == address(token1), "Invalid output token");
-            amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1);
-            _transfer(token1, amount1, to, unwrapBento);
-            balance1 -= amount1;
-            amount = amount1;
-        }
-
-        _update(balance0, balance1);
-        kLast = MirinMath.sqrt(balance0 * balance1);
-        emit Burn(msg.sender, amount0, amount1, to);
-    }
-
     function swapWithoutContext(
         address tokenIn,
         address tokenOut,
@@ -240,14 +224,14 @@ contract ConcentratedLiquidityPool is MirinERC20, IPool {
         if (tokenIn == address(token0)) {
             require(tokenOut == address(token1), "Invalid output token");
             amountIn = balance0 - _reserve0;
-            amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
+            amountOut = _getRangeAmountOut(amountIn, _reserve0, _reserve1);
             _transfer(token1, amountOut, recipient, unwrapBento);
             _update(balance0, balance1 - amountOut);
         } else {
             require(tokenIn == address(token1), "Invalid input token");
             require(tokenOut == address(token0), "Invalid output token");
             amountIn = balance1 - _reserve1;
-            amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
+            amountOut = _getRangeAmountOut(amountIn, _reserve1, _reserve0);
             _transfer(token0, amountOut, recipient, unwrapBento);
             _update(balance0 - amountOut, balance1);
         }
@@ -267,7 +251,7 @@ contract ConcentratedLiquidityPool is MirinERC20, IPool {
         if (tokenIn == address(token0)) {
             require(tokenOut == address(token1), "Invalid output token");
             
-            amountOut = _computeRange(amountIn, true);
+            amountOut = _getRangeAmountOut(amountIn, _reserve0, _reserve1);
             _processSwap(tokenIn, tokenOut, recipient, amountIn, amountOut, context, unwrapBento);
 
             (uint256 balance0, uint256 balance1) = _balance();
@@ -278,7 +262,7 @@ contract ConcentratedLiquidityPool is MirinERC20, IPool {
             require(tokenIn == address(token1), "Invalid input token");
             require(tokenOut == address(token0), "Invalid output token");
 
-            amountOut = _computeRange(amountIn, true);
+            amountOut = _getRangeAmountOut(amountIn, _reserve1, _reserve0);
             _processSwap(tokenIn, tokenOut, recipient, amountIn, amountOut, context, unwrapBento);
 
             (uint256 balance0, uint256 balance1) = _balance();
@@ -290,15 +274,12 @@ contract ConcentratedLiquidityPool is MirinERC20, IPool {
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
     
-    function _computeRange(uint256 amountIn, bool token0) internal returns (uint256 delta) {
+    function _getRangeAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) internal returns (uint256 delta) {
         /// @dev using sarang's tick cross/swap formula
-        uint256 nearestTickReserve0 = ticks[nearestTick].reserve0;
-        uint256 nearestTickReserve1 = ticks[nearestTick].reserve1;
-        
         uint256 delta_y = amountIn;
-        uint256 nearestTickLiquidity = MirinMath.sqrt(nearestTickReserve0 * nearestTickReserve1);
-        uint256 delta_sqrt_price = delta_y / nearestTickLiquidity;
-        uint256 sqrt_price = MirinMath.sqrt(nearestTickReserve1 / nearestTickReserve0);
+        uint256 liquidity = MirinMath.sqrt(reserveIn * reserveOut);
+        uint256 delta_sqrt_price = delta_y / liquidity;
+        uint256 sqrt_price = MirinMath.sqrt(reserveIn / reserveOut);
         
         uint256 tick_start = ConcentratedMath.calcTick(sqrt_price);
         uint256 tick_finish = ConcentratedMath.calcTick(sqrt_price + delta_sqrt_price);
@@ -307,28 +288,28 @@ contract ConcentratedLiquidityPool is MirinERC20, IPool {
         
         for (uint256 i = 0; i < diff; i++) {
             // calculate the delta_sqrt_price
-            uint256 tick_sqrt_price = ConcentratedMath.calcSqrtPrice(tick_start + 1);
+            uint256 tick_sqrt_price = ConcentratedMath.calcSqrtPrice(tick_start + i + 1);
             delta_sqrt_price = tick_sqrt_price - sqrt_price;
             uint256 inverse_delta_sqrt_price = (1 / sqrt_price) - (1 / tick_sqrt_price);
             
             // check how much y is left to swap
-            if (delta_y - (delta_sqrt_price * nearestTickLiquidity) > 0) {
-                delta_y -= (delta_sqrt_price * nearestTickLiquidity);
-                delta_x += (nearestTickLiquidity * inverse_delta_sqrt_price);
+            if (delta_y - (delta_sqrt_price * liquidity) > 0) {
+                delta_y -= (delta_sqrt_price * liquidity);
+                delta_x += (liquidity * inverse_delta_sqrt_price);
             } else {
                 // delta_y is exhausted for the integer value of tick
             }
             
             if (delta_y > 0) {
-                delta_sqrt_price = delta_y / nearestTickLiquidity;
+                delta_sqrt_price = delta_y / liquidity;
                 uint256 fractional_tick = ConcentratedMath.calcTick(sqrt_price + delta_sqrt_price);
                 tick_sqrt_price = ConcentratedMath.calcSqrtPrice(fractional_tick);
                 inverse_delta_sqrt_price = (1 / sqrt_price) - (1 / tick_sqrt_price);
-                delta_x += (nearestTickLiquidity * inverse_delta_sqrt_price);
+                delta_x += (liquidity * inverse_delta_sqrt_price);
             }
         }
         
-        return delta_x;
+        delta = delta_x;
     }
 
     function _processSwap(
@@ -351,6 +332,8 @@ contract ConcentratedLiquidityPool is MirinERC20, IPool {
     }
 
     function _mintFee(
+        int24 lower,
+        int24 upper,
         uint128 _reserve0,
         uint128 _reserve1,
         uint256 _totalSupply
@@ -375,15 +358,6 @@ contract ConcentratedLiquidityPool is MirinERC20, IPool {
         balance1 = bento.balanceOf(token1, address(this));
     }
 
-    function _getAmountOut(
-        uint256 amountIn,
-        uint256 reserveIn,
-        uint256 reserveOut
-    ) internal view returns (uint256 amountOut) {
-        uint256 amountInWithFee = amountIn * MAX_FEE_MINUS_SWAP_FEE;
-        amountOut = (amountInWithFee * reserveOut) / (reserveIn * MAX_FEE + amountInWithFee);
-    }
-
     function _transfer(
         IERC20 token,
         uint256 amount,
@@ -404,50 +378,56 @@ contract ConcentratedLiquidityPool is MirinERC20, IPool {
     ) external view returns (uint256 amountOut) {
         (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
         if (IERC20(tokenIn) == token0) {
-            amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
+            amountOut = _getRangeAmountOut(amountIn, _reserve0, _reserve1);
         } else {
-            amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
+            amountOut = _getRangeAmountOut(amountIn, _reserve1, _reserve0);
         }
     }
 
-    function getOptimalLiquidityInAmounts(liquidityInput[] memory liquidityInputs)
-        external
-        view
-        override
-        returns (liquidityAmount[] memory)
-    {
-        if (IERC20(liquidityInputs[0].token) == token1) {
-            // Swap tokens to be in order
-            (liquidityInputs[0], liquidityInputs[1]) = (liquidityInputs[1], liquidityInputs[0]);
-        }
-        uint128 _reserve0;
-        uint128 _reserve1;
-        liquidityAmount[] memory liquidityOptimal = new liquidityAmount[](2);
-        liquidityOptimal[0] = liquidityAmount({
-            token: liquidityInputs[0].token,
-            amount: liquidityInputs[0].amountDesired
-        });
-        liquidityOptimal[1] = liquidityAmount({
-            token: liquidityInputs[1].token,
-            amount: liquidityInputs[1].amountDesired
-        });
-
-        (_reserve0, _reserve1) = (reserve0, reserve1);
-
-        if (_reserve0 == 0) {
-            return liquidityOptimal;
-        }
-
-        uint256 amount1Optimal = (liquidityInputs[0].amountDesired * _reserve1) / _reserve0;
-        if (amount1Optimal <= liquidityInputs[1].amountDesired) {
-            require(amount1Optimal >= liquidityInputs[1].amountMin, "INSUFFICIENT_B_AMOUNT");
-            liquidityOptimal[1].amount = amount1Optimal;
+    /// @dev gasper's link-listing logic ****
+    
+    function getAssets(uint160 priceLower, uint160 priceUpper, uint160 _sqrtPriceX96, uint112 liquidityAmount) internal {
+        uint256 token0amount = 0;
+        uint256 token1amount = 0;
+        // to-do use the fullmath library here to deal fith over flows
+        if (priceUpper < _sqrtPriceX96) { // todo, think about edgecases here <= vs <
+        // only supply token1 (token1 is Y)
+            token1amount = liquidityAmount * uint256(priceUpper - priceLower);
+        } else if (_sqrtPriceX96 < priceLower) {
+        // only supply token0 (token0 is X)
+            token0amount = (liquidityAmount * uint256(priceUpper - priceLower) / priceLower ) / priceUpper;
         } else {
-            uint256 amount0Optimal = (liquidityInputs[1].amountDesired * _reserve0) / _reserve1;
-            require(amount0Optimal >= liquidityInputs[0].amountMin, "INSUFFICIENT_A_AMOUNT");
-            liquidityOptimal[0].amount = amount0Optimal;
+            token0amount = ((uint256(liquidityAmount) << 96) * uint256(priceUpper - _sqrtPriceX96) / _sqrtPriceX96) / priceUpper;
+            token1amount = liquidityAmount * uint256(_sqrtPriceX96 - priceLower) / 0x1000000000000000000000000;
         }
+    }
 
-        return liquidityOptimal;
+    function updateNearestTickPointer(int24 lower, int24 upper, int24 currentNearestTick, uint160 _sqrtPriceX96) internal  {
+        int24 actualNearestTick = TickMath.getTickAtSqrtRatio(_sqrtPriceX96);
+        if (currentNearestTick < lower && lower <= actualNearestTick) currentNearestTick = lower;
+        if (currentNearestTick < upper && upper <= actualNearestTick) currentNearestTick = upper;
+        nearestTick = currentNearestTick;
+    }
+
+    function updateLinkedList(int24 lowerOld, int24 lower, int24 upperOld, int24 upper, uint112 amount) internal {
+        require(uint24(lower) % 2 == 0, "Lower even");
+        require(uint24(upper) % 2 == 1, "Upper odd");
+
+        if (ticks[lower].exists) {
+            ticks[lower].liquidity += amount;
+        } else {
+            Tick storage old = ticks[lowerOld];
+            require(old.exists && old.nextTick > lower && lowerOld < lower, "Bad ticks");
+            ticks[lower] = Tick(lowerOld, old.nextTick, amount, true);
+            old.nextTick = lower;
+        }
+        if (ticks[upper].exists) {
+            ticks[upper].liquidity += amount;
+        } else {
+        Tick storage old = ticks[upperOld];
+        require(old.exists && old.nextTick > upper && upperOld < upper, "Bad ticks");
+        ticks[upper] = Tick(upperOld, old.nextTick, amount, true);
+        old.nextTick = upper;
+        }
     }
 }
