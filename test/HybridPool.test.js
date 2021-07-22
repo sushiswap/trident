@@ -22,7 +22,7 @@ describe("Router", function () {
     bento = await Bento.deploy(usdt.address);
     masterDeployer = await Deployer.deploy(17, feeTo.address, bento.address);
     mirinPoolFactory = await PoolFactory.deploy();
-    router = await SwapRouter.deploy(usdt.address, masterDeployer.address, bento.address);
+    router = await SwapRouter.deploy(usdt.address, bento.address);
 
     // Whitelist pool factory in master deployer
     await masterDeployer.addToWhitelist(mirinPoolFactory.address);

@@ -129,13 +129,18 @@ contract HybridPool is MirinERC20, IPool {
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
-    function burn(address to, bool unwrapBento) external override returns (liquidityAmount[] memory withdrawnAmounts) {}
+    function burn(address to, bool unwrapBento)
+        external
+        override
+        lock
+        returns (liquidityAmount[] memory withdrawnAmounts)
+    {}
 
     function burnLiquiditySingle(
         address tokenOut,
         address to,
         bool unwrapBento
-    ) external override returns (uint256 amount) {}
+    ) external override lock returns (uint256 amount) {}
 
     function swapWithoutContext(
         address tokenIn,
@@ -173,8 +178,10 @@ contract HybridPool is MirinERC20, IPool {
     ) public override lock returns (uint256 amountOut) {
         (uint256 _reserve0, uint256 _reserve1) = _reserve();
         uint256 fee;
+
         if (tokenIn == address(token0)) {
             require(tokenOut == address(token1), "Invalid output token");
+            amountIn = bento.toAmount(token0, amountIn, false);
             fee = (amountIn * swapFee) / MAX_FEE;
             amountOut = _getAmountOut(amountIn - fee, _reserve0, _reserve1, true);
             _processSwap(tokenIn, tokenOut, recipient, amountIn, amountOut, context, unwrapBento);
@@ -183,6 +190,7 @@ contract HybridPool is MirinERC20, IPool {
         } else {
             require(tokenIn == address(token1), "Invalid input token");
             require(tokenOut == address(token0), "Invalid output token");
+            amountIn = bento.toAmount(token1, amountIn, false);
             fee = (amountIn * swapFee) / MAX_FEE;
             amountOut = _getAmountOut(amountIn - fee, _reserve1, _reserve0, false);
             _processSwap(tokenIn, tokenOut, recipient, amountIn, amountOut, context, unwrapBento);
