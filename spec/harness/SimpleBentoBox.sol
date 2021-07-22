@@ -2,13 +2,14 @@ pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "contracts/flat/BentoBoxV1Flat.sol";
+
 // Note: Rebasing tokens ARE NOT supported and WILL cause loss of funds
 contract SimpleBentoBox is BentoBoxV1 {
 	using BoringMath for uint256;
 
 	uint256 private constant RATIO = 2;
 
-	function toShare(IERC20 token, uint256 amount, bool roundUp) external override view returns (uint256 share) {
+	function toShare(IERC20 token, uint256 amount, bool roundUp) public override view returns (uint256 share) {
 		// if (RATIO == 1)
 		//	return amount; 
         if (roundUp)
@@ -17,7 +18,7 @@ contract SimpleBentoBox is BentoBoxV1 {
 		 	return amount / RATIO; 
     }
 
-    function toAmount(IERC20 token, uint256 share, bool roundUp) external override view returns (uint256 amount) {
+    function toAmount(IERC20 token, uint256 share, bool roundUp) public override view returns (uint256 amount) {
 		//if (RATIO == 1)
 		//	return share; 
 		
@@ -28,19 +29,39 @@ contract SimpleBentoBox is BentoBoxV1 {
 		require(totals[IERC20(token_)].elastic == ratio.mul(totals[IERC20(token_)].base));
 	}
 
-	/* 
+	
 	function deposit(IERC20 token_, address from, address to, uint256 amount, uint256 share)
-		public virtual override payable allowed(from) returns (uint256 amountOut, uint256 shareOut) {
-		require(totals[IERC20(token_)].elastic ==  RATIO.mul(totals[IERC20(token_)].base));
-		super.deposit(token_, from, to, amount, share); 
+	public payable allowed(from) override returns (uint256 amountOut, uint256 shareOut)
+	{
+		IERC20 token = token_ == USE_ETHEREUM ? wethToken : token_;
+		if (share == 0) {
+			shareOut = toShare(token, amount,false);
+			amountOut = amount;
+		}
+		else {
+			shareOut = share;
+			amountOut = toAmount(token, share,false);
+		}
+		balanceOf[token][from] = balanceOf[token][from].sub(shareOut);
+		token.transfer(to, amountOut);
 	}
 
-	function withdraw(IERC20 token_, address from, address to, uint256 amount, uint256 share)
-		override public allowed(from) returns (uint256 amountOut, uint256 shareOut) {
-		require(totals[IERC20(token_)].elastic ==  RATIO.mul(totals[IERC20(token_)].base));
-		super.withdraw(token_, from, to, amount, share); 
+
+	function withdraw(IERC20 token_, address from, address to, uint256 amount, uint256 share)  public allowed(from) override returns (uint256 amountOut, uint256 shareOut)
+	{
+		IERC20 token = token_ == USE_ETHEREUM ? wethToken : token_;
+		if (share == 0) {
+			shareOut = toShare(token, amount,true);
+			amountOut = amount;
+		}
+		else {
+			shareOut = share;
+			amountOut = toAmount(token, share, true);
+		}
+		balanceOf[token][from] = balanceOf[token][from].sub(shareOut);
+		token.transfer(to, amountOut);
 	}
-	*/
+	
 
 	constructor(IERC20 wethToken_) BentoBoxV1(wethToken_) public { }
 

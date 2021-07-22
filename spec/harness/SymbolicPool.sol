@@ -60,11 +60,12 @@ contract SymbolicPool is IPool, MirinERC20 {
 
     }
 
-      
+
     // a basic one to one mapping
     function mint(address to) external override returns(uint256 liquidity) {
-        for( uint i = 0 ; i < tokens.length ; i++) 
-           liquidity += bento.balanceOf(IERC20(tokens[i]),address(this)) - reserves[tokens[i]];
+        liquidity = getBalanceOfToken(0) - getReserveOfToken(0);
+        liquidity += getBalanceOfToken(1) - getReserveOfToken(1);
+        liquidity += getBalanceOfToken(2) - getReserveOfToken(2);
         _mint(to, liquidity);
         update(); 
     }
@@ -73,13 +74,27 @@ contract SymbolicPool is IPool, MirinERC20 {
     function burn(address to, bool unwrapBento) external override returns (liquidityAmount[] memory withdrawnAmounts) {
         //how much liquidity passed to the pool for burning
         uint256 liquidity = balanceOf[address(this)];
+        
         _burn(address(this), liquidity);
-        uint256 split = liquidity / tokens.length; 
+        
+        uint256 split = getSplitValue(liquidity); 
+        
         withdrawnAmounts = new liquidityAmount[](tokens.length);
-        for( uint i = 0 ; i < tokens.length ; i++) {
-            bento.transfer(tokens[i], address(this), to, split);
-            withdrawnAmounts[i] = liquidityAmount({token: address(tokens[i]), amount: split});
+        if ( tokens.length > 0) {
+            bento.transfer(tokens[0], address(this), to, split);
+            withdrawnAmounts[0] = liquidityAmount({token: address(tokens[0]), amount: split});
         }
+
+        if ( tokens.length > 1) {
+            bento.transfer(tokens[1], address(this), to, split);
+            withdrawnAmounts[1] = liquidityAmount({token: address(tokens[1]), amount: split});
+        }
+
+        if ( tokens.length > 2) {
+            bento.transfer(tokens[2], address(this), to, split);
+            withdrawnAmounts[2] = liquidityAmount({token: address(tokens[2]), amount: split});
+        } 
+
         update();
     }
 
@@ -91,13 +106,62 @@ contract SymbolicPool is IPool, MirinERC20 {
     }
 
     function update() internal {
-        for( uint i = 0 ; i < tokens.length ; i++) {
-            reserves[tokens[i]] = bento.balanceOf(tokens[i],address(this));
-        }
+        setReserveOfToken(0);
+        setReserveOfToken(1);
+        setReserveOfToken(2);
     }
 
     function tokensLength() public returns (uint256) {
         return tokens.length;
     }
+
+    function isStable() public returns (bool) {
+        return  getBalanceOfToken(0) == getReserveOfToken(0) &&
+                getBalanceOfToken(1) == getReserveOfToken(1) &&
+                getBalanceOfToken(2) == getReserveOfToken(2);
+    }
+
+  
     
+    function hasToken(address token) public returns (bool) {
+        return  getToken(0) == token ||
+                getToken(1) == token ||
+                getToken(2) == token;
+    }
+
+
+    
+    // functions to avoid loops
+    function getBalanceOfToken(uint i) private returns(uint256) {
+        if ( tokens.length > i)
+            return  bento.balanceOf(IERC20(tokens[i]),address(this));
+        return 0;
+    }
+
+    function getReserveOfToken(uint i) private returns(uint256) {
+        if ( tokens.length > i)
+            return  reserves[tokens[i]];
+        return 0;
+    } 
+
+    function setReserveOfToken(uint i) private returns(uint256) {
+        if ( tokens.length > i)
+            reserves[tokens[i]] = bento.balanceOf(IERC20(tokens[i]),address(this));
+    } 
+
+    function getToken(uint i) private returns (address) {
+         if ( tokens.length > i)
+            return address(tokens[i]); 
+    }
+
+    function getSplitValue(uint liquidity) private returns(uint256) {
+        if (tokens.length == 1)
+            return liquidity;
+        if (tokens.length == 2)
+            return liquidity / 2;
+        if (tokens.length == 3)
+            return liquidity / 3;
+                
+    }
+
 }
