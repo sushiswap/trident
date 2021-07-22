@@ -13,7 +13,7 @@ library MirinMath {
      * License-Identifier: BSD-4-Clause
      * @dev Calculate sqrt (x) rounding down, where x is unsigned 256-bit integer number
      * @param x unsigned 256-bit integer number
-     * @return unsigned 128-bit integer number
+     * @return unsigned 256-bit integer number
      */
     function sqrt(uint256 x) internal pure returns (uint256) {
         unchecked {
@@ -36,7 +36,7 @@ library MirinMath {
                 r = (r + x / r) >> 1;
                 r = (r + x / r) >> 1; // Seven iterations should be enough
                 uint256 r1 = x / r;
-                return (r < r1 ? r : r1);
+                return r < r1 ? r : r1;
             }
         }
     }
