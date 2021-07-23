@@ -14,6 +14,7 @@ import "../deployer/MasterDeployer.sol";
 contract ConstantProductPool is MirinERC20, IPool {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
+    event sync(uint256 reserve0, uint256 reserve1);
 
     uint256 internal constant MINIMUM_LIQUIDITY = 1000;
 
@@ -33,6 +34,10 @@ contract ConstantProductPool is MirinERC20, IPool {
 
     uint128 internal reserve0;
     uint128 internal reserve1;
+
+    uint256 public constant override poolType = 1;
+    uint256 public constant override assetsCount = 2;
+    address[] public override assets;
 
     uint256 private unlocked = 1;
     modifier lock() {
@@ -61,6 +66,8 @@ contract ConstantProductPool is MirinERC20, IPool {
         barFeeTo = MasterDeployer(_masterDeployer).barFeeTo();
         masterDeployer = MasterDeployer(_masterDeployer);
         unlocked = 1;
+        assets.push(address(_token0));
+        assets.push(address(_token1));
     }
 
     function mint(address to) public override lock returns (uint256 liquidity) {
@@ -139,7 +146,7 @@ contract ConstantProductPool is MirinERC20, IPool {
         if (tokenOut == address(token0)) {
             // Swap token1 for token0
             // Calculate amountOut as if the user first withdrew balanced liquidity and then swapped token1 for token0
-            amount0 += _getAmountOut(amount1, _reserve0 - amount0, _reserve1 - amount1);
+            amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0);
             _transfer(token0, amount0, to, unwrapBento);
             balance0 -= amount0;
             amount = amount0;
@@ -237,6 +244,7 @@ contract ConstantProductPool is MirinERC20, IPool {
         require(balance0 < type(uint128).max && balance1 < type(uint128).max, "MIRIN: OVERFLOW");
         reserve0 = uint128(balance0);
         reserve1 = uint128(balance1);
+        emit sync(balance0, balance1);
     }
 
     function _mintFee(

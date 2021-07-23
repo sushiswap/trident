@@ -15,6 +15,7 @@ import "../deployer/MasterDeployer.sol";
 contract ConstantProductPoolWithTWAP is MirinERC20, IPool {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
+    event sync(uint256 reserve0, uint256 reserve1);
 
     uint256 internal constant MINIMUM_LIQUIDITY = 1000;
 
@@ -37,6 +38,10 @@ contract ConstantProductPoolWithTWAP is MirinERC20, IPool {
     uint112 internal reserve0;
     uint112 internal reserve1;
     uint32 internal blockTimestampLast;
+
+    uint256 public constant override poolType = 2;
+    uint256 public constant override assetsCount = 2;
+    address[] public override assets;
 
     uint256 private unlocked = 1;
     modifier lock() {
@@ -65,6 +70,8 @@ contract ConstantProductPoolWithTWAP is MirinERC20, IPool {
         barFeeTo = MasterDeployer(_masterDeployer).barFeeTo();
         masterDeployer = MasterDeployer(_masterDeployer);
         unlocked = 1;
+        assets.push(address(_token0));
+        assets.push(address(_token1));
     }
 
     function mint(address to) public override lock returns (uint256 liquidity) {
@@ -143,7 +150,7 @@ contract ConstantProductPoolWithTWAP is MirinERC20, IPool {
         if (tokenOut == address(token0)) {
             // Swap token1 for token0
             // Calculate amountOut as if the user first withdrew balanced liquidity and then swapped token1 for token0
-            amount0 += _getAmountOut(amount1, _reserve0 - amount0, _reserve1 - amount1);
+            amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0);
             _transfer(token0, amount0, to, unwrapBento);
             balance0 -= amount0;
             amount = amount0;
@@ -272,6 +279,7 @@ contract ConstantProductPoolWithTWAP is MirinERC20, IPool {
         reserve0 = uint112(balance0);
         reserve1 = uint112(balance1);
         blockTimestampLast = blockTimestamp;
+        emit sync(balance0, balance1);
     }
 
     function _mintFee(

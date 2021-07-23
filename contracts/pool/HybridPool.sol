@@ -19,6 +19,7 @@ contract HybridPool is MirinERC20, IPool {
 
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
+    event sync(uint256 reserve0, uint256 reserve1);
 
     uint256 internal constant MINIMUM_LIQUIDITY = 10**3;
     uint8 internal constant PRECISION = 112;
@@ -47,6 +48,10 @@ contract HybridPool is MirinERC20, IPool {
 
     uint128 internal reserve0;
     uint128 internal reserve1;
+
+    uint256 public constant override poolType = 3;
+    uint256 public constant override assetsCount = 2;
+    address[] public override assets;
 
     uint256 private unlocked = 1;
     modifier lock() {
@@ -81,11 +86,9 @@ contract HybridPool is MirinERC20, IPool {
         N_A = 2 * a;
         token0PrecisionMultiplier = uint256(10)**(decimals - MirinERC20(_token0).decimals());
         token1PrecisionMultiplier = uint256(10)**(decimals - MirinERC20(_token1).decimals());
-    }
-
-    function init() public {
-        require(totalSupply == 0);
         unlocked = 1;
+        assets.push(address(_token0));
+        assets.push(address(_token1));
     }
 
     function mint(address to) public override lock returns (uint256 liquidity) {
@@ -239,6 +242,7 @@ contract HybridPool is MirinERC20, IPool {
         require(_reserve0 < type(uint128).max && _reserve1 < type(uint128).max, "OVERFLOW");
         reserve0 = uint128(_reserve0);
         reserve1 = uint128(_reserve1);
+        emit sync(_reserve0, _reserve1);
     }
 
     function _balance() internal view returns (uint256 balance0, uint256 balance1) {
