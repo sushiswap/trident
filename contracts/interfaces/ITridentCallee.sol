@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.2;
 
-/// @notice Interface for Trident pool calls with data context.
+/// @notice Interface for Trident pool interactions with data context
 interface ITridentCallee {
     function tridentCallback(
         address tokenIn,
