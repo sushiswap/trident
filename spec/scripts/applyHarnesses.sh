@@ -7,6 +7,16 @@ perl -0777 -i -pe 's/external payable returns \(bool /external virtual payable r
 perl -0777 -i -pe 's/public payable returns \(address /public virtual payable returns \(address /g' contracts/flat/BentoBoxV1Flat.sol
 perl -0777 -i -pe 's/        external\n        payable/        external\n        virtual\n        payable/g' contracts/flat/BentoBoxV1Flat.sol # for batch
 
+# adding transfer functions to the IERC20 interface in the BentoBoxV1
+perl -0777 -i -pe 's/function decimals\(\) external view returns \(uint256\);/function decimals\(\) external view returns \(uint256\);\n    function transfer\(address to, uint256 amount\) external;\n    function transferFrom\(address from, address to, uint256 amount\) external;/g' contracts/flat/BentoBoxV1Flat.sol
+
+# bytes4 private -> bytes4 internal for BentoBoxV1
+perl -0777 -i -pe 's/private/internal/g' contracts/flat/BentoBoxV1Flat.sol
+
+# virtualizing deposit and withdraw
+perl -0777 -i -pe 's/\) public payable allowed\(from\)/\) public virtual payable allowed\(from\)/g' contracts/flat/BentoBoxV1Flat.sol
+perl -0777 -i -pe 's/\) public allowed\(from\) returns/\) public virtual allowed\(from\) returns/g' contracts/flat/BentoBoxV1Flat.sol
+
 # virtualize functions for SwapRouter
 perl -0777 -i -pe 's/external payable returns/external virtual payable returns/g' contracts/SwapRouter.sol
 perl -0777 -i -pe 's/external payable /public virtual payable /g' contracts/SwapRouter.sol

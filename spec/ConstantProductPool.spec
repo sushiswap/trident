@@ -19,15 +19,15 @@ using SimpleBentoBox as bentoBox
 */
 
 methods {
-    // state variables
+    // ConstantProductPool state variables
     token0() returns (address) envfree
     token1() returns (address) envfree
-
     reserve0() returns (uint128) envfree
     reserve1() returns (uint128) envfree
 
     // ConstantProductPool functions
     _balance() returns (uint256 balance0, uint256 balance1) envfree
+    transferFrom(address, address, uint256) envfree
 
     // MirinERC20 (permit)
     ecrecover(bytes32 digest, uint8 v, bytes32 r, bytes32 s) 
@@ -41,6 +41,10 @@ methods {
 
     // bentobox
     bentoBox.balanceOf(address token, address user) returns (uint256) envfree
+    bentoBox.transfer(address token, address from, address to, uint256 share) envfree
+
+    // IERC20
+    tokenBalanceOf(address token, address user) returns (uint256 balance) envfree 
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -95,8 +99,7 @@ rule afterOpBalanceEqualsReserve(method f) {
 
     _balance0, _balance1 = _balance();
 
-    // no need? (Ask Nurit)
-    require reserve0() <= _balance0 && reserve1() <= _balance1;
+    requireInvariant reserveLessThanEqualToBalance();
 
     calldataarg args;
     f(e, args);
@@ -106,8 +109,7 @@ rule afterOpBalanceEqualsReserve(method f) {
 
     balance0_, balance1_ = _balance();
 
-    // reserve should go up. Does it make sense to use before
-    // balance to compare here? (Ask Nurit)
+    // reserve can go up or down or the balance doesn't change
     assert(reserve0() == balance0_ && reserve1() == balance1_,
            "balance doesn't equal reserve after operations");
 }
@@ -129,10 +131,10 @@ rule mintingNotPossibleForBalancedPool() {
            "pool minting on no transfer to pool");
 }
 
+// TODO: only when adding optimal liquidity
 rule inverseOfMintAndBurn() {
     env e;
 
-    // do we actually want to add liquidity? (Ask Nurit)
     uint256 balance0;
     uint256 balance1;
 
@@ -140,11 +142,16 @@ rule inverseOfMintAndBurn() {
 
     require reserve0() < balance0 && reserve1() < balance1;
 
+    // asumming addLiquidity is already called and the assets are transfered
+    // to the pool
     uint256 _liquidity0 = balance0 - reserve0();
     uint256 _liquidity1 = balance1 - reserve1();
 
     calldataarg args0;
-    uint256 liquidity = mint(e, args0);
+    uint256 mirinLiquidity = mint(e, args0);
+
+    // transfer mirin tokens to the pool
+    transferFrom(e.msg.sender, currentContract, mirinLiquidity);
 
     uint256 liquidity0_;
     uint256 liquidity1_;
@@ -152,9 +159,56 @@ rule inverseOfMintAndBurn() {
     calldataarg args1;
     liquidity0_, liquidity1_ = burnGetter(e, args1);
 
-    // do we instead want to check whether the 'to' user got the funds? (Ask Nurit)
+    // do we instead want to check whether the 'to' user got the funds? (Ask Nurit) -- Yes
     assert(_liquidity0 == liquidity0_ && _liquidity1 == liquidity1_, 
            "inverse of mint then burn doesn't hold");
+}
+
+rule burnTokenAdditivity() {
+    env e;
+    address to;
+    bool unwrapBento;
+    uint256 mirinLiquidity;
+
+    uint256 balance0;
+    uint256 balance1;
+
+    balance0, balance1 = _balance();
+
+    require reserve0() == balance0 && reserve1() == balance1;
+
+    // need to replicate the exact state later on
+    storage initState = lastStorage;
+
+    // burn single token
+    transferFrom(e.msg.sender, currentContract, mirinLiquidity);
+    uint256 liquidity0Single = burnLiquiditySingle(e, token0(), to, unwrapBento);
+
+    uint256 _totalUsertoken0 = tokenBalanceOf(token0(), e.msg.sender) + 
+                               bentoBox.balanceOf(token0(), e.msg.sender);
+    uint256 _totalUsertoken1 = tokenBalanceOf(token1(), e.msg.sender) + 
+                               bentoBox.balanceOf(token1(), e.msg.sender);
+
+    uint256 liquidity0;
+    uint256 liquidity1;
+
+    // burn both tokens
+    transferFrom(e.msg.sender, currentContract, mirinLiquidity) at lastStorage;
+    liquidity0, liquidity1 = burnGetter(e, to, unwrapBento);
+
+    // swap token1 for token0
+    // Don't know what's wrong with this (Ask Nurit)
+    // bentoBox.transfer(token1(), e.msg.sender, currentContract, liquidity1);
+    uint256 amountOut = swapWithoutContext(e, token1(), token0(), to, unwrapBento);
+
+    uint256 totalUsertoken0_ = tokenBalanceOf(token0(), e.msg.sender) + 
+                               bentoBox.balanceOf(token0(), e.msg.sender);
+    uint256 totalUsertoken1_ = tokenBalanceOf(token1(), e.msg.sender) + 
+                               bentoBox.balanceOf(token1(), e.msg.sender);
+
+    assert(liquidity0Single == liquidity0 + amountOut, "burns not equivalent");
+    assert(_totalUsertoken0 == totalUsertoken0_, "user's token0 changed");
+    assert(_totalUsertoken1 == totalUsertoken1_, "user's token1 changed");
 }
 
 ////////////////////////////////////////////////////////////////////////////
