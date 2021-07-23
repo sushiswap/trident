@@ -31,8 +31,8 @@ contract ConstantProductPool is MirinERC20, IPool {
 
     uint256 public kLast;
 
-    uint128 internal reserve0;
-    uint128 internal reserve1;
+    uint128 public reserve0;
+    uint128 public reserve1;
 
     uint256 private unlocked = 1;
     modifier lock() {
