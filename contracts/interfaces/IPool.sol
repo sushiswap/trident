@@ -3,6 +3,7 @@
 pragma solidity >=0.5.0;
 pragma experimental ABIEncoderV2;
 
+/// @notice Interface for Trident pool interactions
 interface IPool {
     struct liquidityInput {
         address token;
