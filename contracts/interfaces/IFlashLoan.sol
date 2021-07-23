@@ -1,9 +1,10 @@
-// SPDX-License-Identifier: MIT
-pragma solidity >=0.6.12;
-pragma experimental ABIEncoderV2;
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+pragma solidity ^0.8.2;
 
 import "./IERC20.sol";
 
+/// @notice Interface for flash lending from the BentoBox token vault (V1)
 interface IFlashBorrower {
     /// @notice The flashloan callback. `amount` + `fee` needs to repayed to msg.sender before this call returns.
     /// @param sender The address of the invoker of this flashloan.
@@ -20,6 +21,7 @@ interface IFlashBorrower {
     ) external;
 }
 
+/// @notice Interface for batch flash lending from the BentoBox token vault (V1)
 interface IBatchFlashBorrower {
     /// @notice The callback for batched flashloans. Every amount + fee needs to repayed to msg.sender before this call returns.
     /// @param sender The address of the invoker of this flashloan.
