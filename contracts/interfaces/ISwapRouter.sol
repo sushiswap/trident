@@ -3,7 +3,7 @@
 pragma solidity >=0.7.5;
 pragma abicoder v2;
 
-/// @notice Interface for Trident pool swaps.
+/// @notice Interface for Trident pool routing
 interface ISwapRouter {
     // TODO: Make context optional
 
