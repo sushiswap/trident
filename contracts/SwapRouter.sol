@@ -6,6 +6,7 @@ import "./interfaces/ISwapRouter.sol";
 import "./interfaces/IWETH.sol";
 import "./interfaces/IPool.sol";
 import "./interfaces/IBentoBox.sol";
+import "./interfaces/IFlashLoan.sol";
 
 import "./base/Multicall.sol";
 import "./base/SelfPermit.sol";
@@ -14,7 +15,7 @@ import "./libraries/TransferHelper.sol";
 
 import "hardhat/console.sol";
 
-contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
+contract SwapRouter is IFlashBorrower, ISwapRouter, Multicall, SelfPermit {
     address public immutable WETH;
     IBentoBoxV1 public immutable bento;
 
@@ -434,7 +435,35 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
             bento.transfer(IERC20(token), payer, recipient, value);
         }
     }
-
+    
+    /// @param sender Account that activates flash loan from bentobox
+    /// @param token Token to flash borrow
+    /// @param amount Token amount flash borrowed
+    /// @param fee Bentobox flash loan fee
+    /// @param data Data involved in flash loan
+    function onFlashLoan(
+        address sender,
+        IERC20 token, 
+        uint256 amount, 
+        uint256 fee, 
+        bytes calldata data
+    ) external override {
+        // Run router flash loan strategy through delegatecall
+        (bool success, bytes memory result) = address(this).delegatecall(data);
+            if (!success) {
+                // Next 5 lines from https://ethereum.stackexchange.com/a/83577
+                if (result.length < 68) revert();
+                assembly {
+                    result := add(result, 0x04)
+                }
+                revert(abi.decode(result, (string)));
+            }
+        // Pay back borrowed token to bentobox with fee and send any winnings to `sender`.
+        uint256 payback = amount + fee; // calculate `payback` to bentobox as borrowed token `amount` + `fee`
+        token.transfer(msg.sender, payback); // send `payback` to bentobox or other contract supporting {IFlashBorrower}
+        token.transfer(sender, token.balanceOf(address(this)) - payback); // skim remainder token winnings to `sender`
+    }
+    
     /// @param token The token to pay
     /// @param recipient The entity that will receive payment
     /// @param amount The amount to pay
