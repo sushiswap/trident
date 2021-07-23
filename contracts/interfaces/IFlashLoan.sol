@@ -2,7 +2,7 @@
 pragma solidity >=0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./IERC20.sol";
 
 interface IFlashBorrower {
     /// @notice The flashloan callback. `amount` + `fee` needs to repayed to msg.sender before this call returns.
