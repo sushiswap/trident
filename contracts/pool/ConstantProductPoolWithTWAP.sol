@@ -1,27 +1,20 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 pragma solidity ^0.8.2;
 
 import "../base/Multicall.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/IBentoBox.sol";
-import "../interfaces/IMirinCallee.sol";
+import "../interfaces/ITridentCallee.sol";
 import "./MirinERC20.sol";
 import "../libraries/MirinMath.sol";
 import "hardhat/console.sol";
 import "../deployer/MasterDeployer.sol";
 
+/// @dev This pool swaps between bento shares. It does not care about underlying amounts.
 contract ConstantProductPoolWithTWAP is MirinERC20, IPool {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
-    event Swap(
-        address indexed sender,
-        uint256 amount0In,
-        uint256 amount1In,
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address indexed to
-    );
 
     uint256 internal constant MINIMUM_LIQUIDITY = 1000;
 
@@ -98,7 +91,12 @@ contract ConstantProductPoolWithTWAP is MirinERC20, IPool {
         emit Mint(msg.sender, amount0, amount1, to);
     }
 
-    function burn(address to, bool unwrapBento) public override lock returns (liquidityAmount[] memory withdrawnAmounts) {
+    function burn(address to, bool unwrapBento)
+        public
+        override
+        lock
+        returns (liquidityAmount[] memory withdrawnAmounts)
+    {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         uint256 _totalSupply = totalSupply;
         _mintFee(_reserve0, _reserve1, _totalSupply);
@@ -110,7 +108,8 @@ contract ConstantProductPoolWithTWAP is MirinERC20, IPool {
 
         _burn(address(this), liquidity);
 
-        _transferWithoutData(amount0, amount1, to, unwrapBento);
+        _transfer(token0, amount0, to, unwrapBento);
+        _transfer(token1, amount1, to, unwrapBento);
 
         balance0 -= amount0;
         balance1 -= amount1;
@@ -170,23 +169,23 @@ contract ConstantProductPoolWithTWAP is MirinERC20, IPool {
     ) external override lock returns (uint256 amountOut) {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
+        uint256 amountIn;
 
         if (tokenIn == address(token0)) {
             require(tokenOut == address(token1), "Invalid output token");
-            uint256 amountIn = balance0 - _reserve0;
+            amountIn = balance0 - _reserve0;
             amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
             _transfer(token1, amountOut, recipient, unwrapBento);
             _update(balance0, balance1 - amountOut, _reserve0, _reserve1, _blockTimestampLast);
-            emit Swap(msg.sender, amountIn, 0, 0, amountOut, recipient);
         } else {
             require(tokenIn == address(token1), "Invalid input token");
             require(tokenOut == address(token0), "Invalid output token");
-            uint256 amountIn = balance1 - _reserve1;
+            amountIn = balance1 - _reserve1;
             amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
             _transfer(token0, amountOut, recipient, unwrapBento);
             _update(balance0 - amountOut, balance1, _reserve0, _reserve1, _blockTimestampLast);
-            emit Swap(msg.sender, 0, amountIn, amountOut, 0, recipient);
         }
+        emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
 
     function swapWithContext(
@@ -197,28 +196,45 @@ contract ConstantProductPoolWithTWAP is MirinERC20, IPool {
         bool unwrapBento,
         uint256 amountIn
     ) public override lock returns (uint256 amountOut) {
-        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
 
         if (tokenIn == address(token0)) {
             require(tokenOut == address(token1), "Invalid output token");
-            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
-            _swapWithData(0, amountOut, recipient, unwrapBento, context, _reserve0, _reserve1, _blockTimestampLast);
+
+            amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
+            _processSwap(tokenIn, tokenOut, recipient, amountIn, amountOut, context, unwrapBento);
+
+            (uint256 balance0, uint256 balance1) = _balance();
+            require(balance0 - _reserve0 >= amountIn, "Insuffficient amount in");
+
+            _update(balance0, balance1 - amountOut, _reserve0, _reserve1, _blockTimestampLast);
         } else {
             require(tokenIn == address(token1), "Invalid input token");
             require(tokenOut == address(token0), "Invalid output token");
-            if (amountIn > 0) amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
-            _swapWithData(amountOut, 0, recipient, unwrapBento, context, _reserve0, _reserve1, _blockTimestampLast);
+
+            amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
+            _processSwap(tokenIn, tokenOut, recipient, amountIn, amountOut, context, unwrapBento);
+
+            (uint256 balance0, uint256 balance1) = _balance();
+            require(balance1 - _reserve1 >= amountIn, "Insuffficient amount in");
+
+            _update(balance0 - amountOut, balance1, _reserve0, _reserve1, _blockTimestampLast);
         }
+
+        emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
 
-    function swap(
-        uint256 amount0Out,
-        uint256 amount1Out,
+    function _processSwap(
+        address tokenIn,
+        address tokenOut,
         address to,
-        bytes calldata data
-    ) external lock {
-        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves(); // gas savings
-        _swapWithData(amount0Out, amount1Out, to, false, data, _reserve0, _reserve1, _blockTimestampLast);
+        uint256 amountIn,
+        uint256 amountOut,
+        bytes calldata data,
+        bool unwrapBento
+    ) internal {
+        _transfer(IERC20(tokenOut), amountOut, to, unwrapBento);
+        if (data.length > 0) ITridentCallee(to).tridentCallback(tokenIn, tokenOut, amountIn, amountOut, data);
     }
 
     function _getReserves()
@@ -283,19 +299,6 @@ contract ConstantProductPoolWithTWAP is MirinERC20, IPool {
         balance1 = bento.balanceOf(token1, address(this));
     }
 
-    function _compute(
-        uint256 amount0In,
-        uint256 amount1In,
-        uint256 balance0,
-        uint256 balance1,
-        uint112 _reserve0,
-        uint112 _reserve1
-    ) internal view {
-        uint256 balance0Adjusted = balance0 * MAX_FEE - amount0In * swapFee;
-        uint256 balance1Adjusted = balance1 * MAX_FEE - amount1In * swapFee;
-        require(balance0Adjusted * balance1Adjusted >= uint256(_reserve0) * _reserve1 * MAX_FEE_SQUARE, "MIRIN: LIQUIDITY");
-    }
-
     function _getAmountOut(
         uint256 amountIn,
         uint256 reserveIn,
@@ -312,64 +315,10 @@ contract ConstantProductPoolWithTWAP is MirinERC20, IPool {
         bool unwrapBento
     ) internal {
         if (unwrapBento) {
-            IBentoBoxV1(bento).withdraw(token, address(this), to, amount, 0);
+            bento.withdraw(token, address(this), to, 0, amount);
         } else {
-            bento.transfer(token, address(this), to, bento.toShare(token, amount, false));
+            bento.transfer(token, address(this), to, amount);
         }
-    }
-
-    function _transferWithoutData(
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address to,
-        bool unwrapBento
-    ) internal {
-        if (amount0Out > 0) {
-            if (unwrapBento) {
-                IBentoBoxV1(bento).withdraw(token0, address(this), to, amount0Out, 0);
-            } else {
-                bento.transfer(token0, address(this), to, bento.toShare(token0, amount0Out, false));
-            }
-        }
-        if (amount1Out > 0) {
-            if (unwrapBento) {
-                IBentoBoxV1(bento).withdraw(token1, address(this), to, amount1Out, 0);
-            } else {
-                bento.transfer(token1, address(this), to, bento.toShare(token1, amount1Out, false));
-            }
-        }
-    }
-
-    function _swapWithData(
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address to,
-        bool unwrapBento,
-        bytes calldata data,
-        uint112 _reserve0,
-        uint112 _reserve1,
-        uint32 _blockTimestampLast
-    ) internal {
-        _transferWithoutData(amount0Out, amount1Out, to, unwrapBento);
-        if (data.length > 0) IMirinCallee(to).mirinCall(msg.sender, amount0Out, amount1Out, data);
-        _swap(amount0Out, amount1Out, to, _reserve0, _reserve1, _blockTimestampLast);
-    }
-
-    function _swap(
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address to,
-        uint112 _reserve0,
-        uint112 _reserve1,
-        uint32 _blockTimestampLast
-    ) internal {
-        (uint256 balance0, uint256 balance1) = _balance();
-        uint256 amount0In = balance0 + amount0Out - _reserve0;
-        uint256 amount1In = balance1 + amount1Out - _reserve1;
-        _compute(amount0In, amount1In, balance0, balance1, _reserve0, _reserve1);
-        _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-
-        emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
     }
 
     function getAmountOut(
@@ -398,8 +347,14 @@ contract ConstantProductPoolWithTWAP is MirinERC20, IPool {
         uint112 _reserve0;
         uint112 _reserve1;
         liquidityAmount[] memory liquidityOptimal = new liquidityAmount[](2);
-        liquidityOptimal[0] = liquidityAmount({token: liquidityInputs[0].token, amount: liquidityInputs[0].amountDesired});
-        liquidityOptimal[1] = liquidityAmount({token: liquidityInputs[1].token, amount: liquidityInputs[1].amountDesired});
+        liquidityOptimal[0] = liquidityAmount({
+            token: liquidityInputs[0].token,
+            amount: liquidityInputs[0].amountDesired
+        });
+        liquidityOptimal[1] = liquidityAmount({
+            token: liquidityInputs[1].token,
+            amount: liquidityInputs[1].amountDesired
+        });
 
         (_reserve0, _reserve1) = (reserve0, reserve1);
 

@@ -35,9 +35,7 @@
       "prettier --write"
     ],
     "*.sol": [
-      "solhint -c .solhint.json",
-      "prettier --write",
-      "yarn test"
+      "prettier --write"
     ],
     "*.md": "prettier --write"
   },
