@@ -7,8 +7,8 @@ pragma solidity ^0.8.2;
  * @author Andre Cronje, LevX
  */
 contract MirinERC20 {
-    string public constant name = "Mirin";
-    string public constant symbol = "MIRIN";
+    string public constant name = "Sushi LP Token";
+    string public constant symbol = "SLP";
     uint8 public constant decimals = 18;
 
     uint256 public totalSupply;
@@ -41,7 +41,9 @@ contract MirinERC20 {
 
     function _mint(address to, uint256 value) internal {
         totalSupply += value;
-        balanceOf[to] += value;
+        unchecked {
+            balanceOf[to] += value;
+        }
         emit Transfer(address(0), to, value);
     }
 
@@ -113,7 +115,7 @@ contract MirinERC20 {
         bytes32 r,
         bytes32 s
     ) external {
-        require(deadline >= block.timestamp, "MIRIN: EXPIRED");
+        require(deadline >= block.timestamp, "EXPIRED");
         bytes32 digest = keccak256(
             abi.encodePacked(
                 "\x19\x01",
@@ -122,7 +124,7 @@ contract MirinERC20 {
             )
         );
         address recoveredAddress = ecrecover(digest, v, r, s);
-        require(recoveredAddress != address(0) && recoveredAddress == owner, "MIRIN: INVALID_SIGNATURE");
+        require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_SIGNATURE");
         _approve(owner, spender, value);
     }
 }
