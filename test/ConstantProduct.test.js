@@ -1,10 +1,14 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { BigNumber } = require("ethers");
-const { prepare, deploy, getBigNumber } = require("./utilities");
+const seedrandom = require("seedrandom")
 const { calcOutByIn} = require("@sushiswap/sdk");
+const { prepare, deploy, getBigNumber } = require("./utilities");
 
-describe("ConstantProduct Typescript == Solidity", function () {
+const testSeed = '0';   // Change it to change random generator output values
+const rnd = seedrandom(testSeed); // random [0, 1)
+
+describe("ConstantProductPool Typescript == Solidity check", function () {
   let alice, feeTo, usdt, usdc, weth, bento, masterDeployer, mirinPoolFactory, router, pool;
 
   before(async function () {
@@ -48,13 +52,10 @@ describe("ConstantProduct Typescript == Solidity", function () {
     );
   })
 
-  it("Check", async function() {
+  it("AmountOut should differ less than 1e-14", async function() {
     await bento.transfer(usdc.address, alice.address, pool.address, BigNumber.from(10).pow(19));
     await bento.transfer(usdt.address, alice.address, pool.address, BigNumber.from(10).pow(19));
     await pool.mint(alice.address);
-    let amountIn = BigNumber.from(10).pow(18);
-    const amountOut = await pool.getAmountOut(usdt.address, usdc.address, amountIn);
-    console.log(amountOut.toString());
 
     const pool2 = {
       type: 'ConstantProduct',
@@ -62,8 +63,16 @@ describe("ConstantProduct Typescript == Solidity", function () {
       reserve1: Math.pow(10, 19),
       fee: 0.003
     }
-    const amountOut2 = calcOutByIn(pool2, Math.pow(10, 18));
-    console.log(amountOut2);
-    expect(1).eq(1);
+
+    for (let testNum = 0; testNum < 100; ++testNum) {
+      const random = Math.floor(rnd()*1e15);
+      const amountInBig = BigNumber.from(1000).mul(random);
+      const amountOut1 = (await pool.getAmountOut(usdt.address, usdc.address, amountInBig)).toString();
+      
+      const amountIn = 1000*random;
+      const amountOut2 = calcOutByIn(pool2, amountIn);
+
+      expect(Math.abs(amountOut2/amountOut1 - 1)).lessThan(1e-14)
+    }
   });
 })
