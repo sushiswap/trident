@@ -57,17 +57,16 @@ contract ConstantProductPool is MirinERC20, IPool {
         require(tokenA != tokenB, "MIRIN: IDENTICAL_ADDRESSES");
         require(_swapFee <= MAX_FEE, "MIRIN: INVALID_SWAP_FEE");
 
-        (IERC20 _token0, IERC20 _token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-        token0 = _token0;
-        token1 = _token1;
+        token0 = tokenA;
+        token1 = tokenB;
         swapFee = _swapFee;
         MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
         bento = IBentoBoxV1(MasterDeployer(_masterDeployer).bento());
         barFeeTo = MasterDeployer(_masterDeployer).barFeeTo();
         masterDeployer = MasterDeployer(_masterDeployer);
         unlocked = 1;
-        assets.push(address(_token0));
-        assets.push(address(_token1));
+        assets.push(address(tokenA));
+        assets.push(address(tokenB));
     }
 
     function mint(address to) public override lock returns (uint256 liquidity) {

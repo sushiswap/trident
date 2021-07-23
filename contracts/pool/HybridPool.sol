@@ -33,7 +33,6 @@ contract HybridPool is MirinERC20, IPool {
     address public immutable barFeeTo;
 
     IBentoBoxV1 public immutable bento;
-    MasterDeployer public immutable masterDeployer;
     IERC20 public immutable token0;
     IERC20 public immutable token1;
     uint256 public immutable A;
@@ -75,20 +74,18 @@ contract HybridPool is MirinERC20, IPool {
         require(_swapFee <= MAX_FEE, "MIRIN: INVALID_SWAP_FEE");
         require(a != 0, "MIRIN: ZERO_A");
 
-        (address _token0, address _token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-        token0 = IERC20(_token0);
-        token1 = IERC20(_token1);
+        token0 = IERC20(tokenA);
+        token1 = IERC20(tokenB);
         swapFee = _swapFee;
         bento = IBentoBoxV1(MasterDeployer(_masterDeployer).bento());
         barFeeTo = MasterDeployer(_masterDeployer).barFeeTo();
-        masterDeployer = MasterDeployer(_masterDeployer);
         A = a;
         N_A = 2 * a;
-        token0PrecisionMultiplier = uint256(10)**(decimals - MirinERC20(_token0).decimals());
-        token1PrecisionMultiplier = uint256(10)**(decimals - MirinERC20(_token1).decimals());
+        token0PrecisionMultiplier = uint256(10)**(decimals - MirinERC20(tokenA).decimals());
+        token1PrecisionMultiplier = uint256(10)**(decimals - MirinERC20(tokenB).decimals());
         unlocked = 1;
-        assets.push(address(_token0));
-        assets.push(address(_token1));
+        assets.push(address(tokenA));
+        assets.push(address(tokenB));
     }
 
     function mint(address to) public override lock returns (uint256 liquidity) {

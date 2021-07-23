@@ -81,9 +81,10 @@ describe("Router", function () {
       "0x0000000000000000000000000000000000000000000000000000000000000000"
     );
     // Pool deploy data
+    let addresses = [weth.address, sushi.address].sort();
     const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint8"],
-      [weth.address, sushi.address, 30]
+      [addresses[0], addresses[1], 30]
     );
     pool = await Pool.attach(
       (
@@ -92,9 +93,10 @@ describe("Router", function () {
         ).wait()
       ).events[0].args[0]
     );
+    addresses = [dai.address, sushi.address].sort();
     const deployData2 = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint8"],
-      [dai.address, sushi.address, 30]
+      [addresses[0], addresses[1], 30]
     );
     daiSushiPool = await Pool.attach(
       (
@@ -103,9 +105,10 @@ describe("Router", function () {
         ).wait()
       ).events[0].args[0]
     );
+    addresses = [dai.address, weth.address].sort();
     const deployData3 = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint8"],
-      [dai.address, weth.address, 30]
+      [addresses[0], addresses[1], 30]
     );
     daiWethPool = await Pool.attach(
       (
@@ -117,11 +120,6 @@ describe("Router", function () {
   });
 
   describe("Pool", function () {
-    it("Pool should have correct tokens", async function () {
-      expect(await pool.token0()).eq(weth.address);
-      expect(await pool.token1()).eq(sushi.address);
-    });
-
     it("Should add liquidity directly to the pool", async function () {
       await bento.transfer(
         sushi.address,

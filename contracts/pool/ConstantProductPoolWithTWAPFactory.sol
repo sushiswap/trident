@@ -14,13 +14,6 @@ contract ConstantProductPoolWithTWAPFactory is PairPoolDeployer {
     function deployPool(bytes memory _deployData) external returns (address) {
         (IERC20 tokenA, IERC20 tokenB, ) = abi.decode(_deployData, (IERC20, IERC20, uint256));
         return
-            _deployPool(
-                address(tokenA),
-                address(tokenB),
-                abi.encodePacked(
-                    type(ConstantProductPoolWithTWAP).creationCode,
-                    abi.encode(_deployData, masterDeployer)
-                )
-            );
+            _deployPool(address(tokenA), address(tokenB), type(ConstantProductPoolWithTWAP).creationCode, _deployData);
     }
 }
