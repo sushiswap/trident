@@ -33,7 +33,7 @@ const deployFunction: DeployFunction = async function ({
       throw Error(`No BENTOBOX on chain #${chainId}!`);
     }
     bentoBoxV1Address = BENTOBOX_ADDRESS[chainId];
-    wethAddress = WNATIVE[chainId];
+    wethAddress = WNATIVE[chainId].address;
   }
 
   const { address: masterDeployerAdress } = await ethers.getContract(
