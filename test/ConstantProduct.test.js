@@ -2,11 +2,23 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { BigNumber } = require("ethers");
 const seedrandom = require("seedrandom")
-const { calcOutByIn} = require("@sushiswap/sdk");
+const { calcOutByIn, calcInByOut } = require("@sushiswap/sdk");
 const { prepare, deploy, getBigNumber } = require("./utilities");
 
 const testSeed = '0';   // Change it to change random generator output values
 const rnd = seedrandom(testSeed); // random [0, 1)
+
+function getIntegerRandomValue(exp) {
+  if (exp <= 15) {
+    const value = Math.floor(rnd()*Math.pow(10, exp));
+    return [value, BigNumber.from(value)];
+  } else {
+    const random = Math.floor(rnd()*1e15);
+    const value = random*Math.pow(10, exp-15);
+    const bnValue = BigNumber.from(10).pow(exp-15).mul(random);
+    return [value, bnValue];
+  }
+}
 
 describe("ConstantProductPool Typescript == Solidity check", function () {
   let alice, feeTo, usdt, usdc, weth, bento, masterDeployer, mirinPoolFactory, router, pool;
@@ -53,26 +65,28 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
   })
 
   it("AmountOut should differ less than 1e-14", async function() {
-    await bento.transfer(usdc.address, alice.address, pool.address, BigNumber.from(10).pow(19));
-    await bento.transfer(usdt.address, alice.address, pool.address, BigNumber.from(10).pow(19));
-    await pool.mint(alice.address);
+    //for (let mintNum = 0; mintNum < 2; ++mintNum) {
+      await bento.transfer(usdc.address, alice.address, pool.address, BigNumber.from(10).pow(19));
+      await bento.transfer(usdt.address, alice.address, pool.address, BigNumber.from(10).pow(19));
+      await pool.mint(alice.address);
 
-    const pool2 = {
-      type: 'ConstantProduct',
-      reserve0: Math.pow(10, 19),
-      reserve1: Math.pow(10, 19),
-      fee: 0.003
-    }
+      const pool2 = {
+        type: 'ConstantProduct',
+        reserve0: Math.pow(10, 19),
+        reserve1: Math.pow(10, 19),
+        fee: 0.003
+      }
 
-    for (let testNum = 0; testNum < 100; ++testNum) {
-      const random = Math.floor(rnd()*1e15);
-      const amountInBig = BigNumber.from(1000).mul(random);
-      const amountOut1 = (await pool.getAmountOut(usdt.address, usdc.address, amountInBig)).toString();
-      
-      const amountIn = 1000*random;
-      const amountOut2 = calcOutByIn(pool2, amountIn);
+      for (let swapNum = 0; swapNum < 100; ++swapNum) {
+        const [jsValue, bnValue] = getIntegerRandomValue(18);
+        const amountOutPool = (await pool.getAmountOut(usdt.address, usdc.address, bnValue)).toString();
+        const amountOutPrediction = calcOutByIn(pool2, jsValue);
+        expect(Math.abs(amountOutPrediction/amountOutPool - 1)).lessThan(1e-14);
+        const amounInExpected = calcInByOut(pool2, amountOutPrediction);
+        expect(Math.abs(amounInExpected/jsValue - 1)).lessThan(1e-14);
+      }
 
-      expect(Math.abs(amountOut2/amountOut1 - 1)).lessThan(1e-14)
-    }
+    //   await pool.burn(alice.address, false);
+    // }
   });
 })
