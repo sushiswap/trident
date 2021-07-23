@@ -4,7 +4,7 @@ pragma solidity ^0.8.2;
 
 import "./IERC20.sol";
 
-/// @notice Interface for interacting with the BentoBox token vault (V1).
+/// @notice Minimal interface for interacting with the BentoBox token vault (V1)
 interface IBentoBoxV1 {
     function balanceOf(IERC20, address) external view returns (uint256);
 
