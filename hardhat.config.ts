@@ -11,10 +11,7 @@ import "hardhat-watcher";
 import "solidity-coverage";
 import "@tenderly/hardhat-tenderly";
 import "@typechain/hardhat";
-<<<<<<< HEAD
-import "hardhat-tracer"
-=======
->>>>>>> upstream/master
+import "hardhat-tracer";
 
 import { HardhatUserConfig, task } from "hardhat/config";
 
@@ -131,7 +128,7 @@ const config: HardhatUserConfig = {
       live: true,
       saveDeployments: true,
     },
-    'matic-testnet': {
+    "matic-testnet": {
       url: "https://rpc-mumbai.maticvigil.com/",
       accounts,
       chainId: 80001,
@@ -187,7 +184,7 @@ const config: HardhatUserConfig = {
       saveDeployments: true,
       gasPrice: 470000000000,
     },
-    'avalanche-testnet': {
+    "avalanche-testnet": {
       url: "https://api.avax-test.network/ext/bc/C/rpc",
       accounts,
       chainId: 43113,

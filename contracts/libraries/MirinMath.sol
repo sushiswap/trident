@@ -54,8 +54,4 @@ library MirinMath {
         uint256 r1 = x / r;
         return (r < r1 ? r : r1);
     }
-<<<<<<< HEAD
-
-=======
->>>>>>> upstream/master
 }
