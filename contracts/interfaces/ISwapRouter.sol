@@ -3,11 +3,11 @@
 pragma solidity >=0.7.5;
 pragma abicoder v2;
 
-/// @notice Interface for Trident pool routing
+/// @notice Interface for routing Trident exchange interactions.
 interface ISwapRouter {
     // TODO: Make context optional
 
-    /// @dev In case of a multi hop swap, the output token for first swap is the input token of the next swap
+    /// @dev In case of a multi hop swap, the output token for first swap is the input token of the next swap.
     struct Path {
         address tokenIn;
         address pool;
@@ -67,7 +67,7 @@ interface ISwapRouter {
         address pool;
         address tokenOut;
         bool preFunded;
-        uint256 amountIn; // 0 amountIn implies pre-funding
+        uint256 amountIn; // @dev 0 amountIn implies pre-funding.
         bytes context;
     }
 
@@ -75,7 +75,7 @@ interface ISwapRouter {
         address tokenIn;
         address pool;
         address tokenOut;
-        uint64 balancePercentage; // Multiplied by 10^6
+        uint64 balancePercentage; // @dev Multiplied by 10^6.
         bytes context;
     }
 
