@@ -53,7 +53,7 @@ library TridentHelper {
     /// @param wETH Address of ERC-20 token for wrapped ETH.
     function withdrawFromWETH(address wETH, uint256 balanceWETH) internal {
         (bool success, ) = wETH.call(abi.encodeWithSelector(0x2e1a7d4d, balanceWETH)); // @dev withdraw(uint256)
-        require(success, "ChefHelper: WITHDRAW_FROM_WETH_FAILED");
+        require(success, "TridentHelper: WITHDRAW_FROM_WETH_FAILED");
     }
 
     /// @notice Provides safe ETH transfer.
