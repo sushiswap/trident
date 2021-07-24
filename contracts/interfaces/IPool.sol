@@ -3,8 +3,16 @@
 pragma solidity >=0.5.0;
 pragma experimental ABIEncoderV2;
 
-/// @notice Interface for Trident pool interactions
+/// @notice Interface for Trident exchange pool interactions.
 interface IPool {
+    event Swap(
+        address indexed recipient,
+        address indexed tokenIn,
+        address indexed tokenOut,
+        uint256 amountIn,
+        uint256 amountOut
+    );
+
     struct liquidityInput {
         address token;
         bool native;
@@ -47,5 +55,9 @@ interface IPool {
 
     function burn(address to, bool unwrapBento) external returns (liquidityAmount[] memory withdrawnAmounts);
 
-    function burnLiquiditySingle(address tokenOut, address to, bool unwrapBento) external returns (uint256 amount);
+    function burnLiquiditySingle(
+        address tokenOut,
+        address to,
+        bool unwrapBento
+    ) external returns (uint256 amount);
 }
