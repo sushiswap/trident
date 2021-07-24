@@ -5,11 +5,8 @@ pragma solidity >=0.8.0;
 import "./interfaces/IBentoBoxMinimal.sol";
 import "./interfaces/IPool.sol";
 import "./interfaces/ISwapRouter.sol";
-
 import "./libraries/TridentHelper.sol";
-
 import "./TridentBatcher.sol";
-
 import "hardhat/console.sol";
 
 /// @notice Contract for routing Trident exchange interactions.
