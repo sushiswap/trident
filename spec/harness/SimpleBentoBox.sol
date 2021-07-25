@@ -36,6 +36,7 @@ contract SimpleBentoBox is BentoBoxV1 {
 			public payable allowed(from) override returns (uint256 amountOut, uint256 shareOut) {
 		IERC20 token = token_ == USE_ETHEREUM ? wethToken : token_;
 
+		// we trust here 
 		if (share == 0) {
 			shareOut = toShare(token, amount, false);
 			amountOut = amount;
@@ -44,9 +45,9 @@ contract SimpleBentoBox is BentoBoxV1 {
 			amountOut = toAmount(token, share, false);
 		}
 
-		balanceOf[token][from] = balanceOf[token][from].sub(shareOut);
+		balanceOf[token][from] = balanceOf[token][from].add(shareOut);
 
-		token.transfer(to, amountOut);
+		
 	}
 
 	function withdraw(IERC20 token_, address from, address to,

@@ -119,7 +119,7 @@ contract SymbolicPool is IPool, MirinERC20 {
         return tokens.length;
     }
 
-    function isStable() public returns (bool) {
+    function isBalanced() public returns (bool) {
         return getBalanceOfToken(0) == getReserveOfToken(0) &&
                getBalanceOfToken(1) == getReserveOfToken(1) &&
                getBalanceOfToken(2) == getReserveOfToken(2);
@@ -132,14 +132,14 @@ contract SymbolicPool is IPool, MirinERC20 {
     }
     
     // function to avoid loops
-    function getBalanceOfToken(uint i) private view returns (uint256) {
+    function getBalanceOfToken(uint i) public view returns (uint256) {
         if (tokens.length > i)
             return bento.balanceOf(IERC20(tokens[i]), address(this));
 
         return 0;
     }
 
-    function getReserveOfToken(uint i) private returns (uint256) {
+    function getReserveOfToken(uint i) public returns (uint256) {
         if (tokens.length > i)
             return reserves[tokens[i]];
 
@@ -151,7 +151,7 @@ contract SymbolicPool is IPool, MirinERC20 {
             reserves[tokens[i]] = bento.balanceOf(IERC20(tokens[i]),address(this));
     } 
 
-    function getToken(uint i) private returns (address) {
+    function getToken(uint i) public returns (address) {
          if (tokens.length > i)
             return address(tokens[i]);
     }
