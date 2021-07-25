@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity ^0.8.2;
+pragma solidity >=0.8.0;
 
-import "../libraries/MirinMath.sol";
+import "../pool/ConstantProductPool.sol";
 
-contract MirinMathConsumerMock {
+contract SqrtMock {
     function sqrt(uint256 x) public pure returns (uint256) {
-        return MirinMath.sqrt(x);
+        return ConstantProductPool.sqrt(x);
     }
 }
