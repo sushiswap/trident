@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity ^0.8.2;
+pragma solidity >=0.8.0;
 
 import "../deployer/MasterDeployer.sol";
 import "../interfaces/IBentoBoxMinimal.sol";
@@ -17,7 +17,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
     uint256 internal constant MINIMUM_LIQUIDITY = 1000;
 
-    uint256 internal constant MAX_FEE = 10000; // 100%
+    uint256 internal constant MAX_FEE = 10000; // @dev 100%.
     uint256 internal constant MAX_FEE_SQUARE = 100000000;
     uint256 public immutable swapFee;
     uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
@@ -36,7 +36,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
     uint256 private unlocked = 1;
     modifier lock() {
-        require(unlocked == 1, "LOCKED");
+        require(unlocked == 1, "ConstantProductPool: LOCKED");
         unlocked = 2;
         _;
         unlocked = 1;
