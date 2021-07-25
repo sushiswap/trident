@@ -2,13 +2,12 @@
 
 pragma solidity ^0.8.2;
 
-import "../interfaces/IPool.sol";
-import "../interfaces/IBentoBox.sol";
-import "../interfaces/ITridentCallee.sol";
-import "./MirinERC20.sol";
-import "../libraries/MirinMath.sol";
-import "hardhat/console.sol";
 import "../deployer/MasterDeployer.sol";
+import "../interfaces/IBentoBoxMinimal.sol";
+import "../interfaces/IPool.sol";
+import "../interfaces/ITridentCallee.sol";
+import "./TridentERC20.sol";
+import "hardhat/console.sol";
 
 /// @notice Trident pool template with constant product formula for swapping between an ERC-20 token pair. 
 /// @dev This pool swaps between bento shares - it does not care about underlying amounts.
