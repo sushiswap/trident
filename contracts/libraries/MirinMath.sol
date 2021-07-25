@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.2;
 
-library MirinMath {
+library SqrtMath {
     /// @notice Adapted from https://github.com/abdk-consulting/abdk-libraries-solidity/blob/master/ABDKMath64x64.sol
     /// Copyright © 2019 by ABDK Consulting
     /// License-Identifier: BSD-4-Clause
