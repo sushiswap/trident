@@ -8,11 +8,7 @@ library TridentHelper {
     /// @dev Reverts on failed {balanceOf}.
     /// @param token Address of ERC-20 token.
     /// @return amount Token amount.
-    function balanceOfThis(address token) 
-        internal 
-        view 
-        returns (uint256 amount) 
-    {
+    function balanceOfThis(address token) internal view returns (uint256 amount) {
         (bool success, bytes memory data) = token.staticcall(abi.encodeWithSelector(0x70a08231, address(this))); // @dev balanceOf(address).
         require(success && data.length >= 32, "TridentHelper: BALANCE_OF_FAILED");
         amount = abi.decode(data, (uint256));
