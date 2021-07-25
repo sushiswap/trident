@@ -73,7 +73,7 @@ contract TridentERC20 {
     /// @return (bool) Returns 'true' if succeeded.
     function transfer(address to, uint256 amount) external returns (bool) {
         balanceOf[msg.sender] -= amount;
-        // This is safe, as the sum of all user balances can't exceed
+        // @dev This is safe, as the sum of all user balances can't exceed
         // type(uint256).max, since totalSupply would overflow in_mint
         // and Solidity's default checked math would force it to revert.
         unchecked {
@@ -97,7 +97,7 @@ contract TridentERC20 {
             allowance[from][msg.sender] -= amount;
         }
         balanceOf[from] -= amount;
-        // This is safe, as the sum of all user balances can't exceed
+        // @dev This is safe, as the sum of all user balances can't exceed
         // type(uint256).max, since totalSupply would overflow in _mint
         // and Solidity's default checked math would force it to revert.
         unchecked {
@@ -127,7 +127,7 @@ contract TridentERC20 {
         bytes32 r,
         bytes32 s
     ) external {
-        require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
+        require(deadline >= block.timestamp, "TridentERC20: PERMIT_DEADLINE_EXPIRED");
         bytes32 digest = keccak256(
             abi.encodePacked(
                 "\x19\x01",
@@ -136,7 +136,7 @@ contract TridentERC20 {
             )
         );
         address recoveredAddress = ecrecover(digest, v, r, s);
-        require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_PERMIT_SIGNATURE");
+        require(recoveredAddress != address(0) && recoveredAddress == owner, "TridentERC20: INVALID_PERMIT_SIGNATURE");
         allowance[recoveredAddress][spender] = amount;
         emit Approval(spender, spender, amount);
     }
@@ -146,7 +146,7 @@ contract TridentERC20 {
     //////////////////////////////////////////////////////////////*/
     function _mint(address to, uint256 amount) internal {
         totalSupply += amount;
-        // This is safe, as the sum of all user balances can't exceed
+        // @dev This is safe, as the sum of all user balances can't exceed
         // type(uint256).max, since totalSupply would overflow in _mint
         // and Solidity's default checked math would force it to revert.
         unchecked {
@@ -157,7 +157,7 @@ contract TridentERC20 {
 
     function _burn(address from, uint256 amount) internal {
         balanceOf[from] -= amount;
-        // This is safe, as the sum of all user balances can't exceed
+        // @dev This is safe, as the sum of all user balances can't exceed
         // type(uint256).max, since totalSupply would overflow in _mint
         // and Solidity's default checked math would force it to revert.
         unchecked {
