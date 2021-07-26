@@ -4,8 +4,8 @@ pragma solidity >=0.8.0;
 
 import "../pool/ConstantProductPool.sol";
 
-contract SqrtMock {
-    function sqrt(uint256 x) public pure returns (uint256) {
+abstract contract SqrtMock is ConstantProductPool {
+    function checkSqrt(uint256 x) public pure returns (uint256) {
         return ConstantProductPool.sqrt(x);
     }
 }
