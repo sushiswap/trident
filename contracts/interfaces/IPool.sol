@@ -60,4 +60,10 @@ interface IPool {
         address recipient,
         bool unwrapBento
     ) external returns (uint256 amount);
+
+    function poolType() external pure returns (uint256);
+
+    function assets(uint256 index) external view returns (address);
+
+    function assetsCount() external view returns (uint256);
 }

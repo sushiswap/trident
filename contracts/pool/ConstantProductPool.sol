@@ -14,6 +14,7 @@ import "hardhat/console.sol";
 contract ConstantProductPool is IPool, TridentERC20 {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
+    event Sync(uint256 reserve0, uint256 reserve1);
 
     uint256 internal constant MINIMUM_LIQUIDITY = 1000;
 
@@ -33,6 +34,10 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
     uint128 internal reserve0;
     uint128 internal reserve1;
+    
+    uint256 public constant override poolType = 1;
+    uint256 public constant override assetsCount = 2;
+    address[] public override assets;
 
     uint256 private unlocked = 1;
     modifier lock() {
@@ -51,9 +56,10 @@ contract ConstantProductPool is IPool, TridentERC20 {
         require(tokenA != tokenB, "ConstantProductPool: IDENTICAL_ADDRESSES");
         require(_swapFee <= MAX_FEE, "ConstantProductPool: INVALID_SWAP_FEE");
 
-        (address _token0, address _token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-        token0 = _token0;
-        token1 = _token1;
+        token0 = tokenA;
+        token1 = tokenB;
+        assets.push(tokenA);
+        assets.push(tokenB);
         swapFee = _swapFee;
         MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
         bento = IBentoBoxMinimal(MasterDeployer(_masterDeployer).bento());
@@ -106,7 +112,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
                 r = (r + x / r) >> 1;
                 r = (r + x / r) >> 1;
                 r = (r + x / r) >> 1;
-                r = (r + x / r) >> 1; // Seven iterations should be enough
+                r = (r + x / r) >> 1; // @dev Seven iterations should be enough.
                 uint256 r1 = x / r;
                 r < r1 ? calculated = r : r1;
             }
@@ -192,7 +198,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         if (tokenOut == token0) {
             // @dev Swap token1 for token0.
             // @dev Calculate amountOut as if the user first withdrew balanced liquidity and then swapped token1 for token0.
-            amount0 += _getAmountOut(amount1, _reserve0 - amount0, _reserve1 - amount1);
+            amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0);
             _transfer(token0, amount0, recipient, unwrapBento);
             balance0 -= amount0;
             amount = amount0;
@@ -288,6 +294,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         require(balance0 < type(uint128).max && balance1 < type(uint128).max, "ConstantProductPool: OVERFLOW");
         reserve0 = uint128(balance0);
         reserve1 = uint128(balance1);
+        emit Sync(balance0, balance1);
     }
 
     function _mintFee(

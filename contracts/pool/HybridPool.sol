@@ -17,6 +17,7 @@ contract HybridPool is IPool, TridentERC20 {
 
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
+    event Sync(uint256 reserve0, uint256 reserve1);
 
     uint256 internal constant MINIMUM_LIQUIDITY = 10**3;
     uint8 internal constant PRECISION = 112;
@@ -44,6 +45,10 @@ contract HybridPool is IPool, TridentERC20 {
 
     uint128 internal reserve0;
     uint128 internal reserve1;
+    
+    uint256 public constant override poolType = 3;
+    uint256 public constant override assetsCount = 2;
+    address[] public override assets;
 
     uint256 private unlocked = 1;
     modifier lock() {
@@ -66,22 +71,19 @@ contract HybridPool is IPool, TridentERC20 {
         require(_swapFee <= MAX_FEE, "HybridPool: INVALID_SWAP_FEE");
         require(a != 0, "HybridPool: ZERO_A");
 
-        (address _token0, address _token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-        token0 = _token0;
-        token1 = _token1;
+        token0 = tokenA;
+        token1 = tokenB;
         swapFee = _swapFee;
         bento = IBentoBoxMinimal(MasterDeployer(_masterDeployer).bento());
         barFeeTo = MasterDeployer(_masterDeployer).barFeeTo();
         masterDeployer = MasterDeployer(_masterDeployer);
         A = a;
         N_A = 2 * a;
-        token0PrecisionMultiplier = uint256(10)**(decimals - TridentERC20(_token0).decimals());
-        token1PrecisionMultiplier = uint256(10)**(decimals - TridentERC20(_token1).decimals());
-    }
-
-    function init() public {
-        require(totalSupply == 0);
+        token0PrecisionMultiplier = uint256(10)**(decimals - MirinERC20(tokenA).decimals());
+        token1PrecisionMultiplier = uint256(10)**(decimals - MirinERC20(tokenB).decimals());
         unlocked = 1;
+        assets.push(address(tokenA));
+        assets.push(address(tokenB));
     }
 
     function mint(address to) public override lock returns (uint256 liquidity) {
@@ -227,6 +229,7 @@ contract HybridPool is IPool, TridentERC20 {
         require(_reserve0 < type(uint128).max && _reserve1 < type(uint128).max, "HybridPool: OVERFLOW");
         reserve0 = uint128(_reserve0);
         reserve1 = uint128(_reserve1);
+        emit Sync(_reserve0, _reserve1);
     }
 
     function _balance() internal view returns (uint256 balance0, uint256 balance1) {
