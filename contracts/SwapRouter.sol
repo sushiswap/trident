@@ -11,7 +11,7 @@ import "hardhat/console.sol";
 
 /// @notice Contract for routing Trident exchange interactions.
 contract SwapRouter is ISwapRouter, TridentBatcher {
-    /// @notice BentoBox token vault. 
+    /// @notice BentoBox token vault.
     IBentoBoxMinimal public immutable bento;
     /// @notice ERC-20 token for wrapped ETH.
     address public immutable wETH;
@@ -147,11 +147,7 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
         amountOut = _preFundedExactInputWithContext(params);
     }
 
-    function complexPath(ComplexPathParams calldata params) 
-        external 
-        payable 
-        checkDeadline(params.deadline) 
-    {
+    function complexPath(ComplexPathParams calldata params) external payable checkDeadline(params.deadline) {
         for (uint256 i; i < params.initialPath.length; i++) {
             if (!params.initialPath[i].preFunded) {
                 pay(
@@ -161,11 +157,7 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
                     params.initialPath[i].amountIn
                 );
             }
-            uint256 amountIn = bento.toShare(
-                params.initialPath[i].tokenIn,
-                params.initialPath[i].amountIn,
-                false
-            );
+            uint256 amountIn = bento.toShare(params.initialPath[i].tokenIn, params.initialPath[i].amountIn, false);
             IPool(params.initialPath[i].pool).swapWithContext(
                 params.initialPath[i].tokenIn,
                 params.initialPath[i].tokenOut,
@@ -208,11 +200,7 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
         address recipient,
         uint256 deadline,
         uint256 minLiquidity
-    ) 
-        external 
-        checkDeadline(deadline) 
-        returns (uint256 liquidity) 
-    {
+    ) external checkDeadline(deadline) returns (uint256 liquidity) {
         for (uint256 i; i < liquidityInput.length; i++) {
             if (liquidityInput[i].native) {
                 _depositToBentoBox(liquidityInput[i].token, pool, liquidityInput[i].amount);
@@ -230,11 +218,7 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
         address pool,
         address recipient,
         uint256 deadline
-    ) 
-        external 
-        checkDeadline(deadline) 
-        returns (IPool.liquidityAmount[] memory liquidityOptimal, uint256 liquidity) 
-    {
+    ) external checkDeadline(deadline) returns (IPool.liquidityAmount[] memory liquidityOptimal, uint256 liquidity) {
         for (uint256 i; i < liquidityInput.length; i++) {
             liquidityInput[i].amountDesired = bento.toShare(
                 liquidityInput[i].token,
@@ -244,11 +228,7 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
         }
         liquidityOptimal = IPool(pool).getOptimalLiquidityInAmounts(liquidityInput);
         for (uint256 i; i < liquidityOptimal.length; i++) {
-            uint256 underlyingAmount = bento.toAmount(
-                liquidityOptimal[i].token,
-                liquidityOptimal[i].amount,
-                false
-            );
+            uint256 underlyingAmount = bento.toAmount(liquidityOptimal[i].token, liquidityOptimal[i].amount, false);
             require(underlyingAmount >= liquidityInput[i].amountMin, "SwapRouter: AMOUNT_NOT_OPTIMAL");
             if (liquidityInput[i].native) {
                 _depositSharesToBentoBox(liquidityOptimal[i].token, pool, liquidityOptimal[i].amount);
@@ -351,10 +331,7 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
         }
     }
 
-    function _preFundedExactInput(ExactInputParams memory params) 
-        internal 
-        returns (uint256 amount) 
-    {
+    function _preFundedExactInput(ExactInputParams memory params) internal returns (uint256 amount) {
         amount = bento.toShare(params.path[0].tokenIn, params.amountIn, false);
         uint256 lenMinusOne = params.path.length - 1;
 

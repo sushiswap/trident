@@ -55,6 +55,15 @@ const config: HardhatUserConfig = {
     carol: {
       default: 3,
     },
+    dave: {
+      default: 4,
+    },
+    eve: {
+      default: 5,
+    },
+    feeTo: {
+      default: 6,
+    },
   },
   networks: {
     localhost: {
@@ -127,7 +136,7 @@ const config: HardhatUserConfig = {
       live: true,
       saveDeployments: true,
     },
-    'matic-testnet': {
+    "matic-testnet": {
       url: "https://rpc-mumbai.maticvigil.com/",
       accounts,
       chainId: 80001,
@@ -183,7 +192,7 @@ const config: HardhatUserConfig = {
       saveDeployments: true,
       gasPrice: 470000000000,
     },
-    'avalanche-testnet': {
+    "avalanche-testnet": {
       url: "https://api.avax-test.network/ext/bc/C/rpc",
       accounts,
       chainId: 43113,
@@ -281,6 +290,15 @@ const config: HardhatUserConfig = {
           optimizer: {
             enabled: true,
             runs: 99999,
+          },
+        },
+      },
+      {
+        version: "0.4.19",
+        settings: {
+          optimizer: {
+            enabled: false,
+            runs: 200,
           },
         },
       },

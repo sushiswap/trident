@@ -43,8 +43,8 @@ library TridentHelper {
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x23b872dd, from, recipient, amount)); // @dev transferFrom(address,address,uint256).
         require(success && (data.length == 0 || abi.decode(data, (bool))), "TridentHelper: TRANSFER_FROM_FAILED");
     }
-    
-    /// @notice Provides gas-optimized {balanceOfThis} check on `wETH` and matching {withdraw}. 
+
+    /// @notice Provides gas-optimized {balanceOfThis} check on `wETH` and matching {withdraw}.
     /// @dev Reverts on failed {withdraw}.
     /// @param wETH Address of ERC-20 token for wrapped ETH.
     function withdrawFromWETH(address wETH, uint256 balanceWETH) internal {

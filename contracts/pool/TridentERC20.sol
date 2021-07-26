@@ -66,7 +66,7 @@ contract TridentERC20 {
         emit Approval(spender, spender, amount);
         return true;
     }
-    
+
     /// @notice Transfers `amount` tokens from `msg.sender` to `to`.
     /// @param to The address to move tokens `to`.
     /// @param amount The token `amount` to move.
@@ -82,7 +82,7 @@ contract TridentERC20 {
         emit Transfer(msg.sender, to, amount);
         return true;
     }
-    
+
     /// @notice Transfers `amount` tokens from `from` to `to`. Caller needs approval from `from`.
     /// @param from Address to draw tokens `from`.
     /// @param to The address to move tokens `to`.

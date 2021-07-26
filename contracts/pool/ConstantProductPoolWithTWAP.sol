@@ -9,7 +9,7 @@ import "../interfaces/ITridentCallee.sol";
 import "./TridentERC20.sol";
 import "hardhat/console.sol";
 
-/// @notice Trident exchange pool template with constant product formula for swapping between an ERC-20 token pair with TWAP. 
+/// @notice Trident exchange pool template with constant product formula for swapping between an ERC-20 token pair with TWAP.
 /// @dev This pool swaps between bento shares - it does not care about underlying amounts.
 contract ConstantProductPoolWithTWAP is IPool, TridentERC20 {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
@@ -65,7 +65,7 @@ contract ConstantProductPoolWithTWAP is IPool, TridentERC20 {
         masterDeployer = MasterDeployer(_masterDeployer);
         unlocked = 1;
     }
-    
+
     /// @notice Adapted from https://github.com/abdk-consulting/abdk-libraries-solidity/blob/master/ABDKMath64x64.sol.
     /// Copyright © 2019 by ABDK Consulting, License-Identifier: BSD-4-Clause.
     /// @dev Calculate sqrt (x) rounding down, where x is unsigned 256-bit integer number.
@@ -77,13 +77,33 @@ contract ConstantProductPoolWithTWAP is IPool, TridentERC20 {
             else {
                 uint256 xx = x;
                 uint256 r = 1;
-                if (xx >= 0x100000000000000000000000000000000) { xx >>= 128; r <<= 64; }
-                if (xx >= 0x10000000000000000) { xx >>= 64; r <<= 32; }
-                if (xx >= 0x100000000) { xx >>= 32; r <<= 16; }
-                if (xx >= 0x10000) { xx >>= 16; r <<= 8; }
-                if (xx >= 0x100) { xx >>= 8; r <<= 4; }
-                if (xx >= 0x10) { xx >>= 4; r <<= 2; }
-                if (xx >= 0x8) { r <<= 1; }
+                if (xx >= 0x100000000000000000000000000000000) {
+                    xx >>= 128;
+                    r <<= 64;
+                }
+                if (xx >= 0x10000000000000000) {
+                    xx >>= 64;
+                    r <<= 32;
+                }
+                if (xx >= 0x100000000) {
+                    xx >>= 32;
+                    r <<= 16;
+                }
+                if (xx >= 0x10000) {
+                    xx >>= 16;
+                    r <<= 8;
+                }
+                if (xx >= 0x100) {
+                    xx >>= 8;
+                    r <<= 4;
+                }
+                if (xx >= 0x10) {
+                    xx >>= 4;
+                    r <<= 2;
+                }
+                if (xx >= 0x8) {
+                    r <<= 1;
+                }
                 r = (r + x / r) >> 1;
                 r = (r + x / r) >> 1;
                 r = (r + x / r) >> 1;

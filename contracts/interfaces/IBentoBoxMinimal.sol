@@ -6,7 +6,7 @@ pragma solidity >=0.8.0;
 interface IBentoBoxMinimal {
     /// @notice Balance per ERC-20 token per account in shares.
     function balanceOf(address, address) external view returns (uint256);
-    
+
     /// @notice Deposit an amount of `token` represented in either `amount` or `share`.
     /// @param token_ The ERC-20 token to deposit.
     /// @param from which account to pull the tokens.
@@ -16,13 +16,13 @@ interface IBentoBoxMinimal {
     /// @return amountOut The amount deposited.
     /// @return shareOut The deposited amount repesented in shares.
     function deposit(
-        address token_, 
+        address token_,
         address from,
         address to,
         uint256 amount,
         uint256 share
     ) external payable returns (uint256 amountOut, uint256 shareOut);
-    
+
     /// @notice Withdraws an amount of `token` from a user account.
     /// @param token_ The ERC-20 token to withdraw.
     /// @param from which user to pull the tokens.
@@ -36,7 +36,7 @@ interface IBentoBoxMinimal {
         uint256 amount,
         uint256 share
     ) external returns (uint256 amountOut, uint256 shareOut);
-    
+
     /// @notice Transfer shares from a user account to another one.
     /// @param token The ERC-20 token to transfer.
     /// @param from which user to pull the tokens.
@@ -48,7 +48,7 @@ interface IBentoBoxMinimal {
         address to,
         uint256 share
     ) external;
-    
+
     /// @dev Helper function to represent an `amount` of `token` in shares.
     /// @param token The ERC-20 token.
     /// @param amount The `token` amount.
@@ -59,7 +59,7 @@ interface IBentoBoxMinimal {
         uint256 amount,
         bool roundUp
     ) external view returns (uint256 share);
-    
+
     /// @dev Helper function to represent shares back into the `token` amount.
     /// @param token The ERC-20 token.
     /// @param share The amount of shares.
@@ -70,7 +70,7 @@ interface IBentoBoxMinimal {
         uint256 share,
         bool roundUp
     ) external view returns (uint256 amount);
-    
+
     /// @notice Registers this contract so that users can approve it for the BentoBox.
     function registerProtocol() external;
 }

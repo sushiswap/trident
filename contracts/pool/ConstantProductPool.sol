@@ -9,7 +9,7 @@ import "../interfaces/ITridentCallee.sol";
 import "./TridentERC20.sol";
 import "hardhat/console.sol";
 
-/// @notice Trident pool template with constant product formula for swapping between an ERC-20 token pair. 
+/// @notice Trident pool template with constant product formula for swapping between an ERC-20 token pair.
 /// @dev This pool swaps between bento shares - it does not care about underlying amounts.
 contract ConstantProductPool is IPool, TridentERC20 {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
@@ -61,7 +61,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         masterDeployer = MasterDeployer(_masterDeployer);
         unlocked = 1;
     }
-    
+
     /// @notice Adapted from https://github.com/abdk-consulting/abdk-libraries-solidity/blob/master/ABDKMath64x64.sol.
     /// Copyright © 2019 by ABDK Consulting, License-Identifier: BSD-4-Clause.
     /// @dev Calculate sqrt (x) rounding down, where x is unsigned 256-bit integer number.
@@ -73,13 +73,33 @@ contract ConstantProductPool is IPool, TridentERC20 {
             else {
                 uint256 xx = x;
                 uint256 r = 1;
-                if (xx >= 0x100000000000000000000000000000000) { xx >>= 128; r <<= 64; }
-                if (xx >= 0x10000000000000000) { xx >>= 64; r <<= 32; }
-                if (xx >= 0x100000000) { xx >>= 32; r <<= 16; }
-                if (xx >= 0x10000) { xx >>= 16; r <<= 8; }
-                if (xx >= 0x100) { xx >>= 8; r <<= 4; }
-                if (xx >= 0x10) { xx >>= 4; r <<= 2; }
-                if (xx >= 0x8) { r <<= 1; }
+                if (xx >= 0x100000000000000000000000000000000) {
+                    xx >>= 128;
+                    r <<= 64;
+                }
+                if (xx >= 0x10000000000000000) {
+                    xx >>= 64;
+                    r <<= 32;
+                }
+                if (xx >= 0x100000000) {
+                    xx >>= 32;
+                    r <<= 16;
+                }
+                if (xx >= 0x10000) {
+                    xx >>= 16;
+                    r <<= 8;
+                }
+                if (xx >= 0x100) {
+                    xx >>= 8;
+                    r <<= 4;
+                }
+                if (xx >= 0x10) {
+                    xx >>= 4;
+                    r <<= 2;
+                }
+                if (xx >= 0x8) {
+                    r <<= 1;
+                }
                 r = (r + x / r) >> 1;
                 r = (r + x / r) >> 1;
                 r = (r + x / r) >> 1;
@@ -133,10 +153,10 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint256 amount1 = (liquidity * balance1) / _totalSupply;
 
         _burn(address(this), liquidity);
-        
+
         address _token0 = token0;
         address _token1 = token1;
-        
+
         _transfer(_token0, amount0, recipient, unwrapBento);
         _transfer(_token1, amount1, recipient, unwrapBento);
 
@@ -168,7 +188,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint256 amount1 = (liquidity * balance1) / _totalSupply;
 
         _burn(address(this), liquidity);
-        
+
         if (tokenOut == token0) {
             // @dev Swap token1 for token0.
             // @dev Calculate amountOut as if the user first withdrew balanced liquidity and then swapped token1 for token0.

@@ -29,7 +29,7 @@ contract HybridPool is IPool, TridentERC20 {
     address public immutable barFeeTo;
     IBentoBoxMinimal public immutable bento;
     MasterDeployer public immutable masterDeployer;
-    
+
     address public immutable token0;
     address public immutable token1;
     uint256 public immutable A;
@@ -55,7 +55,8 @@ contract HybridPool is IPool, TridentERC20 {
 
     /// @dev Only set immutable variables here - state changes made here will not be used.
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (address tokenA, address tokenB, uint256 _swapFee, uint256 a) = abi.decode(_deployData,
+        (address tokenA, address tokenB, uint256 _swapFee, uint256 a) = abi.decode(
+            _deployData,
             (address, address, uint256, uint256)
         );
 
