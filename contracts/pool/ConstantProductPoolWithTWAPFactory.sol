@@ -1,19 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity ^0.8.2;
+pragma solidity >=0.8.0;
 
 import "./ConstantProductPoolWithTWAP.sol";
 import "./PairPoolDeployer.sol";
 
-/**
- * @author Mudit Gupta
- */
+/// @notice Contract for deploying Trident exchange Constant Product Pool with configurations and TWAP.
+/// @author Mudit Gupta.
 contract ConstantProductPoolWithTWAPFactory is PairPoolDeployer {
     constructor(address _masterDeployer) PairPoolDeployer(_masterDeployer) {}
 
-    function deployPool(bytes memory _deployData) external returns (address) {
-        (IERC20 tokenA, IERC20 tokenB, ) = abi.decode(_deployData, (IERC20, IERC20, uint256));
-        return
-            _deployPool(address(tokenA), address(tokenB), type(ConstantProductPoolWithTWAP).creationCode, _deployData);
+    function deployPool(bytes memory _deployData) external returns (address pool) {
+        (address tokenA, address tokenB, ) = abi.decode(_deployData, (address, address, uint256));
+        pool = _deployPool(tokenA, tokenB, type(ConstantProductPoolWithTWAP).creationCode, _deployData);
     }
 }
