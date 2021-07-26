@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity ^0.8.2;
+pragma solidity >=0.8.0;
 
 import "./ConstantProductPool.sol";
 
-/**
- * @author Mudit Gupta
- */
+/// @notice Trident exchange pool deployer for whitelisted pair template factories.
+/// @author Mudit Gupta.
 contract PairPoolDeployer {
     mapping(address => mapping(address => address[])) public pools;
     mapping(bytes => address) public configAddress;
     address public immutable masterDeployer;
 
     constructor(address _masterDeployer) {
-        require(_masterDeployer != address(0), "ZERO_ADDRESS");
+        require(_masterDeployer != address(0), "PairPoolDeployer: ZERO_ADDRESS");
         masterDeployer = _masterDeployer;
     }
 
@@ -23,8 +22,8 @@ contract PairPoolDeployer {
         bytes memory creationCode,
         bytes memory deployData
     ) internal returns (address pair) {
-        require(token0 < token1, "INVALID_TOKEN_ORDER");
-        require(configAddress[deployData] == address(0), "POOL_ALREADY_DEPLOYED");
+        require(token0 < token1, "PairPoolDeployer: INVALID_TOKEN_ORDER");
+        require(configAddress[deployData] == address(0), "PairPoolDeployer: POOL_ALREADY_DEPLOYED");
 
         uint256 pairNonce = pools[token0][token1].length;
         bytes32 salt = keccak256(abi.encodePacked(token0, token1, pairNonce));
@@ -41,7 +40,7 @@ contract PairPoolDeployer {
         configAddress[deployData] = pair;
     }
 
-    function poolsCount(address token0, address token1) external view returns (uint256) {
-        return pools[token0][token1].length;
+    function poolsCount(address token0, address token1) external view returns (uint256 count) {
+        count = pools[token0][token1].length;
     }
 }
