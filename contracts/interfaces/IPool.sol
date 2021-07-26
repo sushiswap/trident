@@ -3,9 +3,10 @@
 pragma solidity >=0.5.0;
 pragma experimental ABIEncoderV2;
 
+/// @notice Interface for Trident exchange pool interactions.
 interface IPool {
     event Swap(
-        address indexed recepient,
+        address indexed recipient,
         address indexed tokenIn,
         address indexed tokenOut,
         uint256 amountIn,
