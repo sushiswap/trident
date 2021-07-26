@@ -85,13 +85,7 @@ describe("Router", function () {
       ["address", "address", "uint256"],
       [weth.address, sushi.address, 30]
     );
-    pool = await Pool.attach(
-      (
-        await (
-          await masterDeployer.deployPool(tridentPoolFactory.address, deployData)
-        ).wait()
-      ).events[0].args[0]
-    );
+    pool = await masterDeployer.deployPool(tridentPoolFactory.address, deployData)).wait()).events[0].args[0]);
     const deployData2 = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint256"],
       [dai.address, sushi.address, 30]
