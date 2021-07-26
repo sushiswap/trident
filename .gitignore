@@ -10,6 +10,7 @@ deployments/
 
 # Typechain
 types/
+typechain/
 
 # Env
 .env

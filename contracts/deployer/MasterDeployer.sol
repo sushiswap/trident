@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity ^0.8.2;
+pragma solidity >=0.8.0;
 
 import "../interfaces/IPoolFactory.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * @author Mudit Gupta
  */
 contract MasterDeployer is Ownable {
-    event NewPoolCreated(address indexed poolAddress);
+    event NewPoolCreated(address indexed _factory, address indexed poolAddress);
 
     mapping(address => bool) public whitelistedFactories;
 
@@ -35,9 +35,9 @@ contract MasterDeployer is Ownable {
     }
 
     function deployPool(address _factory, bytes calldata _deployData) external returns (address poolAddress) {
-        require(whitelistedFactories[_factory], "Factory not whitelisted");
+        require(whitelistedFactories[_factory], "FACTORY_NOT_WHITELISTED");
         poolAddress = IPoolFactory(_factory).deployPool(_deployData);
-        emit NewPoolCreated(poolAddress);
+        emit NewPoolCreated(_factory, poolAddress);
     }
 
     function addToWhitelist(address _factory) external onlyOwner {
