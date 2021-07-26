@@ -14,11 +14,11 @@ const deployFunction: DeployFunction = async function ({
 
   const { deployer, feeTo } = await getNamedAccounts();
 
-  const chainId = Number(await getChainId()) as ChainId;
+  const chainId = Number(await getChainId());
 
   let bentoBoxV1Address;
 
-  if (chainId === ChainId.HARDHAT) {
+  if (chainId === 31337) {
     const WETH9 = await ethers.getContractFactory("WETH9");
     const weth9 = await WETH9.deploy();
     const BentoBoxV1 = await ethers.getContractFactory("BentoBoxV1");
@@ -30,7 +30,7 @@ const deployFunction: DeployFunction = async function ({
     } else if (!(chainId in BENTOBOX_ADDRESS)) {
       throw Error(`No BENTOBOX on chain #${chainId}!`);
     }
-    bentoBoxV1Address = BENTOBOX_ADDRESS[chainId];
+    bentoBoxV1Address = BENTOBOX_ADDRESS[chainId as ChainId];
   }
 
   await deploy("MasterDeployer", {

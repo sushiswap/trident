@@ -14,12 +14,12 @@ const deployFunction: DeployFunction = async function ({
 
   const { deployer } = await getNamedAccounts();
 
-  const chainId = Number(await getChainId()) as ChainId;
+  const chainId = Number(await getChainId());
 
   let bentoBoxV1Address;
   let wethAddress;
 
-  if (chainId === ChainId.HARDHAT) {
+  if (chainId === 31337) {
     const WETH9 = await ethers.getContractFactory("WETH9");
     const weth9 = await WETH9.deploy();
     const BentoBoxV1 = await ethers.getContractFactory("BentoBoxV1");
@@ -32,8 +32,8 @@ const deployFunction: DeployFunction = async function ({
     } else if (!(chainId in BENTOBOX_ADDRESS)) {
       throw Error(`No BENTOBOX on chain #${chainId}!`);
     }
-    bentoBoxV1Address = BENTOBOX_ADDRESS[chainId];
-    wethAddress = WNATIVE[chainId].address;
+    bentoBoxV1Address = BENTOBOX_ADDRESS[chainId as ChainId];
+    wethAddress = WNATIVE[chainId as ChainId].address;
   }
 
   const { address: masterDeployerAdress } = await ethers.getContract(
@@ -42,7 +42,7 @@ const deployFunction: DeployFunction = async function ({
 
   await deploy("SwapRouter", {
     from: deployer,
-    args: [wethAddress, masterDeployerAdress, bentoBoxV1Address],
+    args: [bentoBoxV1Address, wethAddress],
     deterministicDeployment: false,
   });
 };

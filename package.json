@@ -61,7 +61,7 @@
     "ethers": "^5.0.0",
     "hardhat": "^2.0.0",
     "hardhat-deploy": "^0.8.0",
-    "hardhat-deploy-ethers": "^0.3.0-beta.10",
+    "hardhat-deploy-ethers": "npm:hardhat-deploy-ethers@0.3.0-beta.10",
     "hardhat-gas-reporter": "^1.0.0",
     "hardhat-interface-generator": "^0.0.6",
     "hardhat-log-remover": "^2.0.0",
