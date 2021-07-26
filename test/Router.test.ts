@@ -13,7 +13,7 @@ describe("Router", function () {
     sushi,
     bento,
     masterDeployer,
-    mirinPoolFactory,
+    tridentPoolFactory,
     router,
     pool,
     dai,
@@ -32,33 +32,33 @@ describe("Router", function () {
     const SwapRouter = await ethers.getContractFactory("SwapRouter");
     const Pool = await ethers.getContractFactory("ConstantProductPool");
 
-    weth = await ERC20.deploy("WETH", "ETH", getBigNumber("10000000"));
+    weth = await ERC20.deploy("WETH", "WETH", getBigNumber("10000000"));
     sushi = await ERC20.deploy("SUSHI", "SUSHI", getBigNumber("10000000"));
-    dai = await ERC20.deploy("SUSHI", "SUSHI", getBigNumber("10000000"));
+    dai = await ERC20.deploy("DAI", "DAI", getBigNumber("10000000"));
     bento = await Bento.deploy(weth.address);
     masterDeployer = await Deployer.deploy(17, feeTo.address, bento.address);
-    mirinPoolFactory = await PoolFactory.deploy();
-    router = await SwapRouter.deploy(weth.address, bento.address);
+    tridentPoolFactory = await PoolFactory.deploy();
+    router = await SwapRouter.deploy(bento.address, weth.address);
 
     // Whitelist pool factory in master deployer
-    await masterDeployer.addToWhitelist(mirinPoolFactory.address);
+    await masterDeployer.addToWhitelist(tridentPoolFactory.address);
 
     // Whitelist Router on BentoBox
     await bento.whitelistMasterContract(router.address, true);
     // Approve BentoBox token deposits
-    await sushi.approve(bento.address, BigNumber.from(10).pow(30));
     await weth.approve(bento.address, BigNumber.from(10).pow(30));
+    await sushi.approve(bento.address, BigNumber.from(10).pow(30));
     await dai.approve(bento.address, BigNumber.from(10).pow(30));
     // Make BentoBox token deposits
     await bento.deposit(
-      sushi.address,
+      weth.address,
       alice.address,
       alice.address,
       BigNumber.from(10).pow(22),
       0
     );
     await bento.deposit(
-      weth.address,
+      sushi.address,
       alice.address,
       alice.address,
       BigNumber.from(10).pow(22),
@@ -82,35 +82,35 @@ describe("Router", function () {
     );
     // Pool deploy data
     const deployData = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8"],
+      ["address", "address", "uint256"],
       [weth.address, sushi.address, 30]
     );
     pool = await Pool.attach(
       (
         await (
-          await masterDeployer.deployPool(mirinPoolFactory.address, deployData)
+          await masterDeployer.deployPool(tridentPoolFactory.address, deployData)
         ).wait()
       ).events[0].args[0]
     );
     const deployData2 = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8"],
+      ["address", "address", "uint256"],
       [dai.address, sushi.address, 30]
     );
     daiSushiPool = await Pool.attach(
       (
         await (
-          await masterDeployer.deployPool(mirinPoolFactory.address, deployData2)
+          await masterDeployer.deployPool(tridentPoolFactory.address, deployData2)
         ).wait()
       ).events[0].args[0]
     );
     const deployData3 = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8"],
+      ["address", "address", "uint256"],
       [dai.address, weth.address, 30]
     );
     daiWethPool = await Pool.attach(
       (
         await (
-          await masterDeployer.deployPool(mirinPoolFactory.address, deployData3)
+          await masterDeployer.deployPool(tridentPoolFactory.address, deployData3)
         ).wait()
       ).events[0].args[0]
     );
@@ -124,13 +124,13 @@ describe("Router", function () {
 
     it("Should add liquidity directly to the pool", async function () {
       await bento.transfer(
-        sushi.address,
+        weth.address,
         alice.address,
         pool.address,
         BigNumber.from(10).pow(19)
       );
       await bento.transfer(
-        weth.address,
+        sushi.address,
         alice.address,
         pool.address,
         BigNumber.from(10).pow(19)
