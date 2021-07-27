@@ -552,8 +552,7 @@
     "@nodelib/fs.scandir" "2.1.5"
     fastq "^1.6.0"
 
-"@nomiclabs/hardhat-ethers@npm:hardhat-deploy-ethers@0.3.0-beta.10", hardhat-deploy-ethers@^0.3.0-beta.10, "hardhat-deploy-ethers@npm:hardhat-deploy-ethers@0.3.0-beta.10":
-  name "@nomiclabs/hardhat-ethers"
+"@nomiclabs/hardhat-ethers@npm:hardhat-deploy-ethers@0.3.0-beta.10", "hardhat-deploy-ethers@npm:hardhat-deploy-ethers@0.3.0-beta.10":
   version "0.3.0-beta.10"
   resolved "https://registry.yarnpkg.com/hardhat-deploy-ethers/-/hardhat-deploy-ethers-0.3.0-beta.10.tgz#bccfcf635d380bbab3638960f6739fe4d396fc5f"
   integrity sha512-TeyriUshRZ7XVHOjMsDtTozIrdwLf3Bw+oZRYNhXdG/eut5HeDhjUFPfRlG7TI1lSLvkcB5dt7OxOtPYKDOxTg==
@@ -3886,7 +3885,7 @@ ethers@^4.0.32, ethers@^4.0.40:
     uuid "2.0.1"
     xmlhttprequest "1.8.0"
 
-ethers@^5.0.0, ethers@^5.0.1, ethers@^5.0.2:
+ethers@^5.0.0, ethers@^5.0.1, ethers@^5.0.2, ethers@^5.0.24:
   version "5.4.1"
   resolved "https://registry.yarnpkg.com/ethers/-/ethers-5.4.1.tgz#bcff1e9f45bf1a061bf313ec04e8d9881d2d53f9"
   integrity sha512-SrcddMdCgP1hukDvCPd87Aipbf4NWjQvdfAbZ65XSZGbfyuYPtIrUJPDH5B1SBRsdlfiEgX3eoz28DdBDzMNFg==
@@ -4810,6 +4809,13 @@ hardhat-spdx-license-identifier@^2.0.0:
   version "2.0.3"
   resolved "https://registry.yarnpkg.com/hardhat-spdx-license-identifier/-/hardhat-spdx-license-identifier-2.0.3.tgz#6dd89a7e036ede4f7e86fb349eb23daaaad6890f"
   integrity sha512-G4u4I1md0tWaitX6Os7Nq9sYZ/CFdR+ibm7clCksGJ4yrtdHEZxgLjWpJ0WiALF9SoFKt03PwCe9lczDQ/5ADA==
+
+hardhat-tracer@^1.0.0-alpha.6:
+  version "1.0.0-alpha.6"
+  resolved "https://registry.yarnpkg.com/hardhat-tracer/-/hardhat-tracer-1.0.0-alpha.6.tgz#4545a772930567cad4620ee9448cb76e89b07b02"
+  integrity sha512-QXKEJPaCDU0P7ZNHvFuGQoKLZ9+uma3ASAoPjhHr4CYwgIHcronVPZ7zkztRc7LhDbKFffIuoh0jEQWGgR6Neg==
+  dependencies:
+    ethers "^5.0.24"
 
 hardhat-watcher@^2.0.0:
   version "2.1.1"
