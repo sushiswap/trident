@@ -10,13 +10,13 @@ const deployFunction: DeployFunction = async function ({
   const { deploy } = deployments;
 
   const { deployer } = await getNamedAccounts();
+  const masterDeployer = await ethers.getContract("MasterDeployer");
 
   const { address } = await deploy("ConstantProductPoolFactory", {
     from: deployer,
     deterministicDeployment: false,
+    args: [masterDeployer.address],
   });
-
-  const masterDeployer = await ethers.getContract("MasterDeployer");
 
   if (!(await masterDeployer.whitelistedFactories(address))) {
     console.log("Add ConstantProductPoolFactory to MasterDeployer whitelist");
