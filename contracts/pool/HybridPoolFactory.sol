@@ -12,6 +12,6 @@ contract HybridPoolFactory is PairPoolDeployer {
 
     function deployPool(bytes memory _deployData) external returns (address pool) {
         (address tokenA, address tokenB, , ) = abi.decode(_deployData, (address, address, uint256, uint256));
-        pool = (tokenA, tokenB, type(HybridPool).creationCode, _deployData);
+        pool = _deployPool(tokenA, tokenB, type(HybridPool).creationCode, _deployData);
     }
 }
