@@ -2,7 +2,7 @@
 
 pragma solidity >=0.8.0;
 
-/// @notice Interface for routing Trident exchange interactions.
+/// @notice Trident exchange pool router interface.
 interface ITridentRouter {
     /// @dev In case of a multi hop swap, the output token for first swap is the input token of the next swap.
     struct Path {
