@@ -25,13 +25,20 @@ methods {
     exactInputSingle((address, address, address, address, bool, uint256, uint256, uint256))
 
     // bentobox
-    toAmount(address token, uint256 share, bool roundUp)
-        returns (uint256) envfree => DISPATCHER(true)
-    toShare(address token, uint256 amount, bool roundUp) 
-        returns (uint256) envfree => DISPATCHER(true)
-    transfer(address token, address from, address to, uint256 shares) envfree => DISPATCHER(true)
-    deposit(address, address, address, uint256, uint256) returns (uint256 amountOut, uint256 shareOut) => DISPATCHER(true)
-    bento.balanceOf(address token, address user) returns (uint256) envfree => DISPATCHER(true)
+    bento.toAmount(address token, uint256 share, bool roundUp)
+        returns (uint256) envfree 
+    bento.toShare(address token, uint256 amount, bool roundUp) 
+        returns (uint256) envfree 
+    bento.transfer(address token, address from, address to, uint256 shares)  
+    bento.deposit(address, address, address, uint256, uint256) returns (uint256 amountOut, uint256 shareOut) 
+    bento.balanceOf(address token, address user) returns (uint256) envfree 
+    //for solidity calls 
+    toAmount(address token, uint256 share, bool roundUp) returns (uint256)  => DISPATCHER(true)
+    toShare(address token, uint256 amount, bool roundUp) returns (uint256)  => DISPATCHER(true)
+    transfer(address token, address from, address to, uint256 shares)  => DISPATCHER(true) 
+    deposit(address, address, address, uint256, uint256) returns (uint256 amountOut, uint256 shareOut) => DISPATCHER(true) 
+    balanceOf(address token, address user) returns (uint256) => DISPATCHER(true)
+
     registerProtocol() => NONDET
 
 
@@ -40,6 +47,9 @@ methods {
     transferFrom(address, address, uint256) => DISPATCHER(true) 
     permit(address from, address to, uint amount, uint deadline, uint8 v, bytes32 r, bytes32 s) => NONDET
     totalSupply() => DISPATCHER(true)
+    balanceOf(address) returns (uint256) => DISPATCHER(true)
+    permit(address holder, address spender, uint256 nonce, uint256 expiry, bool allowed, 
+                    uint8 v, bytes32 r, bytes32 s) => NONDET
 
     //IPool
     swapWithContext(address tokenIn, address tokenOut, bytes context, address recipient, bool unwrapBento, uint256 amountIn) returns (uint256) => DISPATCHER(true)
@@ -51,7 +61,7 @@ methods {
 
 
     // Symbolic Pool helper
-    pool.balanceOf(address) returns (uint256) envfree => DISPATCHER(true)
+    pool.balanceOf(address) returns (uint256) envfree 
     pool.getBalanceOfToken(uint256) returns (uint256) envfree
     pool.getReserveOfToken(uint256) returns (uint256) envfree
     pool.tokensLength() returns (uint256) envfree
@@ -88,16 +98,19 @@ definition allTokenAssets(address token, address user) returns mathint =
     assert _minAmount < minAmount_ && _deadline < deadline_;
 }*/
 
-rule swapRouterTokenBalanceShouldBeZero(method f) {
+rule swapRouterTokenBalanceShouldBeZero(method f) filtered {f -> !f.isView && !f.isFallback } {
     env e;
     calldataarg args;
     require e.msg.sender != bento && e.msg.sender != pool && e.msg.sender != currentContract;
-    
+    require pool.isBalanced();
+    require pool.tokensLength() == 2;
+
+
     require tokenA.balanceOf(e, currentContract) == 0;
     require ethBalance(e,currentContract) == 0;
-    require pool.isBalanced();
+    require bento.balanceOf(tokenA,currentContract) == 0;
+    
 
-    address to;
     address tokenIn; 
     address tokenOut; 
     address recipient;
@@ -110,8 +123,9 @@ rule swapRouterTokenBalanceShouldBeZero(method f) {
 
     assert tokenA.balanceOf(e, currentContract) == 0;
     assert ethBalance(e,currentContract) == 0;
+    assert bento.balanceOf(tokenA,currentContract) == 0;    
 }
-
+/*
 rule swapRouterBalanceShouldBeZero(method f) filtered { f -> f.selector != complexPath((uint256,(address,address,address,bool,uint256,bytes)[],(address,address,address,uint64,bytes)[],(address,address,bool,uint256)[])).selector } {
     env e;
     calldataarg args;
@@ -119,11 +133,12 @@ rule swapRouterBalanceShouldBeZero(method f) filtered { f -> f.selector != compl
 
     require(bento.balanceOf(tokenA,currentContract) == 0);
 
-    f(e,args);
+    require recipient != currentContract;
+    callFunction(e.msg.sender, f, tokenIn, tokenOut, pool, recipient, unwrapBento, amount, min);
 
     assert bento.balanceOf(tokenA,currentContract) == 0;    
 }
-
+*/
 rule inverseOfSwapping(address tokenIn, address tokenOut, uint256 amountIn) {
    
     env e;
@@ -151,15 +166,6 @@ rule inverseOfSwapping(address tokenIn, address tokenOut, uint256 amountIn) {
 
     assert amountOutToIn == amountIn;
 }
-/*
-rule sanity(method f) {
-    env e;
-    calldataarg args;
-    f(e,args);
-    assert(false);
-}
-*/
-
 
 
 
@@ -233,7 +239,16 @@ rule noChangeToOther(method f, address token, address other) {
     uint256 eth = ethBalance(e, other);
     uint256 liquidity = pool.balanceOf(other);
 
-    f(e,args);
+    address tokenIn; 
+    address tokenOut; 
+    address recipient;
+    bool unwrapBento;
+    uint256 amount; 
+    uint256 min;
+
+    require recipient != currentContract;
+    callFunction(e.msg.sender, f, tokenIn, tokenOut, pool, recipient, unwrapBento, amount, min);
+
 
     assert  tokenBalanceOf(token, other) == native &&
             bento.balanceOf(token, other) == inBento &&
@@ -241,7 +256,21 @@ rule noChangeToOther(method f, address token, address other) {
             pool.balanceOf(other) == liquidity ;
 }
 
+/*
+rule validityOfUnwrapBento(method f) {
+    address tokenIn; 
+    address tokenOut; 
+    address recipient;
+    bool unwrapBento;
+    uint256 amount; 
+    uint256 min;
+    address sender;
+    
+    require recipient != currentContract;
+    callFunction(sender, f, tokenIn, tokenOut, pool, recipient, unwrapBento, amount, min);
 
+}
+*/
 ////////////////////////////////////////////////////////////////////////////
 //                             Helper Methods                             //
 ////////////////////////////////////////////////////////////////////////////
@@ -250,10 +279,19 @@ function callFunction(address msgSender, method f,
             address tokenIn, address tokenOut, address _pool, address recipient, bool unwrapBento, uint256 amount, uint256 min) {
     env e;
     require e.msg.sender == msgSender;
- /*   uint256 deadline;
+    uint256 deadline;
 
     if (f.selector == callAddLiquidityUnbalanced(address,uint256,address,address,uint256,uint256).selector ) {
         callAddLiquidityUnbalanced(e, tokenIn, amount, _pool, recipient, deadline, min);
+    }
+    else if(f.selector == callExactInputSingleWithNativeToken(address,address,address,address,bool,uint256,uint256,uint256).selector) {
+        callExactInputSingleWithNativeToken(e, tokenIn, tokenOut, _pool, recipient, unwrapBento, deadline, amount, min);
+    }
+    else if(f.selector == callExactInputSingleWithContext(address,address,address,address,bool,uint256,uint256,uint256).selector) {
+        callExactInputSingleWithContext(e, tokenIn, tokenOut, _pool, recipient, unwrapBento, deadline, amount, min);
+    }
+    else if(f.selector == callExactInputSingleWithNativeTokenAndContext(address,address,address,address,bool,uint256,uint256,uint256).selector) {
+        callExactInputSingleWithNativeTokenAndContext(e, tokenIn, tokenOut, _pool, recipient, unwrapBento, deadline, amount, min);
     }
     else if (f.selector == callAddLiquidityBalanced(address,uint256,address,address,uint256).selector ) {
         callAddLiquidityBalanced(e, tokenIn, amount, _pool, recipient, deadline);
@@ -266,9 +304,23 @@ function callFunction(address msgSender, method f,
         address pool2;
         callExactInput(e, tokenIn, _pool, tokenIn2, pool2, tokenOut, recipient, unwrapBento, deadline, amount, min);
     }
-    else { */
+    else if (f.selector == burnLiquiditySingle(address,address,address,bool,uint256,uint256,uint256).selector) {
+        burnLiquiditySingle(e, _pool, tokenOut, recipient, unwrapBento, deadline, amount, min);
+    }
+    else if (f.selector == depositToBentoBox(address,uint256,address).selector) {
+        depositToBentoBox(e, tokenIn, amount, recipient);
+    }
+    else if (f.selector == sweepBentoBoxToken(address,uint256,address).selector) {
+        sweepBentoBoxToken(e, tokenIn, amount, recipient);
+    }
+    else if (f.selector == sweepNativeToken(address,uint256,address).selector) {
+        sweepNativeToken(e, tokenIn, amount, recipient);
+    }
+    
+    
+    else { 
         calldataarg args;
         f(e, args);
-    //}
+    }
 
 }

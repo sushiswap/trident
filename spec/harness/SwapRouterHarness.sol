@@ -26,7 +26,6 @@ contract SwapRouterHarness is SwapRouter {
         returns (uint256 amountOut) { }
 
 
-
     function callExactInput(address tokenIn1, address pool1, address tokenIn2, address pool2,
         address tokenOut,
         address recipient,
@@ -38,7 +37,8 @@ contract SwapRouterHarness is SwapRouter {
         virtual
         payable
         returns (uint256 amount)
-    { 
+    { }
+    /* todo - try to put back
         Path[] memory paths = new Path[](2);
         paths[0] = Path({tokenIn : tokenIn1, pool: pool1});
         paths[1] = Path({tokenIn : tokenIn2, pool: pool2});
@@ -51,7 +51,7 @@ contract SwapRouterHarness is SwapRouter {
                 amountIn : amountIn,
                 amountOutMinimum : amountOutMinimum });
         return super.exactInput(exactInputParams);
-    }
+    } */
 
 
     function exactInput(ExactInputParams memory params)
@@ -62,6 +62,89 @@ contract SwapRouterHarness is SwapRouter {
     { }
 
 
+    function callExactInputSingleWithNativeToken(address tokenIn, address tokenOut, address pool, address recipient, bool unwrapBento, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum)
+        public returns (uint256) {
+        ExactInputSingleParams memory exactInputSingleParams;
+        exactInputSingleParams = ExactInputSingleParams({tokenIn:tokenIn, tokenOut:tokenOut, pool:pool, recipient:recipient,unwrapBento:unwrapBento,deadline:deadline,amountIn:amountIn,amountOutMinimum:amountOutMinimum});
+        return super.exactInputSingleWithNativeToken(exactInputSingleParams);
+    }
+
+    function exactInputSingleWithNativeToken(ExactInputSingleParams memory params)
+        public
+        override
+        payable
+        returns (uint256 amountOut)
+    { }
+
+    //todo - add call function
+    function exactInputWithNativeToken(ExactInputParams memory params)
+        public
+        override
+        payable
+        returns (uint256 amount)
+    { }
+
+
+
+    bytes public harnessBytes;
+    function callExactInputSingleWithContext(address tokenIn, 
+        address tokenOut,
+        address pool,
+        address recipient,
+        bool unwrapBento,
+        uint256 deadline,
+        uint256 amountIn,
+        uint256 amountOutMinimum)
+        public
+        virtual
+        payable
+        returns (uint256 amount)
+    {
+        ExactInputSingleParamsWithContext memory exactInputSingleParamsWithContext;
+        exactInputSingleParamsWithContext = ExactInputSingleParamsWithContext({tokenIn:tokenIn, tokenOut:tokenOut, pool:pool, recipient:recipient,unwrapBento:unwrapBento,deadline:deadline,amountIn:amountIn,amountOutMinimum:amountOutMinimum, context: harnessBytes});
+        return super.exactInputSingleWithContext(exactInputSingleParamsWithContext);
+    }
+
+    function exactInputSingleWithContext(ExactInputSingleParamsWithContext memory params)
+        public
+        override
+        payable
+        returns (uint256 amountOut)
+    { }
+
+
+    function callExactInputSingleWithNativeTokenAndContext(address tokenIn, 
+        address tokenOut,
+        address pool,
+        address recipient,
+        bool unwrapBento,
+        uint256 deadline,
+        uint256 amountIn,
+        uint256 amountOutMinimum)
+        public
+        virtual
+        payable
+        returns (uint256 amountOut)
+    {
+        ExactInputSingleParamsWithContext memory exactInputSingleParamsWithContext;
+        exactInputSingleParamsWithContext = ExactInputSingleParamsWithContext({tokenIn:tokenIn, tokenOut:tokenOut, pool:pool, recipient:recipient,unwrapBento:unwrapBento,deadline:deadline,amountIn:amountIn,amountOutMinimum:amountOutMinimum, context: harnessBytes});
+        return super.exactInputSingleWithNativeTokenAndContext(exactInputSingleParamsWithContext);
+    }
+
+    function exactInputSingleWithNativeTokenAndContext(ExactInputSingleParamsWithContext memory params)
+        public
+        override
+        payable
+        returns (uint256 amountOut)
+    {
+    }
+    function exactInputWithContext(ExactInputParamsWithContext memory params)
+        public
+        override
+        payable
+        returns (uint256 amount)
+    {
+    }
 
     // A wrapper and override for addLiquidityUnbalance
     function callAddLiquidityUnbalanced(address tokenIn, uint256 amount, address pool,  address to, uint256 deadline,uint256 minliquidity) public returns (uint256) {
@@ -100,6 +183,20 @@ contract SwapRouterHarness is SwapRouter {
 
     }
     
+
+    function burnLiquidity(
+        address pool,
+        address to,
+        bool unwrapBento,
+        uint256 deadline,
+        uint256 liquidity,
+        IPool.liquidityAmount[] memory minWithdrawals
+    ) external override {
+
+    }
+
+    function complexPath(ComplexPathParams memory params) public override payable 
+     { }
     function tokenBalanceOf(address token, address user) public returns (uint256) {
         return IERC20(token).balanceOf(user);
     }
@@ -107,4 +204,5 @@ contract SwapRouterHarness is SwapRouter {
     function ethBalance(address user) public returns (uint256) {
         return user.balance;
     }
+
 }
