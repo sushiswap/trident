@@ -14,10 +14,10 @@ import "hardhat/console.sol";
 /// @notice Trident pool template with concentrated liquidity and constant product formula for swapping between an ERC-20 token pair. 
 /// @dev This pool swaps between bento shares - it does not care about underlying amounts.
 abstract contract ConcentratedLiquidityPool is IPool, TridentNFT {
-    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
-    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
+    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
+    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
 
-    uint256 internal constant MAX_FEE = 10000; // 100%
+    uint256 internal constant MAX_FEE = 10000; // @dev 100%.
     uint256 internal constant MAX_FEE_SQUARE = 100000000;
     uint256 public immutable swapFee;
     uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
@@ -30,55 +30,60 @@ abstract contract ConcentratedLiquidityPool is IPool, TridentNFT {
     address public immutable token1;
     
     int24 public immutable tickSpacing;
-    int24 public nearestTick;
+    int24 public nearestTick; // @dev Tick that is just below the current price.
     
     uint112 internal constant MINIMUM_LIQUIDITY = 1000;
     uint112 public liquidity;
-    uint160 public sqrtPriceX96;
+    uint160 public sqrtPrice;
 
     uint128 internal reserve0;
     uint128 internal reserve1;
     
     uint256 public kLast;
     
+    uint256 public constant override poolType = 5;
+    uint256 public constant override assetsCount = 2;
+    address[] public override assets;
+
     mapping(int24 => Tick) public ticks;
     struct Tick {
-        int24 previousTick;
+        int24 prevTick;
         int24 nextTick;
         uint128 reserve0; // to-do consolidate to liquidity?
         uint128 reserve1; // to-do consolidate to liquidity?
-        uint112 liquidity; // last range liquidity 
+        uint112 liquidity; 
         bool exists; // might not be necessary
     }
 
     uint256 private unlocked = 1;
     modifier lock() {
-        require(unlocked == 1, "MIRIN: LOCKED");
+        require(unlocked == 1, "ConcentratedLiquidityPool: LOCKED");
         unlocked = 2;
         _;
         unlocked = 1;
     }
 
-    /// @dev
-    /// Only set immutable variables here. State changes made here will not be used.
-    constructor(bytes memory _deployData, address _masterDeployer) TridentNFT() {
-        (address tokenA, address tokenB, uint256 _swapFee, int24 _tickSpacing, uint160 _sqrtPriceX96) = abi.decode(_deployData, (address, address, uint256, int24, uint160));
+    /// @dev Only set immutable variables here - state changes made here will not be used.
+    constructor(bytes memory _deployData, address _masterDeployer) {
+        (address tokenA, address tokenB, uint256 _swapFee, int24 _tickSpacing, uint160 _sqrtPrice) = abi.decode(_deployData, (address, address, uint256, int24, uint160));
 
         require(tokenA != address(0), "ConcentratedLiquidityPool: ZERO_ADDRESS");
         require(tokenB != address(0), "ConcentratedLiquidityPool: ZERO_ADDRESS");
         require(tokenA != tokenB, "ConcentratedLiquidityPool: IDENTICAL_ADDRESSES");
         require(_swapFee <= MAX_FEE, "ConcentratedLiquidityPool: INVALID_SWAP_FEE");
 
-        (address _token0, address _token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-        token0 = _token0;
-        token1 = _token1;
+        token0 = tokenA;
+        token1 = tokenB;
+        assets.push(tokenA);
+        assets.push(tokenB);
         swapFee = _swapFee;
+        sqrtPrice = _sqrtPrice;
         MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
         bento = IBentoBoxMinimal(MasterDeployer(_masterDeployer).bento());
         barFeeTo = MasterDeployer(_masterDeployer).barFeeTo();
         masterDeployer = MasterDeployer(_masterDeployer);
         tickSpacing = _tickSpacing;
-        nearestTick = TickMath.getTickAtSqrtRatio(_sqrtPriceX96);
+        nearestTick = TickMath.getTickAtSqrtRatio(_sqrtPrice);
         ticks[TickMath.MIN_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), uint128(0), uint112(0), true);
         ticks[TickMath.MAX_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), uint128(0), uint112(0), true);
         unlocked = 1;
@@ -139,9 +144,9 @@ abstract contract ConcentratedLiquidityPool is IPool, TridentNFT {
         (uint128 _reserve0, uint128 _reserve1) = (reserve0, reserve1);
         
         /// @dev Replicating v2-style LP mgmt in `TridentNFT` which has erc20-like values in struct (totalSupply, balanceOf)....
-        uint128 _rangeReserve0 = tickPools[lower][upper].reserve0; 
-        uint128 _rangeReserve1 = tickPools[lower][upper].reserve1; 
-        uint256 _totalSupply = tickPools[lower][upper].totalSupply; 
+        uint128 _rangeReserve0 = tickRanges[lower][upper].reserve0; 
+        uint128 _rangeReserve1 = tickRanges[lower][upper].reserve1; 
+        uint256 _totalSupply = tickRanges[lower][upper].totalSupply; 
         _mintFee(lower, upper, _rangeReserve0, _rangeReserve1, _totalSupply);
 
         (uint256 balance0, uint256 balance1) = _balance(); 
@@ -165,13 +170,13 @@ abstract contract ConcentratedLiquidityPool is IPool, TridentNFT {
         /// @dev Hooks for gasper's Tick link-listing....
         uint160 priceLower = TickMath.getSqrtRatioAtTick(lower); 
         uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper);
-        uint160 currentPrice = sqrtPriceX96; // gas savings
+        uint160 currentPrice = sqrtPrice;
       
         if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += uint112(liquidityToAdd);
-        tickPools[lower][upper].liquidity += uint112(liquidityToAdd);
+        tickRanges[lower][upper].liquidity += uint112(liquidityToAdd);
         /// @dev Temporary range reserve tracking values to make other functions easier to test
-        tickPools[lower][upper].reserve0 += uint112(amount0);
-        tickPools[lower][upper].reserve1 += uint112(amount1);
+        tickRanges[lower][upper].reserve0 += uint112(amount0);
+        tickRanges[lower][upper].reserve1 += uint112(amount1);
 
         updateLinkedList(lowerOld, lower, upperOld, upper, uint128(amount0), uint128(amount1), liquidityToAdd);
         updateNearestTickPointer(lower, upper, nearestTick, currentPrice);
@@ -188,15 +193,15 @@ abstract contract ConcentratedLiquidityPool is IPool, TridentNFT {
         int24 lower = ranges[tokenId].lower;
         int24 upper = ranges[tokenId].upper;
         /// @dev replicating v2-style LP through `TridentNFT` which has erc20-like values in struct (totalSupply, balanceOf)....
-        uint128 _rangeReserve0 = tickPools[lower][upper].reserve0; 
-        uint128 _rangeReserve1 = tickPools[lower][upper].reserve1; 
-        uint256 _totalSupply = tickPools[lower][upper].totalSupply; 
+        uint128 _rangeReserve0 = tickRanges[lower][upper].reserve0; 
+        uint128 _rangeReserve1 = tickRanges[lower][upper].reserve1; 
+        uint256 _totalSupply = tickRanges[lower][upper].totalSupply; 
          _mintFee(lower, upper, _rangeReserve0, _rangeReserve1, _totalSupply);
         
         uint112 rangeLiquidity = uint112(sqrt(_rangeReserve0 * _rangeReserve0));
-        uint256 liquidityToBurn = tickPools[lower][upper].balanceOf[address(this)]; 
-        uint256 balance0 = tickPools[lower][upper].reserve0;
-        uint256 balance1 = tickPools[lower][upper].reserve1;
+        uint256 liquidityToBurn = tickRanges[lower][upper].balanceOf[address(this)]; 
+        uint256 balance0 = tickRanges[lower][upper].reserve0;
+        uint256 balance1 = tickRanges[lower][upper].reserve1;
 
         uint256 amount0 = (liquidityToBurn * balance0) / _totalSupply;
         uint256 amount1 = (liquidityToBurn * balance1) / _totalSupply;
@@ -212,10 +217,10 @@ abstract contract ConcentratedLiquidityPool is IPool, TridentNFT {
         _update(balance0, balance1);
         kLast = sqrt(balance0 * balance1);
         
-        tickPools[lower][upper].liquidity -= uint112(liquidityToBurn);
+        tickRanges[lower][upper].liquidity -= uint112(liquidityToBurn);
         /// @dev temporary range reserve tracking values to make other functions easier to test
-        tickPools[lower][upper].reserve0 -= uint112(amount0);
-        tickPools[lower][upper].reserve1 -= uint112(amount1);
+        tickRanges[lower][upper].reserve0 -= uint112(amount0);
+        tickRanges[lower][upper].reserve1 -= uint112(amount1);
         
         withdrawnAmounts = new liquidityAmount[](2);
         withdrawnAmounts[0] = liquidityAmount({token: address(token0), amount: amount0});
@@ -279,7 +284,7 @@ abstract contract ConcentratedLiquidityPool is IPool, TridentNFT {
             _processSwap(tokenIn, tokenOut, recipient, amountIn, amountOut, context, unwrapBento);
 
             (uint256 balance0, uint256 balance1) = _balance();
-            require(balance1 - _reserve1 >= amountIn, "Insuffficient amount in");
+            require(balance1 - _reserve1 >= amountIn, "Insufficient amount in");
 
             _update(balance0 - amountOut, balance1);
         }
@@ -340,7 +345,7 @@ abstract contract ConcentratedLiquidityPool is IPool, TridentNFT {
     }
 
     function _update(uint256 balance0, uint256 balance1) internal {
-        require(balance0 < type(uint128).max && balance1 < type(uint128).max, "OVERFLOW");
+        require(balance0 < type(uint128).max && balance1 < type(uint128).max, "ConcentratedLiquidityPool: OVERFLOW");
         reserve0 = uint128(balance0);
         reserve1 = uint128(balance1);
     }
@@ -424,14 +429,14 @@ abstract contract ConcentratedLiquidityPool is IPool, TridentNFT {
     }
 
     function updateLinkedList(int24 lowerOld, int24 lower, int24 upperOld, int24 upper, uint128 amount0, uint128 amount1, uint112 liquidity) internal {
-        require(uint24(lower) % 2 == 0, "Lower even");
-        require(uint24(upper) % 2 == 1, "Upper odd");
+        require(uint24(lower) % 2 == 0, "ConcentratedLiquidityPool: LOWER_EVEN");
+        require(uint24(upper) % 2 == 1, "ConcentratedLiquidityPool: UPPER_OLD");
 
         if (ticks[lower].exists) {
             ticks[lower].liquidity += liquidity;
         } else {
             Tick storage old = ticks[lowerOld];
-            require(old.exists && old.nextTick > lower && lowerOld < lower, "Bad ticks");
+            require(old.exists && old.nextTick > lower && lowerOld < lower, "ConcentratedLiquidityPool: BAD_TICKS");
             ticks[lower] = Tick(lowerOld, old.nextTick, amount0, amount1, liquidity, true);
             old.nextTick = lower;
         }
@@ -439,7 +444,7 @@ abstract contract ConcentratedLiquidityPool is IPool, TridentNFT {
             ticks[upper].liquidity += liquidity;
         } else {
             Tick storage old = ticks[upperOld];
-            require(old.exists && old.nextTick > upper && upperOld < upper, "Bad ticks");
+            require(old.exists && old.nextTick > upper && upperOld < upper, "ConcentratedLiquidityPool: BAD_TICKS");
             ticks[upper] = Tick(upperOld, old.nextTick, amount0, amount1, liquidity, true);
             old.nextTick = upper;
         }
