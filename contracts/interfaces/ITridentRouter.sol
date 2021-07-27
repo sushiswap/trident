@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity >=0.7.5;
-pragma abicoder v2;
+pragma solidity >=0.8.0;
 
 /// @notice Interface for routing Trident exchange interactions.
-interface ISwapRouter {
-    // TODO: Make context optional
-
+interface ITridentRouter {
     /// @dev In case of a multi hop swap, the output token for first swap is the input token of the next swap.
     struct Path {
         address tokenIn;
