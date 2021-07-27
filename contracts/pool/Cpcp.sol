@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../libraries/TickMath.sol";
+import "../libraries/concentratedPool/TickMath.sol";
+import "../libraries/concentratedPool/FullMath.sol";
+import "../libraries/concentratedPool/UnsafeMath.sol";
+import "../libraries/concentratedPool/DyDxMath.sol";
 import "hardhat/console.sol";
 
 pragma solidity ^0.8.2;
@@ -21,7 +24,7 @@ contract Cpcp {
 
   uint160 public sqrtPriceX96;
 
-  int24 public nearestTick;
+  int24 public nearestTick; // tick that is just bellow the current price
 
   IERC20 public token0;
   
@@ -59,34 +62,35 @@ contract Cpcp {
 
     updateNearestTickPointer(lower, upper, nearestTick, currentPrice);
     
-    getAssets(priceLower, priceUpper, currentPrice, amount);
+    getAssets(uint256(priceLower), uint256(priceUpper), uint256(currentPrice), uint256(amount));
 
   }
 
-  function getAssets(uint160 priceLower, uint160 priceUpper, uint160 _sqrtPriceX96, uint112 liquidityAmount) internal {
+  function getAssets(uint256 priceLower, uint256 priceUpper, uint256 _sqrtPriceX96, uint256 liquidityAmount) internal {
 
     uint256 token0amount = 0;
 
     uint256 token1amount = 0;
     
-    // todo use the fullmath library here to deal fith over flows
-    if (priceUpper < _sqrtPriceX96) { // todo, think about edgecases here <= vs <
+    if (priceUpper < _sqrtPriceX96) { // think about edgecases here <= vs <
       // only supply token1 (token1 is Y)
-      token1amount = liquidityAmount * uint256(priceUpper - priceLower);
+      
+      token1amount = DyDxMath.getDy(liquidityAmount, priceLower, priceUpper, true);
     
-    } else if (_sqrtPriceX96 < priceLower) {
+    } else if (priceLower < _sqrtPriceX96) {
       // only supply token0 (token0 is X)
-      token0amount = (liquidityAmount * uint256(priceUpper - priceLower) / priceLower ) / priceUpper;
+      
+      token0amount = DyDxMath.getDx(liquidityAmount, priceLower, priceUpper, true);
 
     } else {
       
-      token0amount = ((uint256(liquidityAmount) << 96) * uint256(priceUpper - _sqrtPriceX96) / _sqrtPriceX96) / priceUpper;
+      token0amount = DyDxMath.getDx(liquidityAmount, _sqrtPriceX96, priceUpper, true);
 
-      token1amount = liquidityAmount * uint256(_sqrtPriceX96 - priceLower) / 0x1000000000000000000000000;
+      token1amount = DyDxMath.getDy(liquidityAmount, priceLower, _sqrtPriceX96, true);
 
     }
     
-    if (token0amount > 0) token0.transferFrom(msg.sender, address(this), token0amount); // ! this will be in bento shares eventually
+    if (token0amount > 0) token0.transferFrom(msg.sender, address(this), token0amount); // ! change this to bento shares
 
     if (token1amount > 0) token1.transferFrom(msg.sender, address(this), token1amount);
     
@@ -141,6 +145,131 @@ contract Cpcp {
       old.nextTick = upper;
 
     }
+  }
+
+  // price is √(y/x)
+  // x is token0
+  // zero for one -> price will move down
+  function swap(bool zeroForOne, uint256 amount, address recipient) public {
+    
+    int24 nextTickToCross = zeroForOne ? nearestTick : ticks[nearestTick].nextTick;
+
+    uint256 currentPrice = uint256(sqrtPriceX96);
+
+    uint256 currentLiquidity = uint256(liquidity);
+
+    uint256 outAmount = 0;
+      
+    while(amount > 0) {
+      
+      uint256 nextTickPrice = uint256(TickMath.getSqrtRatioAtTick(nextTickToCross));
+
+      if (zeroForOne) { // x for y
+        
+        // price is going down
+        // max swap input within current tick range: Δx = Δ(1/√𝑃) · L
+        
+        uint256 maxDx = DyDxMath.getDx(currentLiquidity, nextTickPrice, currentPrice, false);
+
+        if (amount <= maxDx) { // we can swap only within the current range
+            
+          uint256 liquidityPadded = currentLiquidity << 96;
+
+          // calculate new price after swap: L · √𝑃 / (L + Δx · √𝑃)
+          // alternatively: L / (L / √𝑃 + Δx)
+
+          uint256 newPrice = uint160(FullMath.mulDivRoundingUp(liquidityPadded, currentPrice, liquidityPadded + currentPrice * amount));
+
+          if (!(nextTickPrice <= newPrice && newPrice < currentPrice)) { // owerflow -> use a modified version of the formula
+            newPrice = uint160(UnsafeMath.divRoundingUp(liquidityPadded, liquidityPadded / currentPrice + amount));
+          }
+
+          // calculate output of swap 
+          // Δy = Δ√P · L
+          outAmount += DyDxMath.getDy(currentLiquidity, newPrice, currentPrice, false);
+
+          amount = 0;
+
+        } else { // swap & cross the tick
+
+          amount -= maxDx;
+          
+          outAmount += DyDxMath.getDy(currentLiquidity, nextTickPrice, currentPrice, false);
+
+          if (nextTickToCross % 2 == 0) {
+            currentLiquidity = currentLiquidity - uint256(ticks[nextTickToCross].liquidity);
+          } else {
+            currentLiquidity = currentLiquidity + uint256(ticks[nextTickToCross].liquidity);
+          }
+    
+          currentPrice = nextTickPrice;
+
+          nextTickToCross = ticks[nextTickToCross].previousTick;
+
+        }
+
+      } else {
+        
+        // price is going up
+        // max swap within current tick range: Δy = Δ√P · L
+        
+        uint256 maxDy = DyDxMath.getDy(currentLiquidity, currentPrice, nextTickPrice, false);
+
+        if (amount <= maxDy) { // we can swap only within the current range
+
+          // calculate new price after swap ( ΔP = Δy/L )
+          uint256 newPrice;
+          
+          if (amount <= type(uint160).max) {
+            newPrice = currentPrice + (amount << 96 ) / currentLiquidity;
+          } else {
+            newPrice = currentPrice + uint160(FullMath.mulDiv(amount, 0x1000000000000000000000000, liquidity));
+          }
+
+          // calculate output of swap 
+          // Δx = Δ(1/√P) · L
+          outAmount += DyDxMath.getDx(currentLiquidity, currentPrice, newPrice, false);
+
+          amount = 0;
+
+        } else { // swap & cross the tick
+
+          amount -= maxDy;
+
+          if (nextTickToCross % 2 == 0) {
+            currentLiquidity = currentLiquidity + uint256(ticks[nextTickToCross].liquidity);
+          } else {
+            currentLiquidity = currentLiquidity - uint256(ticks[nextTickToCross].liquidity);
+          }
+    
+          currentPrice = nextTickPrice;
+
+          nextTickToCross = ticks[nextTickToCross].nextTick;
+
+        }
+
+      }
+
+    }
+
+    liquidity = uint112(currentLiquidity);
+
+    sqrtPriceX96 = uint160(currentPrice);
+
+    nearestTick = zeroForOne ? nextTickToCross : ticks[nextTickToCross].previousTick;
+
+    if (zeroForOne) {
+
+      token0.transferFrom(msg.sender, address(this), amount); // ! change this to bento shares, a push / pull approach instead
+      token1.transfer(recipient, outAmount);
+
+    } else {
+
+      token1.transferFrom(msg.sender, address(this), amount); // ! change this to bento shares, a push / pull approach instead
+      token0.transfer(recipient, outAmount);
+
+    }
+
   }
 
 }
