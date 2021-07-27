@@ -1,14 +1,14 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity ^0.8.2;
+pragma solidity >=0.8.0;
 
 contract TridentNFT {
-    uint256 public totalSupply; // tracks total unique liquidity `triPts` 
+    uint256 public totalSupply; // @dev tracks total unique liquidity range positions.
     string constant public name = "TridentNFT";
     string constant public symbol = "tNFT";
-    string constant public baseURI = "PLACEHOLDER"; // WIP - make chain-based, auto-generative image re: positions?
+    string constant public baseURI = "";
     
-    mapping(address => uint256) public balanceOf; // tracks `triPts` held by an account
+    mapping(address => uint256) public balanceOf; // @dev tracks liquidity range positions held by an account.
     mapping(uint256 => address) public getApproved;
     mapping(uint256 => address) public ownerOf;
     mapping(uint256 => string) public tokenURI;
@@ -18,27 +18,28 @@ contract TridentNFT {
     event ApprovalForAll(address indexed approver, address indexed operator, bool approved);
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     
-    mapping(uint256 => Range) public ranges; // tracks `Tripoint` range by tokenId
-    struct Range { 
-        uint256 loPt; 
-        uint256 hiPt; 
+    mapping(int24 => mapping(int24 => TickPool)) public tickPools;
+    struct TickPool { // @dev virtual pool for concentrated liquidity in tick range.
+        uint128 reserve0; // to-do consolidate to liquidity?
+        uint128 reserve1; // to-do consolidate to liquidity?
+        uint112 liquidity; // last range liquidity 
+        uint256 totalSupply; // total range mint for pool range providers
+        mapping(address => uint256) balanceOf; // account provider range mint balance
     }
     
-    mapping(uint256 => mapping(uint256 => Tripoint)) public triPts; // tracks liquidity updates in `Tripoint` range
-    struct Tripoint { // virtual pool in liquidity `triPts` range (lo| |hi)
-        uint112 reserve0; // last token0 balance
-        uint112 reserve1; // last token1 balance
-        uint256 totalSupply; // total for pool providers
-        mapping(address => uint256) balanceOf; // account provider balance
+    mapping(uint256 => Range) public ranges; // @dev tracks range by tokenId.
+    struct Range { 
+        int24 lower; 
+        int24 upper; 
+    }
+    
+    function getRangeById(uint256 tokenId) public view returns (int24 lower, int24 upper) {
+        lower = ranges[tokenId].lower;
+        upper = ranges[tokenId].upper;
     }
 
     function supportsInterface(bytes4 sig) external pure returns (bool) {
         return (sig == 0x80ac58cd || sig == 0x5b5e139f); // ERC-165
-    }
-    
-    function getRangeById(uint256 tokenId) public view returns (uint256 loPt, uint256 hiPt) {
-        loPt = ranges[tokenId].loPt;
-        hiPt = ranges[tokenId].hiPt;
     }
     
     function approve(address spender, uint256 tokenId) external {
@@ -54,73 +55,63 @@ contract TridentNFT {
     }
     
     function _mint(
-        uint256 loPt, 
-        uint256 hiPt, 
-        address to, 
-        uint256 value
+        int24 lower, 
+        int24 upper, 
+        address recipient, 
+        uint256 amount
     ) internal {
-        triPts[loPt][hiPt].totalSupply += value;
-        triPts[loPt][hiPt].balanceOf[to] += value;
-        if (triPts[loPt][hiPt].balanceOf[to] == 0) {
+        tickPools[lower][upper].totalSupply += amount;
+        unchecked {
+            tickPools[lower][upper].balanceOf[recipient] += amount;
+        }
+        if (tickPools[lower][upper].balanceOf[recipient] == 0) {
             totalSupply++;
             uint256 tokenId = totalSupply;
-            ranges[tokenId].loPt = loPt;
-            ranges[tokenId].hiPt = hiPt;
-            emit Transfer(address(0), to, tokenId); // notices opening position
+            ranges[tokenId].lower = lower;
+            ranges[tokenId].upper = upper;
+            emit Transfer(address(0), recipient, tokenId); // @dev notices opening position by minting NFT.
         }
     }
 
     function _burn(
         uint256 tokenId,
         address from, 
-        uint256 value
+        uint256 amount
     ) internal {
-        uint256 loPt = ranges[tokenId].loPt;
-        uint256 hiPt = ranges[tokenId].hiPt;
-        triPts[loPt][hiPt].balanceOf[from] -= value;
+        int24 lower = ranges[tokenId].lower;
+        int24 upper = ranges[tokenId].upper;
+        tickPools[lower][upper].balanceOf[from] -= amount;
         unchecked {
-            triPts[loPt][hiPt].totalSupply -= value;
+            tickPools[lower][upper].totalSupply -= amount;
         }
-        if (triPts[loPt][hiPt].balanceOf[from] == 0) {
+        if (tickPools[lower][upper].balanceOf[from] == 0) {
             totalSupply--;
-            emit Transfer(from, address(0), tokenId); // notices closing position
-        }
-    }
-    
-    function _swapBurn(
-        uint256 hiPt, 
-        uint256 loPt, 
-        address from, 
-        uint256 value
-    ) internal {
-        triPts[loPt][hiPt].balanceOf[from] -= value;
-        unchecked {
-            triPts[loPt][hiPt].totalSupply -= value;
+            emit Transfer(from, address(0), tokenId); // @dev notices closing position by burning NFT.
         }
     }
 
-    function transfer(address to, uint256 tokenId) external {
+    function transfer(address recipient, uint256 tokenId) external {
         require(msg.sender == ownerOf[tokenId], '!owner');
         balanceOf[msg.sender]--; 
-        balanceOf[to]++; 
+        balanceOf[recipient]++; 
         getApproved[tokenId] = address(0);
-        ownerOf[tokenId] = to;
-        (uint256 loPt, uint256 hiPt) = getRangeById(tokenId);
-        triPts[loPt][hiPt].balanceOf[to] = triPts[loPt][hiPt].balanceOf[msg.sender];
-        triPts[loPt][hiPt].balanceOf[msg.sender] = 0;
-        emit Transfer(msg.sender, to, tokenId); 
+        ownerOf[tokenId] = recipient;
+        (int24 lower, int24 upper) = getRangeById(tokenId);
+        tickPools[lower][upper].balanceOf[recipient] = tickPools[lower][upper].balanceOf[msg.sender]; // @dev update recipient balance.
+        tickPools[lower][upper].balanceOf[msg.sender] = 0; // @dev nullify sender balance.
+        emit Transfer(msg.sender, recipient, tokenId); 
     }
     
-    function transferFrom(address, address to, uint256 tokenId) external {
+    function transferFrom(address, address recipient, uint256 tokenId) external {
         address owner = ownerOf[tokenId];
         require(msg.sender == owner || msg.sender == getApproved[tokenId] || isApprovedForAll[owner][msg.sender], '!owner/spender/operator');
         balanceOf[owner]--; 
-        balanceOf[to]++; 
+        balanceOf[recipient]++; 
         getApproved[tokenId] = address(0);
-        ownerOf[tokenId] = to;
-        (uint256 loPt, uint256 hiPt) = getRangeById(tokenId);
-        triPts[loPt][hiPt].balanceOf[to] = triPts[loPt][hiPt].balanceOf[owner];
-        triPts[loPt][hiPt].balanceOf[owner] = 0;
-        emit Transfer(owner, to, tokenId); 
+        ownerOf[tokenId] = recipient;
+        (int24 lower, int24 upper) = getRangeById(tokenId);
+        tickPools[lower][upper].balanceOf[recipient] = tickPools[lower][upper].balanceOf[owner]; // @dev update recipient balance.
+        tickPools[lower][upper].balanceOf[owner] = 0; // @dev nullify sender balance.
+        emit Transfer(owner, recipient, tokenId); 
     }
 }

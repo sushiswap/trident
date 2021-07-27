@@ -6,6 +6,7 @@ import "./interfaces/ISwapRouter.sol";
 import "./interfaces/IWETH.sol";
 import "./interfaces/IPool.sol";
 import "./interfaces/IBentoBox.sol";
+import "./interfaces/IFlashLoan.sol";
 
 import "./base/Multicall.sol";
 import "./base/SelfPermit.sol";
@@ -273,5 +274,20 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
             // Process payment via bentobox
             IBentoBoxV1(bento).transfer(IERC20(token), payer, recipient, IBentoBoxV1(bento).toShare(IERC20(token), value, false));
         }
+    }
+    
+    function onFlashLoan(
+        address sender, // account that activates flash loan from BENTO
+        IERC20 token, // token to flash borrow
+        uint256 amount, // token amount flash borrowed
+        uint256 fee, // BENTO flash loan fee
+        bytes calldata // data involved in flash loan
+    ) external override {
+        /// @dev Run flash loan strategy through {multiCall}.
+        multiCall(data);
+        /// @dev Pay back borrowed token to BENTO with fee and send any winnings to `sender`.
+        uint256 payback = amount + fee; // calculate `payback` to BENTO as borrowed token `amount` + `fee`
+        token.safeTransfer(msg.sender, payback); // send `payback` to BENTO
+        token.safeTransfer(sender, token.balanceOf(address(this)) - payback); // skim remainder token winnings to `sender`
     }
 }
