@@ -35,11 +35,11 @@ contract TridentOwnable {
     /// @param direct If 'true', ownership is directly transferred. 
     function transferOwnership(address recipient, bool direct) external onlyOwner {
         if (direct) {
-            owner = to;
-            emit TransferOwnership(msg.sender, to);
+            owner = recipient;
+            emit TransferOwnership(msg.sender, recipient);
         } else {
-            pendingOwner = to;
-            emit TransferOwnershipClaim(msg.sender, to);
+            pendingOwner = recipient;
+            emit TransferOwnershipClaim(msg.sender, recipient);
         }
     }
 }
