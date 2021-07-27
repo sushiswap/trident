@@ -9,10 +9,10 @@ contract TridentBatcher {
     /// @dev The `msg.value` should not be trusted for any method callable from this function.
     /// @param data Encoded function data for each of the calls to make to this contract.
     /// @return results The results from each of the calls passed in via data.
-    function batch(bytes[] calldata data) 
-        external 
-        payable 
-        returns (bytes[] memory results) 
+    function batch(bytes[] calldata data)
+        external
+        payable
+        returns (bytes[] memory results)
     {
         results = new bytes[](data.length);
         for (uint256 i = 0; i < data.length; i++) {
@@ -28,7 +28,7 @@ contract TridentBatcher {
             results[i] = result;
         }
     }
-    
+
     /// @notice Provides EIP-2612 signed approval for this contract to spend user tokens.
     /// @param token Address of ERC-20 token.
     /// @param amount Token amount to grant spending right over.
@@ -48,7 +48,7 @@ contract TridentBatcher {
             0xd505accf, msg.sender, address(this), amount, deadline, v, r, s)); // @dev permit(address,address,uint256,uint256,uint8,bytes32,bytes32).
         require(success, "ChefHelper: PERMIT_FAILED");
     }
-    
+
     /// @notice Provides DAI-derived signed approval for this contract to spend user tokens.
     /// @param token Address of ERC-20 token.
     /// @param nonce Token owner's nonce  - increases at each call to {permit}.
