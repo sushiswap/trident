@@ -79,8 +79,8 @@ contract HybridPool is IPool, TridentERC20 {
         masterDeployer = MasterDeployer(_masterDeployer);
         A = a;
         N_A = 2 * a;
-        token0PrecisionMultiplier = uint256(10)**(decimals - MirinERC20(tokenA).decimals());
-        token1PrecisionMultiplier = uint256(10)**(decimals - MirinERC20(tokenB).decimals());
+        token0PrecisionMultiplier = uint256(10)**(decimals - TridentERC20(tokenA).decimals());
+        token1PrecisionMultiplier = uint256(10)**(decimals - TridentERC20(tokenB).decimals());
         unlocked = 1;
         assets.push(address(tokenA));
         assets.push(address(tokenB));
