@@ -1,91 +1,89 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity ^0.8.2;
+pragma solidity >=0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../interfaces/IPool.sol";
-import "../interfaces/IBentoBox.sol";
-import "../interfaces/ITridentCallee.sol";
-
-import "./MirinERC20.sol";
-import "../libraries/MirinMath.sol";
-import "../libraries/MathUtils.sol";
-import "hardhat/console.sol";
 import "../deployer/MasterDeployer.sol";
+import "../interfaces/IBentoBoxMinimal.sol";
+import "../interfaces/IPool.sol";
+import "../interfaces/ITridentCallee.sol";
+import "../libraries/MathUtils.sol";
+import "./TridentERC20.sol";
+import "hardhat/console.sol";
 
-/// @dev This pool uses bento shares for the API. However, the stabeswap invariant is applied to the underlying amounts.
-contract HybridPool is MirinERC20, IPool {
+/// @notice Trident exchange pool template with hybrid like-kind formula for swapping between an ERC-20 token pair.
+/// @dev This pool uses bento shares for the API - however, the stabeswap invariant is applied to the underlying amounts.
+contract HybridPool is IPool, TridentERC20 {
     using MathUtils for uint256;
 
-    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
-    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
+    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
+    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
+    event Sync(uint256 reserve0, uint256 reserve1);
 
     uint256 internal constant MINIMUM_LIQUIDITY = 10**3;
     uint8 internal constant PRECISION = 112;
 
-    // Constant value used as max loop limit
+    /// @dev Constant value used as max loop limit.
     uint256 private constant MAX_LOOP_LIMIT = 256;
-
-    uint256 internal constant MAX_FEE = 10000; // 100%
+    uint256 internal constant MAX_FEE = 10000; // @dev 100%.
     uint256 public immutable swapFee;
 
     address public immutable barFeeTo;
-
-    IBentoBoxV1 public immutable bento;
+    IBentoBoxMinimal public immutable bento;
     MasterDeployer public immutable masterDeployer;
-    IERC20 public immutable token0;
-    IERC20 public immutable token1;
+
+    address public immutable token0;
+    address public immutable token1;
     uint256 public immutable A;
-    uint256 internal immutable N_A; // 2 * A
+    uint256 internal immutable N_A; // @dev 2 * A.
     uint256 internal constant A_PRECISION = 100;
 
-    // multipliers for each pooled token's precision to get to POOL_PRECISION_DECIMALS
-    // for example, TBTC has 18 decimals, so the multiplier should be 1. WBTC
-    // has 8, so the multiplier should be 10 ** 18 / 10 ** 8 => 10 ** 10
+    /// @dev Multipliers for each pooled token's precision to get to POOL_PRECISION_DECIMALS.
+    /// For example, TBTC has 18 decimals, so the multiplier should be 1. WBTC
+    /// has 8, so the multiplier should be 10 ** 18 / 10 ** 8 => 10 ** 10.
     uint256 public immutable token0PrecisionMultiplier;
     uint256 public immutable token1PrecisionMultiplier;
 
     uint128 internal reserve0;
     uint128 internal reserve1;
 
+    uint256 public constant override poolType = 3;
+    uint256 public constant override assetsCount = 2;
+    address[] public override assets;
+
     uint256 private unlocked = 1;
     modifier lock() {
-        require(unlocked == 1, "MIRIN: LOCKED");
+        require(unlocked == 1, "HybridPool: LOCKED");
         unlocked = 2;
         _;
         unlocked = 1;
     }
 
-    /// @dev
-    /// Only set immutable variables here. State changes made here will not be used.
+    /// @dev Only set immutable variables here - state changes made here will not be used.
     constructor(bytes memory _deployData, address _masterDeployer) {
         (address tokenA, address tokenB, uint256 _swapFee, uint256 a) = abi.decode(
             _deployData,
             (address, address, uint256, uint256)
         );
 
-        require(tokenA != address(0), "MIRIN: ZERO_ADDRESS");
-        require(tokenB != address(0), "MIRIN: ZERO_ADDRESS");
-        require(tokenA != tokenB, "MIRIN: IDENTICAL_ADDRESSES");
-        require(_swapFee <= MAX_FEE, "MIRIN: INVALID_SWAP_FEE");
-        require(a != 0, "MIRIN: ZERO_A");
+        require(tokenA != address(0), "HybridPool: ZERO_ADDRESS");
+        require(tokenB != address(0), "HybridPool: ZERO_ADDRESS");
+        require(tokenA != tokenB, "HybridPool: IDENTICAL_ADDRESSES");
+        require(_swapFee <= MAX_FEE, "HybridPool: INVALID_SWAP_FEE");
+        require(a != 0, "HybridPool: ZERO_A");
 
-        (address _token0, address _token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-        token0 = IERC20(_token0);
-        token1 = IERC20(_token1);
+        token0 = tokenA;
+        token1 = tokenB;
         swapFee = _swapFee;
-        bento = IBentoBoxV1(MasterDeployer(_masterDeployer).bento());
+        bento = IBentoBoxMinimal(MasterDeployer(_masterDeployer).bento());
         barFeeTo = MasterDeployer(_masterDeployer).barFeeTo();
         masterDeployer = MasterDeployer(_masterDeployer);
         A = a;
         N_A = 2 * a;
-        token0PrecisionMultiplier = uint256(10)**(decimals - MirinERC20(_token0).decimals());
-        token1PrecisionMultiplier = uint256(10)**(decimals - MirinERC20(_token1).decimals());
-    }
-
-    function init() public {
-        require(totalSupply == 0);
+        token0PrecisionMultiplier = uint256(10)**(decimals - MirinERC20(tokenA).decimals());
+        token1PrecisionMultiplier = uint256(10)**(decimals - MirinERC20(tokenB).decimals());
         unlocked = 1;
+        assets.push(address(tokenA));
+        assets.push(address(tokenB));
     }
 
     function mint(address to) public override lock returns (uint256 liquidity) {
@@ -103,7 +101,7 @@ contract HybridPool is MirinERC20, IPool {
             uint256 oldLiq = _computeLiquidity(_reserve0, _reserve1);
             liquidity = ((newLiq - oldLiq) * _totalSupply) / oldLiq;
         }
-        require(liquidity > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_MINTED");
+        require(liquidity > 0, "HybridPool: INSUFFICIENT_LIQUIDITY_MINTED");
         _mint(to, liquidity);
         _updateReserves();
         emit Mint(msg.sender, amount0, amount1, to);
@@ -147,19 +145,19 @@ contract HybridPool is MirinERC20, IPool {
         (uint256 balance0, uint256 balance1) = _balance();
 
         if (tokenIn == address(token0)) {
-            require(tokenOut == address(token1), "Invalid output token");
+            require(tokenOut == address(token1), "HybridPool: Invalid output token");
             uint256 amountIn = balance0 - _reserve0;
-            uint256 fee = _handleFee(IERC20(tokenIn), amountIn);
+            uint256 fee = _handleFee(tokenIn, amountIn);
             finalAmountOut = _getAmountOut(amountIn - fee, _reserve0, _reserve1, true);
         } else {
-            require(tokenIn == address(token1), "Invalid input token");
-            require(tokenOut == address(token0), "Invalid output token");
+            require(tokenIn == address(token1), "HybridPool: Invalid input token");
+            require(tokenOut == address(token0), "HybridPool: Invalid output token");
             uint256 amountIn = balance1 - _reserve1;
-            uint256 fee = _handleFee(IERC20(tokenIn), amountIn);
+            uint256 fee = _handleFee(tokenIn, amountIn);
             finalAmountOut = _getAmountOut(amountIn - fee, _reserve1, _reserve0, false);
         }
 
-        _transferAmount(IERC20(tokenOut), recipient, finalAmountOut, unwrapBento);
+        _transferAmount(tokenOut, recipient, finalAmountOut, unwrapBento);
         _updateReserves();
     }
 
@@ -174,28 +172,28 @@ contract HybridPool is MirinERC20, IPool {
         (uint256 _reserve0, uint256 _reserve1) = _reserve();
         uint256 fee;
         if (tokenIn == address(token0)) {
-            require(tokenOut == address(token1), "Invalid output token");
+            require(tokenOut == address(token1), "HybridPool: Invalid output token");
             fee = (amountIn * swapFee) / MAX_FEE;
             amountOut = _getAmountOut(amountIn - fee, _reserve0, _reserve1, true);
             _processSwap(tokenIn, tokenOut, recipient, amountIn, amountOut, context, unwrapBento);
             uint256 balance0 = bento.toAmount(token0, bento.balanceOf(token0, address(this)), false);
-            require(balance0 - _reserve0 >= amountIn, "Insuffficient amount in");
+            require(balance0 - _reserve0 >= amountIn, "HybridPool: Insuffficient amount in");
         } else {
-            require(tokenIn == address(token1), "Invalid input token");
-            require(tokenOut == address(token0), "Invalid output token");
+            require(tokenIn == address(token1), "HybridPool: Invalid input token");
+            require(tokenOut == address(token0), "HybridPool: Invalid output token");
             fee = (amountIn * swapFee) / MAX_FEE;
             amountOut = _getAmountOut(amountIn - fee, _reserve1, _reserve0, false);
             _processSwap(tokenIn, tokenOut, recipient, amountIn, amountOut, context, unwrapBento);
             uint256 balance1 = bento.toAmount(token1, bento.balanceOf(token0, address(this)), false);
-            require(balance1 - _reserve1 >= amountIn, "Insuffficient amount in");
+            require(balance1 - _reserve1 >= amountIn, "HybridPool: Insufficient amount in");
         }
 
-        _transferAmount(IERC20(tokenIn), barFeeTo, fee, false);
+        _transferAmount(tokenIn, barFeeTo, fee, false);
         _updateReserves();
     }
 
     function _transferAmount(
-        IERC20 token,
+        address token,
         address to,
         uint256 amount,
         bool unwrapBento
@@ -216,11 +214,11 @@ contract HybridPool is MirinERC20, IPool {
         bytes calldata data,
         bool unwrapBento
     ) internal {
-        _transferAmount(IERC20(tokenOut), to, amountOut, unwrapBento);
-        if (data.length > 0) ITridentCallee(to).tridentCallback(tokenIn, tokenOut, amountIn, amountOut, data);
+        _transferAmount(tokenOut, to, amountOut, unwrapBento);
+        if (data.length != 0) ITridentCallee(to).tridentCallback(tokenIn, tokenOut, amountIn, amountOut, data);
     }
 
-    function _handleFee(IERC20 tokenIn, uint256 amountIn) internal returns (uint256 fee) {
+    function _handleFee(address tokenIn, uint256 amountIn) internal returns (uint256 fee) {
         fee = (amountIn * swapFee) / MAX_FEE;
         _transferAmount(tokenIn, barFeeTo, fee, false);
     }
@@ -228,9 +226,10 @@ contract HybridPool is MirinERC20, IPool {
     function _updateReserves() internal {
         uint256 _reserve0 = bento.balanceOf(token0, address(this));
         uint256 _reserve1 = bento.balanceOf(token1, address(this));
-        require(_reserve0 < type(uint128).max && _reserve1 < type(uint128).max, "OVERFLOW");
+        require(_reserve0 < type(uint128).max && _reserve1 < type(uint128).max, "HybridPool: OVERFLOW");
         reserve0 = uint128(_reserve0);
         reserve1 = uint128(_reserve1);
+        emit Sync(_reserve0, _reserve1);
     }
 
     function _balance() internal view returns (uint256 balance0, uint256 balance1) {
@@ -250,7 +249,7 @@ contract HybridPool is MirinERC20, IPool {
         uint256 amountIn
     ) external view returns (uint256 amountOut) {
         (uint256 _reserve0, uint256 _reserve1) = _reserve();
-        if (IERC20(tokenIn) == token0) {
+        if (tokenIn == token0) {
             amountOut = _getAmountOut(amountIn, _reserve0, _reserve1, true);
         } else {
             amountOut = _getAmountOut(amountIn, _reserve1, _reserve0, false);
@@ -267,7 +266,7 @@ contract HybridPool is MirinERC20, IPool {
         uint256 amountB;
         liquidityAmount[] memory liquidityOptimal = new liquidityAmount[](2);
 
-        if (IERC20(liquidityInputs[0].token) == token0) {
+        if (liquidityInputs[0].token == token0) {
             (amountA, amountB) = _getOptimalLiquidityInAmounts(
                 liquidityInputs[0].amountDesired,
                 liquidityInputs[0].amountMin,
@@ -301,12 +300,12 @@ contract HybridPool is MirinERC20, IPool {
 
         amount1Optimal = (amount0Desired * _reserve1) / _reserve0;
         if (amount1Optimal <= amount1Desired) {
-            require(amount1Optimal >= amount1Min, "MIRIN: INSUFFICIENT_B_AMOUNT");
+            require(amount1Optimal >= amount1Min, "HybridPool: INSUFFICIENT_B_AMOUNT");
             amount0Optimal = amount0Desired;
         } else {
             amount0Optimal = (amount1Desired * _reserve0) / _reserve1;
             assert(amount0Optimal <= amount0Desired);
-            require(amount0Optimal >= amount0Min, "MIRIN: INSUFFICIENT_A_AMOUNT");
+            require(amount0Optimal >= amount0Min, "HybridPool: INSUFFICIENT_A_AMOUNT");
             amount1Optimal = amount1Desired;
         }
     }
