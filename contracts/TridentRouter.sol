@@ -4,13 +4,13 @@ pragma solidity >=0.8.0;
 
 import "./interfaces/IBentoBoxMinimal.sol";
 import "./interfaces/IPool.sol";
-import "./interfaces/ISwapRouter.sol";
+import "./interfaces/ITridentRouter.sol";
 import "./libraries/TridentHelper.sol";
-import "./TridentBatcher.sol";
+import "./utils/TridentBatcher.sol";
 import "hardhat/console.sol";
 
-/// @notice Contract for routing Trident exchange interactions.
-contract SwapRouter is ISwapRouter, TridentBatcher {
+/// @notice Trident exchange pool router.
+contract TridentRouter is ITridentRouter, TridentBatcher {
     /// @notice BentoBox token vault. 
     IBentoBoxMinimal public immutable bento;
     /// @notice ERC-20 token for wrapped ETH.
