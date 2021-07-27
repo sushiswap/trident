@@ -21,19 +21,15 @@ describe("Router", function () {
     const Bento = await ethers.getContractFactory("BentoBoxV1");
     const Deployer = await ethers.getContractFactory("MasterDeployer");
     const PoolFactory = await ethers.getContractFactory("HybridPoolFactory");
-    const SwapRouter = await ethers.getContractFactory("SwapRouter");
+    const SwapRouter = await ethers.getContractFactory("TridentRouter");
     const Pool = await ethers.getContractFactory("HybridPool");
 
     weth = await ERC20.deploy("WETH", "WETH", getBigNumber("10000000"));
     usdc = await ERC20.deploy("USDC", "USDC", getBigNumber("10000000"));
     bento = await Bento.deploy(weth.address);
     masterDeployer = await Deployer.deploy(17, feeTo.address, bento.address);
-    tridentPoolFactory = await PoolFactory.deploy();
-    router = await SwapRouter.deploy(
-      weth.address,
-      masterDeployer.address,
-      bento.address
-    );
+    tridentPoolFactory = await PoolFactory.deploy(masterDeployer.address);
+    router = await SwapRouter.deploy(bento.address, weth.address);
 
     // Whitelist pool factory in master deployer
     await masterDeployer.addToWhitelist(tridentPoolFactory.address);
