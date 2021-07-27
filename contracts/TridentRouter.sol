@@ -11,7 +11,7 @@ import "hardhat/console.sol";
 
 /// @notice Trident exchange pool router.
 contract TridentRouter is ITridentRouter, TridentBatcher {
-    /// @notice BentoBox token vault. 
+    /// @notice BentoBox token vault.
     IBentoBoxMinimal public immutable bento;
     /// @notice ERC-20 token for wrapped ETH.
     address public immutable wETH;
@@ -147,10 +147,10 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
         amountOut = _preFundedExactInputWithContext(params);
     }
 
-    function complexPath(ComplexPathParams calldata params) 
-        external 
-        payable 
-        checkDeadline(params.deadline) 
+    function complexPath(ComplexPathParams calldata params)
+        external
+        payable
+        checkDeadline(params.deadline)
     {
         for (uint256 i; i < params.initialPath.length; i++) {
             if (!params.initialPath[i].preFunded) {
@@ -208,10 +208,10 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
         address recipient,
         uint256 deadline,
         uint256 minLiquidity
-    ) 
-        external 
-        checkDeadline(deadline) 
-        returns (uint256 liquidity) 
+    )
+        external
+        checkDeadline(deadline)
+        returns (uint256 liquidity)
     {
         for (uint256 i; i < liquidityInput.length; i++) {
             if (liquidityInput[i].native) {
@@ -230,10 +230,10 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
         address pool,
         address recipient,
         uint256 deadline
-    ) 
-        external 
-        checkDeadline(deadline) 
-        returns (IPool.liquidityAmount[] memory liquidityOptimal, uint256 liquidity) 
+    )
+        external
+        checkDeadline(deadline)
+        returns (IPool.liquidityAmount[] memory liquidityOptimal, uint256 liquidity)
     {
         for (uint256 i; i < liquidityInput.length; i++) {
             liquidityInput[i].amountDesired = bento.toShare(
@@ -351,9 +351,9 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
         }
     }
 
-    function _preFundedExactInput(ExactInputParams memory params) 
-        internal 
-        returns (uint256 amount) 
+    function _preFundedExactInput(ExactInputParams memory params)
+        internal
+        returns (uint256 amount)
     {
         amount = bento.toShare(params.path[0].tokenIn, params.amountIn, false);
         uint256 lenMinusOne = params.path.length - 1;
