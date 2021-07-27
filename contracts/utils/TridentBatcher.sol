@@ -30,7 +30,6 @@ contract TridentBatcher {
     }
     
     /// @notice Provides EIP-2612 signed approval for this contract to spend user tokens.
-    /// @dev Reverts on failed {permit}.
     /// @param token Address of ERC-20 token.
     /// @param amount Token amount to grant spending right over.
     /// @param deadline Termination for signed approval (UTC timestamp in seconds).
@@ -51,7 +50,6 @@ contract TridentBatcher {
     }
     
     /// @notice Provides DAI-derived signed approval for this contract to spend user tokens.
-    /// @dev Reverts on failed {permit}.
     /// @param token Address of ERC-20 token.
     /// @param nonce Token owner's nonce  - increases at each call to {permit}.
     /// @param expiry Termination for signed approval - UTC timestamp in seconds.
