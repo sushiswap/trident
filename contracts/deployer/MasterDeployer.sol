@@ -7,7 +7,7 @@ import "../utils/TridentOwnable.sol";
 
 /// @notice Trident exchange pool deployer for whitelisted template factories.
 /// @author Mudit Gupta.
-contract MasterDeployer is Ownable {
+contract MasterDeployer is TridentOwnable {
     event NewPoolCreated(address indexed _factory, address indexed pool);
 
     mapping(address => bool) public whitelistedFactories;
