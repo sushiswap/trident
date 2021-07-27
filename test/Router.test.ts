@@ -13,7 +13,7 @@ describe("Router", function () {
     sushi,
     bento,
     masterDeployer,
-    mirinPoolFactory,
+    tridentPoolFactory,
     router,
     pool,
     dai,
@@ -29,7 +29,7 @@ describe("Router", function () {
     const PoolFactory = await ethers.getContractFactory(
       "ConstantProductPoolFactory"
     );
-    const SwapRouter = await ethers.getContractFactory("SwapRouter");
+    const SwapRouter = await ethers.getContractFactory("TridentRouter");
     const Pool = await ethers.getContractFactory("ConstantProductPool");
 
     weth = await ERC20.deploy("WETH", "ETH", getBigNumber("10000000"));
@@ -37,11 +37,11 @@ describe("Router", function () {
     dai = await ERC20.deploy("SUSHI", "SUSHI", getBigNumber("10000000"));
     bento = await Bento.deploy(weth.address);
     masterDeployer = await Deployer.deploy(17, feeTo.address, bento.address);
-    mirinPoolFactory = await PoolFactory.deploy(masterDeployer.address);
-    router = await SwapRouter.deploy(weth.address, bento.address);
+    tridentPoolFactory = await PoolFactory.deploy(masterDeployer.address);
+    router = await SwapRouter.deploy(bento.address, weth.address);
 
     // Whitelist pool factory in master deployer
-    await masterDeployer.addToWhitelist(mirinPoolFactory.address);
+    await masterDeployer.addToWhitelist(tridentPoolFactory.address);
 
     // Whitelist Router on BentoBox
     await bento.whitelistMasterContract(router.address, true);
@@ -89,7 +89,7 @@ describe("Router", function () {
     pool = await Pool.attach(
       (
         await (
-          await masterDeployer.deployPool(mirinPoolFactory.address, deployData)
+          await masterDeployer.deployPool(tridentPoolFactory.address, deployData)
         ).wait()
       ).events[0].args[0]
     );
@@ -101,7 +101,7 @@ describe("Router", function () {
     daiSushiPool = await Pool.attach(
       (
         await (
-          await masterDeployer.deployPool(mirinPoolFactory.address, deployData2)
+          await masterDeployer.deployPool(tridentPoolFactory.address, deployData2)
         ).wait()
       ).events[0].args[0]
     );
@@ -113,7 +113,7 @@ describe("Router", function () {
     daiWethPool = await Pool.attach(
       (
         await (
-          await masterDeployer.deployPool(mirinPoolFactory.address, deployData3)
+          await masterDeployer.deployPool(tridentPoolFactory.address, deployData3)
         ).wait()
       ).events[0].args[0]
     );
