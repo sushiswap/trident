@@ -25,7 +25,7 @@ contract MasterDeployer is TridentOwnable {
         uint256 _barFee,
         address _barFeeTo,
         address _bento
-    ) Ownable() {
+    ) {
         require(_barFee <= MAX_FEE, "MasterDeployer: INVALID_BAR_FEE");
         require(_barFeeTo != address(0), "MasterDeployer: ZERO_ADDRESS");
         require(_bento != address(0), "MasterDeployer: ZERO_ADDRESS");
