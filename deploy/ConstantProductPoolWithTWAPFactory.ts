@@ -11,12 +11,13 @@ const deployFunction: DeployFunction = async function ({
 
   const { deployer } = await getNamedAccounts();
 
+  const masterDeployer = await ethers.getContract("MasterDeployer");
+
   const { address } = await deploy("ConstantProductPoolWithTWAPFactory", {
     from: deployer,
     deterministicDeployment: false,
+    args: [masterDeployer.address],
   });
-
-  const masterDeployer = await ethers.getContract("MasterDeployer");
 
   if (!(await masterDeployer.whitelistedFactories(address))) {
     console.log(

@@ -9,13 +9,12 @@ const deployFunction: DeployFunction = async function ({
   console.log("Running HybridPoolFactory deploy script");
   const { deploy } = deployments;
   const { deployer } = await getNamedAccounts();
+  const masterDeployer = await ethers.getContract("MasterDeployer");
   const { address } = await deploy("HybridPoolFactory", {
     from: deployer,
     deterministicDeployment: false,
+    args: [masterDeployer.address],
   });
-
-  const masterDeployer = await ethers.getContract("MasterDeployer");
-
   if (!(await masterDeployer.whitelistedFactories(address))) {
     console.log("Add HybridPoolFactory to MasterDeployer whitelist");
     await masterDeployer.addToWhitelist(address);
