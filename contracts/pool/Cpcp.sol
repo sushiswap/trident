@@ -15,7 +15,6 @@ contract Cpcp {
     int24 previousTick;
     int24 nextTick;
     uint112 liquidity;
-    bool exists; // might not be necessary
   }
 
   mapping(int24 => Tick) public ticks;
@@ -40,9 +39,9 @@ contract Cpcp {
 
     sqrtPriceX96 = _sqrtPriceX96;
 
-    ticks[TickMath.MIN_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint112(0), true);
+    ticks[TickMath.MIN_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint112(0));
 
-    ticks[TickMath.MAX_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint112(0), true);
+    ticks[TickMath.MAX_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint112(0));
 
     nearestTick = TickMath.MIN_TICK;
 
@@ -111,40 +110,43 @@ contract Cpcp {
   function updateLinkedList(int24 lowerOld, int24 lower, int24 upperOld, int24 upper, uint112 amount) internal {
     
     require(uint24(lower) % 2 == 0, "Lower even");
-
     require(uint24(upper) % 2 == 1, "Upper odd");
 
-    if (ticks[lower].exists) {
+    require(TickMath.MIN_TICK <= lower && lower < TickMath.MAX_TICK, "Lower range");
+    require(TickMath.MIN_TICK < upper && upper <= TickMath.MAX_TICK, "Upper range");
+
+    if (ticks[lower].liquidity > 0 || lower == TickMath.MIN_TICK) { // we are adding liquidity to an existing tick
       
       ticks[lower].liquidity += amount;
 
-    } else {
+    } else { // inserting a new tick
       
       Tick storage old = ticks[lowerOld];
       
-      require(old.exists && old.nextTick > lower && lowerOld < lower, "Bad ticks");
+      require((old.liquidity > 0 || lowerOld == TickMath.MIN_TICK) && lowerOld < lower && lower < old.nextTick, "Lower order");
 
-      ticks[lower] = Tick(lowerOld, old.nextTick, amount, true);
-      
       old.nextTick = lower;
+      
+      ticks[lower] = Tick(lowerOld, old.nextTick, amount);
 
     }
 
-    if (ticks[upper].exists) {
+    if (ticks[upper].liquidity > 0 || upper == TickMath.MAX_TICK) { // we are adding liquidity to an existing tick
       
       ticks[upper].liquidity += amount;
 
-    } else {
+    } else { // inserting a new tick
       
       Tick storage old = ticks[upperOld];
       
-      require(old.exists && old.nextTick > upper && upperOld < upper, "Bad ticks");
+      require(old.liquidity > 0 && old.nextTick > upper && upperOld < upper, "Upper order");
 
-      ticks[upper] = Tick(upperOld, old.nextTick, amount, true);
+      ticks[upper] = Tick(upperOld, old.nextTick, amount);
       
       old.nextTick = upper;
 
     }
+
   }
 
   // price is √(y/x)
