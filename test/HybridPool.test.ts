@@ -93,7 +93,6 @@ describe("Router", function () {
 
   describe("HybridPool", function () {
     it("Pool should have correct tokens", async function () {
-      console.log("here 5", await pool.token0(), weth.address);
       expect(await pool.token0()).eq(weth.address);
       expect(await pool.token1()).eq(usdc.address);
     });

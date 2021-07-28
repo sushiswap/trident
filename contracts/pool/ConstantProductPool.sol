@@ -80,7 +80,6 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
         uint256 computed = TridentMath.sqrt(balance0 * balance1);
         if (_totalSupply == 0) {
-            console.log(computed, MINIMUM_LIQUIDITY);
             liquidity = computed - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
