@@ -51,15 +51,11 @@ interface IPool {
         external
         returns (liquidityAmount[] memory liquidityOptimal);
 
-    function mint(address recipient) external returns (uint256 liquidity);
+    function mint(bytes calldata mintData) external returns (uint256 liquidity);
 
-    function burn(address recipient, bool unwrapBento) external returns (liquidityAmount[] memory withdrawnAmounts);
+    function burn(bytes calldata burnData) external returns (liquidityAmount[] memory withdrawnAmounts);
 
-    function burnLiquiditySingle(
-        address tokenOut,
-        address recipient,
-        bool unwrapBento
-    ) external returns (uint256 amount);
+    function burnLiquiditySingle(bytes calldata burnData) external returns (uint256 amount);
 
     function poolType() external pure returns (uint256);
 
