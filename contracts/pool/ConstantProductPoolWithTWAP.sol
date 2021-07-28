@@ -6,6 +6,7 @@ import "../deployer/MasterDeployer.sol";
 import "../interfaces/IBentoBoxMinimal.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/ITridentCallee.sol";
+import "../libraries/TridentMath.sol";
 import "./TridentERC20.sol";
 import "hardhat/console.sol";
 
@@ -37,7 +38,7 @@ contract ConstantProductPoolWithTWAP is IPool, TridentERC20 {
     uint112 internal reserve0;
     uint112 internal reserve1;
     uint32 internal blockTimestampLast;
-    
+
     uint256 public constant override poolType = 2;
     uint256 public constant override assetsCount = 2;
     address[] public override assets;
@@ -71,57 +72,6 @@ contract ConstantProductPoolWithTWAP is IPool, TridentERC20 {
         unlocked = 1;
     }
 
-    /// @notice Adapted from https://github.com/abdk-consulting/abdk-libraries-solidity/blob/master/ABDKMath64x64.sol.
-    /// Copyright © 2019 by ABDK Consulting, License-Identifier: BSD-4-Clause.
-    /// @dev Calculate sqrt (x) rounding down, where x is unsigned 256-bit integer number.
-    /// @param x Unsigned 256-bit integer number.
-    /// @return calculated Unsigned 256-bit integer number.
-    function sqrt(uint256 x) internal pure returns (uint256 calculated) {
-        unchecked {
-            if (x == 0) calculated = 0;
-            else {
-                uint256 xx = x;
-                uint256 r = 1;
-                if (xx >= 0x100000000000000000000000000000000) {
-                    xx >>= 128;
-                    r <<= 64;
-                }
-                if (xx >= 0x10000000000000000) {
-                    xx >>= 64;
-                    r <<= 32;
-                }
-                if (xx >= 0x100000000) {
-                    xx >>= 32;
-                    r <<= 16;
-                }
-                if (xx >= 0x10000) {
-                    xx >>= 16;
-                    r <<= 8;
-                }
-                if (xx >= 0x100) {
-                    xx >>= 8;
-                    r <<= 4;
-                }
-                if (xx >= 0x10) {
-                    xx >>= 4;
-                    r <<= 2;
-                }
-                if (xx >= 0x8) {
-                    r <<= 1;
-                }
-                r = (r + x / r) >> 1;
-                r = (r + x / r) >> 1;
-                r = (r + x / r) >> 1;
-                r = (r + x / r) >> 1;
-                r = (r + x / r) >> 1;
-                r = (r + x / r) >> 1;
-                r = (r + x / r) >> 1; // @dev Seven iterations should be enough.
-                uint256 r1 = x / r;
-                r < r1 ? calculated = r : r1;
-            }
-        }
-    }
-
     function mint(address to) public override lock returns (uint256 liquidity) {
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         uint256 _totalSupply = totalSupply;
@@ -131,12 +81,12 @@ contract ConstantProductPoolWithTWAP is IPool, TridentERC20 {
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
 
-        uint256 computed = sqrt(balance0 * balance1);
+        uint256 computed = TridentMath.sqrt(balance0 * balance1);
         if (_totalSupply == 0) {
             liquidity = computed - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
-            uint256 k = sqrt(uint256(_reserve0) * _reserve1);
+            uint256 k = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
             liquidity = ((computed - k) * _totalSupply) / k;
         }
         require(liquidity > 0, "ConstantProductPoolWithTWAP: INSUFFICIENT_LIQUIDITY_MINTED");
@@ -170,7 +120,7 @@ contract ConstantProductPoolWithTWAP is IPool, TridentERC20 {
         balance1 -= amount1;
 
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        kLast = sqrt(balance0 * balance1);
+        kLast = TridentMath.sqrt(balance0 * balance1);
 
         withdrawnAmounts = new liquidityAmount[](2);
         withdrawnAmounts[0] = liquidityAmount({token: address(token0), amount: amount0});
@@ -212,7 +162,7 @@ contract ConstantProductPoolWithTWAP is IPool, TridentERC20 {
         }
 
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        kLast = sqrt(balance0 * balance1);
+        kLast = TridentMath.sqrt(balance0 * balance1);
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
@@ -313,7 +263,10 @@ contract ConstantProductPoolWithTWAP is IPool, TridentERC20 {
         uint112 _reserve1,
         uint32 _blockTimestampLast
     ) internal {
-        require(balance0 <= type(uint112).max && balance1 <= type(uint112).max, "ConstantProductPoolWithTWAP: OVERFLOW");
+        require(
+            balance0 <= type(uint112).max && balance1 <= type(uint112).max,
+            "ConstantProductPoolWithTWAP: OVERFLOW"
+        );
         uint32 blockTimestamp = uint32(block.timestamp % 2**32);
         if (blockTimestamp != _blockTimestampLast && _reserve0 != 0) {
             unchecked {
@@ -337,7 +290,7 @@ contract ConstantProductPoolWithTWAP is IPool, TridentERC20 {
     ) internal returns (uint256 computed) {
         uint256 _kLast = kLast;
         if (_kLast != 0) {
-            computed = sqrt(uint256(_reserve0) * _reserve1);
+            computed = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
             if (computed > _kLast) {
                 // @dev barFee % of increase in liquidity.
                 // @dev NB It's going to be slightly less than barFee % in reality due to the Math.
@@ -420,11 +373,17 @@ contract ConstantProductPoolWithTWAP is IPool, TridentERC20 {
 
         uint256 amount1Optimal = (liquidityInputs[0].amountDesired * _reserve1) / _reserve0;
         if (amount1Optimal <= liquidityInputs[1].amountDesired) {
-            require(amount1Optimal >= liquidityInputs[1].amountMin, "ConstantProductPoolWithTWAP: INSUFFICIENT_B_AMOUNT");
+            require(
+                amount1Optimal >= liquidityInputs[1].amountMin,
+                "ConstantProductPoolWithTWAP: INSUFFICIENT_B_AMOUNT"
+            );
             liquidityOptimal[1].amount = amount1Optimal;
         } else {
             uint256 amount0Optimal = (liquidityInputs[1].amountDesired * _reserve0) / _reserve1;
-            require(amount0Optimal >= liquidityInputs[0].amountMin, "ConstantProductPoolWithTWAP: INSUFFICIENT_A_AMOUNT");
+            require(
+                amount0Optimal >= liquidityInputs[0].amountMin,
+                "ConstantProductPoolWithTWAP: INSUFFICIENT_A_AMOUNT"
+            );
             liquidityOptimal[0].amount = amount0Optimal;
         }
 
