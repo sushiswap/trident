@@ -145,6 +145,13 @@ contract SwapRouterHarness is SwapRouter {
         returns (uint256 amount)
     {
     }
+    // A wrapper and override for addLiquidityUnbalance
+    function callAddLiquidityUnbalanced(address tokenIn1, uint256 amount1, address tokenIn2, uint256 amount2, address pool,  address to, uint256 deadline,uint256 minliquidity) public returns (uint256) {
+        IPool.liquidityInputOptimal[] memory liquidityInput = new IPool.liquidityInputOptimal[](2);
+        liquidityInput[0] = IPool.liquidityInputOptimal({token: tokenIn1, native : false , amount : amount1 });
+        liquidityInput[1] = IPool.liquidityInputOptimal({token: tokenIn2, native : false , amount : amount2 });
+        return super.addLiquidityUnbalanced(liquidityInput, pool, to, deadline, minliquidity);
+    }
 
     // A wrapper and override for addLiquidityUnbalance
     function callAddLiquidityUnbalanced(address tokenIn, uint256 amount, address pool,  address to, uint256 deadline,uint256 minliquidity) public returns (uint256) {
@@ -183,6 +190,20 @@ contract SwapRouterHarness is SwapRouter {
 
     }
     
+    function callBurnLiquidity(
+       address pool,
+       address token1,
+       address token2,
+       address to,
+       bool unwrapBento,
+       uint256 deadline,
+       uint256 liquidity
+    ) external checkDeadline(deadline) {
+        IPool.liquidityAmount[] memory liquidityAmount = new IPool.liquidityInput[](2);
+        liquidityAmount[0] = IPool.liquidityAmount(token1, 0);
+        liquidityAmount[1] = IPool.liquidityAmount(token2, 0);
+        return super.burnLiquidity(pool, to, unwrapBento, deadline, liquidity, liquidityAmount);
+    }
 
     function burnLiquidity(
         address pool,

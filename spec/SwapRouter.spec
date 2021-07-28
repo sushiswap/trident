@@ -212,7 +212,7 @@ rule inverseOfMintAndBurnSingle(address token, uint256 amount) {
     address user = e.msg.sender;
     
     require pool.hasToken(token);
-       
+
     require token != pool; 
     require user != bento && user != pool && user != currentContract;
     // pool is at a stable state 
@@ -223,6 +223,29 @@ rule inverseOfMintAndBurnSingle(address token, uint256 amount) {
     burnLiquiditySingle(e, pool, token, e.msg.sender, false, deadline, liquidity, 0);
     uint256 userTokenBalanceAfter = tokenBalanceOf(token, e.msg.sender);
     assert( userTokenBalanceAfter == userTokenBalanceBefore);
+
+}
+
+rule inverseOfMintAndBurnDual(address token1, address token2, uint256 amount1, uint256 amount2) {
+    env e;
+    uint256 deadline;
+    uint256 minLiquidity;
+    address user = e.msg.sender;
+
+    require pool.hasToken(token1);
+    require pool.hasToken(token2);
+
+    require token1 != pool && token2 != pool;
+    require user != bento && user != pool && user != currentContract;
+    // pool is at a stable state
+    require pool.isBalanced();
+    uint256 userToken1BalanceBefore = tokenBalanceOf(token1, e.msg.sender);
+    uint256 userToken2BalanceBefore = tokenBalanceOf(token2, e.msg.sender);
+    uint256 liquidity = callAddLiquidityUnbalanced(e, token1, amount1, token2, amount2, pool, e.msg.sender, deadline, minLiquidity);
+    callBurnLiquidity(e, pool, token1, token2, e.msg.sender, false, deadline, liquidity);
+    uint256 userToken1BalanceAfter = tokenBalanceOf(token1, e.msg.sender);
+    uint256 userToken2BalanceAfter = tokenBalanceOf(token2, e.msg.sender);
+    assert( userToken1BalanceAfter == userToken1BalanceBefore && userToken2BalanceAfter == userToken2BalanceBefore);
 
 }
 
