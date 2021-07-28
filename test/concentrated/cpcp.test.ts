@@ -1,9 +1,9 @@
 // @ts-nocheck
 import { ethers } from "hardhat";
-import { getBigNumber } from "./utilities";
+import { getBigNumber } from "../utilities";
 import { expect } from "chai";
-import { ERC20Mock } from "../typechain/ERC20Mock";
-import { Cpcp } from "../typechain/Cpcp";
+import { ERC20Mock } from "../../typechain/ERC20Mock";
+import { Cpcp } from "../../typechain/Cpcp";
 import { Signer } from "crypto";
 
 describe.only("Constant product concentrated pool (cpcp)", function () {
