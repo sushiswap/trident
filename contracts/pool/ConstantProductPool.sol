@@ -34,7 +34,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
     uint128 internal reserve0;
     uint128 internal reserve1;
-    
+
     uint256 public constant override poolType = 1;
     uint256 public constant override assetsCount = 2;
     address[] public override assets;
@@ -114,7 +114,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
                 r = (r + x / r) >> 1;
                 r = (r + x / r) >> 1; // @dev Seven iterations should be enough.
                 uint256 r1 = x / r;
-                r < r1 ? calculated = r : r1;
+                calculated = r < r1 ? r : r1;
             }
         }
     }
@@ -127,9 +127,10 @@ contract ConstantProductPool is IPool, TridentERC20 {
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
-
+        console.log(balance0, balance1, balance0 * balance1);
         uint256 computed = sqrt(balance0 * balance1);
         if (_totalSupply == 0) {
+            console.log(computed, MINIMUM_LIQUIDITY);
             liquidity = computed - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {

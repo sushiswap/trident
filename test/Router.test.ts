@@ -95,7 +95,7 @@ describe("Router", function () {
             deployData
           )
         ).wait()
-      ).events[0].args[0]
+      ).events[0].args[1]
     );
     addresses = [dai.address, sushi.address].sort();
     const deployData2 = ethers.utils.defaultAbiCoder.encode(
@@ -110,7 +110,7 @@ describe("Router", function () {
             deployData2
           )
         ).wait()
-      ).events[0].args[0]
+      ).events[0].args[1]
     );
     addresses = [dai.address, weth.address].sort();
     const deployData3 = ethers.utils.defaultAbiCoder.encode(
@@ -125,7 +125,7 @@ describe("Router", function () {
             deployData3
           )
         ).wait()
-      ).events[0].args[0]
+      ).events[0].args[1]
     );
   });
 
