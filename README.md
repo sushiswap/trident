@@ -1,79 +1,57 @@
-# Mirin: SushiSwap AMMv3
-MIRIN, a light alcohol particularly used to create sauces in Japanese cuisine, is the name of our proposed upgraded version of the SushiSwap protocol, or Sushi Protocol v3.
+# Trident: SushiSwap V2
+TRIDENT 🔱 is a newly developed AMM from Sushi. Trident is not a fork of any existing AMM -- the SushiSwap core team began development with Andre Cronje as Deriswap. This development continued on as Mirin developed by LevX. On May 12th, 2021 we began building Trident in earnest on the Mirin/Deriswap foundation.
 
-## Overview
+## Extensibility
 
-### Capital Efficiency ([Deriswap](https://andrecronje.medium.com/deriswap-capital-efficient-swaps-futures-options-and-loans-ea424b24a41c))
-Deriswap combines Swaps, Options, and Loans into a capital efficient single contract, allowing interaction between the two assets that make up the pair.
+Trident is designed as an extensible framework that allows the developers to implement new pool types that conform to the IPool interface. Before launch there will be an EIP submitted for the IPool interface design to standardize pool interfaces across Ethereum. As new pool types are designed or experimented with, they can be added to the AMM so long as they conform to the interface. In this way Trident will at minimum be superset of all AMM pool designs as well as being future proof architecture for Sushi to build on.
 
-#### Oracle
-The TWAP oracle was expanded to take readings every 30 minutes, this allows us to report realized variance, realized volatility, implied volatility (derived from Realizing Smiles), and price over an arbitrary selected time series.
+## New Pools
 
-#### Options
-The above derived values allow us to quote Call/Put options using Black Scholes. These are American options, and can be settled at any point in time. Settlement occurs in the pair assets, so a Call needs to buy the full value, and a Put needs to sell the full value.
+Initially Trident has been developed with four pool types.
 
-Combining swaps and Options have an interesting interaction, options are a trade on volatility, trading fees are a hedge against volatility. The pair volatility(+ve trading fees) offsets the losses from settled options (-ve settlement).
+### ConstantProductPool
 
-Full settlement was also selected since the LPs have a perpetual position on the pair itself, if only profits are settled that is a permanent loss, however if the underlying is settled, that is impermanent loss.
-Settlement can occur ITM, or OTM.
+Constant product pools are the the pools that users will be most familar with. Constant product pools are 50/50 pool, meaning you provide 50% of each of Token X and Token Y. In this pool type, swaps occur over an x*y=k constant product formula.
 
-Options are tokenized via Non Fungible Tokens (NFT) that allow the trade/creation of secondary markets.
+### HybridPool
 
-### Public/Franchised Pools
-In MIRIN, every pair (such as SUSHI-ETH) can have one Public Pool and multiple Franchised Pools.
+Hybrid pools allow the user to use a stableswap curve with reduced price impacts. Hybrid pools are best utilized for swapping like-kind assets. Hybrid pools are configurable to allow 2, 3, or any amount of assets.
 
-A public pool is the primary pool and it offers the standard swap fee (0.3% charged and 0.1% goes to xSUSHI holders).
+### ConcentratedLiquidityPool
 
-A franchised pool is technically separate, however, and we will give the reigns to the third party exchange to manage its pool in terms of user participation parameters. They can also have the option of offering liquidity providers an additional native governance token, which we will discuss more in further detail in the next heading, and can set transaction fee amounts. The fee structure we would like to bring to your attention is as follows: (0.1% — 10%; 0.05% goes to xSUSHI holders). Although capped at 10%, the exchange are able to hedge their risk by charging participants a fee within the aforementioned range.
+Concentrated liquidity pools are pools that allow liquidity providers to specify a range in which to provide liquidity in terms of the ratio of Token X to Token Y. The benefit of this design is it will allow liquidity providers to more narrowly scope their liquidity provisioning to maximize swap fees.
 
-### Integrated 1-Click Zap Features
+### WeightedPool
 
-* 1-Click Add liquidity from a single token
-* 1-Click Add liquidity from ETH
-* 1-Click Remove liquidity to a single token
-* 1-Click Remove liquidity to ETH
-* 1-Click Migrate from Uniswap
-* 1-Click Migrate from Balancer `Work in progress`
+Weighted pools will be similar to constant product pools with the exception that the pools will allow different weight types. A constant product pool has 50/50 weights of Token X to Token Y. Weighted pools will allow an arbitrary weight of Token X to Token Y. The advantage of this pool type is that it shifts the price impacts by the token weights.
 
-### New LP Curve Options
-For liquidity pool creators, two types of new curves are added so that they can maximize the capital efficiency when providing a new pool to the ecosystem. The constant product curve from SushiSwapV2 will still be available, however, the two new proposed options will be:
+All of these pools will have configurable fees that will allow liquidity providers to choose the pool that best suits their risk profile.
 
-#### Arbitrary Weighted Constant Product
- 
-Unlike v2, MIRIN supports each token on a pool can have different weights.
-We can define the equation for the invariant like this:
+As a gas saving measure we allow the pool deployer to disable TWAP oracles. Architecturally this makes the most sense for commonly used pairs that already have accurate Chainlink price oracles.
 
-<img src="https://latex.codecogs.com/gif.latex?k=r_0^{w_0}\cdot%20r_1^{w_1}" />
+## BentoBox Integration
 
-where <img src="https://latex.codecogs.com/gif.latex?r_0" />,
-<img src="https://latex.codecogs.com/gif.latex?r_1" />,
-<img src="https://latex.codecogs.com/gif.latex?w_0" /> and
-<img src="https://latex.codecogs.com/gif.latex?w_1" />, are reserve for first asset, reserve for second asset, weight for first asset and weight for second asset, respectively.
+Trident as a native application on our BentoBox platform. BentoBox is our architectural platform that allows us to build complex capital efficient applications on top. BentoBox works by receiving tokens to be utilized in strategies. Meanwhile, a virtual balance on top of BentoBox is used by the application such as Trident. These strategies are returned to the user enabling the most capital efficient experience. Infact, Trident will be the most capital efficient AMM in existence at launch.
 
-#### Mix of Constant Product + Sum Model
-> Work in progress
+So for instance, if a user were to place a limit order or provide liquidity for a pool the underlying tokens would be making additional yield even if no swaps were occurring.
 
-Fine-tuned for stable coins. (ex: Curve protocol)
+## Tines: Routing Engine
 
-### K3PR-Powered Yield Rebalancing
-> Work in progress.
+Tines is our new routing engine designed for our front end. Tines is an efficient multihop multiroute swap router. Tines will query our many pool types and consider factors such as gas costs, price impacts, and graph topology to generate a best price solution.
 
-MIRIN provides you an automatic yield rebalancing tool, powered by K3PR technology. This can benefit you, since you can add a dedicated job to seek out the best LP yields for you. Keepers do the dirty work of all the calculations and comparisons needed to find the highest returns and automatically switches into those optimal pairs.
+- Multihop - Tines can swap in between multiple pools to get the best price
+- Multiroute - Tines can distribute a trade horizontally to minimize price impacts (slippage)
 
-## RoadMap
-- [x] Franchised Pool
-- [x] Capital Efficiency (Deriswap)
-- [ ] New Curve Options (ETA: late-March)
-- [ ] K3PR-Powered Yield Rebalancing (ETA: mid-April)
-- [ ] Test Coverage (ETA: late-April)
-- [ ] Gas Optimization & Internal Audit (ETA: mid-May)
-- [ ] Formal Verification (ETA: late-May)
+Different asset types perform better in different pool types. For instance like kind assets such as wBTC and renBTC tend to perform better in hybrid pools. Tines will allow routing more effectively to make multiple pools act as a unified pool resulting in drastically reduced price impacts.
 
-## License
+## License (GPL3)
 
-Distributed under the MIT License. See `LICENSE` for more information.
+At Sushi we beleive deeply in the open source ecosystem of defi. Our Trident contract set will be GPL3. As a matter of principle Sushi will continue to release all software that we develop or own under GPL3 or other permissive OSS licenses.
 
-## Contact
+## Post Launch Roadmap
 
-* [Andre Cronje](https://twitter.com/AndreCronjeTech/)
-* [LevX](https://twitter.com/LevxApp/)
+- Franchise pools
+    - Following the launch of Trident the organization will begin working on franchise pools. Franchise pools are a way to allow institutional to provide liquidity on decentralized exchanges while meeting the needs of their compliance. These pools will be differentiated from the main Trident AMM and will allow institutions to whitelist liquidity providers and swappers.
+
+- Storage Proof TWAP
+    - The Trident implementation will allow for the presentation of a storage proof to give two simultaneous snapshots of the cummulative price. To do this, the user using the TWAP price will present a merkle proof where the block root is less than 256 blocks behind the canonical head. On chain the contracts will validate the validity of the storage proof and value to allow an instant TWAP snapshot. We have repurposed another implementation for Kashi and is currently deployed on Polygon. We are worknig on a reduced gas consumption version for a deployment on Ethereum. 

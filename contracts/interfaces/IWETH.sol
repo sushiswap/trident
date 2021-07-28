@@ -1,13 +1,11 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 pragma solidity >=0.5.0;
 
-interface IWETH {
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+interface IWETH is IERC20 {
     function deposit() external payable;
 
     function withdraw(uint256) external;
-
-    function transfer(address recipient, uint256 amount) external returns (bool);
-
-    function balanceOf(address account) external view returns (uint256);
 }

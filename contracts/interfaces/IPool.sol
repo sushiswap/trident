@@ -1,11 +1,12 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 pragma solidity >=0.5.0;
 pragma experimental ABIEncoderV2;
 
+/// @notice Interface for Trident exchange pool interactions.
 interface IPool {
     event Swap(
-        address indexed recepient,
+        address indexed recipient,
         address indexed tokenIn,
         address indexed tokenOut,
         uint256 amountIn,
@@ -50,13 +51,19 @@ interface IPool {
         external
         returns (liquidityAmount[] memory liquidityOptimal);
 
-    function mint(address to) external returns (uint256 liquidity);
+    function mint(address recipient) external returns (uint256 liquidity);
 
-    function burn(address to, bool unwrapBento) external returns (liquidityAmount[] memory withdrawnAmounts);
+    function burn(address recipient, bool unwrapBento) external returns (liquidityAmount[] memory withdrawnAmounts);
 
     function burnLiquiditySingle(
         address tokenOut,
-        address to,
+        address recipient,
         bool unwrapBento
     ) external returns (uint256 amount);
+
+    function poolType() external pure returns (uint256);
+
+    function assets(uint256 index) external view returns (address);
+
+    function assetsCount() external view returns (uint256);
 }
