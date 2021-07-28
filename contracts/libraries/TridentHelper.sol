@@ -10,7 +10,7 @@ library TridentHelper {
     /// @return amount Token amount.
     function balanceOfThis(address token) internal view returns (uint256 amount) {
         (bool success, bytes memory data) = token.staticcall(abi.encodeWithSelector(0x70a08231, address(this))); // @dev balanceOf(address).
-        require(success && data.length >= 32, "TridentHelper: BALANCE_OF_FAILED");
+        require(success && data.length >= 32, "BALANCE_OF_FAILED");
         amount = abi.decode(data, (uint256));
     }
 
@@ -25,7 +25,7 @@ library TridentHelper {
         uint256 amount
     ) internal {
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0xa9059cbb, recipient, amount)); // @dev transfer(address,uint256).
-        require(success && (data.length == 0 || abi.decode(data, (bool))), "TridentHelper: TRANSFER_FAILED");
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "TRANSFER_FAILED");
     }
 
     /// @notice Provides safe ERC20.transferFrom for tokens that do not consistently return true/false.
@@ -41,7 +41,7 @@ library TridentHelper {
         uint256 amount
     ) internal {
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x23b872dd, from, recipient, amount)); // @dev transferFrom(address,address,uint256).
-        require(success && (data.length == 0 || abi.decode(data, (bool))), "TridentHelper: TRANSFER_FROM_FAILED");
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "TRANSFER_FROM_FAILED");
     }
 
     /// @notice Provides gas-optimized {balanceOfThis} check on `wETH` and matching {withdraw}.
@@ -49,7 +49,7 @@ library TridentHelper {
     /// @param wETH Address of ERC-20 token for wrapped ETH.
     function withdrawFromWETH(address wETH, uint256 balanceWETH) internal {
         (bool success, ) = wETH.call(abi.encodeWithSelector(0x2e1a7d4d, balanceWETH)); // @dev withdraw(uint256).
-        require(success, "TridentHelper: WITHDRAW_FROM_WETH_FAILED");
+        require(success, "WITHDRAW_FROM_WETH_FAILED");
     }
 
     /// @notice Provides safe ETH transfer.
@@ -58,6 +58,6 @@ library TridentHelper {
     /// @param amount ETH amount to send.
     function safeTransferETH(address recipient, uint256 amount) internal {
         (bool success, ) = recipient.call{value: amount}("");
-        require(success, "TridentHelper: ETH_TRANSFER_FAILED");
+        require(success, "ETH_TRANSFER_FAILED");
     }
 }
