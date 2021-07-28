@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import { BigNumber } from "@ethersproject/bignumber";
 import { ethers } from "hardhat";
 import { expect } from "chai";
@@ -24,12 +26,16 @@ describe("Router", function () {
     const SwapRouter = await ethers.getContractFactory("TridentRouter");
     const Pool = await ethers.getContractFactory("HybridPool");
 
+    console.log("here");
+
     weth = await ERC20.deploy("WETH", "WETH", getBigNumber("10000000"));
     usdc = await ERC20.deploy("USDC", "USDC", getBigNumber("10000000"));
     bento = await Bento.deploy(weth.address);
     masterDeployer = await Deployer.deploy(17, feeTo.address, bento.address);
     tridentPoolFactory = await PoolFactory.deploy(masterDeployer.address);
     router = await SwapRouter.deploy(bento.address, weth.address);
+
+    console.log("here2");
 
     // Whitelist pool factory in master deployer
     await masterDeployer.addToWhitelist(tridentPoolFactory.address);
@@ -68,6 +74,7 @@ describe("Router", function () {
       ["address", "address", "uint8", "uint256"],
       [weth.address, usdc.address, 30, 200000]
     );
+    console.log("here3");
     pool = await Pool.attach(
       (
         await (
@@ -78,10 +85,12 @@ describe("Router", function () {
         ).wait()
       ).events[0].args[0]
     );
+    console.log("here4", await pool.token0());
   });
 
   describe("HybridPool", function () {
     it("Pool should have correct tokens", async function () {
+      console.log("here 5", await pool.token0(), weth.address);
       expect(await pool.token0()).eq(weth.address);
       expect(await pool.token1()).eq(usdc.address);
     });

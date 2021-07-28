@@ -1,10 +1,11 @@
 // @ts-nocheck
 
-import { ethers } from "hardhat";
-import { expect } from "chai";
-import { prepare, deploy, getBigNumber } from "./utilities";
+import { deploy, getBigNumber, prepare } from "./utilities";
+
 import { BigNumber } from "ethers";
 import { Multicall } from "../typechain/Multicall";
+import { ethers } from "hardhat";
+import { expect } from "chai";
 
 describe("Router", function () {
   let alice,
@@ -89,7 +90,10 @@ describe("Router", function () {
     pool = await Pool.attach(
       (
         await (
-          await masterDeployer.deployPool(tridentPoolFactory.address, deployData)
+          await masterDeployer.deployPool(
+            tridentPoolFactory.address,
+            deployData
+          )
         ).wait()
       ).events[0].args[0]
     );
@@ -101,7 +105,10 @@ describe("Router", function () {
     daiSushiPool = await Pool.attach(
       (
         await (
-          await masterDeployer.deployPool(tridentPoolFactory.address, deployData2)
+          await masterDeployer.deployPool(
+            tridentPoolFactory.address,
+            deployData2
+          )
         ).wait()
       ).events[0].args[0]
     );
@@ -113,7 +120,10 @@ describe("Router", function () {
     daiWethPool = await Pool.attach(
       (
         await (
-          await masterDeployer.deployPool(tridentPoolFactory.address, deployData3)
+          await masterDeployer.deployPool(
+            tridentPoolFactory.address,
+            deployData3
+          )
         ).wait()
       ).events[0].args[0]
     );
