@@ -1,23 +1,17 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity ^0.8.2;
+pragma solidity >=0.8.0;
 
 import "./HybridPool.sol";
 import "./PairPoolDeployer.sol";
 
-/**
- * @author Mudit Gupta
- */
+/// @notice Contract for deploying Trident exchange Hybrid Pool with configurations.
+/// @author Mudit Gupta.
 contract HybridPoolFactory is PairPoolDeployer {
     constructor(address _masterDeployer) PairPoolDeployer(_masterDeployer) {}
 
-    function deployPool(bytes memory _deployData) external returns (address) {
+    function deployPool(bytes memory _deployData) external returns (address pool) {
         (address tokenA, address tokenB, , ) = abi.decode(_deployData, (address, address, uint256, uint256));
-        return
-            _deployPool(
-                address(tokenA),
-                address(tokenB),
-                abi.encodePacked(type(HybridPool).creationCode, abi.encode(_deployData, masterDeployer))
-            );
+        pool = _deployPool(tokenA, tokenB, type(HybridPool).creationCode, _deployData);
     }
 }

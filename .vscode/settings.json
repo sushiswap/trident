@@ -2,7 +2,7 @@
   "mochaExplorer.files": "test/**/*.{j,t}s",
   "mochaExplorer.fullTrace": true,
   "mochaExplorer.exit": true,
-  "solidity.compileUsingRemoteVersion": "v0.8.2+commit.661d1103",
+  "solidity.compileUsingRemoteVersion": "latest",
   "solidity.compilerOptimization": 200,
   "solidity.compileUsingLocalVersion": "",
   "solidity.linter": "solhint",
