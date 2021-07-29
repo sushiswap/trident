@@ -11,7 +11,7 @@ contract ConstantProductPoolFactory is PairPoolDeployer {
     constructor(address _masterDeployer) PairPoolDeployer(_masterDeployer) {}
 
     function deployPool(bytes memory _deployData) external returns (address pool) {
-        (address tokenA, address tokenB, ) = abi.decode(_deployData, (address, address, uint256));
+        (address tokenA, address tokenB, , ) = abi.decode(_deployData, (address, address, uint256, bool));
         pool = _deployPool(tokenA, tokenB, type(ConstantProductPool).creationCode, _deployData);
     }
 }
