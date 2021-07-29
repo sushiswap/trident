@@ -108,22 +108,26 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
     return [poolInfo, pool];
   }
 
+  let swapDirection = true;
   async function checkSwap(pool, poolRouterInfo, swapAmountExp) {
     const [jsValue, bnValue] = getIntegerRandomValue(swapAmountExp);
-    const amountOutPool = (await pool.getAmountOut(usdt.address, usdc.address, bnValue)).toString();
-    const amountOutPrediction = calcOutByIn(poolRouterInfo, jsValue, true);
+    const [t0, t1] = swapDirection ? [usdt.address, usdc.address] : [usdc.address, usdt.address]
+    const amountOutPool = (await pool.getAmountOut(t0, t1, bnValue)).toString();
+    const amountOutPrediction = calcOutByIn(poolRouterInfo, jsValue, swapDirection);
     //console.log(Math.abs(amountOutPrediction/amountOutPool-1), amountOutPrediction, amountOutPool);
     expect(areCloseValues(amountOutPrediction, amountOutPool, 1e-12)).equals(true);
-    if (poolRouterInfo.reserve1 - amountOutPool < MINIMUM_LIQUIDITY)
+    const reserveOut = swapDirection ? poolRouterInfo.reserve1 : poolRouterInfo.reserve0;
+    if (reserveOut - amountOutPool < MINIMUM_LIQUIDITY)
       return;
-    const amounInExpected = calcInByOut(poolRouterInfo, amountOutPrediction, true);
-    const amountOutPrediction2 = calcOutByIn(poolRouterInfo, amounInExpected, true);
+    const amounInExpected = calcInByOut(poolRouterInfo, amountOutPrediction, swapDirection);
+    const amountOutPrediction2 = calcOutByIn(poolRouterInfo, amounInExpected, swapDirection);
     // console.log(Math.abs(amounInExpected/jsValue-1), amounInExpected, jsValue);
     // console.log(Math.abs(amountOutPrediction/amountOutPrediction2-1), amountOutPrediction, amountOutPrediction2);
     expect(
       areCloseValues(amounInExpected, jsValue, 1e-12) 
       || areCloseValues(amountOutPrediction, amountOutPrediction2, 1e-12)
     ).equals(true);
+    swapDirection = !swapDirection;
   }
 
   describe("Check regular liquidity values", function () {
