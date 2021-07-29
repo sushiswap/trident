@@ -5,7 +5,7 @@ const seedrandom = require("seedrandom")
 const { calcOutByIn, calcInByOut } = require("@sushiswap/sdk");
 const { prepare, deploy, getBigNumber } = require("../utilities");
 
-const testSeed = '1';   // Change it to change random generator values
+const testSeed = '2';   // Change it to change random generator values
 const rnd = seedrandom(testSeed); // random [0, 1)
 
 const MINIMUM_LIQUIDITY = 1000;
@@ -172,6 +172,28 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
     for (let mintNum = 0; mintNum < 10; ++mintNum) {
       it(`Test ${mintNum+1}`, async function() {
         const [poolRouterInfo, pool] = await createConstantProductPool(0.003, 33, 33);
+
+        // test regular values
+        for (let swapNum = 0; swapNum < 3; ++swapNum) {
+          await checkSwap(pool, poolRouterInfo, 17);
+        }
+        // test small values
+        for (let swapNum = 0; swapNum < 3; ++swapNum) {
+          await checkSwap(pool, poolRouterInfo, 2);
+        }
+        //test extremely big values 2^112 = 10^33.7153
+        for (let swapNum = 0; swapNum < 3; ++swapNum) {
+          await checkSwap(pool, poolRouterInfo, 33);
+        }
+      });
+    }
+  })
+
+  describe("Check different fees", function () {
+    for (let mintNum = 0; mintNum < 10; ++mintNum) {
+      const fee = (mintNum+1)/1000;
+      it(`fee = ${fee}`, async function() {
+        const [poolRouterInfo, pool] = await createConstantProductPool(fee, 19, 19);
 
         // test regular values
         for (let swapNum = 0; swapNum < 3; ++swapNum) {
