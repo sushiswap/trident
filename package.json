@@ -75,6 +75,7 @@
     "lint-staged": "^11.0.1",
     "prettier": "^2.3.2",
     "prettier-plugin-solidity": "^1.0.0-beta.17",
+    "seedrandom": "^3.0.5",
     "solhint": "^3.0.0",
     "solhint-plugin-prettier": "^0.0.5",
     "solidity-coverage": "^0.7.0",
