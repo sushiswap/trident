@@ -1,10 +1,11 @@
 // @ts-nocheck
 
-import { ethers } from "hardhat";
-import { expect } from "chai";
-import { prepare, deploy, getBigNumber } from "./utilities";
+import { deploy, getBigNumber, prepare } from "./utilities";
+
 import { BigNumber } from "ethers";
 import { Multicall } from "../typechain/Multicall";
+import { ethers } from "hardhat";
+import { expect } from "chai";
 
 describe("Router", function () {
   let alice,
@@ -13,7 +14,7 @@ describe("Router", function () {
     sushi,
     bento,
     masterDeployer,
-    mirinPoolFactory,
+    tridentPoolFactory,
     router,
     pool,
     dai,
@@ -29,7 +30,7 @@ describe("Router", function () {
     const PoolFactory = await ethers.getContractFactory(
       "ConstantProductPoolFactory"
     );
-    const SwapRouter = await ethers.getContractFactory("SwapRouter");
+    const SwapRouter = await ethers.getContractFactory("TridentRouter");
     const Pool = await ethers.getContractFactory("ConstantProductPool");
 
     weth = await ERC20.deploy("WETH", "ETH", getBigNumber("10000000"));
@@ -37,11 +38,11 @@ describe("Router", function () {
     dai = await ERC20.deploy("SUSHI", "SUSHI", getBigNumber("10000000"));
     bento = await Bento.deploy(weth.address);
     masterDeployer = await Deployer.deploy(17, feeTo.address, bento.address);
-    mirinPoolFactory = await PoolFactory.deploy(masterDeployer.address);
-    router = await SwapRouter.deploy(weth.address, bento.address);
+    tridentPoolFactory = await PoolFactory.deploy(masterDeployer.address);
+    router = await SwapRouter.deploy(bento.address, weth.address);
 
     // Whitelist pool factory in master deployer
-    await masterDeployer.addToWhitelist(mirinPoolFactory.address);
+    await masterDeployer.addToWhitelist(tridentPoolFactory.address);
 
     // Whitelist Router on BentoBox
     await bento.whitelistMasterContract(router.address, true);
@@ -83,39 +84,48 @@ describe("Router", function () {
     // Pool deploy data
     let addresses = [weth.address, sushi.address].sort();
     const deployData = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8"],
-      [addresses[0], addresses[1], 30]
+      ["address", "address", "uint8", "bool"],
+      [addresses[0], addresses[1], 30, false]
     );
     pool = await Pool.attach(
       (
         await (
-          await masterDeployer.deployPool(mirinPoolFactory.address, deployData)
+          await masterDeployer.deployPool(
+            tridentPoolFactory.address,
+            deployData
+          )
         ).wait()
-      ).events[0].args[0]
+      ).events[0].args[1]
     );
     addresses = [dai.address, sushi.address].sort();
     const deployData2 = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8"],
-      [addresses[0], addresses[1], 30]
+      ["address", "address", "uint8", "bool"],
+      [addresses[0], addresses[1], 30, false]
     );
     daiSushiPool = await Pool.attach(
       (
         await (
-          await masterDeployer.deployPool(mirinPoolFactory.address, deployData2)
+          await masterDeployer.deployPool(
+            tridentPoolFactory.address,
+            deployData2
+          )
         ).wait()
-      ).events[0].args[0]
+      ).events[0].args[1]
     );
     addresses = [dai.address, weth.address].sort();
     const deployData3 = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8"],
-      [addresses[0], addresses[1], 30]
+      ["address", "address", "uint8", "bool"],
+      [addresses[0], addresses[1], 30, false]
     );
     daiWethPool = await Pool.attach(
       (
         await (
-          await masterDeployer.deployPool(mirinPoolFactory.address, deployData3)
+          await masterDeployer.deployPool(
+            tridentPoolFactory.address,
+            deployData3
+          )
         ).wait()
-      ).events[0].args[0]
+      ).events[0].args[1]
     );
   });
 

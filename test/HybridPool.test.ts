@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import { BigNumber } from "@ethersproject/bignumber";
 import { ethers } from "hardhat";
 import { expect } from "chai";
@@ -16,24 +18,28 @@ describe("Router", function () {
 
   before(async function () {
     [alice, feeTo] = await ethers.getSigners();
-
     const ERC20 = await ethers.getContractFactory("ERC20Mock");
     const Bento = await ethers.getContractFactory("BentoBoxV1");
     const Deployer = await ethers.getContractFactory("MasterDeployer");
     const PoolFactory = await ethers.getContractFactory("HybridPoolFactory");
-    const SwapRouter = await ethers.getContractFactory("SwapRouter");
+    const SwapRouter = await ethers.getContractFactory("TridentRouter");
     const Pool = await ethers.getContractFactory("HybridPool");
-
     weth = await ERC20.deploy("WETH", "WETH", getBigNumber("10000000"));
+
+    await weth.deployed();
     usdc = await ERC20.deploy("USDC", "USDC", getBigNumber("10000000"));
+    await usdc.deployed();
+
     bento = await Bento.deploy(weth.address);
+    await bento.deployed();
+
     masterDeployer = await Deployer.deploy(17, feeTo.address, bento.address);
-    tridentPoolFactory = await PoolFactory.deploy();
-    router = await SwapRouter.deploy(
-      weth.address,
-      masterDeployer.address,
-      bento.address
-    );
+    await masterDeployer.deployed();
+
+    tridentPoolFactory = await PoolFactory.deploy(masterDeployer.address);
+    await tridentPoolFactory.deployed();
+    router = await SwapRouter.deploy(bento.address, weth.address);
+    await router.deployed();
 
     // Whitelist pool factory in master deployer
     await masterDeployer.addToWhitelist(tridentPoolFactory.address);
@@ -72,6 +78,7 @@ describe("Router", function () {
       ["address", "address", "uint8", "uint256"],
       [weth.address, usdc.address, 30, 200000]
     );
+
     pool = await Pool.attach(
       (
         await (
@@ -80,16 +87,11 @@ describe("Router", function () {
             deployData
           )
         ).wait()
-      ).events[0].args[0]
+      ).events[0].args[1]
     );
   });
 
   describe("HybridPool", function () {
-    it("Pool should have correct tokens", async function () {
-      expect(await pool.token0()).eq(weth.address);
-      expect(await pool.token1()).eq(usdc.address);
-    });
-
     it("Should add liquidity directly to the pool", async function () {
       await bento.transfer(
         weth.address,
@@ -365,7 +367,11 @@ describe("Router", function () {
 
     it("Should swap some tokens", async function () {
       let amountIn = BigNumber.from(10).pow(18);
-      let expectedAmountOut = await pool.getAmountOut(weth.address, amountIn);
+      let expectedAmountOut = await pool.getAmountOut(
+        weth.address,
+        usdc.address,
+        amountIn
+      );
       expect(expectedAmountOut).gt(1);
       let params = {
         tokenIn: weth.address,
@@ -400,15 +406,19 @@ describe("Router", function () {
       expect(await bento.balanceOf(usdc.address, alice.address)).eq(
         oldAliceUsdcBalance.add(expectedAmountOut)
       );
-      expect(await bento.balanceOf(weth.address, pool.address)).eq(
-        oldPoolWethBalance.add(amountIn)
+      expect(await bento.balanceOf(weth.address, pool.address)).gt(
+        oldPoolWethBalance
       );
       expect(await bento.balanceOf(usdc.address, pool.address)).eq(
         oldPoolUsdcBalance.sub(expectedAmountOut)
       );
 
       amountIn = expectedAmountOut;
-      expectedAmountOut = await pool.getAmountOut(usdc.address, amountIn);
+      expectedAmountOut = await pool.getAmountOut(
+        usdc.address,
+        weth.address,
+        amountIn
+      );
       expect(expectedAmountOut).lt(BigNumber.from(10).pow(18));
       params = {
         tokenIn: usdc.address,
@@ -431,7 +441,7 @@ describe("Router", function () {
       expect(await bento.balanceOf(weth.address, pool.address)).gt(
         oldPoolWethBalance
       );
-      expect(await bento.balanceOf(usdc.address, pool.address)).eq(
+      expect(await bento.balanceOf(usdc.address, pool.address)).lt(
         oldPoolUsdcBalance
       );
     });
@@ -440,6 +450,7 @@ describe("Router", function () {
       let amountIn = BigNumber.from(10).pow(18);
       let expectedAmountOutSingleHop = await pool.getAmountOut(
         weth.address,
+        usdc.address,
         amountIn
       );
       expect(expectedAmountOutSingleHop).gt(1);
@@ -619,7 +630,11 @@ describe("Router", function () {
 
     it("Should swap some native tokens", async function () {
       let amountIn = BigNumber.from(10).pow(18);
-      let expectedAmountOut = await pool.getAmountOut(weth.address, amountIn);
+      let expectedAmountOut = await pool.getAmountOut(
+        weth.address,
+        usdc.address,
+        amountIn
+      );
       expect(expectedAmountOut).gt(1);
       let params = {
         tokenIn: weth.address,

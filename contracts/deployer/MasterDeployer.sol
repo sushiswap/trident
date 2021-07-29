@@ -3,11 +3,11 @@
 pragma solidity >=0.8.0;
 
 import "../interfaces/IPoolFactory.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "../utils/TridentOwnable.sol";
 
 /// @notice Trident exchange pool deployer for whitelisted template factories.
 /// @author Mudit Gupta.
-contract MasterDeployer is Ownable {
+contract MasterDeployer is TridentOwnable {
     event NewPoolCreated(address indexed _factory, address indexed pool);
 
     mapping(address => bool) public whitelistedFactories;
@@ -25,7 +25,7 @@ contract MasterDeployer is Ownable {
         uint256 _barFee,
         address _barFeeTo,
         address _bento
-    ) Ownable() {
+    ) {
         require(_barFee <= MAX_FEE, "MasterDeployer: INVALID_BAR_FEE");
         require(_barFeeTo != address(0), "MasterDeployer: ZERO_ADDRESS");
         require(_bento != address(0), "MasterDeployer: ZERO_ADDRESS");

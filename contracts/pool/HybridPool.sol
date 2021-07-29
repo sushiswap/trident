@@ -127,13 +127,18 @@ contract HybridPool is IPool, TridentERC20 {
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
-    function burn(address to, bool unwrapBento) external override returns (liquidityAmount[] memory withdrawnAmounts) {}
+    function burn(address to, bool unwrapBento)
+        external
+        override
+        lock
+        returns (liquidityAmount[] memory withdrawnAmounts)
+    {}
 
     function burnLiquiditySingle(
         address tokenOut,
         address to,
         bool unwrapBento
-    ) external override returns (uint256 amount) {}
+    ) external override lock returns (uint256 amount) {}
 
     function swapWithoutContext(
         address tokenIn,
@@ -156,6 +161,7 @@ contract HybridPool is IPool, TridentERC20 {
             uint256 fee = _handleFee(tokenIn, amountIn);
             finalAmountOut = _getAmountOut(amountIn - fee, _reserve1, _reserve0, false);
         }
+        console.log("Sending", finalAmountOut);
 
         _transferAmount(tokenOut, recipient, finalAmountOut, unwrapBento);
         _updateReserves();
@@ -171,8 +177,10 @@ contract HybridPool is IPool, TridentERC20 {
     ) public override lock returns (uint256 amountOut) {
         (uint256 _reserve0, uint256 _reserve1) = _reserve();
         uint256 fee;
+
         if (tokenIn == address(token0)) {
             require(tokenOut == address(token1), "HybridPool: Invalid output token");
+            amountIn = bento.toAmount(token0, amountIn, false);
             fee = (amountIn * swapFee) / MAX_FEE;
             amountOut = _getAmountOut(amountIn - fee, _reserve0, _reserve1, true);
             _processSwap(tokenIn, tokenOut, recipient, amountIn, amountOut, context, unwrapBento);
@@ -181,6 +189,7 @@ contract HybridPool is IPool, TridentERC20 {
         } else {
             require(tokenIn == address(token1), "HybridPool: Invalid input token");
             require(tokenOut == address(token0), "HybridPool: Invalid output token");
+            amountIn = bento.toAmount(token1, amountIn, false);
             fee = (amountIn * swapFee) / MAX_FEE;
             amountOut = _getAmountOut(amountIn - fee, _reserve1, _reserve0, false);
             _processSwap(tokenIn, tokenOut, recipient, amountIn, amountOut, context, unwrapBento);
@@ -220,7 +229,8 @@ contract HybridPool is IPool, TridentERC20 {
 
     function _handleFee(address tokenIn, uint256 amountIn) internal returns (uint256 fee) {
         fee = (amountIn * swapFee) / MAX_FEE;
-        _transferAmount(tokenIn, barFeeTo, fee, false);
+        uint256 barFee = (fee * masterDeployer.barFee()) / MAX_FEE;
+        _transferAmount(tokenIn, barFeeTo, barFee, false);
     }
 
     function _updateReserves() internal {
@@ -249,11 +259,14 @@ contract HybridPool is IPool, TridentERC20 {
         uint256 amountIn
     ) external view returns (uint256 amountOut) {
         (uint256 _reserve0, uint256 _reserve1) = _reserve();
+        amountIn = bento.toAmount(tokenIn, amountIn, false);
+        amountIn -= (amountIn * swapFee) / MAX_FEE;
         if (tokenIn == token0) {
             amountOut = _getAmountOut(amountIn, _reserve0, _reserve1, true);
         } else {
             amountOut = _getAmountOut(amountIn, _reserve1, _reserve0, false);
         }
+        console.log("Should Send", amountOut);
     }
 
     function getOptimalLiquidityInAmounts(liquidityInput[] memory liquidityInputs)

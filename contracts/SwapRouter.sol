@@ -3,14 +3,15 @@
 pragma solidity >=0.8.0;
 
 import "./interfaces/IBentoBoxMinimal.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IPool.sol";
-import "./interfaces/ISwapRouter.sol";
-import "./libraries/TridentHelper.sol";
-import "./TridentBatcher.sol";
+import "./interfaces/IWETH.sol";
+import "./interfaces/ITridentRouter.sol";
+import "./utils/TridentBatcher.sol";
 import "hardhat/console.sol";
 
-/// @notice Contract for routing Trident exchange interactions.
-contract SwapRouter is ISwapRouter, TridentBatcher {
+/// @notice Trident exchange pool router.
+contract TridentRouter is ITridentRouter, TridentBatcher {
     /// @notice BentoBox token vault.
     IBentoBoxMinimal public immutable bento;
     /// @notice ERC-20 token for wrapped ETH.
@@ -23,12 +24,12 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
     }
 
     modifier checkDeadline(uint256 deadline) {
-        require(block.timestamp <= deadline, "SwapRouter: TX_TOO_OLD");
+        require(block.timestamp <= deadline, "TX_TOO_OLD");
         _;
     }
 
     receive() external payable {
-        require(msg.sender == wETH, "SwapRouter: NOT_WETH");
+        require(msg.sender == wETH);
     }
 
     function exactInputSingle(ExactInputSingleParams calldata params)
@@ -45,7 +46,7 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
             params.unwrapBento
         );
         amountOut = bento.toAmount(params.tokenOut, amountOut, false);
-        require(amountOut >= params.amountOutMinimum, "SwapRouter: TOO_LITTLE_RECEIVED");
+        require(amountOut >= params.amountOutMinimum, "TOO_LITTLE_RECEIVED");
     }
 
     function exactInput(ExactInputParams calldata params)
@@ -73,7 +74,7 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
             params.unwrapBento
         );
         amountOut = bento.toAmount(params.tokenOut, amountOut, false);
-        require(amountOut >= params.amountOutMinimum, "SwapRouter: TOO_LITTLE_RECEIVED");
+        require(amountOut >= params.amountOutMinimum, "TOO_LITTLE_RECEIVED");
     }
 
     function exactInputWithNativeToken(ExactInputParams calldata params)
@@ -103,7 +104,7 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
             amountIn
         );
         amountOut = bento.toAmount(params.tokenOut, amountOut, false);
-        require(amountOut >= params.amountOutMinimum, "SwapRouter: TOO_LITTLE_RECEIVED");
+        require(amountOut >= params.amountOutMinimum, "TOO_LITTLE_RECEIVED");
     }
 
     function exactInputWithContext(ExactInputParamsWithContext calldata params)
@@ -134,7 +135,7 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
             amountIn
         );
         amountOut = bento.toAmount(params.tokenOut, amountOut, false);
-        require(amountOut >= params.amountOutMinimum, "SwapRouter: TOO_LITTLE_RECEIVED");
+        require(amountOut >= params.amountOutMinimum, "TOO_LITTLE_RECEIVED");
     }
 
     function exactInputWithNativeTokenAndContext(ExactInputParamsWithContext calldata params)
@@ -185,7 +186,7 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
         for (uint256 i; i < params.output.length; i++) {
             uint256 balanceShares = bento.balanceOf(params.output[i].token, address(this));
             uint256 balanceAmount = bento.toAmount(params.output[i].token, balanceShares, false);
-            require(balanceAmount >= params.output[i].minAmount, "SwapRouter: TOO_LITTLE_RECEIVED");
+            require(balanceAmount >= params.output[i].minAmount, "TOO_LITTLE_RECEIVED");
             if (params.output[i].unwrapBento) {
                 bento.withdraw(params.output[i].token, address(this), params.output[i].to, 0, balanceShares);
             } else {
@@ -210,7 +211,7 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
             }
         }
         liquidity = IPool(pool).mint(recipient);
-        require(liquidity >= minLiquidity, "SwapRouter: NOT_ENOUGH_LIQUIDITY_MINTED");
+        require(liquidity >= minLiquidity, "NOT_ENOUGH_LIQUIDITY_MINTED");
     }
 
     function addLiquidityBalanced(
@@ -229,7 +230,7 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
         liquidityOptimal = IPool(pool).getOptimalLiquidityInAmounts(liquidityInput);
         for (uint256 i; i < liquidityOptimal.length; i++) {
             uint256 underlyingAmount = bento.toAmount(liquidityOptimal[i].token, liquidityOptimal[i].amount, false);
-            require(underlyingAmount >= liquidityInput[i].amountMin, "SwapRouter: AMOUNT_NOT_OPTIMAL");
+            require(underlyingAmount >= liquidityInput[i].amountMin, "AMOUNT_NOT_OPTIMAL");
             if (liquidityInput[i].native) {
                 _depositSharesToBentoBox(liquidityOptimal[i].token, pool, liquidityOptimal[i].amount);
             } else {
@@ -247,7 +248,7 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
         uint256 liquidity,
         IPool.liquidityAmount[] memory minWithdrawals
     ) external checkDeadline(deadline) {
-        TridentHelper.safeTransferFrom(pool, msg.sender, pool, liquidity);
+        safeTransferFrom(pool, msg.sender, pool, liquidity);
         IPool.liquidityAmount[] memory withdrawnLiquidity = IPool(pool).burn(recipient, unwrapBento);
         for (uint256 i; i < minWithdrawals.length; i++) {
             uint256 j;
@@ -258,12 +259,12 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
                         withdrawnLiquidity[j].amount,
                         false
                     );
-                    require(underlyingAmount >= minWithdrawals[i].amount, "SwapRouter: TOO_LITTLE_RECEIVED");
+                    require(underlyingAmount >= minWithdrawals[i].amount, "TOO_LITTLE_RECEIVED");
                     break;
                 }
             }
             // @dev A token that is present in `minWithdrawals` is missing from `withdrawnLiquidity`.
-            require(j < withdrawnLiquidity.length, "SwapRouter: INCORRECT_TOKEN_WITHDRAWN");
+            require(j < withdrawnLiquidity.length, "INCORRECT_TOKEN_WITHDRAWN");
         }
     }
 
@@ -277,57 +278,39 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
         uint256 minWithdrawal
     ) external checkDeadline(deadline) {
         // @dev Use liquidity = 0 for pre funding.
-        TridentHelper.safeTransferFrom(pool, msg.sender, pool, liquidity);
+        safeTransferFrom(pool, msg.sender, pool, liquidity);
         uint256 withdrawn = IPool(pool).burnLiquiditySingle(tokenOut, recipient, unwrapBento);
         withdrawn = bento.toAmount(tokenOut, withdrawn, false);
-        require(withdrawn >= minWithdrawal, "SwapRouter: TOO_LITTLE_RECEIVED");
-    }
-
-    function depositToBentoBox(
-        address token,
-        uint256 amount,
-        address recipient
-    ) external payable {
-        bento.deposit{value: address(this).balance}(token, msg.sender, recipient, amount, 0);
+        require(withdrawn >= minWithdrawal, "TOO_LITTLE_RECEIVED");
     }
 
     function sweepBentoBoxToken(
         address token,
-        uint256 amountMinimum,
+        uint256 amount,
         address recipient
     ) external {
-        uint256 balanceShares = bento.balanceOf(token, address(this));
-        require(bento.toAmount(token, balanceShares, false) >= amountMinimum, "SwapRouter: INSUFFICIENT_TOKEN");
-
-        if (balanceShares != 0) {
-            bento.withdraw(token, address(this), recipient, 0, balanceShares);
-        }
+        bento.transfer(token, address(this), recipient, amount);
     }
 
     function sweepNativeToken(
         address token,
-        uint256 amountMinimum,
+        uint256 amount,
         address recipient
     ) external {
-        uint256 balanceToken = TridentHelper.balanceOfThis(token);
-        require(balanceToken >= amountMinimum, "SwapRouter: INSUFFICIENT_TOKEN");
-
-        if (balanceToken != 0) {
-            TridentHelper.safeTransfer(token, recipient, balanceToken);
-        }
+        safeTransfer(token, recipient, amount);
     }
 
     function refundETH() external payable {
-        if (address(this).balance != 0) TridentHelper.safeTransferETH(msg.sender, address(this).balance);
+        if (address(this).balance != 0) safeTransferETH(msg.sender, address(this).balance);
     }
 
     function unwrapWETH(uint256 amountMinimum, address recipient) external {
-        uint256 balanceWETH = TridentHelper.balanceOfThis(wETH);
-        require(balanceWETH >= amountMinimum, "SwapRouter: INSUFFICIENT_WETH");
+        uint256 balanceWETH = IERC20(wETH).balanceOf(address(this));
+        require(balanceWETH >= amountMinimum, "INSUFFICIENT_WETH");
 
         if (balanceWETH != 0) {
-            TridentHelper.withdrawFromWETH(wETH, balanceWETH);
-            TridentHelper.safeTransferETH(recipient, balanceWETH);
+            IWETH(wETH).withdraw(balanceWETH);
+            safeTransferETH(recipient, balanceWETH);
         }
     }
 
@@ -353,7 +336,7 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
         );
 
         amount = bento.toAmount(params.path[lenMinusOne].tokenIn, amount, false);
-        require(amount >= params.amountOutMinimum, "SwapRouter: TOO_LITTLE_RECEIVED");
+        require(amount >= params.amountOutMinimum, "TOO_LITTLE_RECEIVED");
     }
 
     function _preFundedExactInputWithContext(ExactInputParamsWithContext memory params)
@@ -384,7 +367,7 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
         );
 
         amount = bento.toAmount(params.path[lenMinusOne].tokenIn, amount, false);
-        require(amount >= params.amountOutMinimum, "SwapRouter: TOO_LITTLE_RECEIVED");
+        require(amount >= params.amountOutMinimum, "TOO_LITTLE_RECEIVED");
     }
 
     /// @param token The token to pay.
@@ -450,5 +433,44 @@ contract SwapRouter is ISwapRouter, TridentBatcher {
             // @dev Deposit ERC20 token into `recipient` `bento` account.
             bento.deposit(token, msg.sender, recipient, 0, amount);
         }
+    }
+
+    /// @notice Provides safe ERC20.transfer for tokens that do not consistently return true/false.
+    /// @dev Reverts on failed {transfer}.
+    /// @param token Address of ERC-20 token.
+    /// @param recipient Account to send tokens to.
+    /// @param amount The token amount to send.
+    function safeTransfer(
+        address token,
+        address recipient,
+        uint256 amount
+    ) internal {
+        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0xa9059cbb, recipient, amount)); // @dev transfer(address,uint256).
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "TRANSFER_FAILED");
+    }
+
+    /// @notice Provides safe ERC20.transferFrom for tokens that do not consistently return true/false.
+    /// @dev Reverts on failed {transferFrom}.
+    /// @param token Address of ERC-20 token.
+    /// @param from Account to send tokens from.
+    /// @param recipient Account to send tokens to.
+    /// @param amount Token amount to send.
+    function safeTransferFrom(
+        address token,
+        address from,
+        address recipient,
+        uint256 amount
+    ) internal {
+        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x23b872dd, from, recipient, amount)); // @dev transferFrom(address,address,uint256).
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "TRANSFER_FROM_FAILED");
+    }
+
+    /// @notice Provides safe ETH transfer.
+    /// @dev Reverts on failed {call}.
+    /// @param recipient Account to send ETH.
+    /// @param amount ETH amount to send.
+    function safeTransferETH(address recipient, uint256 amount) internal {
+        (bool success, ) = recipient.call{value: amount}("");
+        require(success, "ETH_TRANSFER_FAILED");
     }
 }
