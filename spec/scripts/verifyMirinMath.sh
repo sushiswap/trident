@@ -1,0 +1,1 @@
+certoraRun spec/harness/MirinMathWrapper.sol  --verify MirinMathWrapper:spec/MirinMath.spec --settings -smt_bitVectorTheory=true --solc solc8.2 --staging
