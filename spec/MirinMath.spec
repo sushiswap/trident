@@ -26,7 +26,7 @@ rule inverseWithinScope(uint256 x) {
     uint256 result = sqrt(x);  // I was hoping this would display the actual value in the Verification Report
 
     assert( result * result  <=  x                       , "Upper Bound violated");
-    assert( x                <  (result+1) * (result+1)  , "LowerBound violated");
+    assert( x                <  (result+1) * (result+1)  , "Lower Bound violated");
 }
 
 rule inverseWithinLowerScope(uint256 x) {

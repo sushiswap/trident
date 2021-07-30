@@ -7,8 +7,9 @@ import "../interfaces/IBentoBox.sol";
 import "../interfaces/IMirinCallee.sol";
 import "./MirinERC20.sol";
 import "../libraries/MirinMath.sol";
-import "hardhat/console.sol";
+// import "hardhat/console.sol";
 import "../deployer/MasterDeployer.sol";
+import "../../spec/harness/Simplifications.sol";
 
 contract ConstantProductPool is MirinERC20, IPool {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
@@ -30,6 +31,7 @@ contract ConstantProductPool is MirinERC20, IPool {
     uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
 
     address internal immutable barFeeTo;
+    Simplifications public simplified;
     IBentoBoxV1 internal immutable bento;
     MasterDeployer internal immutable masterDeployer;
 
@@ -38,8 +40,8 @@ contract ConstantProductPool is MirinERC20, IPool {
 
     uint256 public kLast;
 
-    uint128 internal reserve0;
-    uint128 internal reserve1;
+    uint128 public reserve0;
+    uint128 public reserve1;
 
     uint256 private unlocked = 1;
     modifier lock() {
@@ -79,12 +81,12 @@ contract ConstantProductPool is MirinERC20, IPool {
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
 
-        uint256 computed = MirinMath.sqrt(balance0 * balance1);
+        uint256 computed = simplified.sqrt(balance0 * balance1);
         if (_totalSupply == 0) {
             liquidity = computed - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
-            uint256 k = MirinMath.sqrt(uint256(_reserve0) * _reserve1);
+            uint256 k = simplified.sqrt(uint256(_reserve0) * _reserve1);
             liquidity = ((computed - k) * _totalSupply) / k;
         }
         require(liquidity > 0, "MIRIN: INSUFFICIENT_LIQUIDITY_MINTED");
@@ -117,7 +119,7 @@ contract ConstantProductPool is MirinERC20, IPool {
         balance1 -= amount1;
 
         _update(balance0, balance1);
-        kLast = MirinMath.sqrt(balance0 * balance1);
+        kLast = simplified.sqrt(balance0 * balance1);
 
         withdrawnAmounts = new liquidityAmount[](2);
         withdrawnAmounts[0] = liquidityAmount({token: address(token0), amount: amount0});
@@ -159,7 +161,7 @@ contract ConstantProductPool is MirinERC20, IPool {
         }
 
         _update(balance0, balance1);
-        kLast = MirinMath.sqrt(balance0 * balance1);
+        kLast = simplified.sqrt(balance0 * balance1);
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
@@ -235,7 +237,7 @@ contract ConstantProductPool is MirinERC20, IPool {
     ) internal returns (uint256 computed) {
         uint256 _kLast = kLast;
         if (_kLast != 0) {
-            computed = MirinMath.sqrt(uint256(_reserve0) * _reserve1);
+            computed = simplified.sqrt(uint256(_reserve0) * _reserve1);
             if (computed > _kLast) {
                 // barFee % of increase in liquidity
                 // NB It's going to be slihgtly less than barFee % in reality due to the Math
@@ -248,7 +250,7 @@ contract ConstantProductPool is MirinERC20, IPool {
         }
     }
 
-    function _balance() internal view returns (uint256 balance0, uint256 balance1) {
+    function _balance() public view returns (uint256 balance0, uint256 balance1) {
         balance0 = bento.balanceOf(token0, address(this));
         balance1 = bento.balanceOf(token1, address(this));
     }

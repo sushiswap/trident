@@ -12,7 +12,7 @@ import "./base/SelfPermit.sol";
 
 import "./libraries/TransferHelper.sol";
 
-import "hardhat/console.sol";
+// import "hardhat/console.sol";
 
 contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
     address public immutable WETH;
@@ -29,12 +29,13 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         _;
     }
 
-    receive() external payable {
+    receive() external virtual payable {
         require(msg.sender == WETH, "Not WETH");
     }
 
-    function exactInputSingle(ExactInputSingleParams calldata params)
-        external
+    function exactInputSingle(ExactInputSingleParams memory params)
+        public
+        virtual
         payable
         checkDeadline(params.deadline)
         returns (uint256 amountOut)
@@ -51,7 +52,8 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
     }
 
     function exactInput(ExactInputParams memory params)
-        external
+        public
+        virtual
         payable
         checkDeadline(params.deadline)
         returns (uint256 amount)
@@ -62,8 +64,9 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         return _preFundedExactInput(params);
     }
 
-    function exactInputSingleWithNativeToken(ExactInputSingleParams calldata params)
-        external
+    function exactInputSingleWithNativeToken(ExactInputSingleParams memory params)
+        public
+        virtual
         payable
         checkDeadline(params.deadline)
         returns (uint256 amountOut)
@@ -80,7 +83,8 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
     }
 
     function exactInputWithNativeToken(ExactInputParams memory params)
-        external
+        public
+        virtual
         payable
         checkDeadline(params.deadline)
         returns (uint256 amount)
@@ -90,8 +94,9 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         return _preFundedExactInput(params);
     }
 
-    function exactInputSingleWithContext(ExactInputSingleParamsWithContext calldata params)
-        external
+    function exactInputSingleWithContext(ExactInputSingleParamsWithContext memory params)
+        public
+        virtual
         payable
         checkDeadline(params.deadline)
         returns (uint256 amountOut)
@@ -111,7 +116,8 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
     }
 
     function exactInputWithContext(ExactInputParamsWithContext memory params)
-        external
+        public
+        virtual
         payable
         checkDeadline(params.deadline)
         returns (uint256 amount)
@@ -122,8 +128,9 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         return _preFundedExactInputWithContext(params);
     }
 
-    function exactInputSingleWithNativeTokenAndContext(ExactInputSingleParamsWithContext calldata params)
-        external
+    function exactInputSingleWithNativeTokenAndContext(ExactInputSingleParamsWithContext memory params)
+        public
+        virtual
         payable
         checkDeadline(params.deadline)
         returns (uint256 amountOut)
@@ -143,7 +150,8 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
     }
 
     function exactInputWithNativeTokenAndContext(ExactInputParamsWithContext memory params)
-        external
+        public
+        virtual
         payable
         checkDeadline(params.deadline)
         returns (uint256 amount)
@@ -153,7 +161,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         return _preFundedExactInputWithContext(params);
     }
 
-    function complexPath(ComplexPathParams memory params) external payable checkDeadline(params.deadline) {
+    function complexPath(ComplexPathParams memory params) public virtual payable checkDeadline(params.deadline) {
         for (uint256 i; i < params.initialPath.length; i++) {
             if (!params.initialPath[i].preFunded) {
                 pay(
@@ -205,12 +213,12 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
     }
 
     function addLiquidityUnbalanced(
-        IPool.liquidityInputOptimal[] calldata liquidityInput,
+        IPool.liquidityInputOptimal[] memory liquidityInput,
         address pool,
         address to,
         uint256 deadline,
         uint256 minLiquidity
-    ) external checkDeadline(deadline) returns (uint256 liquidity) {
+    ) public checkDeadline(deadline) virtual returns (uint256 liquidity) {
         for (uint256 i; i < liquidityInput.length; i++) {
             if (liquidityInput[i].native) {
                 _depositToBentoBox(liquidityInput[i].token, pool, liquidityInput[i].amount);
@@ -228,7 +236,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         address pool,
         address to,
         uint256 deadline
-    ) external checkDeadline(deadline) returns (IPool.liquidityAmount[] memory liquidityOptimal, uint256 liquidity) {
+    ) public checkDeadline(deadline) virtual returns (IPool.liquidityAmount[] memory liquidityOptimal, uint256 liquidity) {
         for (uint256 i; i < liquidityInput.length; i++) {
             liquidityInput[i].amountDesired = bento.toShare(
                 IERC20(liquidityInput[i].token),
@@ -260,7 +268,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         uint256 deadline,
         uint256 liquidity,
         IPool.liquidityAmount[] memory minWithdrawals
-    ) external checkDeadline(deadline) {
+    ) public virtual checkDeadline(deadline) {
         require(IERC20(pool).transferFrom(msg.sender, pool, liquidity));
         IPool.liquidityAmount[] memory withdrawnLiquidity = IPool(pool).burn(to, unwrapBento);
         for (uint256 i; i < minWithdrawals.length; i++) {
@@ -301,7 +309,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         address token,
         uint256 amount,
         address recipient
-    ) external payable {
+    ) public virtual payable {
         bento.deposit{value: address(this).balance}(IERC20(token), msg.sender, recipient, amount, 0);
     }
 
@@ -309,7 +317,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         address token,
         uint256 amountMinimum,
         address recipient
-    ) external payable {
+    ) public virtual payable {
         uint256 balanceShares = bento.balanceOf(IERC20(token), address(this));
         require(bento.toAmount(IERC20(token), balanceShares, false) >= amountMinimum, "Insufficient token");
 
@@ -322,7 +330,7 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         address token,
         uint256 amountMinimum,
         address recipient
-    ) external payable {
+    ) public virtual payable {
         uint256 balanceToken = IERC20(token).balanceOf(address(this));
         require(balanceToken >= amountMinimum, "Insufficient token");
 
@@ -331,11 +339,11 @@ contract SwapRouter is ISwapRouter, Multicall, SelfPermit {
         }
     }
 
-    function refundETH() external payable {
+    function refundETH() public virtual payable {
         if (address(this).balance > 0) TransferHelper.safeTransferETH(msg.sender, address(this).balance);
     }
 
-    function unwrapWETH(uint256 amountMinimum, address recipient) external payable {
+    function unwrapWETH(uint256 amountMinimum, address recipient) public virtual payable {
         uint256 balanceWETH = IWETH(WETH).balanceOf(address(this));
         require(balanceWETH >= amountMinimum, "Insufficient WETH");
 

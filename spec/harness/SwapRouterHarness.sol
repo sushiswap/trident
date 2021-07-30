@@ -12,7 +12,8 @@ contract SwapRouterHarness is SwapRouter {
         SwapRouter(WETH, bento) public { }
 
     // A wrapper for exactInput
-    function callExactInputSingle(address tokenIn, address tokenOut, address pool, address recipient, bool unwrapBento, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum) public returns (uint256) {
+    function callExactInputSingle(address tokenIn, address tokenOut, address pool, address recipient, bool unwrapBento, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum)
+    public returns (uint256) {
         ExactInputSingleParams memory exactInputSingleParams;
         exactInputSingleParams = ExactInputSingleParams({tokenIn:tokenIn, tokenOut:tokenOut, pool:pool, recipient:recipient,unwrapBento:unwrapBento,deadline:deadline,amountIn:amountIn,amountOutMinimum:amountOutMinimum});
         return super.exactInputSingle(exactInputSingleParams);
@@ -166,7 +167,7 @@ contract SwapRouterHarness is SwapRouter {
         address to,
         uint256 deadline,
         uint256 minLiquidity
-    ) public override returns (uint256 liquidity) { }
+    ) public override virtual returns (uint256 liquidity) { }
 
 
     function callAddLiquidityBalanced(
@@ -212,7 +213,7 @@ contract SwapRouterHarness is SwapRouter {
         uint256 deadline,
         uint256 liquidity,
         IPool.liquidityAmount[] memory minWithdrawals
-    ) external override {
+    ) public override {
 
     }
 
