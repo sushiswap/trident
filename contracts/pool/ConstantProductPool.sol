@@ -119,38 +119,37 @@ contract ConstantProductPool is TridentERC20 {
         emit Mint(msg.sender, amount0, amount1, to);
     }
 
-    // function burn(address to, bool unwrapBento)
-    //     public
-    //     override
-    //     lock
-    //     returns (TokenAmount[] memory withdrawnAmounts)
-    // {
-    //     (uint256 reserveAmount0, uint256 reserveAmount1, uint32 _blockTimestampLast, Rebase total0, Rebase total1) = _getReserves();
-    //     uint256 _totalSupply = totalSupply;
-    //     _mintFee(reserveAmount0, reserveAmount1, _totalSupply);
+    function burn(address to, bool unwrapBento) public lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
+        (Holdings memory reserves, uint32 _blockTimestampLast, Rebases memory rebase) = _getReserves();
+        Holdings memory balances = _balance(rebase);
+        uint256 _totalSupply = totalSupply;
+        _mintFee(reserves.amount0, reserves.amount1, _totalSupply);
+        uint256 liquidity = balanceOf[address(this)];
 
-    //     uint256 liquidity = balanceOf[address(this)];
-    //     (uint256 balanceShares0, uint256 balanceShares1) = _balance();
-    //     uint256 amount0 = (liquidity * balanceShares0) / _totalSupply;
-    //     uint256 amount1 = (liquidity * balanceShares1) / _totalSupply;
+        uint256 shares0 = (liquidity * balances.shares0) / _totalSupply;
+        uint256 shares1 = (liquidity * balances.shares1) / _totalSupply;
+        uint256 amount0 = rebase.total0.toElastic(shares0);
+        uint256 amount1 = rebase.total0.toElastic(shares1);
 
-    //     _burn(address(this), liquidity);
+        _burn(address(this), liquidity);
 
-    //     _transfer(token0, amount0, to, unwrapBento);
-    //     _transfer(token1, amount1, to, unwrapBento);
+        _transferShares(token0, shares0, to, unwrapBento);
+        _transferShares(token1, shares1, to, unwrapBento);
 
-    //     balanceShares0 -= amount0;
-    //     balanceShares1 -= amount1;
+        balances.shares0 -= shares0;
+        balances.shares1 -= shares1;
+        balances.amount0 = rebase.total0.toElastic(balances.shares0);
+        balances.amount1 = rebase.total1.toElastic(balances.shares1);
 
-    //     _update(balanceShares0, balanceShares1, _reserveShares0, _reserveShares1, _blockTimestampLast);
-    //     kLast = TridentMath.sqrt(balanceShares0 * balanceShares1);
+        _update(reserves, balances, _blockTimestampLast);
+        kLast = TridentMath.sqrt(balances.amount0 * balances.amount1);
 
-    //     withdrawnAmounts = new TokenAmount[](2);
-    //     withdrawnAmounts[0] = TokenAmount({token: address(token0), amount: amount0});
-    //     withdrawnAmounts[1] = TokenAmount({token: address(token1), amount: amount1});
+        withdrawnAmounts = new IPool.TokenAmount[](2);
+        withdrawnAmounts[0] = IPool.TokenAmount({token: address(token0), amount: amount0});
+        withdrawnAmounts[1] = IPool.TokenAmount({token: address(token1), amount: amount1});
 
-    //     emit Burn(msg.sender, amount0, amount1, to);
-    // }
+        emit Burn(msg.sender, amount0, amount1, to);
+    }
 
     // function burnLiquiditySingle(
     //     address tokenOut,
@@ -361,18 +360,18 @@ contract ConstantProductPool is TridentERC20 {
     //     amountOut = (amountInWithFee * reserveOut) / (reserveIn * MAX_FEE + amountInWithFee);
     // }
 
-    // function _transfer(
-    //     address token,
-    //     uint256 amount,
-    //     address to,
-    //     bool unwrapBento
-    // ) internal {
-    //     if (unwrapBento) {
-    //         bento.withdraw(token, address(this), to, 0, amount);
-    //     } else {
-    //         bento.transfer(token, address(this), to, amount);
-    //     }
-    // }
+    function _transferShares(
+        address token,
+        uint256 shares,
+        address to,
+        bool unwrapBento
+    ) internal {
+        if (unwrapBento) {
+            bento.withdraw(token, address(this), to, 0, shares);
+        } else {
+            bento.transfer(token, address(this), to, shares);
+        }
+    }
 
     // function getAmountOut(
     //     address tokenIn,
