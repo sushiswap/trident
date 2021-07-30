@@ -25,8 +25,11 @@ rule multiplication(uint256 x, uint256 y) {
 rule inverseWithinScope(uint256 x) {
     uint256 result = sqrt(x);  // I was hoping this would display the actual value in the Verification Report
 
-    assert( result * result  <=  x                       , "Upper Bound violated");
-    assert( x                <  (result+1) * (result+1)  , "LowerBound violated");
+    uint256 result_sqrd = result * result;
+    mathint result_plus1_sqrd = (result + 1) * (result + 1);
+
+    assert( result_sqrd <=  x               , "Upper Bound violated");
+    assert( x           <   result_plus1_sqrd, "LowerBound violated");
 }
 
 rule inverseWithinLowerScope(uint256 x) {
