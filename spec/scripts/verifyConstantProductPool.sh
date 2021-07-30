@@ -4,5 +4,5 @@ certoraRun spec/harness/ConstantProductPoolHarness.sol spec/harness/SimpleBentoB
 	--link ConstantProductPoolHarness:bento=SimpleBentoBox \
 	--solc_map ConstantProductPoolHarness=solc8.2,SimpleBentoBox=solc6.12,Simplifications=solc8.2,DummyERC20A=solc8.2,DummyERC20B=solc8.2 \
 	--optimistic_loop --loop_iter 2 \
-    --packages @openzeppelin=/Users/vasu/Documents/Certora/trident/node_modules/@openzeppelin \
+    --packages @openzeppelin=$PWD/node_modules/@openzeppelin \
 	--staging --msg "ConstantProductPool all rules"
