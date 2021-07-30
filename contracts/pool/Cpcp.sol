@@ -86,6 +86,8 @@ contract Cpcp {
 
             token0amount = DyDxMath.getDx(liquidityAmount, priceLower, priceUpper, true);
         } else {
+            // supply both tokens
+
             token0amount = DyDxMath.getDx(liquidityAmount, _sqrtPriceX96, priceUpper, true);
 
             token1amount = DyDxMath.getDy(liquidityAmount, priceLower, _sqrtPriceX96, true);
@@ -216,6 +218,8 @@ contract Cpcp {
                     outAmount += DyDxMath.getDy(currentLiquidity, newPrice, currentPrice, false);
 
                     amount = 0;
+
+                    currentPrice = newPrice;
                 } else {
                     // swap & cross the tick
 
@@ -258,6 +262,8 @@ contract Cpcp {
                     outAmount += DyDxMath.getDx(currentLiquidity, currentPrice, newPrice, false);
 
                     amount = 0;
+
+                    currentPrice = newPrice;
                 } else {
                     // swap & cross the tick
 
