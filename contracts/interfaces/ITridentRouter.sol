@@ -4,59 +4,25 @@ pragma solidity >=0.8.0;
 
 /// @notice Trident exchange pool router interface.
 interface ITridentRouter {
-    /// @dev In case of a multi hop swap, the output token for first swap is the input token of the next swap.
     struct Path {
-        address tokenIn;
         address pool;
-    }
-
-    struct PathWithContext {
-        address tokenIn;
-        address pool;
-        bytes context;
+        bytes data;
     }
 
     struct ExactInputSingleParams {
-        address tokenIn;
-        address tokenOut;
-        address pool;
-        address recipient;
-        bool unwrapBento;
-        uint256 deadline;
         uint256 amountIn;
         uint256 amountOutMinimum;
-    }
-
-    struct ExactInputSingleParamsWithContext {
-        address tokenIn;
-        address tokenOut;
         address pool;
-        address recipient;
-        bool unwrapBento;
-        uint256 deadline;
-        uint256 amountIn;
-        uint256 amountOutMinimum;
-        bytes context;
+        address tokenIn;
+        bytes data;
     }
 
     struct ExactInputParams {
+        address tokenIn;
+        address tokenOut;
+        uint256 amountIn;
+        uint256 amountOutMinimum;
         Path[] path;
-        address tokenOut;
-        address recipient;
-        bool unwrapBento;
-        uint256 deadline;
-        uint256 amountIn;
-        uint256 amountOutMinimum;
-    }
-
-    struct ExactInputParamsWithContext {
-        PathWithContext[] path;
-        address tokenOut;
-        address recipient;
-        bool unwrapBento;
-        uint256 deadline;
-        uint256 amountIn;
-        uint256 amountOutMinimum;
     }
 
     struct InitialPath {
