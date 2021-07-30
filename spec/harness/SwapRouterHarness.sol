@@ -199,7 +199,7 @@ contract SwapRouterHarness is SwapRouter {
        uint256 deadline,
        uint256 liquidity
     ) external checkDeadline(deadline) {
-        IPool.liquidityAmount[] memory liquidityAmount = new IPool.liquidityInput[](2);
+        IPool.liquidityAmount[] memory liquidityAmount = new IPool.liquidityAmount[](2);
         liquidityAmount[0] = IPool.liquidityAmount(token1, 0);
         liquidityAmount[1] = IPool.liquidityAmount(token2, 0);
         return super.burnLiquidity(pool, to, unwrapBento, deadline, liquidity, liquidityAmount);
