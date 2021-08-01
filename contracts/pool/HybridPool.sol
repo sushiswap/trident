@@ -161,7 +161,6 @@ contract HybridPool is IPool, TridentERC20 {
             uint256 fee = _handleFee(tokenIn, amountIn);
             finalAmountOut = _getAmountOut(amountIn - fee, _reserve1, _reserve0, false);
         }
-        console.log("Sending", finalAmountOut);
 
         _transferAmount(tokenOut, recipient, finalAmountOut, unwrapBento);
         _updateReserves();
@@ -266,7 +265,6 @@ contract HybridPool is IPool, TridentERC20 {
         } else {
             amountOut = _getAmountOut(amountIn, _reserve1, _reserve0, false);
         }
-        console.log("Should Send", amountOut);
     }
 
     function getOptimalLiquidityInAmounts(liquidityInput[] memory liquidityInputs)
@@ -364,6 +362,9 @@ contract HybridPool is IPool, TridentERC20 {
         uint256 _reserveOut,
         bool token0In
     ) public view returns (uint256) {
+        //console.log("Solidity params:");
+        //console.log("x, y, in, A", _reserveIn, _reserveOut);
+        //console.log("in, A", amountIn, A/A_PRECISION);
         uint256 tokenInPrecisionMultiplier = (token0In ? token0PrecisionMultiplier : token1PrecisionMultiplier);
         uint256 tokenOutPrecisionMultiplier = (!token0In ? token0PrecisionMultiplier : token1PrecisionMultiplier);
 
@@ -375,6 +376,8 @@ contract HybridPool is IPool, TridentERC20 {
         uint256 x = xpIn + amountIn;
         uint256 y = _getY(x, d);
         uint256 dy = xpOut - y - 1;
+        //console.log("D, y", d, y);
+        //console.log("out", dy);
         dy /= tokenOutPrecisionMultiplier;
         return dy;
     }

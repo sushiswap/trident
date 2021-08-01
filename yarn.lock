@@ -742,10 +742,10 @@
   resolved "https://registry.yarnpkg.com/@sushiswap/prettier-config/-/prettier-config-0.1.0.tgz#4fdddf1ba2590025f78adf6cb54ed016344958a4"
   integrity sha512-QD+xdR0VZbmqwSa1xMMkCh5KGCVQQLqN3VHS7VDh5rB4FtZKbUE8lNgKvtKwp38aG0zIlwZcbA+ASFBnWmbkJQ==
 
-"@sushiswap/sdk@5.0.0-canary.28":
-  version "5.0.0-canary.28"
-  resolved "https://registry.yarnpkg.com/@sushiswap/sdk/-/sdk-5.0.0-canary.28.tgz#a501d86385faededd34991858fb3f7f30271ac87"
-  integrity sha512-qCcURS0nQndfvzeV6DxAC0Gh99RyRGWuPeapIWRjCxMm+lqjt6s0cWJpfOubWTe9gSuZ0qDF+l2qmlRVsdcxhA==
+"@sushiswap/sdk@5.0.0-canary.30":
+  version "5.0.0-canary.30"
+  resolved "https://registry.yarnpkg.com/@sushiswap/sdk/-/sdk-5.0.0-canary.30.tgz#d75ce0649188a6610b89f1d8d4ecd825ba9c98df"
+  integrity sha512-xZsdla2v25mkAM3gydiblURYxMJm4MfabwqvXC4yB5dUzolgkNNqviG+Kowcx6x5MeaaxY0NaARQW5suRVT1sA==
   dependencies:
     "@sushiswap/core" "^2.0.0-canary.0"
     big.js "^5.2.2"
