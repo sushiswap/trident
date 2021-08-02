@@ -92,11 +92,6 @@ describe("Router", function () {
   });
 
   describe("HybridPool", function () {
-    it("Pool should have correct tokens", async function () {
-      expect(await pool.token0()).eq(weth.address);
-      expect(await pool.token1()).eq(usdc.address);
-    });
-
     it("Should add liquidity directly to the pool", async function () {
       await bento.transfer(
         weth.address,
@@ -411,15 +406,19 @@ describe("Router", function () {
       expect(await bento.balanceOf(usdc.address, alice.address)).eq(
         oldAliceUsdcBalance.add(expectedAmountOut)
       );
-      expect(await bento.balanceOf(weth.address, pool.address)).eq(
-        oldPoolWethBalance.add(amountIn)
+      expect(await bento.balanceOf(weth.address, pool.address)).gt(
+        oldPoolWethBalance
       );
       expect(await bento.balanceOf(usdc.address, pool.address)).eq(
         oldPoolUsdcBalance.sub(expectedAmountOut)
       );
 
       amountIn = expectedAmountOut;
-      expectedAmountOut = await pool.getAmountOut(usdc.address, amountIn);
+      expectedAmountOut = await pool.getAmountOut(
+        usdc.address,
+        weth.address,
+        amountIn
+      );
       expect(expectedAmountOut).lt(BigNumber.from(10).pow(18));
       params = {
         tokenIn: usdc.address,
@@ -442,7 +441,7 @@ describe("Router", function () {
       expect(await bento.balanceOf(weth.address, pool.address)).gt(
         oldPoolWethBalance
       );
-      expect(await bento.balanceOf(usdc.address, pool.address)).eq(
+      expect(await bento.balanceOf(usdc.address, pool.address)).lt(
         oldPoolUsdcBalance
       );
     });
