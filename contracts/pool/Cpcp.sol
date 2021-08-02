@@ -179,6 +179,8 @@ contract Cpcp {
 
         uint256 outAmount = 0;
 
+        uint256 inAmount = amount;
+
         while (amount > 0) {
             uint256 nextTickPrice = uint256(TickMath.getSqrtRatioAtTick(nextTickToCross));
 
@@ -269,6 +271,8 @@ contract Cpcp {
 
                     amount -= maxDy;
 
+                    outAmount += DyDxMath.getDx(currentLiquidity, currentPrice, nextTickPrice, false);
+
                     if (nextTickToCross % 2 == 0) {
                         currentLiquidity = currentLiquidity + uint256(ticks[nextTickToCross].liquidity);
                     } else {
@@ -289,11 +293,13 @@ contract Cpcp {
         nearestTick = zeroForOne ? nextTickToCross : ticks[nextTickToCross].previousTick;
 
         if (zeroForOne) {
-            token0.transferFrom(msg.sender, address(this), amount); // ! change this to bento shares, a push / pull approach instead
+            token0.transferFrom(msg.sender, address(this), inAmount); // ! change this to bento shares, a push / pull approach instead
             token1.transfer(recipient, outAmount);
         } else {
-            token1.transferFrom(msg.sender, address(this), amount); // ! change this to bento shares, a push / pull approach instead
+            token1.transferFrom(msg.sender, address(this), inAmount); // ! change this to bento shares, a push / pull approach instead
             token0.transfer(recipient, outAmount);
         }
+
+        // emit event
     }
 }
