@@ -222,7 +222,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         }
         _transferShares(tokenOut, sharesOut, recipient, unwrapBento);
         _update(reserves, balances, _blockTimestampLast);
-        //emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
+        emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
 
     function flashSwap(bytes calldata data) external override lock returns (uint256 amountOut) {
@@ -257,7 +257,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
             require(balances.amount1 - reserves.amount1 >= amountIn, "INSUFFICIENT_AMOUNT_IN");
         }
         _update(reserves, balances, _blockTimestampLast);
-        //emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
+        emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
 
     function _getReserves()
