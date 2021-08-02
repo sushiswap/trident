@@ -25,6 +25,12 @@ interface ITridentRouter {
         Path[] path;
     }
 
+    struct TokenInput {
+        address token;
+        bool native;
+        uint256 amount;
+    }
+
     struct InitialPath {
         address tokenIn;
         address pool;

@@ -107,24 +107,23 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
     //     }
     // }
 
-    // function addLiquidity(
-    //     IPool.TokenInput[] calldata tokenInput,
-    //     address pool,
-    //     address recipient,
-    //     uint256 deadline,
-    //     uint256 minLiquidity
-    // ) public returns (uint256 liquidity) {
-    //     for (uint256 i; i < tokenInput.length; i++) {
-    //         if (tokenInput[i].native) {
-    //             _depositToBentoBox(tokenInput[i].token, pool, tokenInput[i].amount);
-    //         } else {
-    //             uint256 shares = bento.toShare(tokenInput[i].token, tokenInput[i].amount, false);
-    //             bento.transfer(tokenInput[i].token, msg.sender, pool, shares);
-    //         }
-    //     }
-    //     liquidity = IPool(pool).mint(recipient);
-    //     require(liquidity >= minLiquidity, "NOT_ENOUGH_LIQUIDITY_MINTED");
-    // }
+    function addLiquidity(
+        TokenInput[] memory tokenInput,
+        address pool,
+        uint256 minLiquidity,
+        bytes calldata data
+    ) public returns (uint256 liquidity) {
+        for (uint256 i; i < tokenInput.length; i++) {
+            if (tokenInput[i].native) {
+                _depositToBentoBox(tokenInput[i].token, pool, tokenInput[i].amount);
+            } else {
+                uint256 shares = bento.toShare(tokenInput[i].token, tokenInput[i].amount, false);
+                bento.transfer(tokenInput[i].token, msg.sender, pool, shares);
+            }
+        }
+        liquidity = IPool(pool).mint(data);
+        require(liquidity >= minLiquidity, "NOT_ENOUGH_LIQUIDITY_MINTED");
+    }
 
     // function burnLiquidity(
     //     address pool,
