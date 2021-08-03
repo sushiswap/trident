@@ -195,8 +195,25 @@ contract SwapRouterHarness is SwapRouter {
 
     }
 
+    function exactInputWithNativeTokenAndContext(ExactInputParamsWithContext memory params)
+        public
+        override
+        payable
+        returns (uint256 amount)
+    {
+    }
+
     function complexPath(ComplexPathParams memory params) public override payable 
      { }
+
+
+    function multicall(bytes[] calldata data) external payable override returns (bytes[] memory results) {
+
+    }
+/*     function refundETH() public virtual override payable {
+        if (address(this).balance > 0) msg.sender.send(address(this).balance);
+     }
+*/
     function tokenBalanceOf(address token, address user) public returns (uint256) {
         return IERC20(token).balanceOf(user);
     }
