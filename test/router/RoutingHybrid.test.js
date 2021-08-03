@@ -104,6 +104,8 @@ describe("HybridPool Typescript == Solidity check", function () {
       type: 'Hybrid',
       reserve0: jsVal0,
       reserve1: jsVal1,
+      reserve0BN: bnVal0,
+      reserve1BN: bnVal1,
       fee,
       data: HybridDataFromParams(A),
       deployData
@@ -119,8 +121,8 @@ describe("HybridPool Typescript == Solidity check", function () {
     const [t0, t1] = swapDirection ? [usdt.address, usdc.address] : [usdc.address, usdt.address]
     const amountOutPool = (await pool.getAmountOut(t0, t1, bnValue)).toString();
     const amountOutPrediction = calcOutByIn(poolRouterInfo, jsValue, swapDirection);
-    //console.log(Math.abs(amountOutPrediction/amountOutPool-1), amountOutPrediction, amountOutPool);
-    expect(areCloseValues(amountOutPrediction, amountOutPool, 1e-5)).equals(true);
+    // console.log(Math.abs(amountOutPrediction/amountOutPool-1), amountOutPrediction, amountOutPool);
+    expect(areCloseValues(amountOutPrediction, amountOutPool, 1e-12)).equals(true);
     const reserveOut = swapDirection ? poolRouterInfo.reserve1 : poolRouterInfo.reserve0;
     if (reserveOut - amountOutPool < MINIMUM_LIQUIDITY) {
       swapDirection = !swapDirection;
@@ -131,8 +133,8 @@ describe("HybridPool Typescript == Solidity check", function () {
     // console.log(Math.abs(amounInExpected/jsValue-1), amounInExpected, jsValue);
     // console.log(Math.abs(amountOutPrediction/amountOutPrediction2-1), amountOutPrediction, amountOutPrediction2);
     expect(
-      areCloseValues(amounInExpected, jsValue, 1e-11) 
-      || areCloseValues(amountOutPrediction, amountOutPrediction2, 1e-11)
+      areCloseValues(amounInExpected, jsValue, 1e-12) 
+      || areCloseValues(amountOutPrediction, amountOutPrediction2, 1e-12)
     ).equals(true);
     swapDirection = !swapDirection;
   }
@@ -147,9 +149,9 @@ describe("HybridPool Typescript == Solidity check", function () {
           await checkSwap(pool, poolRouterInfo, 17);
         }
         // test small values
-        // for (let swapNum = 0; swapNum < 5; ++swapNum) {
-        //   await checkSwap(pool, poolRouterInfo, 2);
-        // }
+        for (let swapNum = 0; swapNum < 5; ++swapNum) {
+          await checkSwap(pool, poolRouterInfo, 2);
+        }
         //test extremely big values 2^112 = 10^33.7153
         for (let swapNum = 0; swapNum < 10; ++swapNum) {
           await checkSwap(pool, poolRouterInfo, 33);
@@ -185,13 +187,13 @@ describe("HybridPool Typescript == Solidity check", function () {
         const [poolRouterInfo, pool] = await createHybridPool(2000, 0.003, 33, 33);
 
         // test regular values
-        // for (let swapNum = 0; swapNum < 3; ++swapNum) {
-        //   await checkSwap(pool, poolRouterInfo, 17);
-        // }
+        for (let swapNum = 0; swapNum < 3; ++swapNum) {
+          await checkSwap(pool, poolRouterInfo, 17);
+        }
         // test small values
-        // for (let swapNum = 0; swapNum < 3; ++swapNum) {
-        //   await checkSwap(pool, poolRouterInfo, 2);
-        // }
+        for (let swapNum = 0; swapNum < 3; ++swapNum) {
+          await checkSwap(pool, poolRouterInfo, 2);
+        }
         //test extremely big values 2^112 = 10^33.7153
         for (let swapNum = 0; swapNum < 3; ++swapNum) {
           await checkSwap(pool, poolRouterInfo, 33);
@@ -211,9 +213,9 @@ describe("HybridPool Typescript == Solidity check", function () {
           await checkSwap(pool, poolRouterInfo, 17);
         }
         // test small values
-        // for (let swapNum = 0; swapNum < 3; ++swapNum) {
-        //   await checkSwap(pool, poolRouterInfo, 2);
-        // }
+        for (let swapNum = 0; swapNum < 3; ++swapNum) {
+          await checkSwap(pool, poolRouterInfo, 2);
+        }
         //test extremely big values 2^112 = 10^33.7153
         for (let swapNum = 0; swapNum < 3; ++swapNum) {
           await checkSwap(pool, poolRouterInfo, 33);

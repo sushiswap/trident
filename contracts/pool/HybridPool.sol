@@ -363,7 +363,7 @@ contract HybridPool is IPool, TridentERC20 {
         bool token0In
     ) public view returns (uint256) {
         //console.log("Solidity params:");
-        //console.log("x, y, in, A", _reserveIn, _reserveOut);
+        //console.log("x, y", _reserveIn, _reserveOut);
         //console.log("in, A", amountIn, A/A_PRECISION);
         uint256 tokenInPrecisionMultiplier = (token0In ? token0PrecisionMultiplier : token1PrecisionMultiplier);
         uint256 tokenOutPrecisionMultiplier = (!token0In ? token0PrecisionMultiplier : token1PrecisionMultiplier);
