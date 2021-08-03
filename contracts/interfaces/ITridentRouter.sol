@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity >=0.7.5;
-pragma abicoder v2;
 
-interface ISwapRouter {
-    // TODO: Make context optional
+pragma solidity >=0.8.0;
 
-    /// @dev In case of a multi hop swap, the output token for first swap is the input token of the next swap
+/// @notice Trident exchange pool router interface.
+interface ITridentRouter {
+    /// @dev In case of a multi hop swap, the output token for first swap is the input token of the next swap.
     struct Path {
         address tokenIn;
         address pool;
@@ -65,7 +64,7 @@ interface ISwapRouter {
         address pool;
         address tokenOut;
         bool preFunded;
-        uint256 amountIn; // 0 amountIn implies pre-funding
+        uint256 amountIn; // @dev 0 amountIn implies pre-funding.
         bytes context;
     }
 
@@ -73,7 +72,7 @@ interface ISwapRouter {
         address tokenIn;
         address pool;
         address tokenOut;
-        uint64 balancePercentage; // Multiplied by 10^6
+        uint64 balancePercentage; // @dev Multiplied by 10^6.
         bytes context;
     }
 

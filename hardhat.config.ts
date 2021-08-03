@@ -2,6 +2,8 @@ import "dotenv/config";
 import "@nomiclabs/hardhat-etherscan";
 import "@nomiclabs/hardhat-solhint";
 import "@nomiclabs/hardhat-waffle";
+import "@nomiclabs/hardhat-ethers";
+import "hardhat-contract-sizer";
 import "hardhat-deploy";
 import "hardhat-deploy-ethers";
 import "hardhat-gas-reporter";
@@ -11,6 +13,7 @@ import "hardhat-watcher";
 import "solidity-coverage";
 import "@tenderly/hardhat-tenderly";
 import "@typechain/hardhat";
+import "hardhat-tracer";
 
 import { HardhatUserConfig, task } from "hardhat/config";
 
@@ -54,6 +57,15 @@ const config: HardhatUserConfig = {
     },
     carol: {
       default: 3,
+    },
+    dave: {
+      default: 4,
+    },
+    eve: {
+      default: 5,
+    },
+    feeTo: {
+      default: 6,
     },
   },
   networks: {
@@ -127,7 +139,7 @@ const config: HardhatUserConfig = {
       live: true,
       saveDeployments: true,
     },
-    'matic-testnet': {
+    "matic-testnet": {
       url: "https://rpc-mumbai.maticvigil.com/",
       accounts,
       chainId: 80001,
@@ -183,7 +195,7 @@ const config: HardhatUserConfig = {
       saveDeployments: true,
       gasPrice: 470000000000,
     },
-    'avalanche-testnet': {
+    "avalanche-testnet": {
       url: "https://api.avax-test.network/ext/bc/C/rpc",
       accounts,
       chainId: 43113,
@@ -284,6 +296,15 @@ const config: HardhatUserConfig = {
           },
         },
       },
+      {
+        version: "0.4.19",
+        settings: {
+          optimizer: {
+            enabled: false,
+            runs: 200,
+          },
+        },
+      },
     ],
   },
   tenderly: {
@@ -303,6 +324,7 @@ const config: HardhatUserConfig = {
   },
   mocha: {
     timeout: 300000,
+    //bail: true
   },
 };
 
