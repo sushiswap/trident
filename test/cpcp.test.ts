@@ -252,7 +252,7 @@ describe("Constant product concentrated pool (cpcp) trading - normal conditions"
     expect(oldPrice.gt(newPrice)).to.be.true;
   });
 
-  it.only("Should execute trade and cross one tick - one for zero", async () => {
+  it("Should execute trade and cross one tick - one for zero", async () => {
     const oldLiq = await daiWethPool.liquidity();
     const oldTick = await daiWethPool.nearestTick();
     const nextTick = (await daiWethPool.ticks(oldTick)).nextTick;
@@ -295,5 +295,44 @@ describe("Constant product concentrated pool (cpcp) trading - normal conditions"
     );
     expect(oldPrice.lt(newPrice)).to.be.eq(true, "Price didn't increase");
     expect(newTick).to.be.eq(nextTick, "We didn't cross to the next tick");
+  });
+
+  it("Should execute trade and cross one tick - zero for one", async () => {
+    // first push price into a range with 2 lp positions
+    await daiWethPool.swap(false, getBigNumber(1000), alice.address);
+
+    const oldLiq = await daiWethPool.liquidity();
+    const oldTick = await daiWethPool.nearestTick();
+    const nextTick = (await daiWethPool.ticks(oldTick)).nextTick;
+    const oldEthBalance = await weth.balanceOf(alice.address);
+    const oldUSDBalance = await usd.balanceOf(alice.address);
+    const oldPrice = await daiWethPool.sqrtPriceX96();
+
+    await daiWethPool.swap(true, getBigNumber(1), alice.address); // sell 1 weth
+
+    const newLiq = await daiWethPool.liquidity();
+    const newPrice = await daiWethPool.sqrtPriceX96();
+    const newTick = await daiWethPool.nearestTick();
+    const usdReceived = (await usd.balanceOf(alice.address)).sub(oldUSDBalance);
+    const ethPaid = oldEthBalance.sub(await weth.balanceOf(alice.address));
+    const tradePrice = parseInt(usdReceived.mul(100000).div(ethPaid)) / 100000;
+    const tradePriceSqrtX96 = getSqrtX96Price(tradePrice);
+
+    expect(ethPaid.eq(getBigNumber(1))).to.be.eq(true, "Didn't sell one eth");
+    expect(usdReceived.gt(0)).to.be.eq(true, "Didn't get any usd");
+    expect(oldPrice.gt(tradePriceSqrtX96)).to.be.eq(
+      true,
+      "Trade price isnt't lower than starting price"
+    );
+    expect(newPrice.lt(tradePriceSqrtX96)).to.be.eq(
+      true,
+      "New price isn't lower than trade prie"
+    );
+    expect(newTick < oldTick).to.be.eq(true, "We didn't drop down a tick");
+    expect(oldPrice.gt(newPrice)).to.be.eq(true, "Price didn't increase");
+    expect(oldLiq.gt(newLiq)).to.be.eq(
+      true,
+      "We didn't cross out of one position"
+    );
   });
 });

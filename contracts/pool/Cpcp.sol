@@ -13,12 +13,12 @@ contract Cpcp {
     struct Tick {
         int24 previousTick;
         int24 nextTick;
-        uint112 liquidity;
+        uint128 liquidity;
     }
 
     mapping(int24 => Tick) public ticks;
 
-    uint112 public liquidity;
+    uint128 public liquidity;
 
     uint160 public sqrtPriceX96;
 
@@ -37,9 +37,9 @@ contract Cpcp {
 
         sqrtPriceX96 = _sqrtPriceX96;
 
-        ticks[TickMath.MIN_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint112(0));
+        ticks[TickMath.MIN_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0));
 
-        ticks[TickMath.MAX_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint112(0));
+        ticks[TickMath.MAX_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0));
 
         nearestTick = TickMath.MIN_TICK;
     }
@@ -49,7 +49,7 @@ contract Cpcp {
         int24 lower,
         int24 upperOld,
         int24 upper,
-        uint112 amount
+        uint128 amount
     ) public {
         uint160 priceLower = TickMath.getSqrtRatioAtTick(lower);
 
@@ -118,7 +118,7 @@ contract Cpcp {
         int24 lower,
         int24 upperOld,
         int24 upper,
-        uint112 amount
+        uint128 amount
     ) internal {
         require(uint24(lower) % 2 == 0, "Lower even");
         require(uint24(upper) % 2 == 1, "Upper odd");
@@ -286,7 +286,7 @@ contract Cpcp {
             }
         }
 
-        liquidity = uint112(currentLiquidity);
+        liquidity = uint128(currentLiquidity);
 
         sqrtPriceX96 = uint160(currentPrice);
 
