@@ -120,6 +120,7 @@ rule afterOpBalanceEqualsReserve(method f) {
     env e;
 
     validState(false);
+    require balanceOf(e, currentContract) == 0;
 
     uint256 _balance0;
     uint256 _balance1;
@@ -146,6 +147,7 @@ rule afterOpBalanceEqualsReserve(method f) {
            "balance doesn't equal reserve after state changing operations");
 }
 
+// Failing maybe because of sqrt dispatcher?
 rule mintingNotPossibleForBalancedPool() {
     env e;
 
@@ -199,10 +201,16 @@ rule inverseOfMintAndBurn() {
     address to;
     bool unwrapBento;
 
+    // TODO: require e.msg.sender == to? Or check the assets of 'to'?
     validState(true);
 
     uint256 _liquidity0;
     uint256 _liquidity1;
+
+    uint256 _totalUsertoken0 = tokenBalanceOf(token0(), e.msg.sender) + 
+                               bentoBox.balanceOf(token0(), e.msg.sender);
+    uint256 _totalUsertoken1 = tokenBalanceOf(token1(), e.msg.sender) + 
+                               bentoBox.balanceOf(token1(), e.msg.sender);
 
     sinvoke bentoBox.transfer(token0(), e.msg.sender, currentContract, _liquidity0);
     sinvoke bentoBox.transfer(token1(), e.msg.sender, currentContract, _liquidity1);
@@ -216,9 +224,16 @@ rule inverseOfMintAndBurn() {
 
     liquidity0_, liquidity1_ = burnGetter(e, to, unwrapBento);
 
-    // do we instead want to check whether the 'to' user got the funds? (Ask Nurit) -- Yes
+    uint256 totalUsertoken0_ = tokenBalanceOf(token0(), e.msg.sender) + 
+                               bentoBox.balanceOf(token0(), e.msg.sender);
+    uint256 totalUsertoken1_ = tokenBalanceOf(token1(), e.msg.sender) + 
+                               bentoBox.balanceOf(token1(), e.msg.sender);
+
     assert(_liquidity0 == liquidity0_ && _liquidity1 == liquidity1_, 
            "inverse of mint then burn doesn't hold");
+    assert(_totalUsertoken0 == totalUsertoken0_ && 
+           _totalUsertoken1 == totalUsertoken1_, 
+           "user's total balances changed");
 }
 
 rule burnTokenAdditivity() {
