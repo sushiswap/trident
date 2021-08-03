@@ -33,7 +33,7 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
         require(amountOut >= params.amountOutMinimum, "TOO_LITTLE_RECEIVED");
     }
 
-    function exactInput(ExactInputParams memory params) public payable returns (uint256 amountOut) {
+    function exactInput(ExactInputParams calldata params) public payable returns (uint256 amountOut) {
         // @dev Pay the first pool directly.
         pay(params.tokenIn, msg.sender, params.path[0].pool, params.amountIn);
         for (uint256 i; i < params.path.length; i++) {
@@ -60,52 +60,48 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
         require(amountOut >= params.amountOutMinimum, "TOO_LITTLE_RECEIVED");
     }
 
-    // function complexPath(ComplexPathParams calldata params) public payable {
-    //     for (uint256 i; i < params.initialPath.length; i++) {
-    //         if (!params.initialPath[i].preFunded) {
-    //             pay(
-    //                 params.initialPath[i].tokenIn,
-    //                 msg.sender,
-    //                 params.initialPath[i].pool,
-    //                 params.initialPath[i].amountIn
-    //             );
-    //         }
-    //         uint256 amountIn = bento.toShare(params.initialPath[i].tokenIn, params.initialPath[i].amountIn, false);
-    //         IPool(params.initialPath[i].pool).swapWithContext(
-    //             params.initialPath[i].tokenIn,
-    //             params.initialPath[i].tokenOut,
-    //             params.initialPath[i].context,
-    //             address(this),
-    //             false,
-    //             amountIn
-    //         );
-    //     }
+    function complexPath(ComplexPathParams calldata params) public payable {
+        for (uint256 i; i < params.initialPath.length; i++) {
+            if (params.initialPath[i].native) {
+                _depositToBentoBox(
+                    params.initialPath[i].tokenIn,
+                    params.initialPath[i].pool,
+                    params.initialPath[i].amount
+                );
+            } else {
+                pay(
+                    params.initialPath[i].tokenIn,
+                    msg.sender,
+                    params.initialPath[i].pool,
+                    params.initialPath[i].amount
+                );
+            }
+            IPool(params.initialPath[i].pool).swap(params.initialPath[i].data);
+        }
 
-    //     for (uint256 i; i < params.percentagePath.length; i++) {
-    //         uint256 balanceShares = bento.balanceOf(params.percentagePath[i].tokenIn, address(this));
-    //         uint256 transferShares = (balanceShares * params.percentagePath[i].balancePercentage) / uint256(10)**6;
-    //         payInShares(params.percentagePath[i].tokenIn, address(this), params.percentagePath[i].pool, transferShares);
-    //         IPool(params.percentagePath[i].pool).swapWithContext(
-    //             params.percentagePath[i].tokenIn,
-    //             params.percentagePath[i].tokenOut,
-    //             params.percentagePath[i].context,
-    //             address(this),
-    //             false,
-    //             transferShares
-    //         );
-    //     }
+        for (uint256 i; i < params.percentagePath.length; i++) {
+            uint256 balanceShares = bento.balanceOf(params.percentagePath[i].tokenIn, address(this));
+            uint256 transferShares = (balanceShares * params.percentagePath[i].balancePercentage) / uint256(10)**6;
+            bento.transfer(
+                params.percentagePath[i].tokenIn,
+                address(this),
+                params.percentagePath[i].pool,
+                transferShares
+            );
+            IPool(params.percentagePath[i].pool).swap(params.percentagePath[i].data);
+        }
 
-    //     for (uint256 i; i < params.output.length; i++) {
-    //         uint256 balanceShares = bento.balanceOf(params.output[i].token, address(this));
-    //         uint256 balanceAmount = bento.toAmount(params.output[i].token, balanceShares, false);
-    //         require(balanceAmount >= params.output[i].minAmount, "TOO_LITTLE_RECEIVED");
-    //         if (params.output[i].unwrapBento) {
-    //             bento.withdraw(params.output[i].token, address(this), params.output[i].to, 0, balanceShares);
-    //         } else {
-    //             payInShares(params.output[i].token, address(this), params.output[i].to, balanceShares);
-    //         }
-    //     }
-    // }
+        for (uint256 i; i < params.output.length; i++) {
+            uint256 balanceShares = bento.balanceOf(params.output[i].token, address(this));
+            uint256 balanceAmount = bento.toAmount(params.output[i].token, balanceShares, false);
+            require(balanceAmount >= params.output[i].minAmount, "TOO_LITTLE_RECEIVED");
+            if (params.output[i].unwrapBento) {
+                bento.withdraw(params.output[i].token, address(this), params.output[i].to, 0, balanceShares);
+            } else {
+                bento.transfer(params.output[i].token, address(this), params.output[i].to, balanceShares);
+            }
+        }
+    }
 
     function addLiquidity(
         TokenInput[] memory tokenInput,

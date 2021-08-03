@@ -34,18 +34,16 @@ interface ITridentRouter {
     struct InitialPath {
         address tokenIn;
         address pool;
-        address tokenOut;
-        bool preFunded;
-        uint256 amountIn; // @dev 0 amountIn implies pre-funding.
-        bytes context;
+        bool native;
+        uint256 amount;
+        bytes data;
     }
 
     struct PercentagePath {
         address tokenIn;
         address pool;
-        address tokenOut;
         uint64 balancePercentage; // @dev Multiplied by 10^6.
-        bytes context;
+        bytes data;
     }
 
     struct Output {
@@ -56,7 +54,6 @@ interface ITridentRouter {
     }
 
     struct ComplexPathParams {
-        uint256 deadline;
         InitialPath[] initialPath;
         PercentagePath[] percentagePath;
         Output[] output;

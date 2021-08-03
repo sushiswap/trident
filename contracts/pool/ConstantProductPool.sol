@@ -268,27 +268,20 @@ contract ConstantProductPool is IPool, TridentERC20 {
             Rebases memory _rebase
         )
     {
-        uint112 _reserveShares0 = reserveShares0;
-        uint112 _reserveShares1 = reserveShares1;
+        _reserves.shares0 = reserveShares0;
+        _reserves.shares1 = reserveShares1;
         _blockTimestampLast = blockTimestampLast;
-        _rebase = Rebases({total0: bento.totals(token0), total1: bento.totals(token1)});
-        _reserves = Holdings({
-            shares0: _reserveShares0,
-            shares1: _reserveShares1,
-            amount0: _rebase.total0.toElastic(_reserveShares0),
-            amount1: _rebase.total1.toElastic(_reserveShares1)
-        });
+        _rebase.total0 = bento.totals(token0);
+        _rebase.total1 = bento.totals(token1);
+        _reserves.amount0 = _rebase.total0.toElastic(_reserves.shares0);
+        _reserves.amount1 = _rebase.total1.toElastic(_reserves.shares1);
     }
 
     function _balance(Rebases memory _rebase) internal view returns (Holdings memory _balances) {
-        uint256 balanceShares0 = bento.balanceOf(token0, address(this));
-        uint256 balanceShares1 = bento.balanceOf(token1, address(this));
-        _balances = Holdings({
-            shares0: balanceShares0,
-            shares1: balanceShares1,
-            amount0: _rebase.total0.toElastic(balanceShares0),
-            amount1: _rebase.total1.toElastic(balanceShares1)
-        });
+        _balances.shares0 = bento.balanceOf(token0, address(this));
+        _balances.shares1 = bento.balanceOf(token1, address(this));
+        _balances.amount0 = _rebase.total0.toElastic(_balances.shares0);
+        _balances.amount1 = _rebase.total1.toElastic(_balances.shares1);
     }
 
     function _update(
@@ -299,7 +292,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         require(_balances.shares0 <= type(uint112).max && _balances.shares1 <= type(uint112).max, "SAHRES_OVERFLOW");
         require(_balances.amount0 < type(uint128).max && _balances.amount1 < type(uint128).max, "AMOUNT_OVERFLOW");
 
-        if (blockTimestampLast == 0) {
+        if (_blockTimestampLast == 0) {
             // TWAP support is disabled for gas efficiency
             reserveShares0 = uint112(_balances.shares0);
             reserveShares1 = uint112(_balances.shares1);
