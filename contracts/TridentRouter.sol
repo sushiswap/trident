@@ -113,8 +113,7 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
             if (tokenInput[i].native) {
                 _depositToBentoBox(tokenInput[i].token, pool, tokenInput[i].amount);
             } else {
-                uint256 shares = bento.toShare(tokenInput[i].token, tokenInput[i].amount, false);
-                bento.transfer(tokenInput[i].token, msg.sender, pool, shares);
+                pay(tokenInput[i].token, msg.sender, pool, tokenInput[i].amount);
             }
         }
         liquidity = IPool(pool).mint(data);
