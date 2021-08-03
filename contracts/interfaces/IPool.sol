@@ -15,9 +15,11 @@ interface IPool {
 
     function burnSingle(bytes calldata data) external returns (uint256 amount);
 
-    function poolType() external pure returns (uint256);
+    function poolIdentifier() external pure returns (bytes32);
 
     function getAssets() external view returns (address[] memory);
+
+    function getAmountOut(bytes calldata data) external view returns (uint256 finalAmountOut);
 
     event Swap(
         address indexed recipient,

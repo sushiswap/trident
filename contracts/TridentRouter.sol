@@ -125,49 +125,38 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
         require(liquidity >= minLiquidity, "NOT_ENOUGH_LIQUIDITY_MINTED");
     }
 
-    // function burnLiquidity(
-    //     address pool,
-    //     address recipient,
-    //     bool unwrapBento,
-    //     uint256 deadline,
-    //     uint256 liquidity,
-    //     IPool.TokenAmount[] memory minWithdrawals
-    // ) public {
-    //     safeTransferFrom(pool, msg.sender, pool, liquidity);
-    //     IPool.TokenAmount[] memory withdrawnLiquidity = IPool(pool).burn(recipient, unwrapBento);
-    //     for (uint256 i; i < minWithdrawals.length; i++) {
-    //         uint256 j;
-    //         for (; j < withdrawnLiquidity.length; j++) {
-    //             if (withdrawnLiquidity[j].token == minWithdrawals[i].token) {
-    //                 uint256 underlyingAmount = bento.toAmount(
-    //                     withdrawnLiquidity[j].token,
-    //                     withdrawnLiquidity[j].amount,
-    //                     false
-    //                 );
-    //                 require(underlyingAmount >= minWithdrawals[i].amount, "TOO_LITTLE_RECEIVED");
-    //                 break;
-    //             }
-    //         }
-    //         // @dev A token that is present in `minWithdrawals` is missing from `withdrawnLiquidity`.
-    //         require(j < withdrawnLiquidity.length, "INCORRECT_TOKEN_WITHDRAWN");
-    //     }
-    // }
+    function burnLiquidity(
+        address pool,
+        uint256 liquidity,
+        bytes calldata data,
+        IPool.TokenAmount[] memory minWithdrawals
+    ) public {
+        safeTransferFrom(pool, msg.sender, pool, liquidity);
+        IPool.TokenAmount[] memory withdrawnLiquidity = IPool(pool).burn(data);
+        for (uint256 i; i < minWithdrawals.length; i++) {
+            uint256 j;
+            for (; j < withdrawnLiquidity.length; j++) {
+                if (withdrawnLiquidity[j].token == minWithdrawals[i].token) {
+                    require(withdrawnLiquidity[j].amount >= minWithdrawals[i].amount, "TOO_LITTLE_RECEIVED");
+                    break;
+                }
+            }
+            // @dev A token that is present in `minWithdrawals` is missing from `withdrawnLiquidity`.
+            require(j < withdrawnLiquidity.length, "INCORRECT_TOKEN_WITHDRAWN");
+        }
+    }
 
-    // function burnLiquiditySingle(
-    //     address pool,
-    //     address tokenOut,
-    //     address recipient,
-    //     bool unwrapBento,
-    //     uint256 deadline,
-    //     uint256 liquidity,
-    //     uint256 minWithdrawal
-    // ) public {
-    //     // @dev Use liquidity = 0 for pre funding.
-    //     safeTransferFrom(pool, msg.sender, pool, liquidity);
-    //     uint256 withdrawn = IPool(pool).burnLiquiditySingle(tokenOut, recipient, unwrapBento);
-    //     withdrawn = bento.toAmount(tokenOut, withdrawn, false);
-    //     require(withdrawn >= minWithdrawal, "TOO_LITTLE_RECEIVED");
-    // }
+    function burnLiquiditySingle(
+        address pool,
+        uint256 liquidity,
+        bytes calldata data,
+        uint256 minWithdrawal
+    ) public {
+        // @dev Use liquidity = 0 for pre funding.
+        safeTransferFrom(pool, msg.sender, pool, liquidity);
+        uint256 withdrawn = IPool(pool).burnSingle(data);
+        require(withdrawn >= minWithdrawal, "TOO_LITTLE_RECEIVED");
+    }
 
     function sweepBentoBoxToken(
         address token,

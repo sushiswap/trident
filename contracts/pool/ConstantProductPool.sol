@@ -39,11 +39,11 @@ contract ConstantProductPool is IPool, TridentERC20 {
     uint256 public price1CumulativeLast;
     uint256 public kLast;
 
-    uint112 public reserveShares0;
-    uint112 public reserveShares1;
-    uint32 public blockTimestampLast;
+    uint112 internal reserveShares0;
+    uint112 internal reserveShares1;
+    uint32 internal blockTimestampLast;
 
-    uint256 public constant override poolType = 1;
+    bytes32 public constant override poolIdentifier = "Trident:ConstantProduct";
 
     uint256 private unlocked = 1;
     modifier lock() {
@@ -73,7 +73,6 @@ contract ConstantProductPool is IPool, TridentERC20 {
         );
 
         require(tokenA != address(0), "ConstantProductPoolWithTWAP: ZERO_ADDRESS");
-        require(tokenB != address(0), "ConstantProductPoolWithTWAP: ZERO_ADDRESS");
         require(tokenA != tokenB, "ConstantProductPoolWithTWAP: IDENTICAL_ADDRESSES");
         require(_swapFee <= MAX_FEE, "ConstantProductPoolWithTWAP: INVALID_SWAP_FEE");
 
@@ -90,7 +89,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         }
     }
 
-    function mint(bytes calldata data) external override lock returns (uint256 liquidity) {
+    function mint(bytes calldata data) public override lock returns (uint256 liquidity) {
         address to = abi.decode(data, (address));
         (Holdings memory reserves, uint32 _blockTimestampLast, Rebases memory rebase) = _getReserves();
         Holdings memory balances = _balance(rebase);
@@ -115,7 +114,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         emit Mint(msg.sender, amount0, amount1, to);
     }
 
-    function burn(bytes calldata data) external override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
+    function burn(bytes calldata data) public override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
         (address to, bool unwrapBento) = abi.decode(data, (address, bool));
         (Holdings memory reserves, uint32 _blockTimestampLast, Rebases memory rebase) = _getReserves();
         Holdings memory balances = _balance(rebase);
@@ -148,7 +147,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
-    function burnSingle(bytes calldata data) external override lock returns (uint256 amount) {
+    function burnSingle(bytes calldata data) public override lock returns (uint256 amount) {
         (address tokenOut, address to, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (Holdings memory reserves, uint32 _blockTimestampLast, Rebases memory rebase) = _getReserves();
         Holdings memory balances = _balance(rebase);
@@ -196,7 +195,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
-    function swap(bytes calldata data) external override lock returns (uint256 amountOut) {
+    function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (Holdings memory reserves, uint32 _blockTimestampLast, Rebases memory rebase) = _getReserves();
         Holdings memory balances = _balance(rebase);
@@ -225,7 +224,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
 
-    function flashSwap(bytes calldata data) external override lock returns (uint256 amountOut) {
+    function flashSwap(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento, uint256 amountIn, bytes memory context) = abi.decode(
             data,
             (address, address, bool, uint256, bytes)
@@ -369,5 +368,27 @@ contract ConstantProductPool is IPool, TridentERC20 {
         assets = new address[](2);
         assets[0] = token0;
         assets[1] = token1;
+    }
+
+    function getAmountOut(bytes calldata data) public view override returns (uint256 finalAmountOut) {
+        (address tokenIn, uint256 amountIn) = abi.decode(data, (address, uint256));
+        (Holdings memory reserves, , ) = _getReserves();
+        if (tokenIn == address(token0)) {
+            finalAmountOut = _getAmountOut(amountIn, reserves.amount0, reserves.amount1);
+        } else {
+            finalAmountOut = _getAmountOut(amountIn, reserves.amount1, reserves.amount0);
+        }
+    }
+
+    function getReserves()
+        public
+        view
+        returns (
+            Holdings memory,
+            uint32,
+            Rebases memory
+        )
+    {
+        return _getReserves();
     }
 }
