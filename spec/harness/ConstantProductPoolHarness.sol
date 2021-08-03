@@ -6,6 +6,7 @@ contract ConstantProductPoolHarness is ConstantProductPool {
     constructor(bytes memory _deployData, address _masterDeployer)
             ConstantProductPool(_deployData, _masterDeployer) { }
 
+    // TODO: burn and burnGetter are esentially the same, so override maybe?
     function burnGetter(address to, bool unwrapBento) public lock
             returns (uint256 liquidity0_, uint256 liquidity1_) {
         liquidityAmount[] memory withdrawnAmounts = burn(to, unwrapBento);
