@@ -6,6 +6,4 @@ certoraRun spec/harness/SwapRouterHarness.sol spec/harness/SimpleBentoBox.sol sp
 	--solc_map SwapRouterHarness=solc8.2,DummyERC20A=solc8.2,SimpleBentoBox=solc6.12,SymbolicPool=solc8.2,DummyERC20B=solc8.2,DummyWeth=solc8.2 \
 	--settings -ignoreViewFunctions,-postProcessCounterExamples=true,-solvers=z3,-t=120 \
 	--cache Trident --short_output \
-	--staging  --msg "Swap Router :WETH " 
-	#--packages @openzeppelin=/Users/vasu/Documents/Certora/trident/node_modules/@openzeppelin \
-	
+	--staging  --msg "Swap Router: WETH"

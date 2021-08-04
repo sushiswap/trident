@@ -21,15 +21,32 @@ perl -0777 -i -pe 's/\) public payable allowed\(from\)/\) public virtual payable
 perl -0777 -i -pe 's/\) public allowed\(from\) returns/\) public virtual allowed\(from\) returns/g' contracts/flat/BentoBoxV1Flat.sol
 
 ##################################################
+#                 TridentBatcher                 #
+##################################################
+# virtualizing batch function
+perl -0777 -i -pe 's/function batch\(bytes\[\] calldata data\) external/function batch\(bytes\[\] calldata data\) external virtual/g' contracts/utils/TridentBatcher.sol
+
+##################################################
 #                   SwapRouter                   #
 ##################################################
 # remove hardhat console
 perl -0777 -i -pe 's/import \"hardhat/\/\/ import \"hardhat/g' contracts/SwapRouter.sol
 
+# virtualizing receive
+perl -0777 -i -pe 's/receive\(\) external payable \{/receive\(\) external virtual payable \{/g' contracts/SwapRouter.sol
+
 # virtualize functions for SwapRouter
-perl -0777 -i -pe 's/external payable returns/external virtual payable returns/g' contracts/SwapRouter.sol
 perl -0777 -i -pe 's/external payable /public virtual payable /g' contracts/SwapRouter.sol
 perl -0777 -i -pe 's/        external\n        payable/        public\n        virtual\n        payable/g' contracts/SwapRouter.sol # for ExactSingleInput and others ...
+
+# external checkDeadline -> public virtual checkDeadline
+perl -0777 -i -pe 's/external checkDeadline/public virtual checkDeadline/g' contracts/SwapRouter.sol
+
+# ) external { -> ) public {
+perl -0777 -i -pe 's/\) external \{/\) public \{/g' contracts/SwapRouter.sol
+
+# calldata -> memory
+perl -0777 -i -pe 's/calldata/memory/g' contracts/SwapRouter.sol
 
 ##################################################
 #               ConstantProductPool              #
