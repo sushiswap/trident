@@ -229,27 +229,27 @@ describe("HybridPool Typescript == Solidity check", function () {
     }
   })
 
-  /*describe("Check different A", function () {
-    const Avariants =  [1, 5, 10, 30, 100, 300, 1000, 10_000];
+  describe("Check different A", function () {
+    const Avariants =  [100, 450, 1000, 3000, 10_000, 30_000, 100_000, 1000_000];
     for (let i = 0; i < Avariants.length; ++i) {
       const A = Avariants[i];
       it(`A = ${A}`, async function() {
         const [poolRouterInfo, pool] = await createHybridPool(A, 0.003, 19, 19);
 
         // test regular values
-        for (let swapNum = 0; swapNum < 1; ++swapNum) {
+        for (let swapNum = 0; swapNum < 3; ++swapNum) {
           await checkSwap(pool, poolRouterInfo, 17);
         }
         // test small values
-        // for (let swapNum = 0; swapNum < 3; ++swapNum) {
-        //   await checkSwap(pool, poolRouterInfo, 2);
-        // }
+        for (let swapNum = 0; swapNum < 3; ++swapNum) {
+          await checkSwap(pool, poolRouterInfo, 2);
+        }
         //test extremely big values 2^112 = 10^33.7153
-        // for (let swapNum = 0; swapNum < 3; ++swapNum) {
-        //   await checkSwap(pool, poolRouterInfo, 33);
-        // }
+        for (let swapNum = 0; swapNum < 3; ++swapNum) {
+          await checkSwap(pool, poolRouterInfo, 33);
+        }
       });
     }
-  })*/
+  })
 
 })
