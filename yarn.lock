@@ -742,10 +742,10 @@
   resolved "https://registry.yarnpkg.com/@sushiswap/prettier-config/-/prettier-config-0.1.0.tgz#4fdddf1ba2590025f78adf6cb54ed016344958a4"
   integrity sha512-QD+xdR0VZbmqwSa1xMMkCh5KGCVQQLqN3VHS7VDh5rB4FtZKbUE8lNgKvtKwp38aG0zIlwZcbA+ASFBnWmbkJQ==
 
-"@sushiswap/sdk@5.0.0-canary.34":
-  version "5.0.0-canary.34"
-  resolved "https://registry.yarnpkg.com/@sushiswap/sdk/-/sdk-5.0.0-canary.34.tgz#38eb34632fd645e265b1914d2a252466ddd0a8fd"
-  integrity sha512-gy9BAbebjSTpAS7s/4kwSsU7A1Y3Ac7dY+KwJhN5ZwhwDSWXobo2SypqqWF7+gxBLqmAom/WATbN2yxUA+olfA==
+"@sushiswap/sdk@5.0.0-canary.36":
+  version "5.0.0-canary.36"
+  resolved "https://registry.yarnpkg.com/@sushiswap/sdk/-/sdk-5.0.0-canary.36.tgz#581b8be1f2a395ef1e05d820fe9fa20367fba57d"
+  integrity sha512-AH5kfivOJqO6BnVzqMT0ul1G1Xd6+GP3XDJlXNypenGMtuJXelgZ+8/Y5kvm8KPddw0yC69JHx3pmsM7Pke+Sg==
   dependencies:
     "@ethersproject/bignumber" "^5.4.1"
     "@sushiswap/core" "^2.0.0-canary.0"
