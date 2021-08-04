@@ -182,7 +182,7 @@ rule mintingNotPossibleForBalancedPool() {
 //     uint256 mirinLiquidity = mint(e, args0);
 
 //     // transfer mirin tokens to the pool
-//     transferFrom(e.msg.sender, currentContract, mirinLiquidity);
+//     transferFrom(e, e.msg.sender, currentContract, mirinLiquidity);
 
 //     uint256 liquidity0_;
 //     uint256 liquidity1_;
@@ -213,12 +213,12 @@ rule inverseOfMintAndBurn() {
     uint256 _totalUsertoken1 = tokenBalanceOf(token1(), e.msg.sender) + 
                                bentoBox.balanceOf(token1(), e.msg.sender);
 
-    sinvoke bentoBox.transfer(token0(), e.msg.sender, currentContract, _liquidity0);
-    sinvoke bentoBox.transfer(token1(), e.msg.sender, currentContract, _liquidity1);
+    sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, _liquidity0);
+    sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, _liquidity1);
     uint256 mirinLiquidity = mint(e, to);
 
     // transfer mirin tokens to the pool
-    transferFrom(e.msg.sender, currentContract, mirinLiquidity);
+    transferFrom(e, e.msg.sender, currentContract, mirinLiquidity);
 
     uint256 liquidity0_;
     uint256 liquidity1_;
@@ -255,7 +255,7 @@ rule burnTokenAdditivity() {
     storage initState = lastStorage;
 
     // burn single token
-    transferFrom(e.msg.sender, currentContract, mirinLiquidity);
+    transferFrom(e, e.msg.sender, currentContract, mirinLiquidity);
     uint256 liquidity0Single = burnLiquiditySingle(e, token0(), to, unwrapBento);
 
     uint256 _totalUsertoken0 = tokenBalanceOf(token0(), e.msg.sender) + 
@@ -267,11 +267,11 @@ rule burnTokenAdditivity() {
     uint256 liquidity1;
 
     // burn both tokens
-    transferFrom(e.msg.sender, currentContract, mirinLiquidity) at initState;
+    transferFrom(e, e.msg.sender, currentContract, mirinLiquidity) at initState;
     liquidity0, liquidity1 = burnGetter(e, to, unwrapBento);
 
     // swap token1 for token0
-    sinvoke bentoBox.transfer(token1(), e.msg.sender, currentContract, liquidity1);
+    sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, liquidity1);
     uint256 amountOut = swapWithoutContext(e, token1(), token0(), to, unwrapBento);
 
     uint256 totalUsertoken0_ = tokenBalanceOf(token0(), e.msg.sender) + 
@@ -304,7 +304,7 @@ rule burnTokenAdditivity() {
 //     storage initState = lastStorage;
 
 //     // burn single token before swapping
-//     transferFrom(e.msg.sender, currentContract, mirinLiquidity);
+//     transferFrom(e, e.msg.sender, currentContract, mirinLiquidity);
 //     uint256 _liquidity0Single = burnLiquiditySingle(e, token0(), to, unwrapBento);
 
 //     calldataarg args;
@@ -314,7 +314,7 @@ rule burnTokenAdditivity() {
 //     // if branch? Like if the ratio is the same, burn and see if liquidity
 //     // increased. TODO
 //     // burn single token after swapping
-//     transferFrom(e.msg.sender, currentContract, mirinLiquidity);
+//     transferFrom(e, e.msg.sender, currentContract, mirinLiquidity);
 //     uint256 liquidity0Single_ = burnLiquiditySingle(e, token0(), to, unwrapBento);
 
 //     assert((reserve0() / reserve1() == 2) => _liquidity0Single <= liquidity0Single_,
@@ -373,9 +373,9 @@ rule multiSwapLessThanSingleSwap() {
     storage initState = lastStorage;
 
     // swap token1 for token0 in two steps
-    sinvoke bentoBox.transfer(token1(), e.msg.sender, currentContract, liquidity1);
+    sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, liquidity1);
     uint256 multiAmountOut1 = swapWithoutContext(e, token1(), token0(), to, unwrapBento);
-    sinvoke bentoBox.transfer(token1(), e.msg.sender, currentContract, liquidity2);
+    sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, liquidity2);
     uint256 multiAmountOut2 = swapWithoutContext(e, token1(), token0(), to, unwrapBento);
 
     // checking for overflows
@@ -383,7 +383,7 @@ rule multiSwapLessThanSingleSwap() {
     require liquidity1 + liquidity2 <= max_uint256;
 
     // swap token1 for token0 in a single step
-    sinvoke bentoBox.transfer(token1(), e.msg.sender, currentContract, liquidity1 + liquidity2) at initState; 
+    sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, liquidity1 + liquidity2) at initState; 
     uint256 singleAmountOut = swapWithoutContext(e, token1(), token0(), to, unwrapBento);
 
     assert(singleAmountOut > multiAmountOut1 + multiAmountOut2, "multiple swaps better than one single swap");
@@ -405,12 +405,12 @@ rule additivityOfMint() {
     storage initState = lastStorage;
 
     // minting in two steps
-    sinvoke bentoBox.transfer(token0(), e.msg.sender, currentContract, x1);
-    sinvoke bentoBox.transfer(token1(), e.msg.sender, currentContract, x2);
+    sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, x1);
+    sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, x2);
     uint256 mirinTwoSteps1 = mint(e, to);
 
-    sinvoke bentoBox.transfer(token0(), e.msg.sender, currentContract, y1);
-    sinvoke bentoBox.transfer(token1(), e.msg.sender, currentContract, y2);
+    sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, y1);
+    sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, y2);
     uint256 mirinTwoSteps2 = mint(e, to);
 
     // checking for overflows
@@ -418,8 +418,8 @@ rule additivityOfMint() {
     require x1 + x2 < max_uint256 && y1 + y2 < max_uint256;
 
     // minting in a single step
-    sinvoke bentoBox.transfer(token0(), e.msg.sender, currentContract, x1 + x2) at initState;
-    sinvoke bentoBox.transfer(token1(), e.msg.sender, currentContract, y1 + y2);
+    sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, x1 + x2) at initState;
+    sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, y1 + y2);
     uint256 mirinSingleStep = mint(e, to);
 
     assert(mirinSingleStep >= mirinTwoSteps1 + mirinTwoSteps2, "multiple mints better than a single mint");
