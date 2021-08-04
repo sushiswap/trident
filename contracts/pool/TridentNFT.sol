@@ -21,11 +21,9 @@ contract TridentNFT {
     
     mapping(int24 => mapping(int24 => TickRange)) public tickRanges;
     struct TickRange { // @dev Virtual pool for concentrated liquidity in tick range.
-        uint128 reserve0; // to-do consolidate to liquidity?
-        uint128 reserve1; // to-do consolidate to liquidity?
         uint112 liquidity; // last range liquidity 
         uint256 totalSupply; // total range mint for pool range providers
-        mapping(address => uint256) balanceOf; // account provider range mint balance
+        mapping(address => uint256) balanceOf; // account provider range mint balance (compare erc20)
     }
     
     mapping(uint256 => Range) public ranges; // @dev Tracks range by tokenId.
@@ -58,8 +56,8 @@ contract TridentNFT {
     function _mint(
         int24 lower, 
         int24 upper, 
-        address recipient, 
-        uint256 amount
+        uint256 amount,
+        address recipient
     ) internal {
         tickRanges[lower][upper].totalSupply += amount;
         unchecked {
