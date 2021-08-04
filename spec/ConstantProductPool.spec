@@ -22,28 +22,29 @@ methods {
     // ConstantProductPool state variables
     token0() returns (address) envfree
     token1() returns (address) envfree
-    reserve0() returns (uint128) envfree
-    reserve1() returns (uint128) envfree
+    reserve0() returns (uint112) envfree
+    reserve1() returns (uint112) envfree
 
     // ConstantProductPool functions
     _balance() returns (uint256 balance0, uint256 balance1) envfree
-    transferFrom(address, address, uint256) envfree
+    transferFrom(address, address, uint256)
     totalSupply() returns (uint256) envfree
 
     // TODO: not working
-    // MirinERC20 (permit)
+    // TridentERC20 (permit)
     ecrecover(bytes32 digest, uint8 v, bytes32 r, bytes32 s) 
               returns (address) => NONDET
 
-    // ConstantProductPool (swap, swapWithContext) -> IMirinCallee (mirinCall)
-    mirinCall(address sender, uint256 amount0Out, uint256 amount1Out, bytes data) => NONDET
+    // ConstantProductPool (swap, swapWithContext) -> ITridentCallee (tridentCallback)
+    tridentCallback(address tokenIn, address tokenOut, uint256 amountIn,
+                    uint256 amountOut, bytes data) => NONDET
 
     // simplification of sqrt
     sqrt(uint256 x) returns (uint256) => DISPATCHER(true) UNRESOLVED
 
     // bentobox
     bentoBox.balanceOf(address token, address user) returns (uint256) envfree
-    bentoBox.transfer(address token, address from, address to, uint256 share) envfree
+    bentoBox.transfer(address token, address from, address to, uint256 share)
 
     // IERC20
     transfer(address recipient, uint256 amount) returns (bool) => DISPATCHER(true) UNRESOLVED

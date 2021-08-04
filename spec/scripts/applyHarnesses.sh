@@ -41,15 +41,15 @@ perl -0777 -i -pe 's/import \"hardhat/\/\/ import \"hardhat/g' contracts/pool/Co
 perl -0777 -i -pe 's/import \"..\/deployer\/MasterDeployer.sol\";/import \"..\/deployer\/MasterDeployer.sol\";\nimport \"..\/..\/spec\/harness\/Simplifications.sol\";/g' contracts/pool/ConstantProductPool.sol
 perl -0777 -i -pe 's/address internal immutable barFeeTo;/address internal immutable barFeeTo;\n    Simplifications public simplified;/g' contracts/pool/ConstantProductPool.sol
 
-# simplifying sqrt MirinMath.sqrt(balance0 * balance1) in ConstantProductPool
-perl -0777 -i -pe 's/MirinMath.sqrt\(/simplified.sqrt\(/g' contracts/pool/ConstantProductPool.sol
+# simplifying sqrt TridentMath.sqrt(balance0 * balance1) in ConstantProductPool
+perl -0777 -i -pe 's/TridentMath.sqrt\(/simplified.sqrt\(/g' contracts/pool/ConstantProductPool.sol
 
 # _balance: internal -> public
 perl -0777 -i -pe 's/_balance\(\) internal view/_balance\(\) public view/g' contracts/pool/ConstantProductPool.sol
 
 # reserve: internal -> public
-perl -0777 -i -pe 's/uint128 internal reserve0;/uint128 public reserve0;/g' contracts/pool/ConstantProductPool.sol
-perl -0777 -i -pe 's/uint128 internal reserve1;/uint128 public reserve1;/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/uint112 internal reserve0;/uint112 public reserve0;/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/uint112 internal reserve1;/uint112 public reserve1;/g' contracts/pool/ConstantProductPool.sol
 
 ##################################################
 #                    HybridPool                  #
@@ -61,8 +61,8 @@ perl -0777 -i -pe 's/import \"hardhat/\/\/ import \"hardhat/g' contracts/pool/Hy
 perl -0777 -i -pe 's/import \"..\/deployer\/MasterDeployer.sol\";/import \"..\/deployer\/MasterDeployer.sol\";\nimport \"..\/..\/spec\/harness\/Simplifications.sol\";/g' contracts/pool/HybridPool.sol
 perl -0777 -i -pe 's/address public immutable barFeeTo;/address public immutable barFeeTo;\n    Simplifications public simplified;/g' contracts/pool/HybridPool.sol
 
-# simplifying sqrt MirinMath.sqrt(balance0 * balance1) in HybridPool
-perl -0777 -i -pe 's/MirinMath.sqrt\(/simplified.sqrt\(/g' contracts/pool/HybridPool.sol
+# simplifying sqrt TridentMath.sqrt(balance0 * balance1) in HybridPool
+perl -0777 -i -pe 's/TridentMath.sqrt\(/simplified.sqrt\(/g' contracts/pool/HybridPool.sol
 
 # _balance: internal -> public
 perl -0777 -i -pe 's/_balance\(\) internal view/_balance\(\) public view/g' contracts/pool/HybridPool.sol
