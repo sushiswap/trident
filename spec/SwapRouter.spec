@@ -54,7 +54,7 @@ methods {
                     uint8 v, bytes32 r, bytes32 s) => NONDET
 
     // WETH
-    //withdraw(uint256) => DISPATCHER(true)
+    withdraw(uint256) => DISPATCHER(true)
 
     //IPool
     swapWithContext(address tokenIn, address tokenOut, bytes context, address recipient, bool unwrapBento, uint256 amountIn) returns (uint256) => DISPATCHER(true)
@@ -175,6 +175,7 @@ rule integrityOfAddLiquidity(address token, uint256 x, uint256 amount) {
 
     assert userTokenBalanceAfter == userTokenBalanceBefore - amount;
     assert poolTokenBalanceAfter == poolTokenBalanceBefore + bento.toShare(token, amount, false);
+    assert userLiquidityBalanceBefore + liquidity <= max_uint256;
     assert userLiquidityBalanceAfter == userLiquidityBalanceBefore + liquidity;
 
     assert liquidity > 0 <=> amount > 0;
@@ -291,9 +292,6 @@ function callFunction(address msgSender, method f,
     }
     else if (f.selector == burnLiquiditySingle(address,address,address,bool,uint256,uint256,uint256).selector) {
         burnLiquiditySingle(e, _pool, tokenOut, recipient, unwrapBento, deadline, amount, min);
-    }
-    else if (f.selector == depositToBentoBox(address,uint256,address).selector) {
-        depositToBentoBox(e, tokenIn, amount, recipient);
     }
     else if (f.selector == sweepBentoBoxToken(address,uint256,address).selector) {
         sweepBentoBoxToken(e, tokenIn, amount, recipient);

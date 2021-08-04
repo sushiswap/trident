@@ -10,7 +10,7 @@ contract ConstantProductPoolHarness is ConstantProductPool {
     // TODO: burn and burnGetter are esentially the same, so override maybe?
     function burnGetter(address to, bool unwrapBento) public
             returns (uint256 liquidity0_, uint256 liquidity1_) {
-        liquidityAmount[] memory withdrawnAmounts = burn(to, unwrapBento);
+        liquidityAmount[] memory withdrawnAmounts = super.burn(to, unwrapBento);
 
         // Assuming in BentoBox shares (Ask Nurit)
         return (withdrawnAmounts[0].amount, withdrawnAmounts[1].amount);
@@ -19,5 +19,14 @@ contract ConstantProductPoolHarness is ConstantProductPool {
     function tokenBalanceOf(IERC20 token, address user)
             public view returns (uint256 balance) {
         return token.balanceOf(user);
+    }
+
+    //override burn since we have the burnGetter - to save time
+     function burn(address to, bool unwrapBento)
+        public
+        override
+        
+        returns (liquidityAmount[] memory withdrawnAmounts)
+    {
     }
 }

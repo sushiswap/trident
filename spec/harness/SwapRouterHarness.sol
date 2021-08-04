@@ -2,14 +2,14 @@ pragma solidity ^0.8.2;
 pragma abicoder v2;
 
 import "../../contracts/SwapRouter.sol";
-import "../../contracts/interfaces/IBentoBox.sol";
+import "../../contracts/interfaces/IBentoBoxMinimal.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract SwapRouterHarness is SwapRouter {
+contract SwapRouterHarness is TridentRouter {
     IERC20 public tokenA;
 
-    constructor(address WETH, IBentoBoxV1 bento)
-        SwapRouter(WETH, bento) public { }
+    constructor(IBentoBoxMinimal _bento, address _wETH)
+        TridentRouter(_bento, _wETH) public { }
 
     // A wrapper for exactInput
     function callExactInputSingle(address tokenIn, address tokenOut, address pool, address recipient, bool unwrapBento, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum) public returns (uint256) {
@@ -191,7 +191,7 @@ contract SwapRouterHarness is SwapRouter {
         uint256 deadline,
         uint256 liquidity,
         IPool.liquidityAmount[] memory minWithdrawals
-    ) external override {
+    ) public override {
 
     }
 
@@ -207,7 +207,7 @@ contract SwapRouterHarness is SwapRouter {
      { }
 
 
-    function multicall(bytes[] calldata data) external payable override returns (bytes[] memory results) {
+    function batch(bytes[] calldata data) external payable override returns (bytes[] memory results) {
 
     }
 /*     function refundETH() public virtual override payable {

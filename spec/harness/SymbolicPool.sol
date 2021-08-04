@@ -9,30 +9,29 @@ pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../../contracts/interfaces/IPool.sol";
-import "../../contracts/interfaces/IBentoBox.sol";
-import "../../contracts/pool/MirinERC20.sol";
+import "../../contracts/interfaces/IBentoBoxMinimal.sol";
+import "../../contracts/pool/TridentERC20.sol";
 
-contract SymbolicPool is IPool, MirinERC20 {
-    IBentoBoxV1 public bento;
-    IERC20 public token0;
-    IERC20 public token1;
-    IERC20 public token2;
+contract SymbolicPool is IPool, TridentERC20 {
+    IBentoBoxMinimal public bento;
+    address public token0;
+    address public token1;
+    address public token2;
     // There is a set of tokens this pool supports
     // the amount of holding the pool has for each token[i]
-    mapping(IERC20 => uint256) public reserves; 
+    mapping(address => uint256) public reserves; 
     // a symbolic representation of fixed conversion ratio between each two tokens
-    mapping (IERC20 => mapping (IERC20 => uint256)) public rates; 
+    mapping (address => mapping (address => uint256)) public rates; 
 
     uint256 internal constant NUM_TOKENS = 3;
     
     function swapWithoutContext(address tokenIn, address tokenOut,
                                 address recipient, bool unwrapBento) 
                                 external override returns(uint256 finalAmountOut) {
-        IERC20 _tokenIn = IERC20(tokenIn);
+        
+        uint256 amountIn = bento.balanceOf(tokenIn, address(this)) - reserves[tokenIn];
 
-        uint256 amountIn = bento.balanceOf(_tokenIn, address(this)) - reserves[_tokenIn];
-
-        return basicSwap(_tokenIn, IERC20(tokenOut), recipient, amountIn);
+        return basicSwap(tokenIn, address(tokenOut), recipient, amountIn);
     }
 
     function swapWithContext(address tokenIn, address tokenOut,
@@ -40,10 +39,10 @@ contract SymbolicPool is IPool, MirinERC20 {
                              bool unwrapBento, uint256 amountIn)
                             external override returns(uint256 finalAmountOut) {
         // TODO: add call to another contract
-        return basicSwap(IERC20(tokenIn), IERC20(tokenOut), recipient,amountIn);
+        return basicSwap(address(tokenIn), address(tokenOut), recipient,amountIn);
     }
 
-    function basicSwap(IERC20 tokenIn, IERC20 tokenOut, address recipient,
+    function basicSwap(address tokenIn, address tokenOut, address recipient,
                        uint256 amountIn) internal  returns(uint256 finalAmountOut) {
         // checking swapRouter, it should pass in amountIn of tokenIn
         assert(bento.balanceOf(tokenIn,address(this)) - reserves[tokenIn] >= amountIn);
@@ -65,9 +64,9 @@ contract SymbolicPool is IPool, MirinERC20 {
 
     // a basic one to one mapping
     function mint(address to) external override returns(uint256 liquidity) {
-        liquidity =  bento.balanceOf(IERC20(token0),address(this)) - reserves[IERC20(token0)];
-        liquidity +=  bento.balanceOf(IERC20(token1),address(this)) - reserves[IERC20(token1)];
-        liquidity +=  bento.balanceOf(IERC20(token2),address(this)) - reserves[IERC20(token2)];
+        liquidity =  bento.balanceOf(address(token0),address(this)) - reserves[address(token0)];
+        liquidity +=  bento.balanceOf(address(token1),address(this)) - reserves[address(token1)];
+        liquidity +=  bento.balanceOf(address(token2),address(this)) - reserves[address(token2)];
         _mint(to, liquidity);
         update(token0); 
         update(token1);
@@ -107,12 +106,12 @@ contract SymbolicPool is IPool, MirinERC20 {
 
         _burn(address(this), amount);
 
-        bento.transfer(IERC20(tokenOut), address(this), to, amount);
+        bento.transfer(address(tokenOut), address(this), to, amount);
 
-        update(IERC20(tokenOut));
+        update(address(tokenOut));
     }
 
-    function update(IERC20 token) internal {
+    function update(address token) internal {
         reserves[token] = bento.balanceOf(token,address(this));
     }
 
@@ -127,7 +126,7 @@ contract SymbolicPool is IPool, MirinERC20 {
     }
     
     
-    function getReserveOfToken(IERC20 token) public returns (uint256) {
+    function getReserveOfToken(address token) public returns (uint256) {
         return reserves[token];
 
     }
@@ -136,4 +135,27 @@ contract SymbolicPool is IPool, MirinERC20 {
         return liquidity /  NUM_TOKENS; 
         
     }
+
+    function poolType() external pure override returns (uint256) {
+        return 1;
+    }
+
+    function assets(uint256 index) external view override returns (address){
+        if (index == 0 )
+            return address(token0);
+        else if (index == 1)
+            return address(token1);
+        else if (index == 2)
+            return address(token2);
+        require(false);
+        return address(0);
+            
+
+    }
+
+    function assetsCount() external view override returns (uint256) {
+        return NUM_TOKENS;
+    }
+    
+    
 }

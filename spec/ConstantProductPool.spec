@@ -89,7 +89,11 @@ invariant reserveLessThanEqualToBalance()
 // }
 
 // REVIEW: swapWithContext should fail all others should pass
-rule noChangeToBalancedPoolAssets(method f) {
+rule noChangeToBalancedPoolAssets(method f)  filtered { f-> 
+                /*    f.selector != burnGetter(address,bool).selector && 
+                    f.selector != burnLiquiditySingle(address,address,bool).selector && */
+                    f.selector != swapWithContext(address, address, bytes, address, bool, uint256).selector }
+ {
     env e;
 
     uint256 _balance0;
@@ -102,10 +106,8 @@ rule noChangeToBalancedPoolAssets(method f) {
     require balanceOf(e, currentContract) == 0;
 
     calldataarg args;
-    if (f.selector != swapWithContext(address, address, bytes, address, bool, uint256).selector) {
-        f(e, args);
-    }
-
+    f(e, args);
+    
     uint256 balance0_;
     uint256 balance1_;
 
@@ -131,8 +133,20 @@ rule afterOpBalanceEqualsReserve(method f) {
     uint256 _reserve0 = reserve0();
     uint256 _reserve1 = reserve1();
 
-    calldataarg args;
-    f(e, args);
+    address to;
+    require to != currentContract;
+    bool unwrapBento;
+    if (f.selector == burnGetter(address,bool).selector) {
+        burnGetter(e, to, unwrapBento);
+    }
+    else if (f.selector == burnLiquiditySingle(address,address,bool).selector) {
+        address tokenOut;
+        burnLiquiditySingle(e, tokenOut, to, unwrapBento);
+    }
+    else {
+        calldataarg args;
+        f(e, args);
+    }
 
     uint256 balance0_;
     uint256 balance1_;
@@ -358,6 +372,7 @@ rule sameUnderlyingRatioLiquidity(method f) filtered { f ->
 }
 
 // TODO: all swap methods
+// todo - need to first prove this on the amountout method
 rule multiSwapLessThanSingleSwap() {
     env e;
     address to;
@@ -437,9 +452,10 @@ function validState(bool isBalanced) {
     requireInvariant tokensNotMirin();
 
     if (isBalanced) {
-        requireInvariant reserveLessThanEqualToBalance();
-    } else {
         require reserve0() == bentoBox.balanceOf(token0(), currentContract) &&
                 reserve1() == bentoBox.balanceOf(token1(), currentContract);
+    } else {
+        requireInvariant reserveLessThanEqualToBalance();
     }
 }
+
