@@ -14,13 +14,23 @@ contract Cpcp {
         int24 previousTick;
         int24 nextTick;
         uint128 liquidity;
+        uint256 feeGrowthOutside0X128; // per unit of liquidity
+        uint256 feeGrowthOutside1X128;
+    }
+
+    struct Position {
+        uint128 liquidity;
+        uint256 feeGrowthInside0LastX128; // per unit of liquidity
+        uint256 feeGrowthInside1LastX128;
     }
 
     mapping(int24 => Tick) public ticks;
 
+    mapping(address => mapping(int24 => mapping(int24 => Position))) public positions;
+
     uint128 public liquidity;
 
-    uint160 public sqrtPriceX96;
+    uint160 public price; // sqrt of price, multiplied by 2^96
 
     int24 public nearestTick; // tick that is just bellow the current price
 
@@ -28,18 +38,24 @@ contract Cpcp {
 
     IERC20 public token1;
 
+    uint256 public feeGrowthGlobal0X128;
+
+    uint256 public feeGrowthGlobal1X128;
+
+    uint256 public fee = 1000; // 0.1% fee
+
     constructor(bytes memory deployData) {
-        (IERC20 _token0, IERC20 _token1, uint160 _sqrtPriceX96) = abi.decode(deployData, (IERC20, IERC20, uint160));
+        (IERC20 _token0, IERC20 _token1, uint160 _price) = abi.decode(deployData, (IERC20, IERC20, uint160));
 
         token0 = _token0;
 
         token1 = _token1;
 
-        sqrtPriceX96 = _sqrtPriceX96;
+        price = _price;
 
-        ticks[TickMath.MIN_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0));
+        ticks[TickMath.MIN_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0);
 
-        ticks[TickMath.MAX_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0));
+        ticks[TickMath.MAX_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0);
 
         nearestTick = TickMath.MIN_TICK;
     }
@@ -49,19 +65,20 @@ contract Cpcp {
         int24 lower,
         int24 upperOld,
         int24 upper,
-        uint128 amount
+        uint128 amount,
+        address recipient
     ) public {
         uint160 priceLower = TickMath.getSqrtRatioAtTick(lower);
 
         uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper);
 
-        uint160 currentPrice = sqrtPriceX96;
+        uint160 currentPrice = price;
 
         if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += amount;
 
-        updateLinkedList(lowerOld, lower, upperOld, upper, amount);
+        storePosition(recipient, lower, upper, amount);
 
-        updateNearestTickPointer(lower, upper, nearestTick, currentPrice);
+        updateLinkedList(lowerOld, lower, upperOld, upper, amount, currentPrice);
 
         getAssets(uint256(priceLower), uint256(priceUpper), uint256(currentPrice), uint256(amount));
     }
@@ -69,28 +86,27 @@ contract Cpcp {
     function getAssets(
         uint256 priceLower,
         uint256 priceUpper,
-        uint256 _sqrtPriceX96,
+        uint256 currentPrice,
         uint256 liquidityAmount
     ) internal {
         uint256 token0amount = 0;
 
         uint256 token1amount = 0;
 
-        if (priceUpper < _sqrtPriceX96) {
-            // think about edgecases here <= vs <
+        if (priceUpper <= currentPrice) {
             // only supply token1 (token1 is Y)
 
             token1amount = DyDxMath.getDy(liquidityAmount, priceLower, priceUpper, true);
-        } else if (_sqrtPriceX96 < priceLower) {
+        } else if (currentPrice <= priceLower) {
             // only supply token0 (token0 is X)
 
             token0amount = DyDxMath.getDx(liquidityAmount, priceLower, priceUpper, true);
         } else {
             // supply both tokens
 
-            token0amount = DyDxMath.getDx(liquidityAmount, _sqrtPriceX96, priceUpper, true);
+            token0amount = DyDxMath.getDx(liquidityAmount, currentPrice, priceUpper, true);
 
-            token1amount = DyDxMath.getDy(liquidityAmount, priceLower, _sqrtPriceX96, true);
+            token1amount = DyDxMath.getDy(liquidityAmount, priceLower, currentPrice, true);
         }
 
         if (token0amount > 0) token0.transferFrom(msg.sender, address(this), token0amount); // ! change this to bento shares
@@ -98,27 +114,13 @@ contract Cpcp {
         if (token1amount > 0) token1.transferFrom(msg.sender, address(this), token1amount);
     }
 
-    function updateNearestTickPointer(
-        int24 lower,
-        int24 upper,
-        int24 currentNearestTick,
-        uint160 _sqrtPriceX96
-    ) internal {
-        int24 actualNearestTick = TickMath.getTickAtSqrtRatio(_sqrtPriceX96);
-
-        if (currentNearestTick < lower && lower <= actualNearestTick) currentNearestTick = lower;
-
-        if (currentNearestTick < upper && upper <= actualNearestTick) currentNearestTick = upper;
-
-        nearestTick = currentNearestTick;
-    }
-
     function updateLinkedList(
         int24 lowerOld,
         int24 lower,
         int24 upperOld,
         int24 upper,
-        uint128 amount
+        uint128 amount,
+        uint160 currentPrice
     ) internal {
         require(uint24(lower) % 2 == 0, "Lower even");
         require(uint24(upper) % 2 == 1, "Upper odd");
@@ -127,6 +129,8 @@ contract Cpcp {
 
         require(TickMath.MIN_TICK <= lower && lower < TickMath.MAX_TICK, "Lower range");
         require(TickMath.MIN_TICK < upper && upper <= TickMath.MAX_TICK, "Upper range");
+
+        int24 currentNearestTick = nearestTick;
 
         if (ticks[lower].liquidity > 0 || lower == TickMath.MIN_TICK) {
             // we are adding liquidity to an existing tick
@@ -142,7 +146,11 @@ contract Cpcp {
                 "Lower order"
             );
 
-            ticks[lower] = Tick(lowerOld, old.nextTick, amount);
+            if (lower <= currentNearestTick) {
+                ticks[lower] = Tick(lowerOld, old.nextTick, amount, feeGrowthGlobal0X128, feeGrowthGlobal1X128);
+            } else {
+                ticks[lower] = Tick(lowerOld, old.nextTick, amount, 0, 0);
+            }
 
             old.nextTick = lower;
         }
@@ -157,10 +165,33 @@ contract Cpcp {
 
             require(old.liquidity > 0 && old.nextTick > upper && upperOld < upper, "Upper order");
 
-            ticks[upper] = Tick(upperOld, old.nextTick, amount);
+            if (lower <= currentNearestTick) {
+                ticks[upper] = Tick(upperOld, old.nextTick, amount, feeGrowthGlobal0X128, feeGrowthGlobal1X128);
+            } else {
+                ticks[upper] = Tick(upperOld, old.nextTick, amount, 0, 0);
+            }
 
             old.nextTick = upper;
         }
+
+        int24 actualNearestTick = TickMath.getTickAtSqrtRatio(currentPrice);
+
+        if (currentNearestTick < lower && lower <= actualNearestTick) currentNearestTick = lower;
+
+        if (currentNearestTick < upper && upper <= actualNearestTick) currentNearestTick = upper;
+
+        nearestTick = currentNearestTick;
+    }
+
+    function storePosition(
+        address recipient,
+        int24 lower,
+        int24 upper,
+        uint128 amount
+    ) internal {
+        Position storage position = positions[recipient][lower][upper];
+
+        // todo
     }
 
     // price is √(y/x)
@@ -168,21 +199,29 @@ contract Cpcp {
     // zero for one -> price will move down
     function swap(
         bool zeroForOne,
-        uint256 amount,
+        uint256 inAmount,
         address recipient
     ) public {
         int24 nextTickToCross = zeroForOne ? nearestTick : ticks[nearestTick].nextTick;
 
-        uint256 currentPrice = uint256(sqrtPriceX96);
+        uint256 currentPrice = uint256(price);
 
         uint256 currentLiquidity = uint256(liquidity);
 
         uint256 outAmount = 0;
 
-        uint256 inAmount = amount;
+        uint256 input = inAmount;
 
-        while (amount > 0) {
+        uint256 feeGrowthGlobal = zeroForOne ? feeGrowthGlobal1X128 : feeGrowthGlobal0X128; // take fees in the ouput token
+
+        while (input > 0) {
             uint256 nextTickPrice = uint256(TickMath.getSqrtRatioAtTick(nextTickToCross));
+
+            uint256 output = 0;
+
+            uint256 feeAmount = 0;
+
+            bool cross = false;
 
             if (zeroForOne) {
                 // x for y
@@ -192,7 +231,7 @@ contract Cpcp {
 
                 uint256 maxDx = DyDxMath.getDx(currentLiquidity, nextTickPrice, currentPrice, false);
 
-                if (amount <= maxDx) {
+                if (input <= maxDx) {
                     // we can swap only within the current range
 
                     uint256 liquidityPadded = currentLiquidity << 96;
@@ -201,43 +240,33 @@ contract Cpcp {
                     // alternatively: L / (L / √𝑃 + Δx)
 
                     uint256 newPrice = uint160(
-                        FullMath.mulDivRoundingUp(
-                            liquidityPadded,
-                            currentPrice,
-                            liquidityPadded + currentPrice * amount
-                        )
+                        FullMath.mulDivRoundingUp(liquidityPadded, currentPrice, liquidityPadded + currentPrice * input)
                     );
 
                     if (!(nextTickPrice <= newPrice && newPrice < currentPrice)) {
-                        // owerflow -> use a modified version of the formula
+                        // overflow -> use a modified version of the formula
                         newPrice = uint160(
-                            UnsafeMath.divRoundingUp(liquidityPadded, liquidityPadded / currentPrice + amount)
+                            UnsafeMath.divRoundingUp(liquidityPadded, liquidityPadded / currentPrice + input)
                         );
                     }
 
                     // calculate output of swap
                     // Δy = Δ√P · L
-                    outAmount += DyDxMath.getDy(currentLiquidity, newPrice, currentPrice, false);
-
-                    amount = 0;
+                    output = DyDxMath.getDy(currentLiquidity, newPrice, currentPrice, false);
 
                     currentPrice = newPrice;
+
+                    input = 0;
                 } else {
                     // swap & cross the tick
 
-                    amount -= maxDx;
-
-                    outAmount += DyDxMath.getDy(currentLiquidity, nextTickPrice, currentPrice, false);
-
-                    if (nextTickToCross % 2 == 0) {
-                        currentLiquidity = currentLiquidity - uint256(ticks[nextTickToCross].liquidity);
-                    } else {
-                        currentLiquidity = currentLiquidity + uint256(ticks[nextTickToCross].liquidity);
-                    }
+                    output = DyDxMath.getDy(currentLiquidity, nextTickPrice, currentPrice, false);
 
                     currentPrice = nextTickPrice;
 
-                    nextTickToCross = ticks[nextTickToCross].previousTick;
+                    cross = true;
+
+                    input -= maxDx;
                 }
             } else {
                 // price is going up
@@ -245,41 +274,54 @@ contract Cpcp {
 
                 uint256 maxDy = DyDxMath.getDy(currentLiquidity, currentPrice, nextTickPrice, false);
 
-                if (amount <= maxDy) {
+                if (input <= maxDy) {
                     // we can swap only within the current range
 
                     // calculate new price after swap ( ΔP = Δy/L )
-                    uint256 newPrice;
-
-                    if (amount <= type(uint160).max) {
-                        newPrice = currentPrice + (amount << 96) / currentLiquidity;
-                    } else {
-                        newPrice =
-                            currentPrice +
-                            uint160(FullMath.mulDiv(amount, 0x1000000000000000000000000, liquidity));
-                    }
+                    uint256 newPrice = currentPrice +
+                        FullMath.mulDiv(input, 0x1000000000000000000000000, currentLiquidity);
 
                     // calculate output of swap
                     // Δx = Δ(1/√P) · L
-                    outAmount += DyDxMath.getDx(currentLiquidity, currentPrice, newPrice, false);
-
-                    amount = 0;
+                    output = DyDxMath.getDx(currentLiquidity, currentPrice, newPrice, false);
 
                     currentPrice = newPrice;
+
+                    input = 0;
                 } else {
                     // swap & cross the tick
 
-                    amount -= maxDy;
-
-                    outAmount += DyDxMath.getDx(currentLiquidity, currentPrice, nextTickPrice, false);
-
-                    if (nextTickToCross % 2 == 0) {
-                        currentLiquidity = currentLiquidity + uint256(ticks[nextTickToCross].liquidity);
-                    } else {
-                        currentLiquidity = currentLiquidity - uint256(ticks[nextTickToCross].liquidity);
-                    }
+                    output = DyDxMath.getDx(currentLiquidity, currentPrice, nextTickPrice, false);
 
                     currentPrice = nextTickPrice;
+
+                    cross = true;
+
+                    input -= maxDy;
+                }
+            }
+
+            feeAmount = FullMath.mulDivRoundingUp(output, fee, 1e6);
+
+            feeGrowthGlobal += FullMath.mulDiv(feeAmount, 0x100000000000000000000000000000000, currentLiquidity);
+
+            outAmount += output - feeAmount;
+
+            if (cross) {
+                if (zeroForOne) {
+                    if (nextTickToCross % 2 == 0) {
+                        currentLiquidity -= ticks[nextTickToCross].liquidity;
+                    } else {
+                        currentLiquidity += ticks[nextTickToCross].liquidity;
+                    }
+
+                    nextTickToCross = ticks[nextTickToCross].previousTick;
+                } else {
+                    if (nextTickToCross % 2 == 0) {
+                        currentLiquidity += ticks[nextTickToCross].liquidity;
+                    } else {
+                        currentLiquidity -= ticks[nextTickToCross].liquidity;
+                    }
 
                     nextTickToCross = ticks[nextTickToCross].nextTick;
                 }
@@ -288,7 +330,7 @@ contract Cpcp {
 
         liquidity = uint128(currentLiquidity);
 
-        sqrtPriceX96 = uint160(currentPrice);
+        price = uint160(currentPrice);
 
         nearestTick = zeroForOne ? nextTickToCross : ticks[nextTickToCross].previousTick;
 

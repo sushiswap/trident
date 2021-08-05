@@ -7,7 +7,7 @@ import { Cpcp } from "../typechain/Cpcp";
 import { Signer } from "crypto";
 import { getNormalPrice, getSqrtX96Price } from "./utilities/sqrtPrice";
 
-describe("Constant product concentrated pool (cpcp)", function () {
+describe.only("Constant product concentrated pool (cpcp)", function () {
   let alice: Signer,
     weth: ERC20Mock,
     dai: ERC20Mock,
@@ -67,7 +67,7 @@ describe("Constant product concentrated pool (cpcp)", function () {
     const lower = -80068; // 0.000333 dai per eth
     const upper = -69081; // 0.001 dai per eth
 
-    const currentPrice = await daiWethPool.sqrtPriceX96();
+    const currentPrice = await daiWethPool.price();
     const startingLiquidity = await daiWethPool.liquidity();
 
     const dy = getBigNumber(1);
@@ -76,7 +76,14 @@ describe("Constant product concentrated pool (cpcp)", function () {
 
     const liquidity = dy.mul("0x1000000000000000000000000").div(dP);
 
-    await daiWethPool.mint(-887272, lower, lower, upper, liquidity);
+    await daiWethPool.mint(
+      -887272,
+      lower,
+      lower,
+      upper,
+      liquidity,
+      alice.address
+    );
 
     expect((await daiWethPool.liquidity()).toString()).to.be.eq(
       liquidity.add(startingLiquidity).toString(),
@@ -101,7 +108,7 @@ describe("Constant product concentrated pool (cpcp)", function () {
   });
 });
 
-describe("Constant product concentrated pool (cpcp) trading - normal conditions", function () {
+describe.only("Constant product concentrated pool (cpcp) trading - normal conditions", function () {
   let alice: Signer,
     weth: ERC20Mock,
     usd: ERC20Mock,
@@ -146,7 +153,7 @@ describe("Constant product concentrated pool (cpcp) trading - normal conditions"
     const upperTick1Price = await tickMath.getSqrtRatioAtTick(upperTick1);
 
     const currentTick = 78244; // price 2500
-    const currentTickPrice = await daiWethPool.sqrtPriceX96();
+    const currentTickPrice = await daiWethPool.price();
 
     const lowerTick2 = 78640; // price 2601
     const lowerTick2Price = await tickMath.getSqrtRatioAtTick(lowerTick2);
@@ -165,7 +172,8 @@ describe("Constant product concentrated pool (cpcp) trading - normal conditions"
       lowerTick1,
       lowerTick1,
       upperTick1,
-      liquidity
+      liquidity,
+      alice.address
     );
 
     await daiWethPool.mint(
@@ -173,7 +181,8 @@ describe("Constant product concentrated pool (cpcp) trading - normal conditions"
       lowerTick2,
       lowerTick2,
       upperTick2,
-      liquidity
+      liquidity,
+      alice.address
     );
   });
 
@@ -193,12 +202,12 @@ describe("Constant product concentrated pool (cpcp) trading - normal conditions"
 
     expect(oldLiq.gt(0)).to.be.true;
 
-    const oldPrice = await daiWethPool.sqrtPriceX96();
+    const oldPrice = await daiWethPool.price();
 
     // buy eth with 50 usd (one for zero, one is USD)
     await daiWethPool.swap(false, getBigNumber(50), alice.address);
 
-    const newPrice = await daiWethPool.sqrtPriceX96();
+    const newPrice = await daiWethPool.price();
     const newTick = await daiWethPool.nearestTick();
     const ethReceived = (await weth.balanceOf(alice.address)).sub(
       oldEthBalance
@@ -232,12 +241,12 @@ describe("Constant product concentrated pool (cpcp) trading - normal conditions"
 
     expect(oldLiq.gt(0)).to.be.true;
 
-    const oldPrice = await daiWethPool.sqrtPriceX96();
+    const oldPrice = await daiWethPool.price();
 
     // buy usd with 0.1 eth
     await daiWethPool.swap(true, getBigNumber(1).div(10), alice.address);
 
-    const newPrice = await daiWethPool.sqrtPriceX96();
+    const newPrice = await daiWethPool.price();
     const newTick = await daiWethPool.nearestTick();
     const usdReceived = (await usd.balanceOf(alice.address)).sub(oldUSDBalance);
     const ethPaid = oldEthBalance.sub(await weth.balanceOf(alice.address));
@@ -261,13 +270,13 @@ describe("Constant product concentrated pool (cpcp) trading - normal conditions"
 
     expect(oldLiq.gt(0)).to.be.true;
 
-    const oldPrice = await daiWethPool.sqrtPriceX96();
+    const oldPrice = await daiWethPool.price();
 
     // buy eth with 1000 usd (one for zero, one is USD)
     await daiWethPool.swap(false, getBigNumber(1000), alice.address);
 
     const newLiq = await daiWethPool.liquidity();
-    const newPrice = await daiWethPool.sqrtPriceX96();
+    const newPrice = await daiWethPool.price();
     const newTick = await daiWethPool.nearestTick();
     const ethReceived = (await weth.balanceOf(alice.address)).sub(
       oldEthBalance
@@ -306,12 +315,12 @@ describe("Constant product concentrated pool (cpcp) trading - normal conditions"
     const nextTick = (await daiWethPool.ticks(oldTick)).nextTick;
     const oldEthBalance = await weth.balanceOf(alice.address);
     const oldUSDBalance = await usd.balanceOf(alice.address);
-    const oldPrice = await daiWethPool.sqrtPriceX96();
+    const oldPrice = await daiWethPool.price();
 
     await daiWethPool.swap(true, getBigNumber(1), alice.address); // sell 1 weth
 
     const newLiq = await daiWethPool.liquidity();
-    const newPrice = await daiWethPool.sqrtPriceX96();
+    const newPrice = await daiWethPool.price();
     const newTick = await daiWethPool.nearestTick();
     const usdReceived = (await usd.balanceOf(alice.address)).sub(oldUSDBalance);
     const ethPaid = oldEthBalance.sub(await weth.balanceOf(alice.address));
@@ -336,3 +345,5 @@ describe("Constant product concentrated pool (cpcp) trading - normal conditions"
     );
   });
 });
+
+// todo add test for swapping outsite ticks where liquidity is 0
