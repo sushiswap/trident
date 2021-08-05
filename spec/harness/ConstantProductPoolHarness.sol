@@ -16,17 +16,12 @@ contract ConstantProductPoolHarness is ConstantProductPool {
         return (withdrawnAmounts[0].amount, withdrawnAmounts[1].amount);
     }
 
+    // override burn since we have the burnGetter - to save time
+    function burn(address to, bool unwrapBento)
+        public override returns (liquidityAmount[] memory withdrawnAmounts) { }
+
     function tokenBalanceOf(IERC20 token, address user)
             public view returns (uint256 balance) {
         return token.balanceOf(user);
-    }
-
-    //override burn since we have the burnGetter - to save time
-     function burn(address to, bool unwrapBento)
-        public
-        override
-        
-        returns (liquidityAmount[] memory withdrawnAmounts)
-    {
     }
 }

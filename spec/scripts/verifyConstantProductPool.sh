@@ -5,4 +5,4 @@ certoraRun spec/harness/ConstantProductPoolHarness.sol spec/harness/SimpleBentoB
 	--solc_map ConstantProductPoolHarness=solc8.2,SimpleBentoBox=solc6.12,Simplifications=solc8.2,DummyERC20A=solc8.2,DummyERC20B=solc8.2 \
 	--optimistic_loop --loop_iter 1   \
     --packages @openzeppelin=$PWD/node_modules/@openzeppelin \
-	--staging --msg "ConstantProductPool : ALL "
+	--staging --msg "ConstantProductPool: ALL"

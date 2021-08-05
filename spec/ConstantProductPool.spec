@@ -89,11 +89,10 @@ invariant reserveLessThanEqualToBalance()
 // }
 
 // REVIEW: swapWithContext should fail all others should pass
-rule noChangeToBalancedPoolAssets(method f)  filtered { f-> 
-                /*    f.selector != burnGetter(address,bool).selector && 
+rule noChangeToBalancedPoolAssets(method f)  filtered { f -> 
+                 /* f.selector != burnGetter(address,bool).selector && 
                     f.selector != burnLiquiditySingle(address,address,bool).selector && */
-                    f.selector != swapWithContext(address, address, bytes, address, bool, uint256).selector }
- {
+                    f.selector != swapWithContext(address, address, bytes, address, bool, uint256).selector } {
     env e;
 
     uint256 _balance0;
@@ -136,14 +135,13 @@ rule afterOpBalanceEqualsReserve(method f) {
     address to;
     require to != currentContract;
     bool unwrapBento;
-    if (f.selector == burnGetter(address,bool).selector) {
+    
+    if (f.selector == burnGetter(address, bool).selector) {
         burnGetter(e, to, unwrapBento);
-    }
-    else if (f.selector == burnLiquiditySingle(address,address,bool).selector) {
+    } else if (f.selector == burnLiquiditySingle(address, address, bool).selector) {
         address tokenOut;
         burnLiquiditySingle(e, tokenOut, to, unwrapBento);
-    }
-    else {
+    } else {
         calldataarg args;
         f(e, args);
     }
@@ -353,18 +351,19 @@ rule sameUnderlyingRatioLiquidity(method f) filtered { f ->
     validState(true);
 
     uint256 reserveRatio = reserve0() / reserve1();
-
     require reserveRatio == 2;
 
-    // liquidity0 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
+    // user's liquidity for token0 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
     uint256 _liquidity0 = balanceOf(e1, e1.msg.sender) * reserve0() / totalSupply();
+    // user's liquidity for token1 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
     uint256 _liquidity1 = balanceOf(e1, e1.msg.sender) * reserve1() / totalSupply();
 
     calldataarg args;
     f(e2, args); // TODO: run with all swaps
 
-    // liquidity0 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
+    // user's liquidity for token0 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
     uint256 liquidity0_ = balanceOf(e3, e3.msg.sender) * reserve0() / totalSupply();
+    // user's liquidity for token1 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
     uint256 liquidity1_ = balanceOf(e3, e3.msg.sender) * reserve1() / totalSupply();
 
     assert((reserve0() / reserve1() == 2) => (_liquidity0 <= liquidity0_ &&
@@ -372,7 +371,7 @@ rule sameUnderlyingRatioLiquidity(method f) filtered { f ->
 }
 
 // TODO: all swap methods
-// todo - need to first prove this on the amountout method
+// TODO - need to first prove this on the amountout method
 rule multiSwapLessThanSingleSwap() {
     env e;
     address to;
@@ -421,26 +420,97 @@ rule additivityOfMint() {
 
     // minting in two steps
     sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, x1);
-    sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, x2);
+    sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, y1);
     uint256 mirinTwoSteps1 = mint(e, to);
 
-    sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, y1);
+    sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, x2);
     sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, y2);
     uint256 mirinTwoSteps2 = mint(e, to);
 
+    uint256 userMirinBalanceTwoStep = balanceOf(e, e.msg.sender);
+
     // checking for overflows
     require mirinTwoSteps1 + mirinTwoSteps2 <= max_uint256;
-    require x1 + x2 < max_uint256 && y1 + y2 < max_uint256;
+    require x1 + x2 <= max_uint256 && y1 + y2 <= max_uint256;
 
     // minting in a single step
     sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, x1 + x2) at initState;
     sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, y1 + y2);
     uint256 mirinSingleStep = mint(e, to);
 
+    uint256 userMirinBalanceOneStep = balanceOf(e, e.msg.sender);
+
+    // TODO: strictly greater than?
     assert(mirinSingleStep >= mirinTwoSteps1 + mirinTwoSteps2, "multiple mints better than a single mint");
+    assert(userMirinBalanceOneStep >= userMirinBalanceTwoStep, "user received less mirin in one step");
 }
 
-// rule integrityOfgetOptimalLiquidityInAmounts() {
+rule mintWithOptimalLiquidity() {
+    env e;
+    address to;
+
+    uint256 xOptimal;
+    uint256 yOptimal;
+    uint256 x;
+    uint256 y;
+
+    // require dollarAmount(xOptimal) + dollarAmount(yOptimal) == dollarAmount(x) + dollarAmount(y);
+    // require x / y != 2;
+    require xOptimal / yOptimal == 2;
+
+    uint256 reserveRatio = reserve0() / reserve1();
+    require reserveRatio == 2;
+
+    // TODO: require e.msg.sender == to? Or check the assets of 'to'?
+    validState(true);
+
+    // need to replicate the exact state later on
+    storage initState = lastStorage;
+
+    // minting with optimal liquidities
+    sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, xOptimal);
+    sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, yOptimal);
+    uint256 mirinOptimal = mint(e, to);
+
+    uint256 userMirinBalanceOptimal = balanceOf(e, e.msg.sender);
+
+    // minting with non-optimal liquidities
+    sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, x) at initState;
+    sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, y);
+    uint256 mirinNonOptimal = mint(e, to);
+
+    uint256 userMirinBalanceNonOptimal = balanceOf(e, e.msg.sender);
+
+    // TODO: strictly greater?
+    assert(mirinOptimal >= mirinNonOptimal);
+    assert(userMirinBalanceOptimal >= userMirinBalanceNonOptimal);
+}
+
+rule zeroCharacteristicsOfGetAmountOut() {
+    env e;
+    uint256 amountIn;
+    address tokenIn;
+    address dummyToken;
+
+    require tokenIn == token0() || tokenIn == token1();
+
+    // dummyToken parameter is not used in the function
+    uint256 amountOut = getAmountOut(e, tokenIn, dummyToken, amountIn);
+
+    if (amountIn == 0) {
+        assert(amountOut == 0, "amountIn is 0, but amountOut is not 0");
+    } else {
+        if (tokenIn == token0() && reserve1() == 0) {
+            assert(amountOut == 0, "token1 has no reserves, but amountOut is non-zero");
+        } else if (tokenIn == token1() && reserve0() == 0) {
+            assert(amountOut == 0, "token0 has no reserves, but amountOut is non-zero");
+        } else {
+            assert(amountOut > 0);
+        }
+    }
+}
+
+// rule integrityOfGetOptimalLiquidity() {
 
 // }
 
@@ -458,4 +528,3 @@ function validState(bool isBalanced) {
         requireInvariant reserveLessThanEqualToBalance();
     }
 }
-
