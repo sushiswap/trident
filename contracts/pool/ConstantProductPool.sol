@@ -140,9 +140,9 @@ contract ConstantProductPool is IPool, TridentERC20 {
         _update(reserves, balances, _blockTimestampLast);
         kLast = TridentMath.sqrt(balances.amount0 * balances.amount1);
 
-        withdrawnAmounts = new IPool.TokenAmount[](2);
-        withdrawnAmounts[0] = IPool.TokenAmount({token: address(token0), amount: amount0});
-        withdrawnAmounts[1] = IPool.TokenAmount({token: address(token1), amount: amount1});
+        withdrawnAmounts = new TokenAmount[](2);
+        withdrawnAmounts[0] = TokenAmount({token: address(token0), amount: amount0});
+        withdrawnAmounts[1] = TokenAmount({token: address(token1), amount: amount1});
 
         emit Burn(msg.sender, amount0, amount1, to);
     }
