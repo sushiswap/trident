@@ -6,16 +6,14 @@ import "../deployer/MasterDeployer.sol";
 import "../interfaces/IBentoBoxMinimal.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/ITridentCallee.sol";
-import "../libraries/BMath.sol";
-import "../libraries/RebaseLibrary.sol";
+import "../libraries/IndexMath.sol";
 import "./TridentERC20.sol";
 import "hardhat/console.sol";
 
 /// @notice Trident exchange pool template with constant mean formula for swapping between an array of ERC-20 tokens.
-/// @dev This pool swaps between bento shares - it does not care about underlying amounts.
-contract IndexPool is IPool, BMath, TridentERC20 {
-    using RebaseLibrary for Rebase;
-
+/// @dev The reserves are stored as bento shares.
+///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
+contract IndexPool is IPool, IndexMath, TridentERC20 {
     event Mint(address indexed sender, address tokenIn, uint256 amountIn, address indexed recipient);
     event Burn(address indexed sender, address tokenOut, uint256 amountOut, address indexed recipient);
 
@@ -30,7 +28,7 @@ contract IndexPool is IPool, BMath, TridentERC20 {
     
     bytes32 public constant override poolIdentifier = "Trident:Index";
     
-    address[] public assets;
+    address[] private tokens;
     uint256 public totalWeight;
 
     uint256 private unlocked = 1;
@@ -46,31 +44,32 @@ contract IndexPool is IPool, BMath, TridentERC20 {
         bool bound;  
         uint256 index; 
         uint256 denorm;
-        uint256 reserve;
-        uint256 shares;
-        Rebase total;
+        uint256 amount;
     }
 
     /// @dev Only set immutable variables here - state changes made here will not be used.
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (address[] memory _assets, uint256[] memory _denorms, uint256 _swapFee) = abi.decode(
+        (address[] memory _tokens, uint256[] memory _denorms, uint256 _swapFee) = abi.decode(
             _deployData,
             (address[], uint256[], uint256)
         );
         
-        for (uint256 i = 0; i < assets.length; i++) {
-            require(_assets[i] != address(0), "IndexPool: ZERO_ADDRESS");
-            require(!records[_assets[i]].bound, "IndexPool: BOUND");
+        for (uint256 i = 0; i < tokens.length; i++) {
+            require(_tokens[i] != address(0), "IndexPool: ZERO_ADDRESS");
+            require(!records[_tokens[i]].bound, "IndexPool: BOUND");
             require(_denorms[i] >= MIN_WEIGHT, "IndexPool: MIN_WEIGHT");
             require(_denorms[i] <= MAX_WEIGHT, "IndexPool: MAX_WEIGHT");
-            totalWeight = badd(totalWeight, _denorms[i]);
-            require(totalWeight <= MAX_TOTAL_WEIGHT, "ERR_MAX_TOTAL_WEIGHT");
-            records[_assets[i]].bound = true;
-            records[_assets[i]].index = i;
-            records[_assets[i]].denorm = _denorms[i];
-            assets.push(assets[i]);
+            require(_tokens.length >= MIN_BOUND_TOKENS, "IndexPool: MIN_TOKENS");
+            require(_tokens.length <= MAX_BOUND_TOKENS, "IndexPool: MAX_TOKENS");
+            totalWeight = totalWeight + _denorms[i];
+            require(totalWeight <= MAX_TOTAL_WEIGHT, "IndexPool: MAX_TOTAL_WEIGHT");
+            records[_tokens[i]].bound = true;
+            records[_tokens[i]].index = i;
+            records[_tokens[i]].denorm = _denorms[i];
+            tokens.push(_tokens[i]);
         }
         require(_swapFee <= MAX_FEE, "IndexPool: BAD_SWAP_FEE");
+        _mint(tx.origin, INIT_POOL_SUPPLY); // @dev This grants pool deployer the initial LP supply.
 
         swapFee = _swapFee;
         MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
@@ -81,55 +80,61 @@ contract IndexPool is IPool, BMath, TridentERC20 {
     }
     
     function mint(bytes calldata data) public override lock returns (uint256 liquidity) {
-        (uint256 liquidity, uint256[] memory maxAmountsIn, address recipient) = abi.decode(
+        (uint256 toMint, uint256[] memory maxAmountsIn, address recipient) = abi.decode(
             data,
             (uint256, uint256[], address)
         );
         
-        uint256 ratio = bdiv(liquidity, totalSupply);
-        require(ratio != 0, "IndexPool: MATH_APPROX");
+        uint256 ratio = toMint / totalSupply;
         
-        for (uint256 i = 0; i < assets.length; i++) {
-            address tokenIn = assets[i];
-            uint256 reserve = records[tokenIn].reserve;
-            uint256 amountIn = bmul(ratio, reserve);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            address tokenIn = tokens[i];
+            uint256 amount = records[tokenIn].amount;
+            uint256 amountIn = ratio * amount;
             require(amountIn >= MIN_BALANCE, "IndexPool: MIN_BALANCE");
-            require(_getBalance(tokenIn) >= amountIn + reserve, "IndexPool: NOT_RECEIVED");
-            require(amountIn <= maxAmountsIn[i], "IndexPool: LIMIT_IN");
-            records[tokenIn].reserve = badd(records[tokenIn].reserve, amountIn);
+            require(_getBentoBalance(tokenIn) >= amountIn + amount, "IndexPool: NOT_RECEIVED");
+            require(amountIn <= maxAmountsIn[i], "IndexPool: LIMIT_IN"); // @dev Check Trident router has sent token amount for skim into pool.
+            records[tokenIn].amount = records[tokenIn].amount + amountIn;
             emit Mint(msg.sender, tokenIn, amountIn, recipient);
         }
         
-        _mint(recipient, liquidity);
+        _mint(recipient, toMint);
+        liquidity = toMint;
     }
   
-    function burn(bytes calldata data) public override lock returns (TokenAmount[] memory withdrawnAmounts) {
-        (uint256 poolAmountIn, uint256[] memory minAmountsOut, address recipient, bool unwrapBento) = abi.decode(
+    function burn(bytes calldata data) public override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
+        (uint256 toBurn, uint256[] memory minAmountsOut, address recipient, bool unwrapBento) = abi.decode(
             data,
             (uint256, uint256[], address, bool)
         );
 
-        uint256 ratio = bdiv(poolAmountIn, totalSupply);
-        require(ratio != 0, "IndexPool: MATH_APPROX");
+        uint256 ratio = toBurn / totalSupply;
 
-        _burn(address(this), poolAmountIn);
+        _burn(address(this), toBurn);
+        
+        withdrawnAmounts = new TokenAmount[](tokens.length);
 
-        for (uint256 i = 0; i < assets.length; i++) {
-            address tokenOut = assets[i];
-            uint256 reserve = records[tokenOut].reserve;
-            uint256 amountOut = bmul(ratio, reserve);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            address tokenOut = tokens[i];
+            uint256 amount = records[tokenOut].amount;
+            uint256 amountOut = ratio * amount;
             require(amountOut != 0, "IndexPool: MATH_APPROX");
             require(amountOut >= minAmountsOut[i], "IndexPool: LIMIT_OUT");
-            records[tokenOut].reserve = bsub(records[tokenOut].reserve, amountOut);
-            _transferShares(tokenOut, amountOut, recipient, unwrapBento);
+            records[tokenOut].amount = records[tokenOut].amount - amountOut;
+            _transfer(tokenOut, amountOut, recipient, unwrapBento);
+            withdrawnAmounts[i] = TokenAmount({token: tokenOut, amount: amountOut});
             emit Burn(msg.sender, tokenOut, amountOut, recipient);
         }
     }
+    
+    function burnSingle(bytes calldata) public override lock returns (uint256 amount) {
+        amount = 0;
+    }
 
     function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
-        (address tokenIn, address tokenOut, uint256 amountIn, uint256 minAmountOut, uint256 maxPrice, address recipient, bool unwrapBento) = abi.decode(
+        (address tokenIn, address tokenOut, address recipient, bool unwrapBento, uint256 amountIn) = abi.decode(
             data,
-            (address, address, uint256, uint256, uint256, address, bool)
+            (address, address, address, bool, uint256)
         );
         
         require(records[tokenIn].bound, "IndexPool: NOT_BOUND");
@@ -138,63 +143,74 @@ contract IndexPool is IPool, BMath, TridentERC20 {
         Record storage inRecord = records[tokenIn];
         Record storage outRecord = records[tokenOut];
         
-        require(amountIn <= bmul(inRecord.reserve, MAX_IN_RATIO), "IndexPool: MAX_IN_RATIO");
+        require(amountIn <= inRecord.amount * MAX_IN_RATIO, "IndexPool: MAX_IN_RATIO");
         
-        uint256 spotPriceBefore = calcSpotPrice(
-                                    inRecord.reserve,
-                                    inRecord.denorm,
-                                    outRecord.reserve,
-                                    outRecord.denorm,
-                                    swapFee);
-        require(spotPriceBefore <= maxPrice, "IndexPool: BAD_LIMIT_PRICE");
-
-        amountOut = calcOutGivenIn(
-                            inRecord.reserve,
+        amountOut = _getAmountOut(
+                            inRecord.amount,
                             inRecord.denorm,
-                            outRecord.reserve,
+                            outRecord.amount,
                             outRecord.denorm,
-                            amountIn,
-                            swapFee);
-        require(amountOut >= minAmountOut, "IndexPool: LIMIT_OUT");
+                            amountIn);
 
-        inRecord.reserve = badd(inRecord.reserve, amountIn);
-        outRecord.reserve = bsub(outRecord.reserve, amountOut);
+        inRecord.amount += amountIn;
+        outRecord.amount -= amountOut;
 
-        uint256 spotPriceAfter = calcSpotPrice(
-                                inRecord.reserve,
-                                inRecord.denorm,
-                                outRecord.reserve,
-                                outRecord.denorm,
-                                swapFee);
-        require(spotPriceAfter >= spotPriceBefore, "IndexPool: MATH_APPROX");     
-        require(spotPriceAfter <= maxPrice, "IndexPool: LIMIT_PRICE");
-        require(spotPriceBefore <= bdiv(amountIn, amountOut), "IndexPool: MATH_APPROX");
-
-        require(_getBalance(tokenIn) >= amountIn + inRecord.reserve, "IndexPool: NOT_RECEIVED");
-        _transferShares(tokenOut, amountOut, recipient, unwrapBento);
+        require(_getBentoBalance(tokenIn) >= amountIn + inRecord.amount, "IndexPool: NOT_RECEIVED"); // @dev Check Trident router has sent token amount for skim into pool.
+        _transfer(tokenOut, amountOut, recipient, unwrapBento);
 
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
+    
+    function flashSwap(bytes calldata) public override lock returns (uint256 amountOut) {
+        amountOut = 0;
+    }
 
-    function _transferShares(
+    function _transfer(
         address token,
         uint256 shares,
-        address recipient,
+        address to,
         bool unwrapBento
     ) internal {
         if (unwrapBento) {
-            bento.withdraw(token, address(this), recipient, 0, shares);
+            bento.withdraw(token, address(this), to, 0, shares);
         } else {
-            bento.transfer(token, address(this), recipient, shares);
+            bento.transfer(token, address(this), to, shares);
         }
     }
  
-    function _getBalance(address token) internal view returns (uint256 balance) {
+    function _getBentoBalance(address token) internal view returns (uint256 balance) {
         balance = bento.balanceOf(token, address(this));
     }
     
+    function _getAmountOut(
+        uint256 tokenBalanceIn,
+        uint256 tokenWeightIn,
+        uint256 tokenBalanceOut,
+        uint256 tokenWeightOut,
+        uint256 tokenAmountIn
+    ) internal view returns (uint256 finalAmountOut) {
+        uint256 weightRatio = tokenWeightIn / tokenWeightOut;
+        uint256 adjustedIn = BONE - swapFee;
+        adjustedIn = tokenAmountIn * adjustedIn;
+        uint256 y = tokenBalanceIn / tokenBalanceIn + adjustedIn;
+        uint256 foo = bpow(y, weightRatio);
+        uint256 bar = BONE - foo;
+        finalAmountOut = tokenBalanceOut * bar;
+    }
+    
+    function getAmountOut(bytes calldata data) public view override returns (uint256 finalAmountOut) {
+        (uint256 tokenBalanceIn, uint256 tokenWeightIn, uint256 tokenBalanceOut, uint256 tokenWeightOut, uint256 tokenAmountIn) 
+        = abi.decode(data, (uint256, uint256, uint256, uint256, uint256));
+        
+       finalAmountOut = _getAmountOut(tokenBalanceIn, tokenWeightIn, tokenBalanceOut, tokenWeightOut, tokenAmountIn);
+    }
+
+    function getAssets() public view override returns (address[] memory assets) {
+        assets = tokens;
+    }
+    
     function getNormalizedWeight(address asset) external view returns (uint256 norm) {
-        norm = bdiv(records[asset].denorm, totalWeight);
+        norm = records[asset].denorm / totalWeight;
     }
     
     function getDenormalizedWeight(address asset) external view returns (uint256 denorm) {
