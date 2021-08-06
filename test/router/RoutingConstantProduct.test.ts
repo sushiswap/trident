@@ -1,5 +1,6 @@
+// @ts-nocheck
+
 import { expect } from "chai";
-// @ts-ignore
 import { ethers } from "hardhat";
 import { BigNumber } from "ethers";
 import seedrandom from "seedrandom";
@@ -37,6 +38,20 @@ function areCloseValues(v1, v2, threshould) {
   if (threshould == 0) return v1 == v2;
   if (v1 < 1 / threshould) return Math.abs(v1 - v2) <= 1.1;
   return Math.abs(v1 / v2 - 1) < threshould;
+}
+
+function encodedSwapData(tokenIn, to, unwrapBento) {
+  return ethers.utils.defaultAbiCoder.encode(
+    ["address", "address", "bool"],
+    [tokenIn, to, unwrapBento]
+  );
+}
+
+function encodedTokenAmount(token, amount) {
+  return ethers.utils.defaultAbiCoder.encode(
+    ["address", "uint256"],
+    [token, amount]
+  );
 }
 
 describe("ConstantProductPool Typescript == Solidity check", function () {
@@ -155,7 +170,9 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
         : getIntegerRandomValueWithMin(res1exp, MINIMUM_LIQUIDITY);
     await bento.transfer(usdt.address, alice.address, pool.address, bnVal0);
     await bento.transfer(usdc.address, alice.address, pool.address, bnVal1);
-    await pool.mint(alice.address);
+    await pool.mint(
+      ethers.utils.defaultAbiCoder.encode(["address"], [alice.address])
+    );
 
     const poolInfo = {
       type: "ConstantProduct",
@@ -173,7 +190,9 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
     const [t0, t1] = swapDirection
       ? [usdt.address, usdc.address]
       : [usdc.address, usdt.address];
-    const amountOutPool = (await pool.getAmountOut(t0, t1, bnValue)).toString();
+    const amountOutPool = (
+      await pool.getAmountOut(encodedTokenAmount(t0, bnValue))
+    ).toString();
     const amountOutPrediction = calcOutByIn(
       poolRouterInfo,
       jsValue,
