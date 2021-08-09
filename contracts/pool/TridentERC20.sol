@@ -8,7 +8,7 @@ contract TridentERC20 {
     /*///////////////////////////////////////////////////////////////
                                   EVENTS
     //////////////////////////////////////////////////////////////*/
-    event Transfer(address indexed from, address indexed to, uint256 amount);
+    event Transfer(address indexed from, address indexed recipient, uint256 amount);
     event Approval(address indexed owner, address indexed spender, uint256 amount);
 
     /*///////////////////////////////////////////////////////////////
@@ -63,47 +63,45 @@ contract TridentERC20 {
     /// @return (bool) Returns 'true' if succeeded.
     function approve(address spender, uint256 amount) external returns (bool) {
         allowance[msg.sender][spender] = amount;
-        emit Approval(spender, spender, amount);
+        emit Approval(msg.sender, spender, amount);
         return true;
     }
 
-    /// @notice Transfers `amount` tokens from `msg.sender` to `to`.
-    /// @param to The address to move tokens `to`.
+    /// @notice Transfers `amount` tokens from `msg.sender` to `recipient`.
+    /// @param recipient The address to move tokens to.
     /// @param amount The token `amount` to move.
     /// @return (bool) Returns 'true' if succeeded.
-    function transfer(address to, uint256 amount) external returns (bool) {
+    function transfer(address recipient, uint256 amount) external returns (bool) {
         balanceOf[msg.sender] -= amount;
-        // @dev This is safe, as the sum of all user balances can't exceed
-        // type(uint256).max, since totalSupply would overflow in_mint
-        // and Solidity's default checked math would force it to revert.
+        // @dev This is safe because the sum of all user
+        // balances can't exceed type(uint256).max
         unchecked {
-            balanceOf[to] += amount;
+            balanceOf[recipient] += amount;
         }
-        emit Transfer(msg.sender, to, amount);
+        emit Transfer(msg.sender, recipient, amount);
         return true;
     }
 
-    /// @notice Transfers `amount` tokens from `from` to `to`. Caller needs approval from `from`.
+    /// @notice Transfers `amount` tokens from `from` to `recipient`. Caller needs approval from `from`.
     /// @param from Address to draw tokens `from`.
-    /// @param to The address to move tokens `to`.
+    /// @param recipient The address to move tokens to.
     /// @param amount The token `amount` to move.
     /// @return (bool) Returns 'true' if succeeded.
     function transferFrom(
         address from,
-        address to,
+        address recipient,
         uint256 amount
     ) external returns (bool) {
         if (allowance[from][msg.sender] != type(uint256).max) {
             allowance[from][msg.sender] -= amount;
         }
         balanceOf[from] -= amount;
-        // @dev This is safe, as the sum of all user balances can't exceed
-        // type(uint256).max, since totalSupply would overflow in _mint
-        // and Solidity's default checked math would force it to revert.
+        // @dev This is safe because the sum of all user
+        // balances can't exceed type(uint256).max
         unchecked {
-            balanceOf[to] += amount;
+            balanceOf[recipient] += amount;
         }
-        emit Transfer(from, to, amount);
+        emit Transfer(from, recipient, amount);
         return true;
     }
 
@@ -138,28 +136,26 @@ contract TridentERC20 {
         address recoveredAddress = ecrecover(digest, v, r, s);
         require(recoveredAddress != address(0) && recoveredAddress == owner, "TridentERC20: INVALID_PERMIT_SIGNATURE");
         allowance[recoveredAddress][spender] = amount;
-        emit Approval(spender, spender, amount);
+        emit Approval(owner, spender, amount);
     }
 
     /*///////////////////////////////////////////////////////////////
                           INTERNAL UTILS
     //////////////////////////////////////////////////////////////*/
-    function _mint(address to, uint256 amount) internal {
+    function _mint(address recipient, uint256 amount) internal {
         totalSupply += amount;
-        // @dev This is safe, as the sum of all user balances can't exceed
-        // type(uint256).max, since totalSupply would overflow in _mint
-        // and Solidity's default checked math would force it to revert.
+        // @dev This is safe because the sum of all user
+        // balances can't exceed type(uint256).max
         unchecked {
-            balanceOf[to] += amount;
+            balanceOf[recipient] += amount;
         }
-        emit Transfer(address(0), to, amount);
+        emit Transfer(address(0), recipient, amount);
     }
 
     function _burn(address from, uint256 amount) internal {
         balanceOf[from] -= amount;
-        // @dev This is safe, as the sum of all user balances can't exceed
-        // type(uint256).max, since totalSupply would overflow in _mint
-        // and Solidity's default checked math would force it to revert.
+        // @dev This is safe because a user won't ever
+        // have a balance larger than totalSupply
         unchecked {
             totalSupply -= amount;
         }
