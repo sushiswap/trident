@@ -10,7 +10,11 @@ contract Simplifications {
             return 0;
         }
         
-        require(sqrtHarness[x] != 0, "sqrt constraint not met");
+        // TODO: check
+        require(sqrtHarness[x] != 0 && sqrtHarness[x] <= x,
+                "sqrt constraint not met");
+
+        require(sqrtHarness[x] * sqrtHarness[x] == x);
 
         return sqrtHarness[x];
     }

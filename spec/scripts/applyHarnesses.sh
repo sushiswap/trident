@@ -73,6 +73,9 @@ perl -0777 -i -pe 's/function burn\(address to, bool unwrapBento\)
         public/function burn\(address to, bool unwrapBento\)
         public\n        virtual/g' contracts/pool/ConstantProductPool.sol
 
+# virtualizing _getAmountOut
+perl -0777 -i -pe 's/internal view returns \(uint256 amountOut\)/internal virtual view returns \(uint256 amountOut\)/g' contracts/pool/ConstantProductPool.sol
+
 ##################################################
 #                    HybridPool                  #
 ##################################################

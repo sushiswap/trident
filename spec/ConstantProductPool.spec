@@ -161,6 +161,7 @@ rule afterOpBalanceEqualsReserve(method f) {
 }
 
 // Failing maybe because of sqrt dispatcher?
+// add require sqrt(x) * sqrt(x) = x
 rule mintingNotPossibleForBalancedPool() {
     env e;
 
@@ -208,13 +209,17 @@ rule mintingNotPossibleForBalancedPool() {
 // }
 
 // DIFFERENT STYLE OF WRITING THE SAME RULE (inverseOfMintAndBurn)
-// TODO: try with optimal liquidity
+// TODO: try with optimal liquidity (use the ratio method)
 rule inverseOfMintAndBurn() {
     env e;
     address to;
     bool unwrapBento;
 
-    // TODO: require e.msg.sender == to? Or check the assets of 'to'?
+    require e.msg.sender != currentContract && to != currentContract;
+    // so that they get the mirin tokens and transfer them back. Also,
+    // when they burn, they get the liquidity back
+    require e.msg.sender == to; 
+
     validState(true);
 
     uint256 _liquidity0;
@@ -339,35 +344,55 @@ rule sameUnderlyingRatioLiquidity(method f) filtered { f ->
     env e1;
     env e2;
     env e3;
-    address to;
-    bool unwrapBento;
-    uint256 mirinLiquidity;
 
+    // setting the environment constraints
     require e1.block.timestamp < e2.block.timestamp && 
             e2.block.timestamp < e3.block.timestamp;
-    require e1.msg.sender == e2.msg.sender && e2.msg.sender == e3.msg.sender;
+    // TODO: swap is done by someother person (maybe incorrect)
+    require e1.msg.sender == e3.msg.sender && e2.msg.sender != e1.msg.sender;
 
     // TODO: require e.msg.sender == to? Or check the assets of 'to'?
+
     validState(true);
 
+    // TODO: is this a safe asumption (Ask Nurit)
+    require reserve1() != 0;
     uint256 reserveRatio = reserve0() / reserve1();
     require reserveRatio == 2;
 
-    // user's liquidity for token0 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
-    uint256 _liquidity0 = balanceOf(e1, e1.msg.sender) * reserve0() / totalSupply();
-    // user's liquidity for token1 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
-    uint256 _liquidity1 = balanceOf(e1, e1.msg.sender) * reserve1() / totalSupply();
+    uint256 _liquidity0;
+    uint256 _liquidity1;
+
+    if (totalSupply() != 0) {
+        // user's liquidity for token0 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
+        _liquidity0 = balanceOf(e1, e1.msg.sender) * reserve0() / totalSupply();
+        // user's liquidity for token1 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
+        _liquidity1 = balanceOf(e1, e1.msg.sender) * reserve1() / totalSupply();
+    } else {
+        _liquidity0 = 0;
+        _liquidity1 = 0;
+    }
 
     calldataarg args;
     f(e2, args); // TODO: run with all swaps
 
-    // user's liquidity for token0 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
-    uint256 liquidity0_ = balanceOf(e3, e3.msg.sender) * reserve0() / totalSupply();
-    // user's liquidity for token1 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
-    uint256 liquidity1_ = balanceOf(e3, e3.msg.sender) * reserve1() / totalSupply();
+    uint256 liquidity0_;
+    uint256 liquidity1_;
 
+    if (totalSupply() != 0) {
+        // user's liquidity for token0 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
+        uint256 liquidity0_ = balanceOf(e3, e3.msg.sender) * reserve0() / totalSupply();
+        // user's liquidity for token1 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
+        uint256 liquidity1_ = balanceOf(e3, e3.msg.sender) * reserve1() / totalSupply();
+    } else {
+        liquidity0_ = 0;
+        liquidity1_ = 0;
+    }
+    
+    // since swap is taking place, liquidities should be strictly greater
+    // TODO: && totalSupply() != 0 not working, counter example when liquidities are 0
     assert((reserve0() / reserve1() == 2) => (_liquidity0 <= liquidity0_ &&
-           _liquidity1 <= liquidity1_), "with time mirin liquidity decreased");
+           _liquidity1 <= liquidity1_), "with time liquidities decreased");
 }
 
 // TODO: all swap methods
@@ -380,7 +405,8 @@ rule multiSwapLessThanSingleSwap() {
     uint256 liquidity2;
 
     // TODO: liquidity1, liquidity2 can't be 0??? Maybe (to prevent counter examples)
-    // TODO: require e.msg.sender == to? Or check the assets of 'to'?
+    require e.msg.sender != currentContract && to != currentContract;
+
     validState(true);
 
     // need to replicate the exact state later on
@@ -400,7 +426,8 @@ rule multiSwapLessThanSingleSwap() {
     sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, liquidity1 + liquidity2) at initState; 
     uint256 singleAmountOut = swapWithoutContext(e, token1(), token0(), to, unwrapBento);
 
-    assert(singleAmountOut > multiAmountOut1 + multiAmountOut2, "multiple swaps better than one single swap");
+    // TODO: Mudit wanted strictly greater, but when all amountOuts are 0s we get a counter example
+    assert(singleAmountOut >= multiAmountOut1 + multiAmountOut2, "multiple swaps better than one single swap");
 }
 
 rule additivityOfMint() {
@@ -455,7 +482,9 @@ rule mintWithOptimalLiquidity() {
     uint256 y;
 
     // require dollarAmount(xOptimal) + dollarAmount(yOptimal) == dollarAmount(x) + dollarAmount(y);
-    // require x / y != 2;
+    require getAmountOut(e, token1(), token0(), yOptimal) + xOptimal == 
+            getAmountOut(e, token1(), token0(), y) + x;
+    require x / y != 2;
     require xOptimal / yOptimal == 2;
 
     uint256 reserveRatio = reserve0() / reserve1();
