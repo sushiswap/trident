@@ -80,13 +80,14 @@ methods {
     
 }
 
-function setupPoolAndMsgSender(address sender) {
+function setupPoolAndMsgSender(address sender, address token) {
     require pool.token0() == tokenA || pool.token0() == tokenWeth;
     require pool.token1() == tokenB || pool.token1() == tokenWeth;
     require pool.token2() == tokenA || pool.token2() == tokenB || pool.token2() == tokenWeth;
     require pool.token0() !=  pool.token1() && pool.token1() !=  pool.token2() &&
             pool.token0() !=  pool.token2();
     require sender != bento && sender != pool && sender != currentContract;
+    require token == tokenA || token == tokenB || token == tokenWeth;
 }
 
 
@@ -94,7 +95,8 @@ function setupPoolAndMsgSender(address sender) {
 rule swapRouterTokenBalanceShouldBeZero(method f) filtered {f -> !f.isView && !f.isFallback  } {
     env e;
     calldataarg args;
-    setupPoolAndMsgSender(e.msg.sender);
+    address tokenIn; 
+    setupPoolAndMsgSender(e.msg.sender,tokenIn);
 
     require pool.isBalanced();
     require tokenA.balanceOf(e, currentContract) == 0;
@@ -102,7 +104,6 @@ rule swapRouterTokenBalanceShouldBeZero(method f) filtered {f -> !f.isView && !f
     require bento.balanceOf(tokenA,currentContract) == 0;
     
 
-    address tokenIn; 
     address tokenOut; 
     address recipient;
     bool unwrapBento;
@@ -128,7 +129,7 @@ rule inverseOfSwapping(address tokenIn, address tokenOut, uint256 amountIn) {
     uint256 amountOutMinimum;
     
 
-    setupPoolAndMsgSender(user);
+    setupPoolAndMsgSender(user,tokenIn);
     require tokenIn==tokenA || tokenIn==tokenB || tokenIn==tokenWeth;
     require tokenOut==tokenA || tokenOut==tokenB || tokenOut==tokenWeth;
     require(pool.rates(tokenIn,tokenOut) == 1);
@@ -154,7 +155,7 @@ rule integrityOfAddLiquidity(address token, uint256 x, uint256 amount) {
     uint256 minLiquidity;
     address user = e.msg.sender;
     
-    setupPoolAndMsgSender(user);
+    setupPoolAndMsgSender(user,token);
     // pool is at a stable state 
     require pool.isBalanced();
    
@@ -175,7 +176,7 @@ rule integrityOfAddLiquidity(address token, uint256 x, uint256 amount) {
 
     assert userTokenBalanceAfter == userTokenBalanceBefore - amount;
     assert poolTokenBalanceAfter == poolTokenBalanceBefore + bento.toShare(token, amount, false);
-    assert userLiquidityBalanceBefore + liquidity <= max_uint256;
+    require userLiquidityBalanceBefore + liquidity <= max_uint256;
     assert userLiquidityBalanceAfter == userLiquidityBalanceBefore + liquidity;
 
     assert liquidity > 0 <=> amount > 0;
@@ -192,7 +193,7 @@ rule inverseOfMintAndBurnSingle(address token, uint256 amount) {
     uint256 minLiquidity;
     address user = e.msg.sender;
     
-    setupPoolAndMsgSender(user);   
+    setupPoolAndMsgSender(user, token);   
     
     // pool is at a stable state 
     poolHasToken(token);
@@ -212,7 +213,7 @@ rule noChangeToOther(method f, address token, address other) {
     calldataarg args;
     address user = e.msg.sender;
     
-    setupPoolAndMsgSender(user);
+    setupPoolAndMsgSender(user, token);
 
     require user != other && bento != other && other != pool && other != currentContract;
 
@@ -249,7 +250,8 @@ rule validityOfUnwrapBento(address token, method f) {
     address user; 
 
     
-    setupPoolAndMsgSender(user);
+    setupPoolAndMsgSender(user, token);
+    
     require unwrapBento == true;
     require recipient != currentContract;
     uint256 before = bento.balanceOf(token, user);
@@ -299,8 +301,13 @@ function callFunction(address msgSender, method f,
     else if (f.selector == sweepNativeToken(address,uint256,address).selector) {
         sweepNativeToken(e, tokenIn, amount, recipient);
     }
-    
-    
+    else if (f.selector == refundETH().selector) {
+        require e.msg.sender == recipient;
+        refundETH(e);
+    }
+    else if (f.selector == unwrapWETH(uint256,address).selector) {
+        unwrapWETH(e,amount,recipient);
+    }
     else { 
         calldataarg args;
         f(e, args);

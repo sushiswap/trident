@@ -167,7 +167,7 @@ rule mintingNotPossibleForBalancedPool() {
     validState(true);
 
     calldataarg args;
-    uint256 liquidity = mint(e, args);
+    uint256 liquidity = mint@withrevert(e, args);
 
     assert(lastReverted || liquidity == 0, 
            "pool minting on no transfer to pool");
@@ -486,29 +486,73 @@ rule mintWithOptimalLiquidity() {
     assert(userMirinBalanceOptimal >= userMirinBalanceNonOptimal);
 }
 
-rule zeroCharacteristicsOfGetAmountOut() {
+
+
+rule zeroCharacteristicsOfGetAmountOut(uint256 _reserve0, uint256 _reserve1) {
     env e;
     uint256 amountIn;
     address tokenIn;
     address dummyToken;
 
-    require tokenIn == token0() || tokenIn == token1();
+    validState(false);
+    //assume token0 to token1
+    require tokenIn == token0(); 
 
+    require _reserve0 == reserve0();
+    require _reserve0 == reserve1();
+    require _reserve0 * _reserve1 >= 1000;
+    require MAX_FEE_MINUS_SWAP_FEE(e) <= MAX_FEE(e);
     // dummyToken parameter is not used in the function
     uint256 amountOut = getAmountOut(e, tokenIn, dummyToken, amountIn);
 
     if (amountIn == 0) {
         assert(amountOut == 0, "amountIn is 0, but amountOut is not 0");
-    } else {
+    } else { 
         if (tokenIn == token0() && reserve1() == 0) {
             assert(amountOut == 0, "token1 has no reserves, but amountOut is non-zero");
-        } else if (tokenIn == token1() && reserve0() == 0) {
-            assert(amountOut == 0, "token0 has no reserves, but amountOut is non-zero");
-        } else {
+        }
+        else {
             assert(amountOut > 0);
         }
     }
+    /*else if (tokenIn == token1() && reserve0() == 0) {
+            assert(amountOut == 0, "token0 has no reserves, but amountOut is non-zero");
+        } */ 
+    
 }
+
+
+rule maxAmountOut(uint256 _reserve0, uint256 _reserve1) {
+
+
+    env e;
+    uint256 amountIn;
+    address tokenIn;
+    address dummyToken;
+
+    validState(false);
+    require tokenIn == token0(); 
+    require _reserve0 == reserve0();
+    require _reserve1 == reserve1();
+    require _reserve0 > 0 && _reserve1 > 0;
+    require MAX_FEE_MINUS_SWAP_FEE(e) <= MAX_FEE(e);
+    uint256 amountOut = getAmountOut(e, tokenIn, dummyToken, amountIn);
+    //mathint maxValue =  to_mathint(amountIn) * to_mathint(_reserve1) / to_mathint(_reserve0) ;
+    //assert amountOut <= maxValue ;
+    assert amountOut <= _reserve1;
+
+}
+
+rule nonZeroMint() {
+    env e;
+    address to;
+    validState(false);
+    require reserve0() > bentoBox.balanceOf(token0(), currentContract) ||
+                reserve1() > bentoBox.balanceOf(token1(), currentContract);
+    uint256 liquidity = mint(e,to);
+    assert liquidity > 0;
+}
+
 
 // rule integrityOfGetOptimalLiquidity() {
 
