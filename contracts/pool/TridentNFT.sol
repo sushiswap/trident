@@ -2,11 +2,11 @@
 
 pragma solidity >=0.8.0;
 
-/// @notice Contract for Trident pool ERC-721.
+/// @notice Contract for Trident Concentrated Liquidity Pool ERC-721 `positions`.
 contract TridentNFT {
     uint256 public totalSupply; // @dev Tracks total unique liquidity range positions.
-    string constant public name = "TridentNFT";
-    string constant public symbol = "tNFT";
+    string constant public name = "Sushi LP Token";
+    string constant public symbol = "SLP";
     string constant public baseURI = "";
     
     mapping(address => uint256) public balanceOf; // @dev Tracks liquidity range positions held by an account.
@@ -19,9 +19,11 @@ contract TridentNFT {
     event ApprovalForAll(address indexed approver, address indexed operator, bool approved);
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     
-    mapping(int24 => mapping(int24 => TickRange)) public tickRanges;
-    struct TickRange { // @dev Virtual pool for concentrated liquidity in tick range.
-        uint112 liquidity; // last range liquidity 
+    mapping(int24 => mapping(int24 => Position)) public positions;
+    struct Position { // @dev Virtual pool for concentrated liquidity in tick range.
+        uint128 liquidity; // last range liquidity 
+        uint256 feeGrowthInside0LastX128; // per unit of liquidity
+        uint256 feeGrowthInside1LastX128;
         uint256 totalSupply; // total range mint for pool range providers
         mapping(address => uint256) balanceOf; // account provider range mint balance (compare erc20)
     }
@@ -59,11 +61,11 @@ contract TridentNFT {
         uint256 amount,
         address recipient
     ) internal {
-        tickRanges[lower][upper].totalSupply += amount;
+        positions[lower][upper].totalSupply += amount;
         unchecked {
-            tickRanges[lower][upper].balanceOf[recipient] += amount;
+            positions[lower][upper].balanceOf[recipient] += amount;
         }
-        if (tickRanges[lower][upper].balanceOf[recipient] == 0) {
+        if (positions[lower][upper].balanceOf[recipient] == 0) {
             totalSupply++;
             uint256 tokenId = totalSupply;
             ranges[tokenId].lower = lower;
@@ -79,11 +81,11 @@ contract TridentNFT {
     ) internal {
         int24 lower = ranges[tokenId].lower;
         int24 upper = ranges[tokenId].upper;
-        tickRanges[lower][upper].balanceOf[from] -= amount;
+        positions[lower][upper].balanceOf[from] -= amount;
         unchecked {
-            tickRanges[lower][upper].totalSupply -= amount;
+            positions[lower][upper].totalSupply -= amount;
         }
-        if (tickRanges[lower][upper].balanceOf[from] == 0) {
+        if (positions[lower][upper].balanceOf[from] == 0) {
             totalSupply--;
             emit Transfer(from, address(0), tokenId); // @dev Notices closing position by burning NFT.
         }
@@ -96,8 +98,8 @@ contract TridentNFT {
         getApproved[tokenId] = address(0);
         ownerOf[tokenId] = recipient;
         (int24 lower, int24 upper) = getRangeById(tokenId);
-        tickRanges[lower][upper].balanceOf[recipient] = tickRanges[lower][upper].balanceOf[msg.sender]; // @dev Update recipient balance.
-        tickRanges[lower][upper].balanceOf[msg.sender] = 0; // @dev Nullify sender balance.
+        positions[lower][upper].balanceOf[recipient] = positions[lower][upper].balanceOf[msg.sender]; // @dev Update recipient balance.
+        positions[lower][upper].balanceOf[msg.sender] = 0; // @dev Nullify sender balance.
         emit Transfer(msg.sender, recipient, tokenId); 
     }
     
@@ -109,8 +111,8 @@ contract TridentNFT {
         getApproved[tokenId] = address(0);
         ownerOf[tokenId] = recipient;
         (int24 lower, int24 upper) = getRangeById(tokenId);
-        tickRanges[lower][upper].balanceOf[recipient] = tickRanges[lower][upper].balanceOf[owner]; // @dev Update recipient balance.
-        tickRanges[lower][upper].balanceOf[owner] = 0; // @dev Nullify sender balance.
+        positions[lower][upper].balanceOf[recipient] = positions[lower][upper].balanceOf[owner]; // @dev Update recipient balance.
+        positions[lower][upper].balanceOf[owner] = 0; // @dev Nullify sender balance.
         emit Transfer(owner, recipient, tokenId); 
     }
 }
