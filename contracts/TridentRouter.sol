@@ -28,14 +28,14 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
     }
 
     function exactInputSingle(ExactInputSingleParams calldata params) public payable returns (uint256 amountOut) {
-        pay(params.tokenIn, msg.sender, params.pool, params.amountIn);
+        bento.transfer(params.tokenIn, msg.sender, params.pool, params.amountIn);
         amountOut = IPool(params.pool).swap(params.data);
         require(amountOut >= params.amountOutMinimum, "TOO_LITTLE_RECEIVED");
     }
 
     function exactInput(ExactInputParams calldata params) public payable returns (uint256 amountOut) {
         // @dev Pay the first pool directly.
-        pay(params.tokenIn, msg.sender, params.path[0].pool, params.amountIn);
+        bento.transfer(params.tokenIn, msg.sender, params.path[0].pool, params.amountIn);
         for (uint256 i; i < params.path.length; i++) {
             amountOut = IPool(params.path[i].pool).swap(params.path[i].data);
         }
@@ -69,7 +69,7 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
                     params.initialPath[i].amount
                 );
             } else {
-                pay(
+                bento.transfer(
                     params.initialPath[i].tokenIn,
                     msg.sender,
                     params.initialPath[i].pool,
@@ -113,7 +113,7 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
             if (tokenInput[i].native) {
                 _depositToBentoBox(tokenInput[i].token, pool, tokenInput[i].amount);
             } else {
-                pay(tokenInput[i].token, msg.sender, pool, tokenInput[i].amount);
+                bento.transfer(tokenInput[i].token, msg.sender, pool, tokenInput[i].amount);
             }
         }
         liquidity = IPool(pool).mint(data);
@@ -184,25 +184,6 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
     }
 
     /// @param token The token to pay.
-    /// @param payer The account that must pay.
-    /// @param recipient The account that will receive payment.
-    /// @param amount The amount to pay.
-    function pay(
-        address token,
-        address payer,
-        address recipient,
-        uint256 amount
-    ) internal {
-        if (token == address(0) || (token == wETH && address(this).balance >= amount)) {
-            // @dev Deposit ETH into `recipient` `bento` account.
-            bento.deposit{value: amount}(address(0), address(this), recipient, amount, 0);
-        } else {
-            // @dev Process payment via `bento`.
-            bento.transfer(token, payer, recipient, bento.toShare(token, amount, false));
-        }
-    }
-
-    /// @param token The token to pay.
     /// @param recipient The account that will receive payment.
     /// @param amount The amount to pay.
     function _depositToBentoBox(
@@ -210,13 +191,16 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
         address recipient,
         uint256 amount
     ) internal {
-        if (token == address(0) || (token == wETH && address(this).balance >= amount)) {
-            // @dev Deposit ETH into `recipient` `bento` account.
-            bento.deposit{value: amount}(address(0), address(this), recipient, amount, 0);
-        } else {
-            // @dev Deposit ERC20 token into `recipient` `bento` account.
-            bento.deposit(token, msg.sender, recipient, amount, 0);
+        if (token == wETH && address(this).balance > 0) {
+            uint256 underlyingAmount = bento.toAmount(wETH, amount, true);
+            if (address(this).balance > underlyingAmount) {
+                // @dev Deposit ETH into `recipient` `bento` account.
+                bento.deposit{value: underlyingAmount}(address(0), address(this), recipient, 0, amount);
+                return;
+            }
         }
+        // @dev Deposit ERC20 token into `recipient` `bento` account.
+        bento.deposit(token, msg.sender, recipient, amount, 0);
     }
 
     /// @notice Provides safe ERC20.transfer for tokens that do not consistently return true/false.

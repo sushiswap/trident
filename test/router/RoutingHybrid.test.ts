@@ -1,5 +1,6 @@
+// @ts-nocheck
+
 import { expect } from "chai";
-// @ts-ignore
 import { ethers } from "hardhat";
 import { BigNumber } from "ethers";
 import seedrandom from "seedrandom";
