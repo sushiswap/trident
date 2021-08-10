@@ -52,7 +52,7 @@ contract IndexPool is IPool, TridentERC20 {
     mapping(address => Record) public records;
     struct Record {
         bool bound;  
-        uint256 index; 
+        uint8 index; 
         uint256 weight;
         uint256 amount;
     }
@@ -63,10 +63,11 @@ contract IndexPool is IPool, TridentERC20 {
             _deployData,
             (address[], uint256[], uint256)
         );
-        require(_tokens.length == _weights.length, "ARRAY_MISMATCH");
-        require(_swapFee <= MAX_FEE, "BAD_SWAP_FEE");
         
-        for (uint256 i = 0; i < _tokens.length; i++) {
+        require(_tokens.length == _weights.length, "ARRAY_MISMATCH");
+        require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
+        
+        for (uint8 i = 0; i < _tokens.length; i++) {
             require(_tokens[i] != address(0), "ZERO_ADDRESS");
             require(!records[_tokens[i]].bound, "BOUND");
             require(_weights[i] >= MIN_WEIGHT, "MIN_WEIGHT");
@@ -75,16 +76,19 @@ contract IndexPool is IPool, TridentERC20 {
             require(_tokens.length <= MAX_BOUND_TOKENS, "MAX_TOKENS");
             totalWeight += _weights[i];
             require(totalWeight <= MAX_TOTAL_WEIGHT, "MAX_TOTAL_WEIGHT");
+            
             records[_tokens[i]] = Record({
                 bound: true,
                 index: i,
                 weight: _weights[i],
                 amount: 0
             });
+            
             tokens.push(_tokens[i]);
         }
         
-        _mint(tx.origin, INIT_POOL_SUPPLY); // @dev This grants pool deployer initial LP supply.
+        _mint(address(0), INIT_POOL_SUPPLY); // @dev This burns initial LP supply.
+        
         swapFee = _swapFee;
         MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
         bento = IBentoBoxMinimal(MasterDeployer(_masterDeployer).bento());
@@ -94,9 +98,9 @@ contract IndexPool is IPool, TridentERC20 {
     }
     
     function mint(bytes calldata data) public override lock returns (uint256 liquidity) {
-        (uint256 toMint, uint256[] memory maxAmountsIn, address recipient) = abi.decode(
+        (uint256 toMint, address recipient) = abi.decode(
             data,
-            (uint256, uint256[], address)
+            (uint256, address)
         );
         
         uint256 ratio = toMint / totalSupply;
@@ -104,22 +108,24 @@ contract IndexPool is IPool, TridentERC20 {
         for (uint256 i = 0; i < tokens.length; i++) {
             address tokenIn = tokens[i];
             uint256 amount = records[tokenIn].amount;
-            uint256 amountIn = ratio * amount;
+            // @dev If token amount is 0, initialize with `ratio`.
+            uint256 amountIn = amount != 0 ? ratio * amount : ratio;
             require(amountIn >= MIN_BALANCE, "MIN_BALANCE");
-            require(_balance(tokenIn) >= amountIn + amount, "NOT_RECEIVED"); // @dev Check Trident router has sent amount for skim into pool.
-            require(amountIn <= maxAmountsIn[i], "LIMIT_IN");
+            // @dev Check Trident router has sent amount for skim into pool.
+            require(_balance(tokenIn) >= amountIn + amount, "NOT_RECEIVED");
             records[tokenIn].amount += amountIn;
             emit Mint(msg.sender, tokenIn, amountIn, recipient);
         }
         
         _mint(recipient, toMint);
+        
         liquidity = toMint;
     }
   
     function burn(bytes calldata data) public override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
-        (uint256 toBurn, uint256[] memory minAmountsOut, address recipient, bool unwrapBento) = abi.decode(
+        (uint256 toBurn, address recipient, bool unwrapBento) = abi.decode(
             data,
-            (uint256, uint256[], address, bool)
+            (uint256, address, bool)
         );
 
         uint256 ratio = toBurn / totalSupply;
@@ -133,7 +139,6 @@ contract IndexPool is IPool, TridentERC20 {
             uint256 amount = records[tokenOut].amount;
             uint256 amountOut = ratio * amount;
             require(amountOut != 0, "MATH_APPROX");
-            require(amountOut >= minAmountsOut[i], "LIMIT_OUT");
             records[tokenOut].amount = amount - amountOut;
             _transfer(tokenOut, amountOut, recipient, unwrapBento);
             withdrawnAmounts[i] = TokenAmount({token: tokenOut, amount: amountOut});
@@ -142,14 +147,14 @@ contract IndexPool is IPool, TridentERC20 {
     }
     
     function burnSingle(bytes calldata data) public override lock returns (uint256 amount) {
-        (address tokenOut, uint256 toBurn, uint256 minAmountOut, address recipient, bool unwrapBento) = abi.decode(
+        (address tokenOut, uint256 toBurn, address recipient, bool unwrapBento) = abi.decode(
             data,
-            (address, uint256, uint256, address, bool)
+            (address, uint256, address, bool)
         );
 
-        require(records[tokenOut].bound, "ERR_NOT_BOUND");
-
         Record storage outRecord = records[tokenOut];
+        
+        require(outRecord.bound, "ERR_NOT_BOUND");
 
         amount = calcSingleOutGivenPoolIn(
                             outRecord.amount,
@@ -160,8 +165,7 @@ contract IndexPool is IPool, TridentERC20 {
                             swapFee
                         );
 
-        require(amount >= minAmountOut, "ERR_LIMIT_OUT");
-        require(amount <= records[tokenOut].amount * MAX_OUT_RATIO, "ERR_MAX_OUT_RATIO");
+        require(amount <= outRecord.amount * MAX_OUT_RATIO, "ERR_MAX_OUT_RATIO");
 
         outRecord.amount = outRecord.amount - amount;
 
@@ -191,11 +195,12 @@ contract IndexPool is IPool, TridentERC20 {
                             outRecord.amount,
                             outRecord.weight,
                             amountIn);
-
+        // @dev Check Trident router has sent amount for skim into pool.
+        require(_balance(tokenIn) >= amountIn + inRecord.amount, "NOT_RECEIVED");
+        
         inRecord.amount += amountIn;
         outRecord.amount -= amountOut;
-
-        require(_balance(tokenIn) >= amountIn + inRecord.amount, "NOT_RECEIVED"); // @dev Check Trident router has sent token amount for skim into pool.
+        
         _transfer(tokenOut, amountOut, recipient, unwrapBento);
 
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
@@ -222,12 +227,14 @@ contract IndexPool is IPool, TridentERC20 {
                             outRecord.weight,
                             amountIn);
 
+        ITridentCallee(recipient).tridentCallback(tokenIn, tokenOut, amountIn, amountOut, context);
+        // @dev Check Trident router has sent amount for skim into pool.
+        require(_balance(tokenIn) >= amountIn + inRecord.amount, "NOT_RECEIVED");
+        
         inRecord.amount += amountIn;
         outRecord.amount -= amountOut;
-
-        require(_balance(tokenIn) >= amountIn + inRecord.amount, "NOT_RECEIVED"); // @dev Check Trident router has sent token amount for skim into pool.
+        
         _transfer(tokenOut, amountOut, recipient, unwrapBento);
-        ITridentCallee(recipient).tridentCallback(tokenIn, tokenOut, amountIn, amountOut, context);
 
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
