@@ -134,7 +134,7 @@ contract IndexPool is IPool, TridentERC20 {
             uint256 amountOut = ratio * amount;
             require(amountOut != 0, "MATH_APPROX");
             require(amountOut >= minAmountsOut[i], "LIMIT_OUT");
-            records[tokenOut].amount = records[tokenOut].amount - amountOut;
+            records[tokenOut].amount = amount - amountOut;
             _transfer(tokenOut, amountOut, recipient, unwrapBento);
             withdrawnAmounts[i] = TokenAmount({token: tokenOut, amount: amountOut});
             emit Burn(msg.sender, tokenOut, amountOut, recipient);
