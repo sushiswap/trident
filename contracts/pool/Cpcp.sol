@@ -24,6 +24,12 @@ contract Cpcp {
         uint256 feeGrowthInside1LastX128;
     }
 
+    IERC20 public immutable token0;
+
+    IERC20 public immutable token1;
+
+    uint24 public immutable fee; // 1000 corresponds to 0.1% fee
+
     mapping(int24 => Tick) public ticks;
 
     mapping(address => mapping(int24 => mapping(int24 => Position))) public positions;
@@ -34,24 +40,27 @@ contract Cpcp {
 
     int24 public nearestTick; // tick that is just bellow the current price
 
-    IERC20 public token0;
-
-    IERC20 public token1;
-
     uint256 public feeGrowthGlobal0X128;
 
     uint256 public feeGrowthGlobal1X128;
 
-    uint256 public fee = 1000; // 0.1% fee
+    uint128 private reserve0;
+
+    uint128 private reserve1;
 
     constructor(bytes memory deployData) {
-        (IERC20 _token0, IERC20 _token1, uint160 _price) = abi.decode(deployData, (IERC20, IERC20, uint160));
+        (IERC20 _token0, IERC20 _token1, uint160 _price, uint24 _fee) = abi.decode(
+            deployData,
+            (IERC20, IERC20, uint160, uint24)
+        );
 
         token0 = _token0;
 
         token1 = _token1;
 
         price = _price;
+
+        fee = _fee;
 
         ticks[TickMath.MIN_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0);
 
@@ -89,29 +98,38 @@ contract Cpcp {
         uint256 currentPrice,
         uint256 liquidityAmount
     ) internal {
-        uint256 token0amount = 0;
-
-        uint256 token1amount = 0;
+        uint128 token0amount = 0;
+        uint128 token1amount = 0;
 
         if (priceUpper <= currentPrice) {
             // only supply token1 (token1 is Y)
 
-            token1amount = DyDxMath.getDy(liquidityAmount, priceLower, priceUpper, true);
+            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, priceUpper, true));
         } else if (currentPrice <= priceLower) {
             // only supply token0 (token0 is X)
 
-            token0amount = DyDxMath.getDx(liquidityAmount, priceLower, priceUpper, true);
+            token0amount = uint128(DyDxMath.getDx(liquidityAmount, priceLower, priceUpper, true));
         } else {
             // supply both tokens
 
-            token0amount = DyDxMath.getDx(liquidityAmount, currentPrice, priceUpper, true);
+            token0amount = uint128(DyDxMath.getDx(liquidityAmount, currentPrice, priceUpper, true));
 
-            token1amount = DyDxMath.getDy(liquidityAmount, priceLower, currentPrice, true);
+            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, currentPrice, true));
         }
 
-        if (token0amount > 0) token0.transferFrom(msg.sender, address(this), token0amount); // ! change this to bento shares
+        if (token0amount > 0) {
+            token0amount += reserve0;
+            require(uint256(token0amount) <= token0.balanceOf(address(this)), "Didn't deposit token0"); // ! change this to bento shares
+            reserve0 = token0amount;
+            /** @dev `reserve0 = token0.balanceOf(address(this))`
+                    doesn't help anyone as coins will be stuck */
+        }
 
-        if (token1amount > 0) token1.transferFrom(msg.sender, address(this), token1amount);
+        if (token1amount > 0) {
+            token1amount += reserve1;
+            require(uint256(token1amount) <= token1.balanceOf(address(this)), "Didn't deposit token1"); // ! change this to bento shares
+            reserve1 = token1amount;
+        }
     }
 
     function updateLinkedList(
@@ -335,10 +353,16 @@ contract Cpcp {
         nearestTick = zeroForOne ? nextTickToCross : ticks[nextTickToCross].previousTick;
 
         if (zeroForOne) {
-            token0.transferFrom(msg.sender, address(this), inAmount); // ! change this to bento shares, a push / pull approach instead
+            uint128 newBalance = reserve0 + uint128(inAmount);
+            require(uint256(newBalance) <= token0.balanceOf(address(this)), "Missing x deposit");
+            reserve0 = newBalance;
+            reserve1 -= uint128(outAmount);
             token1.transfer(recipient, outAmount);
         } else {
-            token1.transferFrom(msg.sender, address(this), inAmount); // ! change this to bento shares, a push / pull approach instead
+            uint128 newBalance = reserve1 + uint128(inAmount);
+            require(uint256(newBalance) <= token1.balanceOf(address(this)), "Missing y deposit");
+            reserve1 = newBalance;
+            reserve0 -= uint128(outAmount);
             token0.transfer(recipient, outAmount);
         }
 
