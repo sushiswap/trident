@@ -9,29 +9,11 @@ import "../libraries/concentratedPool/DyDxMath.sol";
 import "hardhat/console.sol";
 
 contract Cpcp {
-    struct Tick {
-        int24 previousTick;
-        int24 nextTick;
-        uint128 liquidity;
-        uint256 feeGrowthOutside0X128; // per unit of liquidity
-        uint256 feeGrowthOutside1X128;
-    }
-
-    struct Position {
-        uint128 liquidity;
-        uint256 feeGrowthInside0LastX128;
-        uint256 feeGrowthInside1LastX128;
-    }
-
     IERC20 public immutable token0;
 
     IERC20 public immutable token1;
 
     uint24 public immutable fee; // 1000 corresponds to 0.1% fee
-
-    mapping(int24 => Tick) public ticks;
-
-    mapping(address => mapping(int24 => mapping(int24 => Position))) public positions;
 
     uint128 public liquidity;
 
@@ -46,6 +28,24 @@ contract Cpcp {
     uint128 private reserve0;
 
     uint128 private reserve1;
+
+    mapping(int24 => Tick) public ticks;
+
+    mapping(address => mapping(int24 => mapping(int24 => Position))) public positions;
+
+    struct Tick {
+        int24 previousTick;
+        int24 nextTick;
+        uint128 liquidity;
+        uint256 feeGrowthOutside0X128; // per unit of liquidity
+        uint256 feeGrowthOutside1X128;
+    }
+
+    struct Position {
+        uint128 liquidity;
+        uint256 feeGrowthInside0LastX128;
+        uint256 feeGrowthInside1LastX128;
+    }
 
     constructor(bytes memory deployData) {
         (IERC20 _token0, IERC20 _token1, uint160 _price, uint24 _fee) = abi.decode(
