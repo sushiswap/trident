@@ -47,7 +47,7 @@
     "@nomiclabs/hardhat-waffle": "^2.0.0",
     "@openzeppelin/contracts": "^4.2.0",
     "@sushiswap/prettier-config": "^0.1.0",
-    "@sushiswap/sdk": "5.0.0-canary.30",
+    "@sushiswap/sdk": "5.0.0-canary.36",
     "@tenderly/hardhat-tenderly": "^1.0.0",
     "@typechain/ethers-v5": "^7.0.0",
     "@typechain/hardhat": "^2.0.0",

@@ -268,7 +268,7 @@ describe("Router", function () {
           amount: BigNumber.from(10).pow(18),
         },
       ];
-      await router.addLiquidityUnbalanced(
+      await router.addLiquidity(
         liquidityInputOptimal,
         pool.address,
         alice.address,
@@ -306,7 +306,7 @@ describe("Router", function () {
           amount: BigNumber.from(10).pow(18),
         },
       ];
-      await router.addLiquidityUnbalanced(
+      await router.addLiquidity(
         liquidityInputOptimal,
         pool.address,
         alice.address,

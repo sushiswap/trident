@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 pragma solidity >=0.8.0;
+import "../libraries/RebaseLibrary.sol";
 
 /// @notice Minimal interface for BentoBox token vault interactions - `token` is aliased as `address` from `IERC20` for code simplicity.
 interface IBentoBoxMinimal {
@@ -73,4 +74,7 @@ interface IBentoBoxMinimal {
 
     /// @notice Registers this contract so that users can approve it for the BentoBox.
     function registerProtocol() external;
+
+    /// @dev Reads the Rebase `totals`from storage for a given token
+    function totals(address token) external view returns (Rebase memory total);
 }
