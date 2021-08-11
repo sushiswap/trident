@@ -14,7 +14,9 @@ contract ConstantProductPoolHarness is ConstantProductPool {
     // getters ///////////////////
     function burnGetter(address to, bool unwrapBento) public
             returns (uint256 liquidity0_, uint256 liquidity1_) {
-        liquidityAmount[] memory withdrawnAmounts = super.burn(to, unwrapBento);
+        bytes memory data = abi.encode(to, unwrapBento);
+
+        IPool.TokenAmount[] memory withdrawnAmounts = ConstantProductPool(address(this)).burn(data);
 
         // Assuming in BentoBox shares (Ask Nurit)
         return (withdrawnAmounts[0].amount, withdrawnAmounts[1].amount);
@@ -27,13 +29,8 @@ contract ConstantProductPoolHarness is ConstantProductPool {
 
     // simplifications ///////////
     // TODO: If it works, maybe override swapWithContext, (Check with Nurit)
-    function swapWithContextWrapper(
-        address tokenIn,
-        address tokenOut,
-        bytes calldata context,
-        address recipient,
-        bool unwrapBento,
-        uint256 amountIn
+    function flashSwapWrapper(
+        address tokenIn, address recipient, bool unwrapBento, uint256 amountIn, bytes memory context
     ) public returns (uint256 amountOut) { 
         require(recipient != address(this), "recepient is current contract");
         // require(recipient != token0, "recepient is token0");
@@ -41,14 +38,13 @@ contract ConstantProductPoolHarness is ConstantProductPool {
 
         // require(tokenIn == token0, "wrong token");
         // require(tokenOut == token1, "wrong token");
-
-        return super.swapWithContext(tokenIn, tokenOut, context,
-                                     recipient, unwrapBento, amountIn);
+        bytes memory data = abi.encode(tokenIn, recipient,  unwrapBento, amountIn, context);
+        return ConstantProductPool(address(this)).flashSwap(data);
     }
 
     // override burn since we have the burnGetter - to save time
-    function burn(address to, bool unwrapBento)
-        public override returns (liquidityAmount[] memory withdrawnAmounts) { }
+    function burn(bytes calldata data)
+        public override returns (IPool.TokenAmount[] memory withdrawnAmounts) { }
 
     // function _getAmountOut(
     //     uint256 amountIn,

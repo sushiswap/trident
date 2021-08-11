@@ -27,26 +27,26 @@ perl -0777 -i -pe 's/\) public allowed\(from\) returns/\) public virtual allowed
 perl -0777 -i -pe 's/function batch\(bytes\[\] calldata data\) external/function batch\(bytes\[\] calldata data\) external virtual/g' contracts/utils/TridentBatcher.sol
 
 ##################################################
-#                   SwapRouter                   #
+#                   TridentRouter                #
 ##################################################
 # remove hardhat console
-perl -0777 -i -pe 's/import \"hardhat/\/\/ import \"hardhat/g' contracts/SwapRouter.sol
+perl -0777 -i -pe 's/import \"hardhat/\/\/ import \"hardhat/g' contracts/TridentRouter.sol
 
 # virtualizing receive
-perl -0777 -i -pe 's/receive\(\) external payable \{/receive\(\) external virtual payable \{/g' contracts/SwapRouter.sol
+perl -0777 -i -pe 's/receive\(\) external payable \{/receive\(\) external virtual payable \{/g' contracts/TridentRouter.sol
 
-# virtualize functions for SwapRouter
-perl -0777 -i -pe 's/external payable /public virtual payable /g' contracts/SwapRouter.sol
-perl -0777 -i -pe 's/        external\n        payable/        public\n        virtual\n        payable/g' contracts/SwapRouter.sol # for ExactSingleInput and others ...
+# virtualize functions for TridentRouter
+perl -0777 -i -pe 's/external payable /public virtual payable /g' contracts/TridentRouter.sol
+perl -0777 -i -pe 's/        external\n        payable/        public\n        virtual\n        payable/g' contracts/TridentRouter.sol # for ExactSingleInput and others ...
 
 # external checkDeadline -> public virtual checkDeadline
-perl -0777 -i -pe 's/external checkDeadline/public virtual checkDeadline/g' contracts/SwapRouter.sol
+perl -0777 -i -pe 's/external checkDeadline/public virtual checkDeadline/g' contracts/TridentRouter.sol
 
 # ) external { -> ) public {
-perl -0777 -i -pe 's/\) external \{/\) public \{/g' contracts/SwapRouter.sol
+perl -0777 -i -pe 's/\) external \{/\) public \{/g' contracts/TridentRouter.sol
 
 # calldata -> memory
-perl -0777 -i -pe 's/calldata/memory/g' contracts/SwapRouter.sol
+perl -0777 -i -pe 's/calldata/memory/g' contracts/TridentRouter.sol
 
 ##################################################
 #               ConstantProductPool              #
@@ -59,7 +59,8 @@ perl -0777 -i -pe 's/import \"..\/deployer\/MasterDeployer.sol\";/import \"..\/d
 perl -0777 -i -pe 's/address internal immutable barFeeTo;/address internal immutable barFeeTo;\n    Simplifications public simplified;/g' contracts/pool/ConstantProductPool.sol
 
 # simplifying sqrt TridentMath.sqrt(balance0 * balance1) in ConstantProductPool
-perl -0777 -i -pe 's/TridentMath.sqrt\(/simplified.sqrt\(/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/contract ConstantProductPool is IPool, TridentERC20/contract ConstantProductPool is IPool, TridentERC20, Simplifications/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/TridentMath.sqrt\(/sqrt\(/g' contracts/pool/ConstantProductPool.sol
 
 # _balance: internal -> public
 perl -0777 -i -pe 's/_balance\(\) internal view/_balance\(\) public view/g' contracts/pool/ConstantProductPool.sol
@@ -69,9 +70,7 @@ perl -0777 -i -pe 's/uint112 internal reserve0;/uint112 public reserve0;/g' cont
 perl -0777 -i -pe 's/uint112 internal reserve1;/uint112 public reserve1;/g' contracts/pool/ConstantProductPool.sol
 
 # virtualizing burn
-perl -0777 -i -pe 's/function burn\(address to, bool unwrapBento\)
-        public/function burn\(address to, bool unwrapBento\)
-        public\n        virtual/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/function burn\(bytes calldata data\) public/function burn\(bytes calldata data\) public virtual/g' contracts/pool/ConstantProductPool.sol
 
 # virtualizing _getAmountOut
 perl -0777 -i -pe 's/internal view returns \(uint256 amountOut\)/internal virtual view returns \(uint256 amountOut\)/g' contracts/pool/ConstantProductPool.sol
