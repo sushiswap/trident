@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+pragma solidity ^0.8.2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../libraries/concentratedPool/TickMath.sol";
@@ -7,7 +8,10 @@ import "../libraries/concentratedPool/UnsafeMath.sol";
 import "../libraries/concentratedPool/DyDxMath.sol";
 import "hardhat/console.sol";
 
-pragma solidity ^0.8.2;
+//                  u         ▼         v
+// ----|----|-------|-------------------|--------|---------
+
+// global, outside u, outside v
 
 contract Cpcp {
     struct Tick {
@@ -20,7 +24,7 @@ contract Cpcp {
 
     struct Position {
         uint128 liquidity;
-        uint256 feeGrowthInside0LastX128; // per unit of liquidity
+        uint256 feeGrowthInside0LastX128;
         uint256 feeGrowthInside1LastX128;
     }
 
@@ -85,7 +89,7 @@ contract Cpcp {
 
         if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += amount;
 
-        storePosition(recipient, lower, upper, amount);
+        addPosition(recipient, lower, upper, amount);
 
         updateLinkedList(lowerOld, lower, upperOld, upper, amount, currentPrice);
 
@@ -183,7 +187,7 @@ contract Cpcp {
 
             require(old.liquidity > 0 && old.nextTick > upper && upperOld < upper, "Upper order");
 
-            if (lower <= currentNearestTick) {
+            if (upper <= currentNearestTick) {
                 ticks[upper] = Tick(upperOld, old.nextTick, amount, feeGrowthGlobal0X128, feeGrowthGlobal1X128);
             } else {
                 ticks[upper] = Tick(upperOld, old.nextTick, amount, 0, 0);
@@ -201,15 +205,14 @@ contract Cpcp {
         nearestTick = currentNearestTick;
     }
 
-    function storePosition(
+    function addPosition(
         address recipient,
         int24 lower,
         int24 upper,
         uint128 amount
     ) internal {
         Position storage position = positions[recipient][lower][upper];
-
-        // todo
+        position.liquidity += amount;
     }
 
     // price is √(y/x)
@@ -326,7 +329,12 @@ contract Cpcp {
             outAmount += output - feeAmount;
 
             if (cross) {
+                ticks[nextTickToCross].feeGrowthOutside0X128 =
+                    feeGrowthGlobal -
+                    ticks[nextTickToCross].feeGrowthOutside0X128;
+
                 if (zeroForOne) {
+                    // goin' left
                     if (nextTickToCross % 2 == 0) {
                         currentLiquidity -= ticks[nextTickToCross].liquidity;
                     } else {
@@ -335,6 +343,7 @@ contract Cpcp {
 
                     nextTickToCross = ticks[nextTickToCross].previousTick;
                 } else {
+                    // goin' right
                     if (nextTickToCross % 2 == 0) {
                         currentLiquidity += ticks[nextTickToCross].liquidity;
                     } else {
