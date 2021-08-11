@@ -25,7 +25,6 @@ contract SwapRouterHarness is TridentRouter {
         payable
         returns (uint256 amountOut) { }
 
-
     function callExactInput(address tokenIn1, address pool1, address tokenIn2, address pool2,
         address tokenOut,
         address recipient,
@@ -53,14 +52,12 @@ contract SwapRouterHarness is TridentRouter {
         return super.exactInput(exactInputParams);
     } */
 
-
     function exactInput(ExactInputParams memory params)
         public
         override
         payable
         returns (uint256 amount)
     { }
-
 
     function callExactInputSingleWithNativeToken(address tokenIn, address tokenOut, address pool, address recipient, bool unwrapBento, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum)
         public returns (uint256) {
@@ -83,8 +80,6 @@ contract SwapRouterHarness is TridentRouter {
         payable
         returns (uint256 amount)
     { }
-
-
 
     bytes public harnessBytes;
     function callExactInputSingleWithContext(address tokenIn, 
@@ -112,7 +107,6 @@ contract SwapRouterHarness is TridentRouter {
         returns (uint256 amountOut)
     { }
 
-
     function callExactInputSingleWithNativeTokenAndContext(address tokenIn, 
         address tokenOut,
         address pool,
@@ -136,15 +130,14 @@ contract SwapRouterHarness is TridentRouter {
         override
         payable
         returns (uint256 amountOut)
-    {
-    }
+    { }
+
     function exactInputWithContext(ExactInputParamsWithContext memory params)
         public
         override
         payable
         returns (uint256 amount)
-    {
-    }
+    { }
 
     // A wrapper and override for addLiquidityUnbalance
     function callAddLiquidityUnbalanced(address tokenIn, uint256 amount, address pool,  address to, uint256 deadline,uint256 minliquidity) public returns (uint256) {
@@ -160,7 +153,6 @@ contract SwapRouterHarness is TridentRouter {
         uint256 deadline,
         uint256 minLiquidity
     ) public override returns (uint256 liquidity) { }
-
 
     function callAddLiquidityBalanced(
         address tokenIn, 
@@ -179,11 +171,8 @@ contract SwapRouterHarness is TridentRouter {
         address pool,
         address to,
         uint256 deadline
-    ) public override returns (IPool.liquidityAmount[] memory liquidityOptimal, uint256 liquidity) {
-
-    }
+    ) public override returns (IPool.liquidityAmount[] memory liquidityOptimal, uint256 liquidity) { }
     
-
     function burnLiquidity(
         address pool,
         address to,
@@ -191,25 +180,20 @@ contract SwapRouterHarness is TridentRouter {
         uint256 deadline,
         uint256 liquidity,
         IPool.liquidityAmount[] memory minWithdrawals
-    ) public override {
-
-    }
+    ) public override { }
 
     function exactInputWithNativeTokenAndContext(ExactInputParamsWithContext memory params)
         public
         override
         payable
         returns (uint256 amount)
-    {
-    }
+    { }
 
     function complexPath(ComplexPathParams memory params) public override payable 
-     { }
+    { }
 
 
-    function batch(bytes[] calldata data) external payable override returns (bytes[] memory results) {
-
-    }
+    function batch(bytes[] calldata data) external payable override returns (bytes[] memory results) { }
 /*     function refundETH() public virtual override payable {
         if (address(this).balance > 0) msg.sender.send(address(this).balance);
      }
@@ -221,5 +205,4 @@ contract SwapRouterHarness is TridentRouter {
     function ethBalance(address user) public returns (uint256) {
         return user.balance;
     }
-
 }

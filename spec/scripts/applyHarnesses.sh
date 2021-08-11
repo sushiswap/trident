@@ -76,6 +76,10 @@ perl -0777 -i -pe 's/function burn\(address to, bool unwrapBento\)
 # virtualizing _getAmountOut
 perl -0777 -i -pe 's/internal view returns \(uint256 amountOut\)/internal virtual view returns \(uint256 amountOut\)/g' contracts/pool/ConstantProductPool.sol
 
+# internal -> public fee constants
+perl -0777 -i -pe 's/uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE/uint256 public immutable MAX_FEE_MINUS_SWAP_FEE/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/uint256 internal constant MAX_FEE/uint256 public constant MAX_FEE/g' contracts/pool/ConstantProductPool.sol
+
 ##################################################
 #                    HybridPool                  #
 ##################################################

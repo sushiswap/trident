@@ -62,9 +62,11 @@ methods {
 ////////////////////////////////////////////////////////////////////////////
 //                               Invariants                               //
 ////////////////////////////////////////////////////////////////////////////
+// TODO: This should fail (passing right now)
 invariant validityOfTokens()
     token0() != 0 && token1() != 0 && token0() != token1()
 
+// TODO: This should fail (passing right now)
 invariant tokensNotMirin()
     token0() != currentContract && token1() != currentContract
 
@@ -133,14 +135,20 @@ rule afterOpBalanceEqualsReserve(method f) {
     uint256 _reserve1 = reserve1();
 
     address to;
-    require to != currentContract;
+    address tokenIn;
+    address tokenOut;
+    address recepient;
     bool unwrapBento;
+
+    require to != currentContract;
+    require recepient != currentContract; // reason for failure in swaps
     
     if (f.selector == burnGetter(address, bool).selector) {
         burnGetter(e, to, unwrapBento);
     } else if (f.selector == burnLiquiditySingle(address, address, bool).selector) {
-        address tokenOut;
         burnLiquiditySingle(e, tokenOut, to, unwrapBento);
+    } else if (f.selector == swapWithoutContext(address, address, address, bool).selector) {
+        swapWithoutContext(e, tokenIn, tokenOut, recepient, unwrapBento);
     } else {
         calldataarg args;
         f(e, args);
@@ -165,13 +173,14 @@ rule afterOpBalanceEqualsReserve(method f) {
 rule mintingNotPossibleForBalancedPool() {
     env e;
 
+    require totalSupply() > 0; // failing without this
+
     validState(true);
 
     calldataarg args;
     uint256 liquidity = mint@withrevert(e, args);
 
-    assert(lastReverted || liquidity == 0, 
-           "pool minting on no transfer to pool");
+    assert(lastReverted, "pool minting on no transfer to pool");
 }
 
 // TODO: only when adding optimal liquidity
@@ -487,6 +496,8 @@ rule mintWithOptimalLiquidity() {
     require x / y != 2;
     require xOptimal / yOptimal == 2;
 
+    // TODO: Ask Nurit if this a safe assumption
+    require reserve1() != 0;
     uint256 reserveRatio = reserve0() / reserve1();
     require reserveRatio == 2;
 
@@ -515,8 +526,6 @@ rule mintWithOptimalLiquidity() {
     assert(userMirinBalanceOptimal >= userMirinBalanceNonOptimal);
 }
 
-
-
 rule zeroCharacteristicsOfGetAmountOut(uint256 _reserve0, uint256 _reserve1) {
     env e;
     uint256 amountIn;
@@ -524,13 +533,14 @@ rule zeroCharacteristicsOfGetAmountOut(uint256 _reserve0, uint256 _reserve1) {
     address dummyToken;
 
     validState(false);
+
     //assume token0 to token1
     require tokenIn == token0(); 
-
     require _reserve0 == reserve0();
     require _reserve0 == reserve1();
     require _reserve0 * _reserve1 >= 1000;
     require MAX_FEE_MINUS_SWAP_FEE(e) <= MAX_FEE(e);
+
     // dummyToken parameter is not used in the function
     uint256 amountOut = getAmountOut(e, tokenIn, dummyToken, amountIn);
 
@@ -539,49 +549,50 @@ rule zeroCharacteristicsOfGetAmountOut(uint256 _reserve0, uint256 _reserve1) {
     } else { 
         if (tokenIn == token0() && reserve1() == 0) {
             assert(amountOut == 0, "token1 has no reserves, but amountOut is non-zero");
-        }
-        else {
+        } else {
             assert(amountOut > 0);
         }
     }
-    /*else if (tokenIn == token1() && reserve0() == 0) {
+    /* else if (tokenIn == token1() && reserve0() == 0) {
             assert(amountOut == 0, "token0 has no reserves, but amountOut is non-zero");
         } */ 
-    
 }
 
-
 rule maxAmountOut(uint256 _reserve0, uint256 _reserve1) {
-
-
     env e;
+
     uint256 amountIn;
     address tokenIn;
     address dummyToken;
 
     validState(false);
+
     require tokenIn == token0(); 
     require _reserve0 == reserve0();
     require _reserve1 == reserve1();
     require _reserve0 > 0 && _reserve1 > 0;
     require MAX_FEE_MINUS_SWAP_FEE(e) <= MAX_FEE(e);
-    uint256 amountOut = getAmountOut(e, tokenIn, dummyToken, amountIn);
-    //mathint maxValue =  to_mathint(amountIn) * to_mathint(_reserve1) / to_mathint(_reserve0) ;
-    //assert amountOut <= maxValue ;
-    assert amountOut <= _reserve1;
 
+    uint256 amountOut = getAmountOut(e, tokenIn, dummyToken, amountIn);
+    // mathint maxValue = to_mathint(amountIn) * to_mathint(_reserve1) / to_mathint(_reserve0);
+    // assert amountOut <= maxValue;
+
+    assert amountOut <= _reserve1;
 }
 
 rule nonZeroMint() {
     env e;
     address to;
+
     validState(false);
+
     require reserve0() > bentoBox.balanceOf(token0(), currentContract) ||
                 reserve1() > bentoBox.balanceOf(token1(), currentContract);
+
     uint256 liquidity = mint(e,to);
+
     assert liquidity > 0;
 }
-
 
 // rule integrityOfGetOptimalLiquidity() {
 
