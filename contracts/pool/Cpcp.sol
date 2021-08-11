@@ -10,7 +10,6 @@ import "../libraries/concentratedPool/TickMath.sol";
 import "../libraries/concentratedPool/FullMath.sol";
 import "../libraries/concentratedPool/UnsafeMath.sol";
 import "../libraries/concentratedPool/DyDxMath.sol";
-import "./TridentNFT.sol";
 import "hardhat/console.sol";
 
 //                  u         ▼         v
