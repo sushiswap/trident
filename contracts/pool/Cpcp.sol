@@ -8,11 +8,6 @@ import "../libraries/concentratedPool/UnsafeMath.sol";
 import "../libraries/concentratedPool/DyDxMath.sol";
 import "hardhat/console.sol";
 
-//                  u         ▼         v
-// ----|----|-------|-------------------|--------|---------
-
-// global, outside u, outside v
-
 contract Cpcp {
     struct Tick {
         int24 previousTick;
@@ -89,130 +84,11 @@ contract Cpcp {
 
         if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += amount;
 
-        addPosition(recipient, lower, upper, amount);
+        setPosition(recipient, lower, upper, int128(amount));
 
         updateLinkedList(lowerOld, lower, upperOld, upper, amount, currentPrice);
 
         getAssets(uint256(priceLower), uint256(priceUpper), uint256(currentPrice), uint256(amount));
-    }
-
-    function getAssets(
-        uint256 priceLower,
-        uint256 priceUpper,
-        uint256 currentPrice,
-        uint256 liquidityAmount
-    ) internal {
-        uint128 token0amount = 0;
-        uint128 token1amount = 0;
-
-        if (priceUpper <= currentPrice) {
-            // only supply token1 (token1 is Y)
-
-            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, priceUpper, true));
-        } else if (currentPrice <= priceLower) {
-            // only supply token0 (token0 is X)
-
-            token0amount = uint128(DyDxMath.getDx(liquidityAmount, priceLower, priceUpper, true));
-        } else {
-            // supply both tokens
-
-            token0amount = uint128(DyDxMath.getDx(liquidityAmount, currentPrice, priceUpper, true));
-
-            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, currentPrice, true));
-        }
-
-        if (token0amount > 0) {
-            token0amount += reserve0;
-            require(uint256(token0amount) <= token0.balanceOf(address(this)), "Didn't deposit token0"); // ! change this to bento shares
-            reserve0 = token0amount;
-            /** @dev `reserve0 = token0.balanceOf(address(this))`
-                    doesn't help anyone as coins will be stuck */
-        }
-
-        if (token1amount > 0) {
-            token1amount += reserve1;
-            require(uint256(token1amount) <= token1.balanceOf(address(this)), "Didn't deposit token1"); // ! change this to bento shares
-            reserve1 = token1amount;
-        }
-    }
-
-    function updateLinkedList(
-        int24 lowerOld,
-        int24 lower,
-        int24 upperOld,
-        int24 upper,
-        uint128 amount,
-        uint160 currentPrice
-    ) internal {
-        require(uint24(lower) % 2 == 0, "Lower even");
-        require(uint24(upper) % 2 == 1, "Upper odd");
-
-        require(lower < upper, "Order");
-
-        require(TickMath.MIN_TICK <= lower && lower < TickMath.MAX_TICK, "Lower range");
-        require(TickMath.MIN_TICK < upper && upper <= TickMath.MAX_TICK, "Upper range");
-
-        int24 currentNearestTick = nearestTick;
-
-        if (ticks[lower].liquidity > 0 || lower == TickMath.MIN_TICK) {
-            // we are adding liquidity to an existing tick
-
-            ticks[lower].liquidity += amount;
-        } else {
-            // inserting a new tick
-
-            Tick storage old = ticks[lowerOld];
-
-            require(
-                (old.liquidity > 0 || lowerOld == TickMath.MIN_TICK) && lowerOld < lower && lower < old.nextTick,
-                "Lower order"
-            );
-
-            if (lower <= currentNearestTick) {
-                ticks[lower] = Tick(lowerOld, old.nextTick, amount, feeGrowthGlobal0X128, feeGrowthGlobal1X128);
-            } else {
-                ticks[lower] = Tick(lowerOld, old.nextTick, amount, 0, 0);
-            }
-
-            old.nextTick = lower;
-        }
-
-        if (ticks[upper].liquidity > 0 || upper == TickMath.MAX_TICK) {
-            // we are adding liquidity to an existing tick
-
-            ticks[upper].liquidity += amount;
-        } else {
-            // inserting a new tick
-            Tick storage old = ticks[upperOld];
-
-            require(old.liquidity > 0 && old.nextTick > upper && upperOld < upper, "Upper order");
-
-            if (upper <= currentNearestTick) {
-                ticks[upper] = Tick(upperOld, old.nextTick, amount, feeGrowthGlobal0X128, feeGrowthGlobal1X128);
-            } else {
-                ticks[upper] = Tick(upperOld, old.nextTick, amount, 0, 0);
-            }
-
-            old.nextTick = upper;
-        }
-
-        int24 actualNearestTick = TickMath.getTickAtSqrtRatio(currentPrice);
-
-        if (currentNearestTick < lower && lower <= actualNearestTick) currentNearestTick = lower;
-
-        if (currentNearestTick < upper && upper <= actualNearestTick) currentNearestTick = upper;
-
-        nearestTick = currentNearestTick;
-    }
-
-    function addPosition(
-        address recipient,
-        int24 lower,
-        int24 upper,
-        uint128 amount
-    ) internal {
-        Position storage position = positions[recipient][lower][upper];
-        position.liquidity += amount;
     }
 
     // price is √(y/x)
@@ -376,5 +252,172 @@ contract Cpcp {
         }
 
         // emit event
+    }
+
+    //                  u         ▼         v
+    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|---------
+
+    //             ▼    u                   v
+    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|---------
+
+    //                  u                   v    ▼
+    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|---------
+
+    // fees: global, outside u, outside v - we are interested in the 'xxxx' zone
+
+    function getFeeGrowthInside(int24 lowerTick, int24 upperTick)
+        public
+        view
+        returns (uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128)
+    {
+        int24 currentTick = nearestTick;
+
+        Tick storage lower = ticks[lowerTick];
+        Tick storage upper = ticks[upperTick];
+
+        // calculate fee growth below & above
+        uint256 feeGrowthBelow0X128;
+        uint256 feeGrowthBelow1X128;
+        uint256 feeGrowthAbove0X128;
+        uint256 feeGrowthAbove1X128;
+
+        if (lowerTick <= currentTick) {
+            feeGrowthBelow0X128 = lower.feeGrowthOutside0X128;
+            feeGrowthBelow1X128 = lower.feeGrowthOutside1X128;
+        } else {
+            feeGrowthBelow0X128 = feeGrowthGlobal0X128 - lower.feeGrowthOutside0X128;
+            feeGrowthBelow1X128 = feeGrowthGlobal1X128 - lower.feeGrowthOutside1X128;
+        }
+
+        if (currentTick < upperTick) {
+            feeGrowthAbove0X128 = upper.feeGrowthOutside0X128;
+            feeGrowthAbove1X128 = upper.feeGrowthOutside1X128;
+        } else {
+            feeGrowthAbove0X128 = feeGrowthGlobal0X128 - upper.feeGrowthOutside0X128;
+            feeGrowthAbove1X128 = feeGrowthGlobal1X128 - upper.feeGrowthOutside1X128;
+        }
+
+        feeGrowthInside0X128 = feeGrowthGlobal0X128 - feeGrowthBelow0X128 - feeGrowthAbove0X128;
+        feeGrowthInside1X128 = feeGrowthGlobal1X128 - feeGrowthBelow1X128 - feeGrowthAbove1X128;
+    }
+
+    function getAssets(
+        uint256 priceLower,
+        uint256 priceUpper,
+        uint256 currentPrice,
+        uint256 liquidityAmount
+    ) internal {
+        uint128 token0amount = 0;
+        uint128 token1amount = 0;
+
+        if (priceUpper <= currentPrice) {
+            // only supply token1 (token1 is Y)
+
+            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, priceUpper, true));
+        } else if (currentPrice <= priceLower) {
+            // only supply token0 (token0 is X)
+
+            token0amount = uint128(DyDxMath.getDx(liquidityAmount, priceLower, priceUpper, true));
+        } else {
+            // supply both tokens
+
+            token0amount = uint128(DyDxMath.getDx(liquidityAmount, currentPrice, priceUpper, true));
+
+            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, currentPrice, true));
+        }
+
+        if (token0amount > 0) {
+            token0amount += reserve0;
+            require(uint256(token0amount) <= token0.balanceOf(address(this)), "Didn't deposit token0"); // ! change this to bento shares
+            reserve0 = token0amount;
+            /** @dev `reserve0 = token0.balanceOf(address(this))`
+                    doesn't help anyone as coins will be stuck */
+        }
+
+        if (token1amount > 0) {
+            token1amount += reserve1;
+            require(uint256(token1amount) <= token1.balanceOf(address(this)), "Didn't deposit token1"); // ! change this to bento shares
+            reserve1 = token1amount;
+        }
+    }
+
+    function updateLinkedList(
+        int24 lowerOld,
+        int24 lower,
+        int24 upperOld,
+        int24 upper,
+        uint128 amount,
+        uint160 currentPrice
+    ) internal {
+        require(uint24(lower) % 2 == 0, "Lower even");
+        require(uint24(upper) % 2 == 1, "Upper odd");
+
+        require(lower < upper, "Order");
+
+        require(TickMath.MIN_TICK <= lower && lower < TickMath.MAX_TICK, "Lower range");
+        require(TickMath.MIN_TICK < upper && upper <= TickMath.MAX_TICK, "Upper range");
+
+        int24 currentNearestTick = nearestTick;
+
+        if (ticks[lower].liquidity > 0 || lower == TickMath.MIN_TICK) {
+            // we are adding liquidity to an existing tick
+
+            ticks[lower].liquidity += amount;
+        } else {
+            // inserting a new tick
+
+            Tick storage old = ticks[lowerOld];
+
+            require(
+                (old.liquidity > 0 || lowerOld == TickMath.MIN_TICK) && lowerOld < lower && lower < old.nextTick,
+                "Lower order"
+            );
+
+            if (lower <= currentNearestTick) {
+                ticks[lower] = Tick(lowerOld, old.nextTick, amount, feeGrowthGlobal0X128, feeGrowthGlobal1X128);
+            } else {
+                ticks[lower] = Tick(lowerOld, old.nextTick, amount, 0, 0);
+            }
+
+            old.nextTick = lower;
+        }
+
+        if (ticks[upper].liquidity > 0 || upper == TickMath.MAX_TICK) {
+            // we are adding liquidity to an existing tick
+
+            ticks[upper].liquidity += amount;
+        } else {
+            // inserting a new tick
+            Tick storage old = ticks[upperOld];
+
+            require(old.liquidity > 0 && old.nextTick > upper && upperOld < upper, "Upper order");
+
+            if (upper <= currentNearestTick) {
+                ticks[upper] = Tick(upperOld, old.nextTick, amount, feeGrowthGlobal0X128, feeGrowthGlobal1X128);
+            } else {
+                ticks[upper] = Tick(upperOld, old.nextTick, amount, 0, 0);
+            }
+
+            old.nextTick = upper;
+        }
+
+        int24 actualNearestTick = TickMath.getTickAtSqrtRatio(currentPrice);
+
+        if (currentNearestTick < lower && lower <= actualNearestTick) currentNearestTick = lower;
+
+        if (currentNearestTick < upper && upper <= actualNearestTick) currentNearestTick = upper;
+
+        nearestTick = currentNearestTick;
+    }
+
+    function setPosition(
+        address recipient,
+        int24 lower,
+        int24 upper,
+        int128 amount
+    ) internal {
+        Position storage position = positions[recipient][lower][upper];
+        if (amount < 0) position.liquidity -= uint128(amount);
+        if (amount > 0) position.liquidity += uint128(amount);
     }
 }
