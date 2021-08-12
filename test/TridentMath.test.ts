@@ -62,10 +62,12 @@ describe("TridentMath", function () {
 
       // 2 ^(2^i)
       var calculatedValue = await tridentMathContract.sqrt(testInput);
-
       await expect(calculatedValue).eq(expectedValue);
+
       // 2 ^(2^i) + 1
-      var calculatedValuePlus1 = await tridentMathContract.sqrt(testInput.add(1));
+      var calculatedValuePlus1 = await tridentMathContract.sqrt(
+        testInput.add(1)
+      );
       await expect(calculatedValuePlus1).eq(expectedValue);
     }
     var maxTestInput = BigNumber.from(
@@ -73,5 +75,16 @@ describe("TridentMath", function () {
     );
     var calculatedValue = await tridentMathContract.sqrt(maxTestInput);
     expect(calculatedValue).eq(arr_out_minus1[8]);
+
+    // Value suggest by Ilya
+    // input = 2**254 + 1
+    var input = BigNumber.from(
+      "0x4000000000000000000000000000000000000000000000000000000000000001"
+    );
+    // correct_res = 2**127
+    var correctValue = BigNumber.from("0x80000000000000000000000000000000");
+
+    var calculatedValue = await tridentMathContract.sqrt(input);
+    expect(calculatedValue).eq(correctValue);
   });
 });
