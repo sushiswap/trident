@@ -114,7 +114,7 @@ contract ConcentratedLiquidityPool is IPool {
         
         setPosition(recipient, lower, upper, int128(amount));
         updateLinkedList(lowerOld, lower, upperOld, upper, amount, currentPrice);
-        (uint256 amount0, uint256 amount1) = getAssets(uint256(priceLower), uint256(priceUpper), uint256(currentPrice), uint256(amount));
+        (uint256 amount0, uint256 amount1) = getAssetsAndUpdate(uint256(priceLower), uint256(priceUpper), uint256(currentPrice), uint256(amount));
 
         minted = amount;
         
@@ -132,9 +132,10 @@ contract ConcentratedLiquidityPool is IPool {
         uint160 currentPrice = price;
 
         if (priceLower < currentPrice && currentPrice < priceUpper) liquidity -= amount;
-
+        
+        setPosition(recipient, lower, upper, int128(amount));
         updateLinkedList(lowerOld, lower, upperOld, upper, amount, currentPrice);
-        (uint256 amount0, uint256 amount1) = getAssets(uint256(priceLower), uint256(priceUpper), uint256(currentPrice), uint256(amount));
+        (uint256 amount0, uint256 amount1) = getAssetsAndUpdate(uint256(priceLower), uint256(priceUpper), uint256(currentPrice), uint256(amount));
         
         withdrawnAmounts = new TokenAmount[](2);
         withdrawnAmounts[0] = TokenAmount({token: token0, amount: amount0});
@@ -279,9 +280,131 @@ contract ConcentratedLiquidityPool is IPool {
         }
     }
     
-    /// WIP
-    function flashSwap(bytes calldata) public override lock returns (uint256 amountOut) {
+    function flashSwap(bytes calldata data) public override lock returns (uint256 amountOut) {
+        (bool zeroForOne, uint256 amountIn, address recipient, bool unwrapBento, bytes memory context) = abi.decode(
+            data,
+            (bool, uint256, address, bool, bytes)
+        );
         
+        int24 nextTickToCross = zeroForOne ? nearestTick : ticks[nearestTick].nextTick;
+        uint256 currentPrice = uint256(price);
+        uint256 currentLiquidity = uint256(liquidity);
+
+        amountOut;
+        uint256 input = amountIn;
+        uint256 feeGrowthGlobal = zeroForOne ? feeGrowthGlobal1X128 : feeGrowthGlobal0X128; /// @dev Take fees in the output token.
+
+        while (input > 0) {
+            uint256 nextTickPrice = uint256(TickMath.getSqrtRatioAtTick(nextTickToCross));
+            uint256 output;
+            uint256 feeAmount;
+            bool cross = false;
+
+            if (zeroForOne) {
+                /// @dev x for y
+                /// price is going down
+                /// max swap input within current tick range: Δx = Δ(1/√𝑃) · L.
+                uint256 maxDx = DyDxMath.getDx(currentLiquidity, nextTickPrice, currentPrice, false);
+                if (input <= maxDx) {
+                    /// @dev We can swap only within the current range.
+                    uint256 liquidityPadded = currentLiquidity << 96;
+                    /// @dev Calculate new price after swap: L · √𝑃 / (L + Δx · √𝑃)
+                    /// alternatively: L / (L / √𝑃 + Δx).
+                    uint256 newPrice = uint160(
+                        FullMath.mulDivRoundingUp(liquidityPadded, currentPrice, liquidityPadded + currentPrice * input)
+                    );
+                    if (!(nextTickPrice <= newPrice && newPrice < currentPrice)) {
+                        /// @dev Overflow -> use a modified version of the formula.
+                        newPrice = uint160(
+                            UnsafeMath.divRoundingUp(liquidityPadded, liquidityPadded / currentPrice + input)
+                        );
+                    }
+                    /// @dev Calculate output of swap
+                    /// Δy = Δ√P · L.
+                    output = DyDxMath.getDy(currentLiquidity, newPrice, currentPrice, false);
+                    currentPrice = newPrice;
+                    input;
+                } else {
+                    /// @dev Swap & cross the tick.
+                    output = DyDxMath.getDy(currentLiquidity, nextTickPrice, currentPrice, false);
+                    currentPrice = nextTickPrice;
+                    cross = true;
+                    input -= maxDx;
+                }
+            } else {
+                /// @dev Price is going up
+                /// max swap within current tick range: Δy = Δ√P · L.
+                uint256 maxDy = DyDxMath.getDy(currentLiquidity, currentPrice, nextTickPrice, false);
+                if (input <= maxDy) {
+                    /// @dev We can swap only within the current range
+                    /// calculate new price after swap ( ΔP = Δy/L ).
+                    uint256 newPrice = currentPrice +
+                        FullMath.mulDiv(input, 0x1000000000000000000000000, currentLiquidity);
+                    /// @dev calculate output of swap
+                    /// Δx = Δ(1/√P) · L.
+                    output = DyDxMath.getDx(currentLiquidity, currentPrice, newPrice, false);
+                    currentPrice = newPrice;
+                    input;
+                } else {
+                    /// @dev Swap & cross the tick.
+                    output = DyDxMath.getDx(currentLiquidity, currentPrice, nextTickPrice, false);
+                    currentPrice = nextTickPrice;
+                    cross = true;
+                    input -= maxDy;
+                }
+            }
+
+            feeAmount = FullMath.mulDivRoundingUp(output, swapFee, 1e6);
+            feeGrowthGlobal += FullMath.mulDiv(feeAmount, 0x100000000000000000000000000000000, currentLiquidity);
+            amountOut += output - feeAmount;
+
+            if (cross) {
+                ticks[nextTickToCross].feeGrowthOutside0X128 =
+                    feeGrowthGlobal -
+                    ticks[nextTickToCross].feeGrowthOutside0X128;
+                if (zeroForOne) {
+                    /// @dev Goin' left.
+                    if (nextTickToCross % 2 == 0) {
+                        currentLiquidity -= ticks[nextTickToCross].liquidity;
+                    } else {
+                        currentLiquidity += ticks[nextTickToCross].liquidity;
+                    }
+                    nextTickToCross = ticks[nextTickToCross].previousTick;
+                } else {
+                    /// @dev Goin' right.
+                    if (nextTickToCross % 2 == 0) {
+                        currentLiquidity += ticks[nextTickToCross].liquidity;
+                    } else {
+                        currentLiquidity -= ticks[nextTickToCross].liquidity;
+                    }
+                    nextTickToCross = ticks[nextTickToCross].nextTick;
+                }
+            }
+        }
+
+        liquidity = uint128(currentLiquidity);
+        price = uint160(currentPrice);
+        nearestTick = zeroForOne ? nextTickToCross : ticks[nextTickToCross].previousTick;
+        
+        if (zeroForOne) {
+            ITridentCallee(recipient).tridentCallback(token0, token1, amountIn, amountOut, context);
+            (uint256 amount0, ) = _balance();
+            uint128 newBalance = reserve0 + uint128(amountIn);
+            require(uint256(newBalance) <= amount0, "MISSING_X_DEPOSIT");
+            reserve0 = newBalance;
+            reserve1 -= uint128(amountOut);
+            _transfer(token1, amountOut, recipient, unwrapBento);
+            //emit Swap(recipient, token0, token1, inAmount, amountOut);
+        } else {
+            ITridentCallee(recipient).tridentCallback(token1, token0, amountIn, amountOut, context);
+            (, uint256 amount1) = _balance();
+            uint128 newBalance = reserve1 + uint128(amountIn);
+            require(uint256(newBalance) <= amount1, "MISSING_Y_DEPOSIT");
+            reserve1 = newBalance;
+            reserve0 -= uint128(amountOut);
+            _transfer(token0, amountOut, recipient, unwrapBento);
+            //emit Swap(recipient, token1, token0, inAmount, amountOut);
+        }
     }
     
     function _balance() internal view returns (uint256 balance0, uint256 balance1) {
@@ -345,7 +468,7 @@ contract ConcentratedLiquidityPool is IPool {
         feeGrowthInside1X128 = feeGrowthGlobal1X128 - feeGrowthBelow1X128 - feeGrowthAbove1X128;
     }
     
-    function getAssets(
+    function getAssetsAndUpdate(
         uint256 priceLower,
         uint256 priceUpper,
         uint256 currentPrice,
