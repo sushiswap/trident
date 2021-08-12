@@ -2,10 +2,34 @@
 
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { BigNumber } from "ethers";
+import { BigNumber, Contract, ContractFactory } from "ethers";
 import seedrandom from "seedrandom";
 import { calcOutByIn, calcInByOut } from "@sushiswap/sdk";
 import { getBigNumber } from "../utilities";
+import {
+  ConstantProductPool,
+  ERC20Mock,
+  BentoBoxV1,
+  MasterDeployer,
+  TridentRouter,
+  ConstantProductPoolFactory,
+} from "../../types";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
+
+interface PoolInfo {
+  type: string;
+  reserve0: BigNumber;
+  reserve1: BigNumber;
+  fee: Number;
+}
+
+interface ExactInputSingleParams {
+  amountIn: BigNumber;
+  amountOutMinimum: BigNumber;
+  pool: string;
+  tokenIn: string;
+  data: string;
+}
 
 const testSeed = "3"; // Change it to change random generator values
 const rnd = seedrandom(testSeed); // random [0, 1)
@@ -34,39 +58,36 @@ function getIntegerRandomValueWithMin(exp, min = 0) {
   return res;
 }
 
-function areCloseValues(v1, v2, threshould) {
-  if (threshould == 0) return v1 == v2;
-  if (v1 < 1 / threshould) return Math.abs(v1 - v2) <= 1.1;
-  return Math.abs(v1 / v2 - 1) < threshould;
+function areCloseValues(v1, v2, threshold) {
+  if (threshold == 0) return v1 == v2;
+  if (v1 < 1 / threshold) return Math.abs(v1 - v2) <= 1.1;
+  return Math.abs(v1 / v2 - 1) < threshold;
 }
 
-function encodedSwapData(tokenIn, to, unwrapBento) {
+function encodedSwapData(tokenIn: string, to: string, unwrapBento: boolean) {
   return ethers.utils.defaultAbiCoder.encode(
     ["address", "address", "bool"],
     [tokenIn, to, unwrapBento]
   );
 }
 
-function encodedTokenAmount(token, amount) {
-  return ethers.utils.defaultAbiCoder.encode(
-    ["address", "uint256"],
-    [token, amount]
-  );
-}
-
 describe("ConstantProductPool Typescript == Solidity check", function () {
-  let alice,
-    feeTo,
-    usdt,
-    usdc,
-    weth,
-    bento,
-    masterDeployer,
-    tridentPoolFactory,
-    router,
-    Pool;
+  let alice: SignerWithAddress,
+    feeTo: SignerWithAddress,
+    usdt: ERC20Mock,
+    usdc: ERC20Mock,
+    weth: ERC20Mock,
+    bento: BentoBoxV1,
+    masterDeployer: MasterDeployer,
+    tridentPoolFactory: ConstantProductPoolFactory,
+    router: TridentRouter,
+    Pool: ContractFactory;
 
-  async function createConstantProductPool(fee, res0exp, res1exp) {
+  async function createConstantProductPool(
+    fee: Number,
+    res0exp: Number,
+    res1exp: Number
+  ): [PoolInfo, Contract] {
     [alice, feeTo] = await ethers.getSigners();
 
     const ERC20 = await ethers.getContractFactory("ERC20Mock");
@@ -141,7 +162,7 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
       "0x0000000000000000000000000000000000000000000000000000000000000000"
     );
 
-    const [address0, address1] =
+    const [address0, address1]: string[] =
       usdt.address.toUpperCase() < usdc.address.toUpperCase()
         ? [usdt.address, usdc.address]
         : [usdc.address, usdt.address];
@@ -149,7 +170,7 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
       ["address", "address", "uint256", "bool"],
       [address0, address1, Math.round(fee * 10_000), true]
     );
-    const pool = await Pool.attach(
+    const pool: ConstantProductPool = await Pool.attach(
       (
         await (
           await masterDeployer.deployPool(
@@ -174,7 +195,7 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
       ethers.utils.defaultAbiCoder.encode(["address"], [alice.address])
     );
 
-    const poolInfo = {
+    const poolInfo: PoolInfo = {
       type: "ConstantProduct",
       reserve0: bnVal0,
       reserve1: bnVal1,
@@ -185,22 +206,46 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
   }
 
   let swapDirection = true;
-  async function checkSwap(pool, poolRouterInfo, swapAmountExp) {
+  async function checkSwap(
+    pool: ConstantProductPool,
+    poolRouterInfo: PoolInfo,
+    swapAmountExp: Number
+  ) {
     const [jsValue, bnValue] = getIntegerRandomValue(swapAmountExp);
-    const [t0, t1] = swapDirection
-      ? [usdt.address, usdc.address]
-      : [usdc.address, usdt.address];
-    const amountOutPool = (
-      await pool.getAmountOut(encodedTokenAmount(t0, bnValue))
-    ).toString();
+    const [t0, t1] = swapDirection ? [usdt, usdc] : [usdc, usdt];
+
+    let params: ExactInputSingleParams = {
+      amountIn: bnValue,
+      amountOutMinimum: 0,
+      pool: pool.address,
+      tokenIn: t0.address,
+      data: encodedSwapData(t0.address, alice.address, false),
+    };
+
+    poolRouterInfo.reserve0 = await bento.balanceOf(usdt.address, pool.address);
+    poolRouterInfo.reserve1 = await bento.balanceOf(usdc.address, pool.address);
+
+    let balOutBefore: BigNumber = await bento.balanceOf(
+      t1.address,
+      alice.address
+    );
+    await router.connect(alice).exactInputSingle(params);
+    let balOutAfter: BigNumber = await bento.balanceOf(
+      t1.address,
+      alice.address
+    );
+    const amountOutPool: BigNumber = balOutAfter.sub(balOutBefore);
+
     const amountOutPrediction = calcOutByIn(
       poolRouterInfo,
       jsValue,
       swapDirection
     );
+
     //console.log(Math.abs(amountOutPrediction/amountOutPool-1), amountOutPrediction, amountOutPool);
     expect(areCloseValues(amountOutPrediction, amountOutPool, 1e-12)).equals(
-      true
+      true,
+      "predicted amount out did not equal swapped amount result"
     );
     const reserveOut = swapDirection
       ? poolRouterInfo.reserve1
@@ -224,7 +269,7 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
     expect(
       areCloseValues(amounInExpected, jsValue, 1e-12) ||
         areCloseValues(amountOutPrediction, amountOutPrediction2, 1e-12)
-    ).equals(true);
+    ).equals(true, "values were not equal");
     swapDirection = !swapDirection;
   }
 
@@ -247,7 +292,7 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
         }
         //test extremely big values 2^112 = 10^33.7153
         for (let swapNum = 0; swapNum < 10; ++swapNum) {
-          await checkSwap(pool, poolRouterInfo, 33);
+          await checkSwap(pool, poolRouterInfo, 32);
         }
       });
     }
