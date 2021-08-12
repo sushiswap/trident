@@ -14,9 +14,9 @@ import "solidity-coverage";
 import "@tenderly/hardhat-tenderly";
 import "@typechain/hardhat";
 import "hardhat-tracer";
+import "./cli";
 
-import { HardhatUserConfig, task } from "hardhat/config";
-
+import { HardhatUserConfig } from "hardhat/config";
 import { removeConsoleLog } from "hardhat-preprocessor";
 
 const accounts = {
@@ -24,16 +24,6 @@ const accounts = {
     process.env.MNEMONIC ||
     "test test test test test test test test test test test junk",
 };
-
-// This is a sample Hardhat task. To learn how to create your own go to
-// https://hardhat.org/guides/create-task.html
-task("accounts", "Prints the list of accounts", async (args, { ethers }) => {
-  const accounts = await ethers.getSigners();
-
-  for (const account of accounts) {
-    console.log(await account.address);
-  }
-});
 
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
@@ -49,23 +39,26 @@ const config: HardhatUserConfig = {
     deployer: {
       default: 0,
     },
-    alice: {
+    dev: {
       default: 1,
     },
-    bob: {
+    alice: {
       default: 2,
     },
-    carol: {
+    bob: {
       default: 3,
     },
-    dave: {
+    carol: {
       default: 4,
     },
-    eve: {
+    dave: {
       default: 5,
     },
-    feeTo: {
+    eve: {
       default: 6,
+    },
+    feeTo: {
+      default: 7,
     },
   },
   networks: {

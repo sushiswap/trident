@@ -17,8 +17,10 @@ const deployFunction: DeployFunction = async function ({
   });
   if (!(await masterDeployer.whitelistedFactories(address))) {
     console.log("Add HybridPoolFactory to MasterDeployer whitelist");
-    await masterDeployer.addToWhitelist(address);
+    await (await masterDeployer.addToWhitelist(address)).wait();
   }
+
+  console.log("HybridPoolFactory deployed at ", address);
 };
 
 export default deployFunction;
