@@ -1,6 +1,11 @@
+import { keccak256, pack } from "@ethersproject/solidity";
+
 import { MAX_FEE } from "./utilities";
+import { bytecode as constantProductPoolBytecode } from "../artifacts/contracts/pool/ConstantProductPool.sol/ConstantProductPool.json";
+import { defaultAbiCoder } from "@ethersproject/abi";
 import { ethers } from "hardhat";
 import { expect } from "chai";
+import { getCreate2Address } from "@ethersproject/address";
 
 describe("MasterDeployer", function () {
   before(async function () {
@@ -67,7 +72,7 @@ describe("MasterDeployer", function () {
 
   describe("#deployPool", async function () {
     it("Reverts on non-whitelisted factory", async function () {
-      const deployData = ethers.utils.defaultAbiCoder.encode(
+      const deployData = defaultAbiCoder.encode(
         ["address", "address", "uint8"],
         [...[this.weth.address, this.sushi.address].sort(), 30]
       );
@@ -85,9 +90,9 @@ describe("MasterDeployer", function () {
         this.constantProductPoolFactory.address
       );
 
-      const deployData = ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "uint8"],
-        [...[this.weth.address, this.sushi.address].sort(), 30]
+      const deployData = defaultAbiCoder.encode(
+        ["address", "address", "uint8", "bool"],
+        [...[this.weth.address, this.sushi.address].sort(), 30, true]
       );
 
       await expect(await this.masterDeployer.poolsCount()).to.eq(0);
@@ -105,9 +110,31 @@ describe("MasterDeployer", function () {
         this.constantProductPoolFactory.address
       );
 
-      const deployData = ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "uint8"],
-        [...[this.weth.address, this.sushi.address].sort(), 30]
+      const deployData = defaultAbiCoder.encode(
+        ["address", "address", "uint8", "bool"],
+        [...[this.weth.address, this.sushi.address].sort(), 30, true]
+      );
+
+      const INIT_CODE_HASH = keccak256(
+        ["bytes"],
+        [
+          pack(
+            ["bytes", "bytes"],
+            [
+              constantProductPoolBytecode,
+              defaultAbiCoder.encode(
+                ["bytes", "address"],
+                [deployData, this.masterDeployer.address]
+              ),
+            ]
+          ),
+        ]
+      );
+
+      const computedConstantProductPoolAddress = getCreate2Address(
+        this.constantProductPoolFactory.address,
+        keccak256(["bytes"], [deployData]),
+        INIT_CODE_HASH
       );
 
       await expect(
@@ -117,7 +144,10 @@ describe("MasterDeployer", function () {
         )
       )
         .to.emit(this.masterDeployer, "NewPoolCreated")
-        .withArgs(this.constantProductPoolFactory.address);
+        .withArgs(
+          this.constantProductPoolFactory.address,
+          computedConstantProductPoolAddress
+        );
     });
   });
 
