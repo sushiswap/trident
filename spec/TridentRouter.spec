@@ -87,7 +87,7 @@ function setupPoolAndMsgSender(address sender, address token) {
     require token == tokenA || token == tokenB || token == tokenWeth;
 }
 
-rule swapRouterTokenBalanceShouldBeZero(method f) filtered { f -> !f.isView && !f.isFallback } {
+rule tridentRouterTokenBalanceShouldBeZero(method f) filtered { f -> !f.isView && !f.isFallback } {
     env e;
     calldataarg args;
 

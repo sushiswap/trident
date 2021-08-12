@@ -5,7 +5,7 @@ import "../../contracts/SwapRouter.sol";
 import "../../contracts/interfaces/IBentoBoxMinimal.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract SwapRouterHarness is TridentRouter {
+contract TridentRouterHarness is TridentRouter {
     IERC20 public tokenA;
 
     constructor(IBentoBoxMinimal _bento, address _wETH)

@@ -5,47 +5,94 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract ConstantProductPoolHarness is ConstantProductPool {
     // state variables ///////////
-    mapping(uint256 => mapping(uint256 => mapping(uint256 => uint256))) public amountOutHarness;
+    // mapping(uint256 => mapping(uint256 => mapping(uint256 => uint256))) public amountOutHarness;
 
     // constructor ///////////////
     constructor(bytes memory _deployData, address _masterDeployer)
             ConstantProductPool(_deployData, _masterDeployer) { }
 
     // getters ///////////////////
-    function burnGetter(address to, bool unwrapBento) public
-            returns (uint256 liquidity0_, uint256 liquidity1_) {
-        bytes memory data = abi.encode(to, unwrapBento);
-
-        IPool.TokenAmount[] memory withdrawnAmounts = ConstantProductPool(address(this)).burn(data);
-
-        // Assuming in BentoBox shares (Ask Nurit)
-        return (withdrawnAmounts[0].amount, withdrawnAmounts[1].amount);
-    }
-
     function tokenBalanceOf(IERC20 token, address user)
             public view returns (uint256 balance) {
         return token.balanceOf(user);
     }
 
-    // simplifications ///////////
-    // TODO: If it works, maybe override swapWithContext, (Check with Nurit)
-    function flashSwapWrapper(
-        address tokenIn, address recipient, bool unwrapBento, uint256 amountIn, bytes memory context
-    ) public returns (uint256 amountOut) { 
+    // wrappers //////////////////
+    function mintWrapper(address to) public returns (uint256 liquidity) {
+        bytes memory data = abi.encode(to);
+        
+        return super.mint(data);
+    }
+
+    function burnWrapper(address to, bool unwrapBento) 
+            public returns (uint256 liquidity0_, uint256 liquidity1_) {
+        bytes memory data = abi.encode(to, unwrapBento);
+
+        IPool.TokenAmount[] memory withdrawnAmounts = super.burn(data);
+
+        return (withdrawnAmounts[0].amount, withdrawnAmounts[1].amount);
+    }
+
+    function burnSingleWrapper(address tokenOut, address to, bool unwrapBento)
+            public returns (uint256 amount) {
+        bytes memory data = abi.encode(tokenOut, to, unwrapBento);
+        
+        return super.burnSingle(data);
+    }
+
+    // swapWrapper
+    function swapWrapper(address tokenIn, address recipient, bool unwrapBento)
+            public returns (uint256 amountOut) {
+        bytes memory data = abi.encode(tokenIn, recipient, unwrapBento);
+        
+        return super.swap(data);
+    }
+
+    function flashSwapWrapper(address tokenIn, address recipient, bool unwrapBento,
+                              uint256 amountIn, bytes memory context)
+            public returns (uint256 amountOut) {
+        // TODO: would be applied for all rules
         require(recipient != address(this), "recepient is current contract");
         // require(recipient != token0, "recepient is token0");
         // require(recipient != token1, "recepient is token1");
 
         // require(tokenIn == token0, "wrong token");
         // require(tokenOut == token1, "wrong token");
+
         bytes memory data = abi.encode(tokenIn, recipient,  unwrapBento, amountIn, context);
-        return ConstantProductPool(address(this)).flashSwap(data);
+
+        return super.flashSwap(data);
     }
 
-    // override burn since we have the burnGetter - to save time
-    function burn(bytes calldata data)
-        public override returns (IPool.TokenAmount[] memory withdrawnAmounts) { }
+    function getAmountOutWrapper(address tokenIn, uint256 amountIn) 
+                public view returns (uint256 finalAmountOut) { 
+        bytes memory data = abi.encode(tokenIn, amountIn);
+        
+        return super.getAmountOut(data);
+    }
 
+    // overrides /////////////////
+    // WARNING: Be careful of interlocking "lock"
+    // modifier if adding to the overrided code blocks
+    function mint(bytes memory data) 
+            public override lock returns (uint256 liquidity) { }
+
+    function burn(bytes memory data)
+            public override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) { }
+
+    function burnSingle(bytes memory data) 
+            public override lock returns (uint256 amount) { }
+
+    function swap(bytes memory data) 
+            public override lock returns (uint256 amountOut) { }
+
+    function flashSwap(bytes memory data)
+            public override lock returns (uint256 amountOut) { }
+
+    function getAmountOut(bytes memory data) 
+            public view override returns (uint256 finalAmountOut) { }
+
+    // simplifications ///////////
     // function _getAmountOut(
     //     uint256 amountIn,
     //     uint256 reserveIn,
