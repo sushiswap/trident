@@ -5,15 +5,17 @@ import { expect } from "chai";
 import { ERC20Mock } from "../typechain/ERC20Mock";
 import { BentoBoxV1 } from "../typechain/BentoBoxV1";
 import { ConcentratedLiquidityPool } from "../typechain/ConcentratedLiquidityPool";
+import { ConcentratedLiquidityPoolFactory } from "../typechain/ConcentratedLiquidityPoolFactory";
 import { getSqrtX96Price } from "./utilities/sqrtPrice";
 import { BigNumber } from "ethers";
 
-describe.only("Concentrated liqudity pool", function () {
+describe.only("Concentrated liquidity pool", function () {
   let alice: ethers.Signer,
     feeTo: ethers.Signer,
     weth: ERC20Mock,
     dai: ERC20Mock,
     usd: ERC20Mock,
+    tridentPoolFactory: ConcentratedLiquidityPoolFactory,
     pool1: ConcentratedLiquidityPool,
     pool2: ConcentratedLiquidityPool,
     tickMath: TickMathTest,
@@ -26,9 +28,10 @@ describe.only("Concentrated liqudity pool", function () {
     [alice, feeTo] = await ethers.getSigners();
 
     const ERC20 = await ethers.getContractFactory("ERC20Mock");
-    const Clp = await ethers.getContractFactory("ConcentratedLiquidityPool");
+    const Pool = await ethers.getContractFactory("ConcentratedLiquidityPool");
     const Bento = await ethers.getContractFactory("BentoBoxV1");
     const MasterDeployer = await ethers.getContractFactory("MasterDeployer");
+    const PoolFactory = await ethers.getContractFactory("ConcentratedLiquidityPoolFactory");
     const TickMathTest = await ethers.getContractFactory("TickMathTest");
     weth = await ERC20.deploy("WETH", "ETH", totalSupply);
     dai = await ERC20.deploy("DAI", "DAI", totalSupply);
@@ -43,7 +46,9 @@ describe.only("Concentrated liqudity pool", function () {
       feeTo.address,
       bento.address
     );
-    // todo write factory & deploy through master deplyoer
+
+    tridentPoolFactory = await PoolFactory.deploy(masterDeployer.address);
+    await tridentPoolFactory.deployed();
 
     await bento.deposit(
       weth.address,
@@ -69,25 +74,62 @@ describe.only("Concentrated liqudity pool", function () {
       0
     );
 
-    let sqrtPrice = BigNumber.from("1807174424252647735792984898");
+    // whitelist pool factory in master deployer
+    await masterDeployer.addToWhitelist(tridentPoolFactory.address);
+
     // divided by 2**96 equals 0.02280974803
     // squared and inverted this is 1922.02 (price of eth in dai)
     // corresponds to tick -75616
+    let sqrtPrice = BigNumber.from("1807174424252647735792984898");
 
-    let deployData = ethers.utils.defaultAbiCoder.encode(
+    // sort tokens for pool1
+    const [address0, address1]: string[] =
+      dai.address.toUpperCase() < weth.address.toUpperCase()
+        ? [dai.address, weth.address]
+        : [weth.address, dai.address];
+
+    let deployData0 = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint24", "uint160"],
-      [dai.address, weth.address, 1000, sqrtPrice] // dai is token0 (x)
+      [address0, address1, 1000, sqrtPrice] 
     );
-    pool1 = await Clp.deploy(deployData, masterDeployer.address);
 
-    sqrtPrice = BigNumber.from("50").mul("0x1000000000000000000000000");
+    // deploy pool1
+    pool1 = await Pool.attach(
+      (
+        await (
+          await masterDeployer.deployPool(
+            tridentPoolFactory.address,
+            deployData0
+          )
+        ).wait()
+      ).events[0].args[1]
+    );
+    
     // current eth price is $2500
+    sqrtPrice = BigNumber.from("50").mul("0x1000000000000000000000000");
 
-    deployData = ethers.utils.defaultAbiCoder.encode(
+    // sort tokens for pool2
+    const [address2, address3]: string[] =
+      weth.address.toUpperCase() < usd.address.toUpperCase()
+        ? [usd.address, weth.address]
+        : [weth.address, usd.address];
+
+    let deployData1 = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint24", "uint160"],
-      [weth.address, usd.address, 1000, sqrtPrice] // weth is token0 (x) ... usd is token 1 ... price is y/x
+      [address2, address3, 1000, sqrtPrice] 
     );
-    pool2 = await Clp.deploy(deployData, masterDeployer.address);
+
+    // deploy pool2
+    pool2 = await Pool.attach(
+      (
+        await (
+          await masterDeployer.deployPool(
+            tridentPoolFactory.address,
+            deployData1
+          )
+        ).wait()
+      ).events[0].args[1]
+    );
 
     // Current price is 2500, we are gonna mint liquidity on intervals ~ [1600, 3600] and ~ [2600, 3000]
     const lowerTick1 = 73780; // price 1599
@@ -175,9 +217,14 @@ describe.only("Concentrated liqudity pool", function () {
 
     const dx = getDx(liquidity, currentPrice, priceUpper);
 
-    await bento.transfer(dai.address, alice.address, pool1.address, dx);
+    const [address0, address1]: string[] =
+      dai.address.toUpperCase() < weth.address.toUpperCase()
+        ? [dai.address, weth.address]
+        : [weth.address, dai.address];
 
-    await bento.transfer(weth.address, alice.address, pool1.address, dy);
+    await bento.transfer(address0, alice.address, pool1.address, dx);
+
+    await bento.transfer(address1, alice.address, pool1.address, dy);
 
     let mintData = ethers.utils.defaultAbiCoder.encode(
       ["int24", "int24", "int24", "int24", "uint128", "address"],
@@ -191,13 +238,13 @@ describe.only("Concentrated liqudity pool", function () {
       "Didn't add right amount of liquidity"
     );
     expect(
-      (await bento.balanceOf(dai.address, pool1.address)).toString()
+      (await bento.balanceOf(address0, pool1.address)).toString()
     ).to.be.eq(
       "2683758334569795392629",
       "Didn't calculate token0 (dx) amount correctly"
     );
     expect(
-      (await bento.balanceOf(weth.address, pool1.address)).toString()
+      (await bento.balanceOf(address1, pool1.address)).toString()
     ).to.be.eq(dy.toString(), "Didn't calculate token1 (dy) amount correctly");
   });
 
