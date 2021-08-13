@@ -11,7 +11,11 @@ contract ConcentratedLiquidityPoolFactory is PairPoolDeployer {
     constructor(address _masterDeployer) PairPoolDeployer(_masterDeployer) {}
 
     function deployPool(bytes memory _deployData) external returns (address pool) {
-        (address tokenA, address tokenB, , ) = abi.decode(_deployData, (address, address, uint24, uint160));
+        (address tokenA, address tokenB, uint24 swapFee, uint160 price) = abi.decode(_deployData, (address, address, uint24, uint160));
+        if (tokenA > tokenB) {
+            (tokenA, tokenB) = (tokenB, tokenA);
+            _deployData = abi.encode(tokenA, tokenB, swapFee, price);
+        }
         pool = _deployPool(tokenA, tokenB, type(ConcentratedLiquidityPool).creationCode, _deployData);
     }
 }
