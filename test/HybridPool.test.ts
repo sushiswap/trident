@@ -7,6 +7,7 @@ import { getBigNumber } from "./utilities";
 
 describe("Router", function () {
   let alice,
+    aliceEncoded,
     feeTo,
     weth,
     usdc,
@@ -14,10 +15,16 @@ describe("Router", function () {
     masterDeployer,
     tridentPoolFactory,
     router,
+    dai,
+    daiUsdcPool,
     pool;
 
   before(async function () {
     [alice, feeTo] = await ethers.getSigners();
+    aliceEncoded = ethers.utils.defaultAbiCoder.encode(
+      ["address"],
+      [alice.address]
+    );
     const ERC20 = await ethers.getContractFactory("ERC20Mock");
     const Bento = await ethers.getContractFactory("BentoBoxV1");
     const Deployer = await ethers.getContractFactory("MasterDeployer");
@@ -25,13 +32,10 @@ describe("Router", function () {
     const SwapRouter = await ethers.getContractFactory("TridentRouter");
     const Pool = await ethers.getContractFactory("HybridPool");
     weth = await ERC20.deploy("WETH", "WETH", getBigNumber("10000000"));
-
-    await weth.deployed();
     usdc = await ERC20.deploy("USDC", "USDC", getBigNumber("10000000"));
-    await usdc.deployed();
+    dai = await ERC20.deploy("DAI", "DAI", getBigNumber("10000000"));
 
     bento = await Bento.deploy(weth.address);
-    await bento.deployed();
 
     masterDeployer = await Deployer.deploy(17, feeTo.address, bento.address);
     await masterDeployer.deployed();
@@ -49,6 +53,8 @@ describe("Router", function () {
     // Approve BentoBox token deposits
     await weth.approve(bento.address, getBigNumber("10000000"));
     await usdc.approve(bento.address, getBigNumber("10000000"));
+    await dai.approve(bento.address, getBigNumber("10000000"));
+
     // Make BentoBox token deposits
     await bento.deposit(
       weth.address,
@@ -64,6 +70,13 @@ describe("Router", function () {
       getBigNumber("1000000"),
       0
     );
+    await bento.deposit(
+      dai.address,
+      alice.address,
+      alice.address,
+      getBigNumber("1000000"),
+      0
+    );
     // Approve Router to spend 'alice' BentoBox tokens
     await bento.setMasterContractApproval(
       alice.address,
@@ -73,10 +86,12 @@ describe("Router", function () {
       "0x0000000000000000000000000000000000000000000000000000000000000000",
       "0x0000000000000000000000000000000000000000000000000000000000000000"
     );
+
     // Pool deploy data
+    let addresses = [weth.address, usdc.address].sort();
     const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint8", "uint256"],
-      [weth.address, usdc.address, 30, 200000]
+      [addresses[0], addresses[1], 30, 200000]
     );
 
     pool = await Pool.attach(
@@ -85,6 +100,22 @@ describe("Router", function () {
           await masterDeployer.deployPool(
             tridentPoolFactory.address,
             deployData
+          )
+        ).wait()
+      ).events[0].args[1]
+    );
+
+    addresses = [dai.address, usdc.address].sort();
+    const deployData2 = ethers.utils.defaultAbiCoder.encode(
+      ["address", "address", "uint8", "uint256"],
+      [addresses[0], addresses[1], 30, 200000]
+    );
+    daiUsdcPool = await Pool.attach(
+      (
+        await (
+          await masterDeployer.deployPool(
+            tridentPoolFactory.address,
+            deployData2
           )
         ).wait()
       ).events[0].args[1]
@@ -105,11 +136,24 @@ describe("Router", function () {
         pool.address,
         BigNumber.from(10).pow(19)
       );
-      await pool.mint(alice.address);
+      await pool.mint(aliceEncoded);
       expect(await pool.totalSupply()).gt(1);
+      await bento.transfer(
+        dai.address,
+        alice.address,
+        daiUsdcPool.address,
+        BigNumber.from(10).pow(19)
+      );
+      await bento.transfer(
+        usdc.address,
+        alice.address,
+        daiUsdcPool.address,
+        BigNumber.from(10).pow(19)
+      );
+      await daiUsdcPool.mint(aliceEncoded);
     });
 
-    it("Should add balanced liquidity", async function () {
+    it("Should add liquidity", async function () {
       let initialTotalSupply = await pool.totalSupply();
       let initialPoolWethBalance = await bento.balanceOf(
         weth.address,
@@ -123,22 +167,15 @@ describe("Router", function () {
         {
           token: weth.address,
           native: false,
-          amountDesired: BigNumber.from(10).pow(18),
-          amountMin: 1,
+          amount: BigNumber.from(10).pow(18),
         },
         {
           token: usdc.address,
           native: false,
-          amountDesired: BigNumber.from(10).pow(18),
-          amountMin: 1,
+          amount: BigNumber.from(10).pow(18),
         },
       ];
-      await router.addLiquidityBalanced(
-        liquidityInput,
-        pool.address,
-        alice.address,
-        2 * Date.now()
-      );
+      await router.addLiquidity(liquidityInput, pool.address, 1, aliceEncoded);
       let intermediateTotalSupply = await pool.totalSupply();
       let intermediatePoolWethBalance = await bento.balanceOf(
         weth.address,
@@ -178,22 +215,15 @@ describe("Router", function () {
         {
           token: weth.address,
           native: false,
-          amountDesired: BigNumber.from(10).pow(17),
-          amountMin: 1,
+          amount: BigNumber.from(10).pow(17),
         },
         {
           token: usdc.address,
           native: false,
-          amountDesired: BigNumber.from(10).pow(18),
-          amountMin: 1,
+          amount: BigNumber.from(10).pow(18),
         },
       ];
-      await router.addLiquidityBalanced(
-        liquidityInput,
-        pool.address,
-        alice.address,
-        2 * Date.now()
-      );
+      await router.addLiquidity(liquidityInput, pool.address, 1, aliceEncoded);
 
       let finalTotalSupply = await pool.totalSupply();
       let finalPoolWethBalance = await bento.balanceOf(
@@ -210,13 +240,13 @@ describe("Router", function () {
         intermediatePoolWethBalance.add(BigNumber.from(10).pow(17))
       );
       expect(finalPoolUsdcBalance).eq(
-        intermediatePoolUsdcBalance.add(BigNumber.from(10).pow(17))
+        intermediatePoolUsdcBalance.add(BigNumber.from(10).pow(18))
       );
       expect(
         finalPoolWethBalance
           .mul(BigNumber.from(10).pow(36))
           .div(finalTotalSupply)
-      ).eq(
+      ).lt(
         initialPoolWethBalance
           .mul(BigNumber.from(10).pow(36))
           .div(initialTotalSupply)
@@ -225,7 +255,7 @@ describe("Router", function () {
         finalPoolWethBalance
           .mul(BigNumber.from(10).pow(36))
           .div(finalTotalSupply)
-      ).eq(
+      ).lt(
         intermediatePoolWethBalance
           .mul(BigNumber.from(10).pow(36))
           .div(intermediateTotalSupply)
@@ -234,7 +264,7 @@ describe("Router", function () {
         finalPoolUsdcBalance
           .mul(BigNumber.from(10).pow(36))
           .div(finalTotalSupply)
-      ).eq(
+      ).gt(
         initialPoolUsdcBalance
           .mul(BigNumber.from(10).pow(36))
           .div(initialTotalSupply)
@@ -243,7 +273,7 @@ describe("Router", function () {
         finalPoolUsdcBalance
           .mul(BigNumber.from(10).pow(36))
           .div(finalTotalSupply)
-      ).eq(
+      ).gt(
         intermediatePoolUsdcBalance
           .mul(BigNumber.from(10).pow(36))
           .div(intermediateTotalSupply)
@@ -271,9 +301,8 @@ describe("Router", function () {
       await router.addLiquidity(
         liquidityInputOptimal,
         pool.address,
-        alice.address,
-        2 * Date.now(),
-        1
+        1,
+        aliceEncoded
       );
 
       let intermediateTotalSupply = await pool.totalSupply();
@@ -309,9 +338,8 @@ describe("Router", function () {
       await router.addLiquidity(
         liquidityInputOptimal,
         pool.address,
-        alice.address,
-        2 * Date.now(),
-        1
+        1,
+        aliceEncoded
       );
 
       let finalTotalSupply = await pool.totalSupply();
@@ -331,7 +359,7 @@ describe("Router", function () {
         finalPoolWethBalance
           .mul(BigNumber.from(10).pow(36))
           .div(finalTotalSupply)
-      ).eq(
+      ).gt(
         initialPoolWethBalance
           .mul(BigNumber.from(10).pow(36))
           .div(initialTotalSupply)
@@ -349,7 +377,7 @@ describe("Router", function () {
         finalPoolUsdcBalance
           .mul(BigNumber.from(10).pow(36))
           .div(finalTotalSupply)
-      ).eq(
+      ).lt(
         initialPoolUsdcBalance
           .mul(BigNumber.from(10).pow(36))
           .div(initialTotalSupply)
@@ -368,21 +396,17 @@ describe("Router", function () {
     it("Should swap some tokens", async function () {
       let amountIn = BigNumber.from(10).pow(18);
       let expectedAmountOut = await pool.getAmountOut(
-        weth.address,
-        usdc.address,
-        amountIn
+        encodedTokenAmount(weth, amountIn)
       );
       expect(expectedAmountOut).gt(1);
-      let params = {
-        tokenIn: weth.address,
-        tokenOut: usdc.address,
-        pool: pool.address,
-        context: "0x",
-        recipient: alice.address,
-        deadline: 2 * Date.now(),
-        amountIn: amountIn,
-        amountOutMinimum: 1,
-      };
+      let params = swapParams(
+        weth.address,
+        amountIn,
+        pool.address,
+        alice.address,
+        1,
+        false
+      );
       let oldAliceWethBalance = await bento.balanceOf(
         weth.address,
         alice.address
@@ -415,21 +439,17 @@ describe("Router", function () {
 
       amountIn = expectedAmountOut;
       expectedAmountOut = await pool.getAmountOut(
-        usdc.address,
-        weth.address,
-        amountIn
+        encodedTokenAmount(usdc, amountIn)
       );
       expect(expectedAmountOut).lt(BigNumber.from(10).pow(18));
-      params = {
-        tokenIn: usdc.address,
-        tokenOut: weth.address,
-        pool: pool.address,
-        context: "0x",
-        recipient: alice.address,
-        deadline: 2 * Date.now(),
-        amountIn: amountIn,
-        amountOutMinimum: expectedAmountOut,
-      };
+      params = swapParams(
+        usdc.address,
+        amountIn,
+        pool.address,
+        alice.address,
+        1,
+        false
+      );
 
       await router.exactInputSingle(params);
       expect(await bento.balanceOf(weth.address, alice.address)).lt(
@@ -449,22 +469,24 @@ describe("Router", function () {
     it("Should handle multi hop swaps", async function () {
       let amountIn = BigNumber.from(10).pow(18);
       let expectedAmountOutSingleHop = await pool.getAmountOut(
-        weth.address,
-        usdc.address,
-        amountIn
+        encodedTokenAmount(weth, amountIn)
       );
       expect(expectedAmountOutSingleHop).gt(1);
       let params = {
-        path: [
-          { tokenIn: weth.address, pool: pool.address, context: "0x" },
-          { tokenIn: usdc.address, pool: pool.address, context: "0x" },
-          { tokenIn: weth.address, pool: pool.address, context: "0x" },
-        ],
+        tokenIn: weth.address,
         tokenOut: usdc.address,
-        recipient: alice.address,
-        deadline: 2 * Date.now(),
         amountIn: amountIn,
         amountOutMinimum: 1,
+        path: [
+          {
+            pool: pool.address,
+            data: encodedSwapData(weth.address, daiUsdcPool.address, false),
+          },
+          {
+            pool: daiUsdcPool.address,
+            data: encodedSwapData(usdc.address, alice.address, false),
+          },
+        ],
       };
 
       let oldAliceWethBalance = await bento.balanceOf(
@@ -475,177 +497,36 @@ describe("Router", function () {
         usdc.address,
         alice.address
       );
-      let oldPoolWethBalance = await bento.balanceOf(
-        weth.address,
-        pool.address
-      );
-      let oldPoolUsdcBalance = await bento.balanceOf(
-        usdc.address,
-        pool.address
+      let oldAliceDaiBalance = await bento.balanceOf(
+        dai.address,
+        alice.address
       );
       await router.exactInput(params);
       expect(await bento.balanceOf(weth.address, alice.address)).eq(
         oldAliceWethBalance.sub(amountIn)
       );
-      expect(await bento.balanceOf(usdc.address, alice.address)).lt(
-        oldAliceUsdcBalance.add(expectedAmountOutSingleHop)
+      expect(await bento.balanceOf(usdc.address, alice.address)).eq(
+        oldAliceUsdcBalance
       );
-      expect(await bento.balanceOf(weth.address, pool.address)).eq(
-        oldPoolWethBalance.add(amountIn)
-      );
-      expect(await bento.balanceOf(usdc.address, pool.address)).gt(
-        oldPoolUsdcBalance.sub(expectedAmountOutSingleHop)
-      );
-    });
-
-    it("Should add balanced liquidity to unbalanced pool", async function () {
-      let initialTotalSupply = await pool.totalSupply();
-      let initialPoolWethBalance = await bento.balanceOf(
-        weth.address,
-        pool.address
-      );
-      let initialPoolUsdcBalance = await bento.balanceOf(
-        usdc.address,
-        pool.address
-      );
-      let liquidityInput = [
-        {
-          token: weth.address,
-          native: false,
-          amountDesired: BigNumber.from(10).pow(18),
-          amountMin: 1,
-        },
-        {
-          token: usdc.address,
-          native: false,
-          amountDesired: BigNumber.from(10).pow(18),
-          amountMin: 1,
-        },
-      ];
-      await router.addLiquidityBalanced(
-        liquidityInput,
-        pool.address,
-        alice.address,
-        2 * Date.now()
-      );
-      let intermediateTotalSupply = await pool.totalSupply();
-      let intermediatePoolWethBalance = await bento.balanceOf(
-        weth.address,
-        pool.address
-      );
-      let intermediatePoolUsdcBalance = await bento.balanceOf(
-        usdc.address,
-        pool.address
-      );
-
-      expect(intermediateTotalSupply).gt(initialTotalSupply);
-      expect(intermediatePoolWethBalance).eq(
-        initialPoolWethBalance.add(BigNumber.from(10).pow(18))
-      );
-      expect(intermediatePoolUsdcBalance).gt(initialPoolUsdcBalance);
-      expect(intermediatePoolUsdcBalance).lt(
-        initialPoolUsdcBalance.add(BigNumber.from(10).pow(18))
-      );
-
-      // Swap fee deducted
-      expect(
-        intermediatePoolWethBalance
-          .mul(BigNumber.from(10).pow(36))
-          .div(intermediateTotalSupply)
-      ).lte(
-        initialPoolWethBalance
-          .mul(BigNumber.from(10).pow(36))
-          .div(initialTotalSupply)
-      );
-      expect(
-        intermediatePoolUsdcBalance
-          .mul(BigNumber.from(10).pow(36))
-          .div(intermediateTotalSupply)
-      ).lte(
-        initialPoolUsdcBalance
-          .mul(BigNumber.from(10).pow(36))
-          .div(initialTotalSupply)
-      );
-
-      liquidityInput = [
-        {
-          token: usdc.address,
-          native: false,
-          amountDesired: BigNumber.from(10).pow(18),
-          amountMin: 1,
-        },
-        {
-          token: weth.address,
-          native: false,
-          amountDesired: BigNumber.from(10).pow(17),
-          amountMin: 1,
-        },
-      ];
-      await router.addLiquidityBalanced(
-        liquidityInput,
-        pool.address,
-        alice.address,
-        2 * Date.now()
-      );
-
-      let finalTotalSupply = await pool.totalSupply();
-      let finalPoolWethBalance = await bento.balanceOf(
-        weth.address,
-        pool.address
-      );
-      let finalPoolUsdcBalance = await bento.balanceOf(
-        usdc.address,
-        pool.address
-      );
-
-      expect(finalTotalSupply).gt(intermediateTotalSupply);
-      expect(finalPoolWethBalance).eq(
-        intermediatePoolWethBalance.add(BigNumber.from(10).pow(17))
-      );
-      expect(finalPoolUsdcBalance).gt(intermediatePoolUsdcBalance);
-      expect(finalPoolUsdcBalance).lt(
-        intermediatePoolUsdcBalance.add(BigNumber.from(10).pow(17))
-      );
-
-      // Using 18 decimal precision rather than 36 here to accommodate for 1wei rounding errors
-      expect(
-        finalPoolWethBalance
-          .mul(BigNumber.from(10).pow(18))
-          .div(finalTotalSupply)
-      ).eq(
-        intermediatePoolWethBalance
-          .mul(BigNumber.from(10).pow(18))
-          .div(intermediateTotalSupply)
-      );
-      expect(
-        finalPoolUsdcBalance
-          .mul(BigNumber.from(10).pow(18))
-          .div(finalTotalSupply)
-      ).eq(
-        intermediatePoolUsdcBalance
-          .mul(BigNumber.from(10).pow(18))
-          .div(intermediateTotalSupply)
+      expect(await bento.balanceOf(dai.address, alice.address)).gt(
+        oldAliceDaiBalance
       );
     });
 
     it("Should swap some native tokens", async function () {
       let amountIn = BigNumber.from(10).pow(18);
       let expectedAmountOut = await pool.getAmountOut(
-        weth.address,
-        usdc.address,
-        amountIn
+        encodedTokenAmount(weth, amountIn)
       );
       expect(expectedAmountOut).gt(1);
-      let params = {
-        tokenIn: weth.address,
-        tokenOut: usdc.address,
-        pool: pool.address,
-        context: "0x",
-        recipient: alice.address,
-        deadline: 2 * Date.now(),
-        amountIn: amountIn,
-        amountOutMinimum: 1,
-      };
+      let params = swapParams(
+        weth.address,
+        amountIn,
+        pool.address,
+        alice.address,
+        1,
+        false
+      );
 
       let oldAliceWethBalance = await weth.balanceOf(alice.address);
       let oldAliceUsdcBalance = await bento.balanceOf(
@@ -665,17 +546,7 @@ describe("Router", function () {
         alice.address
       );
 
-      // multicall
-      await router.multicall([
-        router.interface.encodeFunctionData("depositToBentoBox", [
-          weth.address,
-          amountIn,
-          pool.address,
-        ]),
-        router.interface.encodeFunctionData("exactInputSingleWithPreFunding", [
-          params,
-        ]),
-      ]);
+      await router.exactInputSingleWithNativeToken(params);
 
       expect(await weth.balanceOf(alice.address)).eq(
         oldAliceWethBalance.sub(amountIn)
@@ -683,8 +554,8 @@ describe("Router", function () {
       expect(await bento.balanceOf(usdc.address, alice.address)).eq(
         oldAliceUsdcBalance.add(expectedAmountOut)
       );
-      expect(await bento.balanceOf(weth.address, pool.address)).eq(
-        oldPoolWethBalance.add(amountIn)
+      expect(await bento.balanceOf(weth.address, pool.address)).gt(
+        oldPoolWethBalance
       );
       expect(await bento.balanceOf(usdc.address, pool.address)).eq(
         oldPoolUsdcBalance.sub(expectedAmountOut)
@@ -694,35 +565,54 @@ describe("Router", function () {
       );
 
       amountIn = expectedAmountOut;
-      expectedAmountOut = await pool.getAmountOut(usdc.address, amountIn);
+      expectedAmountOut = await pool.getAmountOut(
+        encodedTokenAmount(usdc, amountIn)
+      );
       expect(expectedAmountOut).lt(BigNumber.from(10).pow(18));
-      params = {
-        tokenIn: usdc.address,
-        tokenOut: weth.address,
-        pool: pool.address,
-        context: "0x",
-        recipient: alice.address,
-        deadline: 2 * Date.now(),
-        amountIn: amountIn,
-        amountOutMinimum: expectedAmountOut,
-      };
+      params = swapParams(
+        usdc.address,
+        amountIn,
+        pool.address,
+        alice.address,
+        1,
+        true
+      );
 
-      await router.multicall([
-        router.interface.encodeFunctionData("depositToBentoBox", [
-          usdc.address,
-          amountIn,
-          pool.address,
-        ]),
-        router.interface.encodeFunctionData("exactInputSingleWithPreFunding", [
-          params,
-        ]),
-      ]);
+      await router.exactInputSingleWithNativeToken(params);
       expect(await bento.balanceOf(weth.address, pool.address)).gt(
         oldPoolWethBalance
-      );
-      expect(await bento.balanceOf(usdc.address, pool.address)).eq(
-        oldPoolUsdcBalance
       );
     });
   });
 });
+
+function encodedTokenAmount(token, amount) {
+  return ethers.utils.defaultAbiCoder.encode(
+    ["address", "uint256"],
+    [token.address, amount]
+  );
+}
+
+function swapParams(
+  tokenIn,
+  amountIn,
+  pool,
+  to,
+  amountOutMinimum,
+  unwrapBento
+) {
+  return {
+    amountIn: amountIn,
+    amountOutMinimum: amountOutMinimum,
+    pool: pool,
+    tokenIn: tokenIn,
+    data: encodedSwapData(tokenIn, to, unwrapBento),
+  };
+}
+
+function encodedSwapData(tokenIn, to, unwrapBento) {
+  return ethers.utils.defaultAbiCoder.encode(
+    ["address", "address", "bool"],
+    [tokenIn, to, unwrapBento]
+  );
+}

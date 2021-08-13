@@ -182,7 +182,7 @@ describe("Router", function () {
       expect(await daiWethPool.totalSupply()).gt(1);
     });
 
-    it("Should add balanced liquidity", async function () {
+    it("Should add liquidity", async function () {
       let initialTotalSupply = await pool.totalSupply();
       let initialPoolWethBalance = await bento.balanceOf(
         weth.address,
