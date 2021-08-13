@@ -145,7 +145,7 @@ describe.only("Concentrated liqudity pool", function () {
 
   it("pool1 - should initialize correctly", async () => {
     const min = -887272;
-    const max = 887272;
+    const max = 887271;
 
     const minTick = await pool1.ticks(min);
     const maxTick = await pool1.ticks(max);
