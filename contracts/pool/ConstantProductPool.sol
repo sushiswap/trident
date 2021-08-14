@@ -5,6 +5,7 @@ pragma solidity >=0.8.0;
 import "../deployer/MasterDeployer.sol";
 import "../interfaces/IBentoBoxMinimal.sol";
 import "../interfaces/IPool.sol";
+import "../interfaces/IMigrator.sol";
 import "../interfaces/ITridentCallee.sol";
 import "../libraries/TridentMath.sol";
 import "../libraries/RebaseLibrary.sol";
@@ -101,8 +102,15 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
         uint256 computed = TridentMath.sqrt(balances.amount0 * balances.amount1);
         if (_totalSupply == 0) {
-            liquidity = computed - MINIMUM_LIQUIDITY;
-            _mint(address(0), MINIMUM_LIQUIDITY);
+            address migrator = masterDeployer.migrator();
+            if (msg.sender == migrator) {
+                liquidity = IMigrator(migrator).desiredLiquidity();
+                require(liquidity > 0 && liquidity != type(uint256).max, "Bad desired liquidity");
+            } else {
+                require(migrator == address(0), "Must not have migrator");
+                liquidity = computed - MINIMUM_LIQUIDITY;
+                _mint(address(0), MINIMUM_LIQUIDITY);
+            }
         } else {
             uint256 k = TridentMath.sqrt(reserves.amount0 * reserves.amount1);
             liquidity = ((computed - k) * _totalSupply) / k;
