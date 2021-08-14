@@ -16,8 +16,8 @@ describe.only("Concentrated liquidity pool", function () {
     dai: ERC20Mock,
     usd: ERC20Mock,
     tridentPoolFactory: ConcentratedLiquidityPoolFactory,
+    pool0: ConcentratedLiquidityPool,
     pool1: ConcentratedLiquidityPool,
-    pool2: ConcentratedLiquidityPool,
     tickMath: TickMathTest,
     bento: BentoBoxV1;
 
@@ -82,19 +82,19 @@ describe.only("Concentrated liquidity pool", function () {
     // corresponds to tick -75616
     let sqrtPrice = BigNumber.from("1807174424252647735792984898");
 
-    // sort tokens for pool1
-    const [address0, address1]: string[] =
+    // sort tokens for pool0
+    const [token0, token1]: string[] =
       dai.address.toUpperCase() < weth.address.toUpperCase()
         ? [dai.address, weth.address]
         : [weth.address, dai.address];
 
     let deployData0 = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint24", "uint160"],
-      [address0, address1, 1000, sqrtPrice] 
+      [token0, token1, 1000, sqrtPrice] 
     );
 
-    // deploy pool1
-    pool1 = await Pool.attach(
+    // deploy pool0
+    pool0 = await Pool.attach(
       (
         await (
           await masterDeployer.deployPool(
@@ -108,19 +108,19 @@ describe.only("Concentrated liquidity pool", function () {
     // current eth price is $2500
     sqrtPrice = BigNumber.from("50").mul("0x1000000000000000000000000");
 
-    // sort tokens for pool2
-    const [address2, address3]: string[] =
+    // sort tokens for pool1
+    const [token2, token3]: string[] =
       weth.address.toUpperCase() < usd.address.toUpperCase()
         ? [usd.address, weth.address]
         : [weth.address, usd.address];
 
     let deployData1 = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint24", "uint160"],
-      [address2, address3, 1000, sqrtPrice] 
+      [token2, token3, 1000, sqrtPrice] 
     );
 
-    // deploy pool2
-    pool2 = await Pool.attach(
+    // deploy pool1
+    pool1 = await Pool.attach(
       (
         await (
           await masterDeployer.deployPool(
@@ -137,7 +137,7 @@ describe.only("Concentrated liquidity pool", function () {
     const upperTick1 = 81891; // price 3600
     const upperTick1Price = await tickMath.getSqrtRatioAtTick(upperTick1);
     const currentTick = 78244; // price 2500
-    const currentTickPrice = await pool2.price();
+    const currentTickPrice = await pool1.price();
     const lowerTick2 = 78640; // price 2601
     const lowerTick2Price = await tickMath.getSqrtRatioAtTick(lowerTick2);
     const upperTick2 = 80149; // price ~3025
@@ -152,14 +152,14 @@ describe.only("Concentrated liquidity pool", function () {
     await bento.transfer(
       weth.address,
       alice.address,
-      pool2.address,
+      pool1.address,
       getDx(liquidity, currentTickPrice, upperTick1Price)
     );
 
     await bento.transfer(
       usd.address,
       alice.address,
-      pool2.address,
+      pool1.address,
       getDy(liquidity, lowerTick1Price, currentTickPrice)
     );
 
@@ -168,12 +168,12 @@ describe.only("Concentrated liquidity pool", function () {
       [-887272, lowerTick1, lowerTick1, upperTick1, liquidity, alice.address]
     );
 
-    await pool2.mint(mintData);
+    await pool1.mint(mintData);
 
     await bento.transfer(
       weth.address,
       alice.address,
-      pool2.address,
+      pool1.address,
       getDx(liquidity, lowerTick2Price, upperTick2Price)
     );
 
@@ -182,32 +182,32 @@ describe.only("Concentrated liquidity pool", function () {
       [lowerTick1, lowerTick2, lowerTick2, upperTick2, liquidity, alice.address]
     );
 
-    await pool2.mint(mintData);
+    await pool1.mint(mintData);
   });
 
-  it("pool1 - should initialize correctly", async () => {
+  it("pool0 - should initialize correctly", async () => {
     const min = -887272;
-    const max = 887272;
+    const max = -min - 1;
 
-    const minTick = await pool1.ticks(min);
-    const maxTick = await pool1.ticks(max);
+    const minTick = await pool0.ticks(min);
+    const maxTick = await pool0.ticks(max);
 
     expect(minTick.previousTick).to.be.eq(min);
     expect(minTick.nextTick).to.be.eq(max);
     expect(maxTick.previousTick).to.be.eq(min);
     expect(maxTick.nextTick).to.be.eq(max);
 
-    expect(await pool1.liquidity()).to.be.eq(0);
+    expect(await pool0.liquidity()).to.be.eq(0);
   });
 
-  it("pool1 - should add liquidity inside price range", async () => {
+  it("pool0 - should add liquidity inside price range", async () => {
     // current price is 1920 dai per eth ... mint liquidity from ~1000 to ~3000
     const lower = -80068; // 0.000333 dai per eth
     const upper = -69081; // 0.001 dai per eth
     const priceLower = await tickMath.getSqrtRatioAtTick(lower);
     const priceUpper = await tickMath.getSqrtRatioAtTick(upper);
-    const currentPrice = await pool1.price();
-    const startingLiquidity = await pool1.liquidity();
+    const currentPrice = await pool0.price();
+    const startingLiquidity = await pool0.liquidity();
 
     const dP = currentPrice.sub(priceLower);
 
@@ -217,62 +217,194 @@ describe.only("Concentrated liquidity pool", function () {
 
     const dx = getDx(liquidity, currentPrice, priceUpper);
 
-    const [address0, address1]: string[] =
+    const [token0, token1]: string[] =
       dai.address.toUpperCase() < weth.address.toUpperCase()
         ? [dai.address, weth.address]
         : [weth.address, dai.address];
 
-    await bento.transfer(address0, alice.address, pool1.address, dx);
+    await bento.transfer(token0, alice.address, pool0.address, dx);
 
-    await bento.transfer(address1, alice.address, pool1.address, dy);
+    await bento.transfer(token1, alice.address, pool0.address, dy);
 
     let mintData = ethers.utils.defaultAbiCoder.encode(
       ["int24", "int24", "int24", "int24", "uint128", "address"],
       [-887272, lower, lower, upper, liquidity, alice.address]
     );
 
-    await pool1.mint(mintData);
+    await pool0.mint(mintData);
 
-    expect((await pool1.liquidity()).toString()).to.be.eq(
+    expect((await pool0.liquidity()).toString()).to.be.eq(
       liquidity.add(startingLiquidity).toString(),
       "Didn't add right amount of liquidity"
     );
     expect(
-      (await bento.balanceOf(address0, pool1.address)).toString()
+      (await bento.balanceOf(token0, pool0.address)).toString()
     ).to.be.eq(
       "2683758334569795392629",
       "Didn't calculate token0 (dx) amount correctly"
     );
     expect(
-      (await bento.balanceOf(address1, pool1.address)).toString()
+      (await bento.balanceOf(token1, pool0.address)).toString()
     ).to.be.eq(dy.toString(), "Didn't calculate token1 (dy) amount correctly");
   });
 
-  it("pool1 - shouldn't allow adding lower odd ticks and upper even ticks");
+  it("pool0 - shouldn't allow adding lower odd ticks", async () => {
+    const lower = -80068 + 1; 
+    const upper = -69081; 
+    const priceLower = await tickMath.getSqrtRatioAtTick(lower);
+    const priceUpper = await tickMath.getSqrtRatioAtTick(upper);
+    const currentPrice = await pool0.price();
+    const startingLiquidity = await pool0.liquidity();
 
-  it("pool1 - shouldn't allow adding ticks outside of min max bounds");
+    const dP = currentPrice.sub(priceLower);
 
-  // todo check that the existing ticks & liquidity make sense
-  it("pool2 - Minted liquidity ticks in the right order");
+    const dy = getBigNumber(1);
+    // calculate the amount of liq we mint based on dy and ticks
+    const liquidity = dy.mul("0x1000000000000000000000000").div(dP);
 
-  // todo check that the state doesn't change if we do swaps with 0 amountIn
-  it("pool2 - should swap with 0 input and make no state changes");
+    const dx = getDx(liquidity, currentPrice, priceUpper);
 
-  it("pool2 - Should execute trade within current tick - one for zero", async () => {
-    const oldLiq = await pool2.liquidity();
-    const oldTick = await pool2.nearestTick();
+    const [token0, token1]: string[] =
+      dai.address.toUpperCase() < weth.address.toUpperCase()
+        ? [dai.address, weth.address]
+        : [weth.address, dai.address];
+
+    await bento.transfer(token0, alice.address, pool0.address, dx);
+
+    await bento.transfer(token1, alice.address, pool0.address, dy);
+
+    let mintData = ethers.utils.defaultAbiCoder.encode(
+      ["int24", "int24", "int24", "int24", "uint128", "address"],
+      [-887272, lower, lower, upper, liquidity, alice.address]
+    );
+
+    await expect(pool0.mint(mintData)).to.be.revertedWith("LOWER_EVEN")
+  });
+
+  it("pool0 - shouldn't allow adding upper even ticks", async () => {
+    const lower = -80068; 
+    const upper = -69081 - 1; 
+    const priceLower = await tickMath.getSqrtRatioAtTick(lower);
+    const priceUpper = await tickMath.getSqrtRatioAtTick(upper);
+    const currentPrice = await pool0.price();
+    const startingLiquidity = await pool0.liquidity();
+
+    const dP = currentPrice.sub(priceLower);
+
+    const dy = getBigNumber(1);
+    // calculate the amount of liq we mint based on dy and ticks
+    const liquidity = dy.mul("0x1000000000000000000000000").div(dP);
+
+    const dx = getDx(liquidity, currentPrice, priceUpper);
+
+    const [token0, token1]: string[] =
+      dai.address.toUpperCase() < weth.address.toUpperCase()
+        ? [dai.address, weth.address]
+        : [weth.address, dai.address];
+
+    await bento.transfer(token0, alice.address, pool0.address, dx);
+
+    await bento.transfer(token1, alice.address, pool0.address, dy);
+
+    let mintData = ethers.utils.defaultAbiCoder.encode(
+      ["int24", "int24", "int24", "int24", "uint128", "address"],
+      [-887272, lower, lower, upper, liquidity, alice.address]
+    );
+
+    await expect(pool0.mint(mintData)).to.be.revertedWith("UPPER_ODD")
+  });
+
+  it("pool0 - shouldn't allow adding ticks outside of min bounds", async () => {
+    const lower = -887272 - 1; // exceed MIN_TICK
+    const upper = -lower - 1;
+    
+    let mintData = ethers.utils.defaultAbiCoder.encode(
+      ["int24", "int24", "int24", "int24", "uint128", "address"],
+      [-887272, lower, lower, upper, getBigNumber(10), alice.address]
+    );
+
+    await expect(pool0.mint(mintData)).to.be.revertedWith("T")
+  });
+
+  it("pool0 - shouldn't allow adding ticks outside of max bounds", async () => {
+    const lower = -887272;
+    const upper = -lower; // exceed MAX_TICK
+    
+    let mintData = ethers.utils.defaultAbiCoder.encode(
+      ["int24", "int24", "int24", "int24", "uint128", "address"],
+      [-887272, lower, lower, upper, getBigNumber(10), alice.address]
+    );
+
+    await expect(pool0.mint(mintData)).to.be.revertedWith("T")
+  });
+
+  // TO DO check that the existing ticks & liquidity make sense
+  it("pool1 - Minted liquidity ticks in the right order");
+
+  it("pool1 - should swap with 0 input and make no state changes", async () => {
+    const oldLiq = await pool1.liquidity();
+    const oldTick = await pool1.nearestTick();
     const oldEthBalance = await bento.balanceOf(weth.address, alice.address);
     const oldUSDBalance = await bento.balanceOf(usd.address, alice.address);
 
     expect(oldLiq.gt(0)).to.be.true;
 
-    const oldPrice = await pool2.price();
+    const oldPrice = await pool1.price();
+
+    let swapData = ethers.utils.defaultAbiCoder.encode(
+      ["bool", "uint256", "address", "bool"],
+      [false, 0, alice.address, false]
+    );
+
+    await pool1.swap(swapData);
+
+    const newPrice = await pool1.price();
+    const newLiq = await pool1.liquidity();
+    const newTick = await pool1.nearestTick();
+    const ethReceived = (
+      await bento.balanceOf(weth.address, alice.address)
+    ).sub(oldEthBalance);
+    const usdPaid = oldUSDBalance.sub(
+      await bento.balanceOf(usd.address, alice.address)
+    );
+
+    expect(oldLiq).to.be.eq(
+      newLiq,
+      "Liquidity changed from 0 input"
+    );
+    expect(oldTick).to.be.eq(
+      newTick,
+      "Tick changed from 0 input"
+    );
+    expect(usdPaid).to.be.eq(
+      0,
+      "Token paid changed from 0 input"
+    );
+    expect(ethReceived).to.be.eq(
+      0,
+      "Token paid changed from 0 input"
+    );
+    expect(oldPrice).to.be.eq(
+      newPrice,
+      "Price changed from 0 input"
+    );
+  });
+
+  it("pool1 - Should execute trade within current tick - one for zero", async () => {
+    const oldLiq = await pool1.liquidity();
+    const oldTick = await pool1.nearestTick();
+    const oldEthBalance = await bento.balanceOf(weth.address, alice.address);
+    const oldUSDBalance = await bento.balanceOf(usd.address, alice.address);
+
+    expect(oldLiq.gt(0)).to.be.true;
+
+    const oldPrice = await pool1.price();
 
     // buy eth with 50 usd (one for zero, one is USD)
     await bento.transfer(
       usd.address,
       alice.address,
-      pool2.address,
+      pool1.address,
       getBigNumber(50)
     );
     let swapData = ethers.utils.defaultAbiCoder.encode(
@@ -280,10 +412,10 @@ describe.only("Concentrated liquidity pool", function () {
       [false, getBigNumber(50), alice.address, false]
     );
 
-    await pool2.swap(swapData);
+    await pool1.swap(swapData);
 
-    const newPrice = await pool2.price();
-    const newTick = await pool2.nearestTick();
+    const newPrice = await pool1.price();
+    const newTick = await pool1.nearestTick();
     const ethReceived = (
       await bento.balanceOf(weth.address, alice.address)
     ).sub(oldEthBalance);
@@ -310,31 +442,31 @@ describe.only("Concentrated liquidity pool", function () {
     expect(oldTick).to.be.eq(newTick, "We crossed by mistake");
   });
 
-  it("pool2 - should execute trade within current tick - zero for one", async () => {
-    const oldLiq = await pool2.liquidity();
-    const oldTick = await pool2.nearestTick();
+  it("pool1 - should execute trade within current tick - zero for one", async () => {
+    const oldLiq = await pool1.liquidity();
+    const oldTick = await pool1.nearestTick();
     const oldEthBalance = await bento.balanceOf(weth.address, alice.address);
     const oldUSDBalance = await bento.balanceOf(usd.address, alice.address);
 
     expect(oldLiq.gt(0)).to.be.true;
 
-    const oldPrice = await pool2.price();
+    const oldPrice = await pool1.price();
 
     // buy usd with 0.1 eth
     await bento.transfer(
       weth.address,
       alice.address,
-      pool2.address,
+      pool1.address,
       getBigNumber(1, 17)
     );
     let swapData = ethers.utils.defaultAbiCoder.encode(
       ["bool", "uint256", "address", "bool"],
       [true, getBigNumber(1, 17), alice.address, false]
     );
-    await pool2.swap(swapData);
+    await pool1.swap(swapData);
 
-    const newPrice = await pool2.price();
-    const newTick = await pool2.nearestTick();
+    const newPrice = await pool1.price();
+    const newTick = await pool1.nearestTick();
     const usdReceived = (await bento.balanceOf(usd.address, alice.address)).sub(
       oldUSDBalance
     );
@@ -352,33 +484,33 @@ describe.only("Concentrated liquidity pool", function () {
     expect(oldPrice.gt(newPrice)).to.be.true;
   });
 
-  it("pool2 - should execute trade and cross one tick - one for zero", async () => {
-    const oldLiq = await pool2.liquidity();
-    const oldTick = await pool2.nearestTick();
-    const nextTick = (await pool2.ticks(oldTick)).nextTick;
+  it("pool1 - should execute trade and cross one tick - one for zero", async () => {
+    const oldLiq = await pool1.liquidity();
+    const oldTick = await pool1.nearestTick();
+    const nextTick = (await pool1.ticks(oldTick)).nextTick;
     const oldEthBalance = await bento.balanceOf(weth.address, alice.address);
     const oldUSDBalance = await bento.balanceOf(usd.address, alice.address);
 
     expect(oldLiq.gt(0)).to.be.true;
 
-    const oldPrice = await pool2.price();
+    const oldPrice = await pool1.price();
 
     // buy eth with 1000 usd (one for zero, one is USD)
     await bento.transfer(
       usd.address,
       alice.address,
-      pool2.address,
+      pool1.address,
       getBigNumber(1000)
     );
     let swapData = ethers.utils.defaultAbiCoder.encode(
       ["bool", "uint256", "address", "bool"],
       [false, getBigNumber(1000), alice.address, false]
     );
-    await pool2.swap(swapData);
+    await pool1.swap(swapData);
 
-    const newLiq = await pool2.liquidity();
-    const newPrice = await pool2.price();
-    const newTick = await pool2.nearestTick();
+    const newLiq = await pool1.liquidity();
+    const newPrice = await pool1.price();
+    const newTick = await pool1.nearestTick();
     const ethReceived = (
       await bento.balanceOf(weth.address, alice.address)
     ).sub(oldEthBalance);
@@ -409,42 +541,42 @@ describe.only("Concentrated liquidity pool", function () {
     expect(newTick).to.be.eq(nextTick, "We didn't cross to the next tick");
   });
 
-  it("pool2 - should execute trade and cross one tick - zero for one", async () => {
+  it("pool1 - should execute trade and cross one tick - zero for one", async () => {
     // first push price into a range with 2 lp positions
     await bento.transfer(
       usd.address,
       alice.address,
-      pool2.address,
+      pool1.address,
       getBigNumber(1000)
     );
     let swapData = ethers.utils.defaultAbiCoder.encode(
       ["bool", "uint256", "address", "bool"],
       [false, getBigNumber(1000), alice.address, false]
     );
-    await pool2.swap(swapData);
+    await pool1.swap(swapData);
 
-    const oldLiq = await pool2.liquidity();
-    const oldTick = await pool2.nearestTick();
-    const nextTick = (await pool2.ticks(oldTick)).nextTick;
+    const oldLiq = await pool1.liquidity();
+    const oldTick = await pool1.nearestTick();
+    const nextTick = (await pool1.ticks(oldTick)).nextTick;
     const oldEthBalance = await bento.balanceOf(weth.address, alice.address);
     const oldUSDBalance = await bento.balanceOf(usd.address, alice.address);
-    const oldPrice = await pool2.price();
+    const oldPrice = await pool1.price();
 
     await bento.transfer(
       weth.address,
       alice.address,
-      pool2.address,
+      pool1.address,
       getBigNumber(1)
     );
     swapData = ethers.utils.defaultAbiCoder.encode(
       ["bool", "uint256", "address", "bool"],
       [true, getBigNumber(1), alice.address, false] // sell 1 weth
     );
-    await pool2.swap(swapData);
+    await pool1.swap(swapData);
 
-    const newLiq = await pool2.liquidity();
-    const newPrice = await pool2.price();
-    const newTick = await pool2.nearestTick();
+    const newLiq = await pool1.liquidity();
+    const newPrice = await pool1.price();
+    const newTick = await pool1.nearestTick();
     const usdReceived = (await bento.balanceOf(usd.address, alice.address)).sub(
       oldUSDBalance
     );
@@ -471,9 +603,10 @@ describe.only("Concentrated liquidity pool", function () {
       "We didn't cross out of one position"
     );
   });
-});
 
-// todo add test for swapping outsite ticks where liquidity is 0
+  // TO DO
+  it("pool1 - shouldn't swap outside ticks where liquidity is 0");
+});
 
 function getDx(liquidity, priceLower, priceUpper, roundUp = true) {
   const increment = roundUp ? 1 : 0;
