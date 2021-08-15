@@ -8,39 +8,39 @@ import "./UnsafeMath.sol";
 /// @notice Math library that facilitates ranged liquidity calculations.
 /// @author @0xGasper.
 library DyDxMath {
-    function getDx(
-        uint256 liquidity,
-        uint256 priceLower,
-        uint256 priceUpper,
-        bool roundUp
-    ) internal pure returns(uint256) {
-        unchecked {
-            if (roundUp) {
-            return UnsafeMath.divRoundingUp(
-                FullMath.mulDivRoundingUp(
-                    liquidity << 96,
-                    priceUpper - priceLower,
-                    priceUpper
-                ),
-                priceLower
-            );
-            } else {
-                return FullMath.mulDiv(liquidity << 96, priceUpper - priceLower, priceUpper) / priceLower;
-            }
-        }
-    }
-
     function getDy(
         uint256 liquidity,
         uint256 priceLower,
         uint256 priceUpper,
         bool roundUp
-    ) internal pure returns(uint256) {
+    ) internal pure returns (uint256 dy) {
         unchecked {
             if (roundUp) {
-                return FullMath.mulDivRoundingUp(liquidity, priceUpper - priceLower, 0x1000000000000000000000000);
+                dy = FullMath.mulDivRoundingUp(liquidity, priceUpper - priceLower, 0x1000000000000000000000000);
             } else {
-                return FullMath.mulDiv(liquidity, priceUpper - priceLower, 0x1000000000000000000000000);
+                dy = FullMath.mulDiv(liquidity, priceUpper - priceLower, 0x1000000000000000000000000);
+            }
+        }
+    }
+    
+    function getDx(
+        uint256 liquidity,
+        uint256 priceLower,
+        uint256 priceUpper,
+        bool roundUp
+    ) internal pure returns (uint256 dx) {
+        unchecked {
+            if (roundUp) {
+                dx = UnsafeMath.divRoundingUp(
+                    FullMath.mulDivRoundingUp(
+                        liquidity << 96,
+                        priceUpper - priceLower,
+                        priceUpper
+                    ),
+                    priceLower
+                );
+            } else {
+                dx = FullMath.mulDiv(liquidity << 96, priceUpper - priceLower, priceUpper) / priceLower;
             }
         }
     }
