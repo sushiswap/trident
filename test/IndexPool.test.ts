@@ -2,15 +2,10 @@
 
 import { BigNumber } from "@ethersproject/bignumber";
 import { ethers } from "hardhat";
-import { expect } from "chai";
 import { getBigNumber } from "./utilities";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { Contract, ContractFactory } from "ethers";
-import chai from "chai";
-import chaiAsPromised from "chai-as-promised";
 import { calcOutByIn } from "@sushiswap/sdk";
-chai.use(chaiAsPromised);
-chai.should();
 
 // ------------- PARAMETERS -------------
 
