@@ -34,6 +34,7 @@ const config: HardhatUserConfig = {
     coinmarketcap: process.env.COINMARKETCAP_API_KEY,
     currency: "USD",
     enabled: process.env.REPORT_GAS === "true",
+    excludeContracts: ["BentoBoxV1", "ERC20Mock", "ERC20", "WETH9"],
   },
   namedAccounts: {
     deployer: {
@@ -272,7 +273,7 @@ const config: HardhatUserConfig = {
   solidity: {
     compilers: [
       {
-        version: "0.8.6",
+        version: "0.8.7",
         settings: {
           optimizer: {
             enabled: true,
