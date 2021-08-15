@@ -151,6 +151,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
             _transfer(token1, amount1, to, unwrapBento);
             balance1 -= amount1;
             amount = amount1;
+            amount0 = 0;
         } else {
             // @dev Swap token1 for token0.
             require(tokenOut == address(token1), "INVALID_OUTPUT_TOKEN");
@@ -158,6 +159,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
             _transfer(token0, amount0, to, unwrapBento);
             balance0 -= amount0;
             amount = amount0;
+            amount1 = 0;
         }
 
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
@@ -165,7 +167,8 @@ contract ConstantProductPool is IPool, TridentERC20 {
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
-    function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
+    function swap(bytes calldata data) public override returns (uint256 amountOut) {
+        require(unlocked == 1, "LOCKED");
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();

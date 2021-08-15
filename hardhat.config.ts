@@ -5,7 +5,6 @@ import "@nomiclabs/hardhat-waffle";
 import "@nomiclabs/hardhat-ethers";
 import "hardhat-contract-sizer";
 import "hardhat-deploy";
-import "hardhat-deploy-ethers";
 import "hardhat-gas-reporter";
 import "hardhat-interface-generator";
 import "hardhat-spdx-license-identifier";
