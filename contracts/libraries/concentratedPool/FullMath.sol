@@ -5,9 +5,9 @@ pragma solidity >0.4.0;
 /// @title Math Library that contains 512-bit math functions.
 /// @notice Facilitates multiplication and division that can have overflow of an intermediate value without any loss of precision.
 /// @author Adapted from https://github.com/Uniswap/uniswap-v3-core/blob/main/contracts/libraries/FullMath.sol.
-/// @dev Handles "phantom overflow" i.e., allows multiplication and division where an intermediate value overflows 256 bits.
+/// @dev Handles "phantom overflow", i.e., allows multiplication and division where an intermediate value overflows 256 bits.
 library FullMath {
-    /// @notice Calculates floor(a×b÷denominator) with full precision - throws if result overflows a uint256 or denominator == 0.
+    /// @notice Calculates floor(a×b÷denominator) with full precision - throws if result overflows an uint256 or denominator == 0.
     /// @param a The multiplicand.
     /// @param b The multiplier.
     /// @param denominator The divisor.
@@ -31,7 +31,6 @@ library FullMath {
                 prod0 := mul(a, b)
                 prod1 := sub(sub(mm, prod0), lt(mm, prod0))
             }
-
             // @dev Handle non-overflow cases, 256 by 256 division.
             if (prod1 == 0) {
                 require(denominator > 0);
@@ -40,15 +39,12 @@ library FullMath {
                 }
                 return result;
             }
-
             // @dev Make sure the result is less than 2**256 -
             // also prevents denominator == 0.
             require(denominator > prod1);
-
             ///////////////////////////////////////////////
             // 512 by 256 division.
             ///////////////////////////////////////////////
-
             // @dev Make division exact by subtracting the remainder from [prod1 prod0] - 
             // compute remainder using mulmod.
             uint256 remainder;
@@ -60,7 +56,6 @@ library FullMath {
                 prod1 := sub(prod1, gt(remainder, prod0))
                 prod0 := sub(prod0, remainder)
             }
-
             // @dev Factor powers of two out of denominator - 
             // compute largest power of two divisor of denominator
             // (always >= 1).
@@ -69,7 +64,6 @@ library FullMath {
             assembly {
                 denominator := div(denominator, twos)
             }
-
             // @dev Divide [prod1 prod0] by the factors of two.
             assembly {
                 prod0 := div(prod0, twos)
@@ -81,7 +75,6 @@ library FullMath {
                 twos := add(div(sub(0, twos), twos), 1)
             }
             prod0 |= prod1 * twos;
-
             // @dev Invert denominator mod 2**256 - 
             // now that denominator is an odd number, it has an inverse
             // modulo 2**256 such that denominator * inv = 1 mod 2**256.
@@ -91,13 +84,12 @@ library FullMath {
             // @dev Now use Newton-Raphson iteration to improve the precision.
             // Thanks to Hensel's lifting lemma, this also works in modular
             // arithmetic, doubling the correct bits in each step.
-            inv *= 2 - denominator * inv; // inverse mod 2**8
-            inv *= 2 - denominator * inv; // inverse mod 2**16
-            inv *= 2 - denominator * inv; // inverse mod 2**32
-            inv *= 2 - denominator * inv; // inverse mod 2**64
-            inv *= 2 - denominator * inv; // inverse mod 2**128
-            inv *= 2 - denominator * inv; // inverse mod 2**256
-
+            inv *= 2 - denominator * inv; // @dev Inverse mod 2**8.
+            inv *= 2 - denominator * inv; // @dev Inverse mod 2**16.
+            inv *= 2 - denominator * inv; // @dev Inverse mod 2**32.
+            inv *= 2 - denominator * inv; // @dev Inverse mod 2**64.
+            inv *= 2 - denominator * inv; // @dev Inverse mod 2**128.
+            inv *= 2 - denominator * inv; // @dev Inverse mod 2**256.
             // @dev Because the division is now exact we can divide by multiplying
             // with the modular inverse of denominator. This will give us the
             // correct result modulo 2**256. Since the precoditions guarantee
@@ -109,7 +101,7 @@ library FullMath {
         }
     }
 
-    /// @notice Calculates ceil(a×b÷denominator) with full precision - throws if result overflows a uint256 or denominator == 0.
+    /// @notice Calculates ceil(a×b÷denominator) with full precision - throws if result overflows an uint256 or denominator == 0.
     /// @param a The multiplicand.
     /// @param b The multiplier.
     /// @param denominator The divisor.
@@ -120,9 +112,11 @@ library FullMath {
         uint256 denominator
     ) internal pure returns (uint256 result) {
         result = mulDiv(a, b, denominator);
-        if (mulmod(a, b, denominator) > 0) {
-            require(result < type(uint256).max);
-            result++;
+        unchecked {
+            if (mulmod(a, b, denominator) != 0) {
+                require(result < type(uint256).max);
+                result++;
+            }
         }
     }
 }
