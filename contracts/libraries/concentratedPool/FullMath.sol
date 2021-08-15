@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity >0.4.0;
+pragma solidity >=0.8.0;
 
 /// @title Math Library that contains 512-bit math functions.
 /// @notice Facilitates multiplication and division that can have overflow of an intermediate value without any loss of precision.
