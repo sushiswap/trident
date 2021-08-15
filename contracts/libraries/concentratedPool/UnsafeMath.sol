@@ -2,8 +2,7 @@
 
 pragma solidity >=0.5.0;
 
-/// @title Math functions that do not check inputs or outputs.
-/// @notice Contains methods that perform common math functions but do not do any overflow or underflow checks.
+/// @notice Math library that contains methods that perform common math functions but do not do any overflow or underflow checks.
 /// @author Adapted from https://github.com/Uniswap/uniswap-v3-core/blob/main/contracts/libraries/UnsafeMath.sol.
 library UnsafeMath {
     /// @notice Returns ceil(x / y).
