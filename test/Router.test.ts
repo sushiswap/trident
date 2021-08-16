@@ -9,6 +9,7 @@ import { expect } from "chai";
 
 describe("Router", function () {
   let alice,
+    aliceEncoded,
     feeTo,
     weth,
     sushi,
@@ -23,6 +24,10 @@ describe("Router", function () {
 
   before(async function () {
     [alice, feeTo] = await ethers.getSigners();
+    aliceEncoded = ethers.utils.defaultAbiCoder.encode(
+      ["address"],
+      [alice.address]
+    );
 
     const ERC20 = await ethers.getContractFactory("ERC20Mock");
     const Bento = await ethers.getContractFactory("BentoBoxV1");
@@ -30,7 +35,7 @@ describe("Router", function () {
     const PoolFactory = await ethers.getContractFactory(
       "ConstantProductPoolFactory"
     );
-    const SwapRouter = await ethers.getContractFactory("TridentRouter");
+    const TridentRouter = await ethers.getContractFactory("TridentRouter");
     const Pool = await ethers.getContractFactory("ConstantProductPool");
 
     weth = await ERC20.deploy("WETH", "ETH", getBigNumber("10000000"));
@@ -39,7 +44,7 @@ describe("Router", function () {
     bento = await Bento.deploy(weth.address);
     masterDeployer = await Deployer.deploy(17, feeTo.address, bento.address);
     tridentPoolFactory = await PoolFactory.deploy(masterDeployer.address);
-    router = await SwapRouter.deploy(bento.address, weth.address);
+    router = await TridentRouter.deploy(bento.address, weth.address);
 
     // Whitelist pool factory in master deployer
     await masterDeployer.addToWhitelist(tridentPoolFactory.address);
@@ -143,7 +148,9 @@ describe("Router", function () {
         pool.address,
         BigNumber.from(10).pow(19)
       );
-      await pool.mint(alice.address);
+
+      await pool.mint(aliceEncoded);
+
       expect(await pool.totalSupply()).gt(1);
       await bento.transfer(
         sushi.address,
@@ -157,7 +164,7 @@ describe("Router", function () {
         daiSushiPool.address,
         BigNumber.from(10).pow(20)
       );
-      await daiSushiPool.mint(alice.address);
+      await daiSushiPool.mint(aliceEncoded);
       expect(await daiSushiPool.totalSupply()).gt(1);
       await bento.transfer(
         weth.address,
@@ -171,11 +178,11 @@ describe("Router", function () {
         daiWethPool.address,
         BigNumber.from(10).pow(20)
       );
-      await daiWethPool.mint(alice.address);
+      await daiWethPool.mint(aliceEncoded);
       expect(await daiWethPool.totalSupply()).gt(1);
     });
 
-    it("Should add balanced liquidity", async function () {
+    it("Should add liquidity", async function () {
       let initialTotalSupply = await pool.totalSupply();
       let initialPoolWethBalance = await bento.balanceOf(
         weth.address,
@@ -189,22 +196,15 @@ describe("Router", function () {
         {
           token: weth.address,
           native: false,
-          amountDesired: BigNumber.from(10).pow(18),
-          amountMin: 1,
+          amount: BigNumber.from(10).pow(18),
         },
         {
           token: sushi.address,
           native: false,
-          amountDesired: BigNumber.from(10).pow(18),
-          amountMin: 1,
+          amount: BigNumber.from(10).pow(18),
         },
       ];
-      await router.addLiquidityBalanced(
-        liquidityInput,
-        pool.address,
-        alice.address,
-        2 * Date.now()
-      );
+      await router.addLiquidity(liquidityInput, pool.address, 1, aliceEncoded);
       let intermediateTotalSupply = await pool.totalSupply();
       let intermediatePoolWethBalance = await bento.balanceOf(
         weth.address,
@@ -244,22 +244,15 @@ describe("Router", function () {
         {
           token: weth.address,
           native: false,
-          amountDesired: BigNumber.from(10).pow(17),
-          amountMin: 1,
+          amount: BigNumber.from(10).pow(17),
         },
         {
           token: sushi.address,
           native: false,
-          amountDesired: BigNumber.from(10).pow(18),
-          amountMin: 1,
+          amount: BigNumber.from(10).pow(18),
         },
       ];
-      await router.addLiquidityBalanced(
-        liquidityInput,
-        pool.address,
-        alice.address,
-        2 * Date.now()
-      );
+      await router.addLiquidity(liquidityInput, pool.address, 1, aliceEncoded);
 
       let finalTotalSupply = await pool.totalSupply();
       let finalPoolWethBalance = await bento.balanceOf(
@@ -276,43 +269,7 @@ describe("Router", function () {
         intermediatePoolWethBalance.add(BigNumber.from(10).pow(17))
       );
       expect(finalPoolSushiBalance).eq(
-        intermediatePoolSushiBalance.add(BigNumber.from(10).pow(17))
-      );
-      expect(
-        finalPoolWethBalance
-          .mul(BigNumber.from(10).pow(36))
-          .div(finalTotalSupply)
-      ).eq(
-        initialPoolWethBalance
-          .mul(BigNumber.from(10).pow(36))
-          .div(initialTotalSupply)
-      );
-      expect(
-        finalPoolWethBalance
-          .mul(BigNumber.from(10).pow(36))
-          .div(finalTotalSupply)
-      ).eq(
-        intermediatePoolWethBalance
-          .mul(BigNumber.from(10).pow(36))
-          .div(intermediateTotalSupply)
-      );
-      expect(
-        finalPoolSushiBalance
-          .mul(BigNumber.from(10).pow(36))
-          .div(finalTotalSupply)
-      ).eq(
-        initialPoolSushiBalance
-          .mul(BigNumber.from(10).pow(36))
-          .div(initialTotalSupply)
-      );
-      expect(
-        finalPoolSushiBalance
-          .mul(BigNumber.from(10).pow(36))
-          .div(finalTotalSupply)
-      ).eq(
-        intermediatePoolSushiBalance
-          .mul(BigNumber.from(10).pow(36))
-          .div(intermediateTotalSupply)
+        intermediatePoolSushiBalance.add(BigNumber.from(10).pow(18))
       );
     });
 
@@ -334,12 +291,11 @@ describe("Router", function () {
           amount: BigNumber.from(10).pow(18),
         },
       ];
-      await router.addLiquidityUnbalanced(
+      await router.addLiquidity(
         liquidityInputOptimal,
         pool.address,
-        alice.address,
-        2 * Date.now(),
-        1
+        1,
+        aliceEncoded
       );
 
       let intermediateTotalSupply = await pool.totalSupply();
@@ -372,12 +328,11 @@ describe("Router", function () {
           amount: BigNumber.from(10).pow(18),
         },
       ];
-      await router.addLiquidityUnbalanced(
+      await router.addLiquidity(
         liquidityInputOptimal,
         pool.address,
-        alice.address,
-        2 * Date.now(),
-        1
+        1,
+        aliceEncoded
       );
 
       let finalTotalSupply = await pool.totalSupply();
@@ -397,7 +352,7 @@ describe("Router", function () {
         finalPoolWethBalance
           .mul(BigNumber.from(10).pow(36))
           .div(finalTotalSupply)
-      ).eq(
+      ).gt(
         initialPoolWethBalance
           .mul(BigNumber.from(10).pow(36))
           .div(initialTotalSupply)
@@ -415,7 +370,7 @@ describe("Router", function () {
         finalPoolSushiBalance
           .mul(BigNumber.from(10).pow(36))
           .div(finalTotalSupply)
-      ).eq(
+      ).lt(
         initialPoolSushiBalance
           .mul(BigNumber.from(10).pow(36))
           .div(initialTotalSupply)
@@ -434,20 +389,18 @@ describe("Router", function () {
     it("Should swap some tokens", async function () {
       let amountIn = BigNumber.from(10).pow(18);
       let expectedAmountOut = await pool.getAmountOut(
-        weth.address,
-        sushi.address,
-        amountIn
+        encodedTokenAmount(weth.address, amountIn)
       );
       expect(expectedAmountOut).gt(1);
       let params = {
-        tokenIn: weth.address,
-        tokenOut: sushi.address,
-        pool: pool.address,
-        recipient: alice.address,
-        unwrapBento: false,
-        deadline: 2 * Date.now(),
         amountIn: amountIn,
-        amountOutMinimum: 1,
+        amountOutMinimum: expectedAmountOut,
+        pool: pool.address,
+        tokenIn: weth.address,
+        data: ethers.utils.defaultAbiCoder.encode(
+          ["address", "address", "bool"],
+          [weth.address, alice.address, false]
+        ),
       };
       let oldAliceWethBalance = await bento.balanceOf(
         weth.address,
@@ -469,32 +422,30 @@ describe("Router", function () {
       expect(await bento.balanceOf(weth.address, alice.address)).eq(
         oldAliceWethBalance.sub(amountIn)
       );
-      expect(await bento.balanceOf(sushi.address, alice.address)).eq(
-        oldAliceSushiBalance.add(expectedAmountOut)
+      expect(await bento.balanceOf(sushi.address, alice.address)).gt(
+        oldAliceSushiBalance
       );
       expect(await bento.balanceOf(weth.address, pool.address)).eq(
         oldPoolWethBalance.add(amountIn)
       );
-      expect(await bento.balanceOf(sushi.address, pool.address)).eq(
-        oldPoolSushiBalance.sub(expectedAmountOut)
+      expect(await bento.balanceOf(sushi.address, pool.address)).lt(
+        oldPoolSushiBalance
       );
 
       amountIn = expectedAmountOut;
       expectedAmountOut = await pool.getAmountOut(
-        sushi.address,
-        weth.address,
-        amountIn
+        encodedTokenAmount(sushi.address, amountIn)
       );
       expect(expectedAmountOut).lt(BigNumber.from(10).pow(18));
       params = {
-        tokenIn: sushi.address,
-        tokenOut: weth.address,
-        pool: pool.address,
-        recipient: alice.address,
-        unwrapBento: true,
-        deadline: 2 * Date.now(),
         amountIn: amountIn,
         amountOutMinimum: expectedAmountOut,
+        pool: pool.address,
+        tokenIn: sushi.address,
+        data: ethers.utils.defaultAbiCoder.encode(
+          ["address", "address", "bool"],
+          [sushi.address, alice.address, true]
+        ),
       };
 
       await router.exactInputSingle(params);
@@ -513,20 +464,17 @@ describe("Router", function () {
 
       amountIn = expectedAmountOut;
       expectedAmountOut = await pool.getAmountOut(
-        weth.address,
-        sushi.address,
-        amountIn
+        encodedTokenAmount(weth.address, amountIn)
       );
       params = {
-        tokenIn: weth.address,
-        tokenOut: sushi.address,
-        pool: pool.address,
-        recipient: alice.address,
-        unwrapBento: false,
-        deadline: 2 * Date.now(),
         amountIn: amountIn,
         amountOutMinimum: expectedAmountOut,
-        context: "0x",
+        pool: pool.address,
+        tokenIn: weth.address,
+        data: ethers.utils.defaultAbiCoder.encode(
+          ["address", "address", "bool"],
+          [weth.address, alice.address, false]
+        ),
       };
 
       oldAliceWethBalance = await bento.balanceOf(weth.address, alice.address);
@@ -537,7 +485,7 @@ describe("Router", function () {
       oldPoolWethBalance = await bento.balanceOf(weth.address, pool.address);
       oldPoolSushiBalance = await bento.balanceOf(sushi.address, pool.address);
 
-      await router.exactInputSingleWithContext(params, { gasLimit: 1000000 });
+      await router.exactInputSingle(params);
 
       expect(await bento.balanceOf(weth.address, alice.address)).lt(
         oldAliceWethBalance
@@ -556,24 +504,32 @@ describe("Router", function () {
     it("Should handle multi hop swaps", async function () {
       let amountIn = BigNumber.from(10).pow(18);
       let expectedAmountOutSingleHop = await pool.getAmountOut(
-        weth.address,
-        sushi.address,
-        amountIn
+        encodedTokenAmount(weth.address, amountIn)
       );
       expect(expectedAmountOutSingleHop).gt(1);
       let params = {
-        path: [
-          { tokenIn: weth.address, pool: pool.address },
-          { tokenIn: sushi.address, pool: daiSushiPool.address },
-          { tokenIn: dai.address, pool: daiWethPool.address },
-          { tokenIn: weth.address, pool: pool.address },
-        ],
+        tokenIn: weth.address,
         tokenOut: sushi.address,
-        recipient: alice.address,
-        unwrapBento: false,
-        deadline: 2 * Date.now(),
         amountIn: amountIn,
         amountOutMinimum: 1,
+        path: [
+          {
+            pool: pool.address,
+            data: encodedSwapData(weth.address, daiSushiPool.address, false),
+          },
+          {
+            pool: daiSushiPool.address,
+            data: encodedSwapData(sushi.address, daiWethPool.address, false),
+          },
+          {
+            pool: daiWethPool.address,
+            data: encodedSwapData(dai.address, pool.address, false),
+          },
+          {
+            pool: pool.address,
+            data: encodedSwapData(weth.address, alice.address, false),
+          },
+        ],
       };
 
       let oldAliceWethBalance = await bento.balanceOf(
@@ -609,153 +565,18 @@ describe("Router", function () {
       );
     });
 
-    it("Should add balanced liquidity to unbalanced pool", async function () {
-      let initialTotalSupply = await pool.totalSupply();
-      let initialPoolWethBalance = await bento.balanceOf(
-        weth.address,
-        pool.address
-      );
-      let initialPoolSushiBalance = await bento.balanceOf(
-        sushi.address,
-        pool.address
-      );
-      let liquidityInput = [
-        {
-          token: weth.address,
-          native: false,
-          amountDesired: BigNumber.from(10).pow(18),
-          amountMin: 1,
-        },
-        {
-          token: sushi.address,
-          native: false,
-          amountDesired: BigNumber.from(10).pow(18),
-          amountMin: 1,
-        },
-      ];
-      await router.addLiquidityBalanced(
-        liquidityInput,
-        pool.address,
-        alice.address,
-        2 * Date.now()
-      );
-      let intermediateTotalSupply = await pool.totalSupply();
-      let intermediatePoolWethBalance = await bento.balanceOf(
-        weth.address,
-        pool.address
-      );
-      let intermediatePoolSushiBalance = await bento.balanceOf(
-        sushi.address,
-        pool.address
-      );
-
-      expect(intermediateTotalSupply).gt(initialTotalSupply);
-      expect(intermediatePoolWethBalance).eq(
-        initialPoolWethBalance.add(BigNumber.from(10).pow(18))
-      );
-      expect(intermediatePoolSushiBalance).gt(initialPoolSushiBalance);
-      expect(intermediatePoolSushiBalance).lt(
-        initialPoolSushiBalance.add(BigNumber.from(10).pow(18))
-      );
-
-      // Swap fee deducted
-      expect(
-        intermediatePoolWethBalance
-          .mul(BigNumber.from(10).pow(36))
-          .div(intermediateTotalSupply)
-      ).lte(
-        initialPoolWethBalance
-          .mul(BigNumber.from(10).pow(36))
-          .div(initialTotalSupply)
-      );
-      expect(
-        intermediatePoolSushiBalance
-          .mul(BigNumber.from(10).pow(36))
-          .div(intermediateTotalSupply)
-      ).lte(
-        initialPoolSushiBalance
-          .mul(BigNumber.from(10).pow(36))
-          .div(initialTotalSupply)
-      );
-
-      liquidityInput = [
-        {
-          token: sushi.address,
-          native: false,
-          amountDesired: BigNumber.from(10).pow(18),
-          amountMin: 1,
-        },
-        {
-          token: weth.address,
-          native: false,
-          amountDesired: BigNumber.from(10).pow(17),
-          amountMin: 1,
-        },
-      ];
-      await router.addLiquidityBalanced(
-        liquidityInput,
-        pool.address,
-        alice.address,
-        2 * Date.now()
-      );
-
-      let finalTotalSupply = await pool.totalSupply();
-      let finalPoolWethBalance = await bento.balanceOf(
-        weth.address,
-        pool.address
-      );
-      let finalPoolSushiBalance = await bento.balanceOf(
-        sushi.address,
-        pool.address
-      );
-
-      expect(finalTotalSupply).gt(intermediateTotalSupply);
-      expect(finalPoolWethBalance).eq(
-        intermediatePoolWethBalance.add(BigNumber.from(10).pow(17))
-      );
-      expect(finalPoolSushiBalance).gt(intermediatePoolSushiBalance);
-      expect(finalPoolSushiBalance).lt(
-        intermediatePoolSushiBalance.add(BigNumber.from(10).pow(17))
-      );
-
-      // Using 18 decimal precision rather than 36 here to accommodate for 1wei rounding errors
-      expect(
-        finalPoolWethBalance
-          .mul(BigNumber.from(10).pow(18))
-          .div(finalTotalSupply)
-      ).eq(
-        intermediatePoolWethBalance
-          .mul(BigNumber.from(10).pow(18))
-          .div(intermediateTotalSupply)
-      );
-      expect(
-        finalPoolSushiBalance
-          .mul(BigNumber.from(10).pow(18))
-          .div(finalTotalSupply)
-      ).eq(
-        intermediatePoolSushiBalance
-          .mul(BigNumber.from(10).pow(18))
-          .div(intermediateTotalSupply)
-      );
-    });
-
     it("Should swap some native tokens", async function () {
       let amountIn = BigNumber.from(10).pow(18);
       let expectedAmountOut = await pool.getAmountOut(
-        weth.address,
-        sushi.address,
-        amountIn
+        encodedTokenAmount(weth.address, amountIn)
       );
       expect(expectedAmountOut).gt(1);
       let params = {
-        tokenIn: weth.address,
-        tokenOut: sushi.address,
-        pool: pool.address,
-        recipient: alice.address,
-        unwrapBento: true,
-        deadline: 2 * Date.now(),
         amountIn: amountIn,
-        amountOutMinimum: 1,
+        amountOutMinimum: expectedAmountOut,
+        pool: pool.address,
+        tokenIn: weth.address,
+        data: encodedSwapData(weth.address, alice.address, true),
       };
 
       let oldAliceWethBalance = await weth.balanceOf(alice.address);
@@ -800,20 +621,15 @@ describe("Router", function () {
 
       amountIn = expectedAmountOut;
       expectedAmountOut = await pool.getAmountOut(
-        sushi.address,
-        weth.address,
-        amountIn
+        encodedTokenAmount(sushi.address, amountIn)
       );
       expect(expectedAmountOut).lt(BigNumber.from(10).pow(18));
       params = {
-        tokenIn: sushi.address,
-        tokenOut: weth.address,
-        pool: pool.address,
-        recipient: alice.address,
-        unwrapBento: false,
-        deadline: 2 * Date.now(),
         amountIn: amountIn,
         amountOutMinimum: expectedAmountOut,
+        pool: pool.address,
+        tokenIn: sushi.address,
+        data: encodedSwapData(sushi.address, alice.address, false),
       };
 
       oldAliceWethBalance = await weth.balanceOf(alice.address);
@@ -841,3 +657,17 @@ describe("Router", function () {
     });
   });
 });
+
+function encodedTokenAmount(token, amount) {
+  return ethers.utils.defaultAbiCoder.encode(
+    ["address", "uint256"],
+    [token, amount]
+  );
+}
+
+function encodedSwapData(tokenIn, to, unwrapBento) {
+  return ethers.utils.defaultAbiCoder.encode(
+    ["address", "address", "bool"],
+    [tokenIn, to, unwrapBento]
+  );
+}

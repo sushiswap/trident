@@ -33,11 +33,13 @@ const deployFunction: DeployFunction = async function ({
     bentoBoxV1Address = BENTOBOX_ADDRESS[chainId as ChainId];
   }
 
-  await deploy("MasterDeployer", {
+  const { address } = await deploy("MasterDeployer", {
     from: deployer,
     args: [17, feeTo, bentoBoxV1Address],
     deterministicDeployment: false,
   });
+
+  console.log("MasterDeployer deployed at ", address);
 };
 
 export default deployFunction;

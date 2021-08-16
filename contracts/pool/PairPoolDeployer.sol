@@ -25,8 +25,8 @@ contract PairPoolDeployer {
         require(token0 < token1, "PairPoolDeployer: INVALID_TOKEN_ORDER");
         require(configAddress[deployData] == address(0), "PairPoolDeployer: POOL_ALREADY_DEPLOYED");
 
-        uint256 pairNonce = pools[token0][token1].length;
-        bytes32 salt = keccak256(abi.encodePacked(token0, token1, pairNonce));
+        // NB Salt is not actually needed since creationCodeWithConfig already contains the salt.
+        bytes32 salt = keccak256(deployData);
 
         bytes memory creationCodeWithConfig = abi.encodePacked(creationCode, abi.encode(deployData, masterDeployer));
 
@@ -42,5 +42,18 @@ contract PairPoolDeployer {
 
     function poolsCount(address token0, address token1) external view returns (uint256 count) {
         count = pools[token0][token1].length;
+    }
+
+    function getPools(
+        address token0,
+        address token1,
+        uint256 startIndex,
+        uint256 endIndex
+    ) external view returns (address[] memory pairPools) {
+        pairPools = new address[](endIndex - startIndex);
+        for (uint256 i = 0; startIndex < endIndex; i++) {
+            pairPools[i] = pools[token0][token1][startIndex];
+            startIndex++;
+        }
     }
 }
