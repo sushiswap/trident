@@ -42,6 +42,12 @@ contract IndexPool is IPool, TridentERC20 {
     uint256 public totalWeight;
 
     uint256 internal unlocked;
+    modifier lock() {
+        require(unlocked == 1, "LOCKED");
+        unlocked = 2;
+        _;
+        unlocked = 1;
+    }
 
     mapping(address => Record) public records;
     struct Record {
@@ -86,9 +92,7 @@ contract IndexPool is IPool, TridentERC20 {
         unlocked = 1;
     }
 
-    function mint(bytes calldata data) public override returns (uint256 liquidity) {
-        require(unlocked == 1, "LOCKED");
-        unlocked = 2;
+    function mint(bytes calldata data) public override lock returns (uint256 liquidity) {
         (address recipient, uint256 toMint) = abi.decode(data, (address, uint256));
         
         uint256 ratio = div(toMint, totalSupply);
@@ -107,12 +111,9 @@ contract IndexPool is IPool, TridentERC20 {
 
         _mint(recipient, toMint);
         liquidity = toMint;
-        unlocked = 1;
     }
 
-    function burn(bytes calldata data) public override returns (IPool.TokenAmount[] memory withdrawnAmounts) {
-        require(unlocked == 1, "LOCKED");
-        unlocked = 2;
+    function burn(bytes calldata data) public override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
         (address recipient, bool unwrapBento, uint256 toBurn) = abi.decode(data, (address, bool, uint256));
         
         uint256 ratio = div(toBurn, totalSupply);
@@ -131,13 +132,9 @@ contract IndexPool is IPool, TridentERC20 {
             withdrawnAmounts[i] = TokenAmount({token: tokenOut, amount: amountOut});
             emit Burn(msg.sender, tokenOut, amountOut, recipient);
         }
-        
-        unlocked = 1;
     }
 
-    function burnSingle(bytes calldata data) public override returns (uint256 amount) {
-        require(unlocked == 1, "LOCKED");
-        unlocked = 2;
+    function burnSingle(bytes calldata data) public override lock returns (uint256 amount) {
         (address tokenOut, address recipient, bool unwrapBento, uint256 toBurn) = abi.decode(
             data,
             (address, address, bool, uint256)
@@ -162,12 +159,11 @@ contract IndexPool is IPool, TridentERC20 {
 
         _burn(address(this), toBurn);
         _transfer(tokenOut, amount, recipient, unwrapBento);
-        unlocked = 1;
 
         emit Burn(msg.sender, tokenOut, amount, recipient);
     }
 
-    function swap(bytes calldata data) public override returns (uint256 amountOut) {
+    function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
         require(unlocked == 1, "LOCKED");
         unlocked = 2;
         (address tokenIn, address tokenOut, address recipient, bool unwrapBento, uint256 amountIn) = abi.decode(
@@ -195,7 +191,7 @@ contract IndexPool is IPool, TridentERC20 {
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
 
-    function flashSwap(bytes calldata data) public override returns (uint256 amountOut) {
+    function flashSwap(bytes calldata data) public override lock returns (uint256 amountOut) {
         require(unlocked == 1, "LOCKED");
         unlocked = 2;
         (
