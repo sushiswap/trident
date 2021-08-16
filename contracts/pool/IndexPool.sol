@@ -331,24 +331,15 @@ contract IndexPool is IPool, TridentERC20 {
     }
     
     function mul(uint256 a, uint256 b) internal pure returns (uint256 c2) {
-        unchecked {
-            uint256 c0 = a * b;
-            require(a == 0 || c0 / a == b, "MUL_OVERFLOW");
-            uint256 c1 = c0 + (BASE / 2);
-            require(c1 >= c0, "MUL_OVERFLOW");
-            c2 = c1 / BASE;
-        }
+        uint256 c0 = a * b;
+        uint256 c1 = c0 + (BASE / 2);
+        c2 = c1 / BASE;
     }
     
     function div(uint256 a, uint256 b) internal pure returns (uint256 c2) {
-        unchecked {
-            require(b != 0, "DIV_ZERO");
-            uint256 c0 = a * BASE;
-            require(a == 0 || c0 / a == BASE, "DIV_INTERNAL"); 
-            uint256 c1 = c0 + (b / 2);
-            require(c1 >= c0, "DIV_INTERNAL"); 
-            c2 = c1 / b;
-        }
+        uint256 c0 = a * BASE;
+        uint256 c1 = c0 + (b / 2);
+        c2 = c1 / b;
     }
     
     function getAmountOut(bytes calldata data) public view override returns (uint256 amountOut) {
