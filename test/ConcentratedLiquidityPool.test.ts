@@ -31,11 +31,25 @@ describe.only("Concentrated liquidity pool", function () {
     const Pool = await ethers.getContractFactory("ConcentratedLiquidityPool");
     const Bento = await ethers.getContractFactory("BentoBoxV1");
     const MasterDeployer = await ethers.getContractFactory("MasterDeployer");
-    const PoolFactory = await ethers.getContractFactory("ConcentratedLiquidityPoolFactory");
+    const PoolFactory = await ethers.getContractFactory(
+      "ConcentratedLiquidityPoolFactory"
+    );
     const TickMathTest = await ethers.getContractFactory("TickMathTest");
-    weth = await ERC20.deploy("WETH", "ETH", totalSupply);
-    dai = await ERC20.deploy("DAI", "DAI", totalSupply);
-    usd = await ERC20.deploy("USD", "USD", totalSupply);
+    weth = await ERC20.deploy("", "", totalSupply);
+    dai = await ERC20.deploy("", "", totalSupply);
+    usd = await ERC20.deploy("", "", totalSupply);
+    // lets require dai < weth to match what is on chain
+    if (dai.address.toUpperCase() > weth.address.toUpperCase()) {
+      let tmp = { ...weth };
+      weth = { ...dai };
+      dai = tmp;
+    }
+    // and weth < usd so the prices make sense
+    if (weth.address.toUpperCase() > usd.address.toUpperCase()) {
+      let tmp = { ...weth };
+      weth = { ...usd };
+      usd = tmp;
+    }
     tickMath = await TickMathTest.deploy();
     bento = await Bento.deploy(weth.address);
     await weth.approve(bento.address, totalSupply);
@@ -82,15 +96,9 @@ describe.only("Concentrated liquidity pool", function () {
     // corresponds to tick -75616
     let sqrtPrice = BigNumber.from("1807174424252647735792984898");
 
-    // sort tokens for pool0
-    const [token0, token1]: string[] =
-      dai.address.toUpperCase() < weth.address.toUpperCase()
-        ? [dai.address, weth.address]
-        : [weth.address, dai.address];
-
     let deployData0 = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint24", "uint160"],
-      [token0, token1, 1000, sqrtPrice] 
+      [dai.address, weth.address, 1000, sqrtPrice]
     );
 
     // deploy pool0
@@ -104,19 +112,13 @@ describe.only("Concentrated liquidity pool", function () {
         ).wait()
       ).events[0].args[1]
     );
-    
+
     // current eth price is $2500
     sqrtPrice = BigNumber.from("50").mul("0x1000000000000000000000000");
 
-    // sort tokens for pool1
-    const [token2, token3]: string[] =
-      weth.address.toUpperCase() < usd.address.toUpperCase()
-        ? [usd.address, weth.address]
-        : [weth.address, usd.address];
-
     let deployData1 = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint24", "uint160"],
-      [token2, token3, 1000, sqrtPrice] 
+      [weth.address, usd.address, 1000, sqrtPrice]
     );
 
     // deploy pool1
@@ -237,20 +239,19 @@ describe.only("Concentrated liquidity pool", function () {
       liquidity.add(startingLiquidity).toString(),
       "Didn't add right amount of liquidity"
     );
-    expect(
-      (await bento.balanceOf(token0, pool0.address)).toString()
-    ).to.be.eq(
+    expect((await bento.balanceOf(token0, pool0.address)).toString()).to.be.eq(
       "2683758334569795392629",
       "Didn't calculate token0 (dx) amount correctly"
     );
-    expect(
-      (await bento.balanceOf(token1, pool0.address)).toString()
-    ).to.be.eq(dy.toString(), "Didn't calculate token1 (dy) amount correctly");
+    expect((await bento.balanceOf(token1, pool0.address)).toString()).to.be.eq(
+      dy.toString(),
+      "Didn't calculate token1 (dy) amount correctly"
+    );
   });
 
   it("pool0 - shouldn't allow adding lower odd ticks", async () => {
-    const lower = -80068 + 1; 
-    const upper = -69081; 
+    const lower = -80068 + 1;
+    const upper = -69081;
     const priceLower = await tickMath.getSqrtRatioAtTick(lower);
     const priceUpper = await tickMath.getSqrtRatioAtTick(upper);
     const currentPrice = await pool0.price();
@@ -264,26 +265,21 @@ describe.only("Concentrated liquidity pool", function () {
 
     const dx = getDx(liquidity, currentPrice, priceUpper);
 
-    const [token0, token1]: string[] =
-      dai.address.toUpperCase() < weth.address.toUpperCase()
-        ? [dai.address, weth.address]
-        : [weth.address, dai.address];
+    await bento.transfer(dai.address, alice.address, pool0.address, dx);
 
-    await bento.transfer(token0, alice.address, pool0.address, dx);
-
-    await bento.transfer(token1, alice.address, pool0.address, dy);
+    await bento.transfer(weth.address, alice.address, pool0.address, dy);
 
     let mintData = ethers.utils.defaultAbiCoder.encode(
       ["int24", "int24", "int24", "int24", "uint128", "address"],
       [-887272, lower, lower, upper, liquidity, alice.address]
     );
 
-    await expect(pool0.mint(mintData)).to.be.revertedWith("LOWER_EVEN")
+    await expect(pool0.mint(mintData)).to.be.revertedWith("Lower even");
   });
 
   it("pool0 - shouldn't allow adding upper even ticks", async () => {
-    const lower = -80068; 
-    const upper = -69081 - 1; 
+    const lower = -80068;
+    const upper = -69081 - 1;
     const priceLower = await tickMath.getSqrtRatioAtTick(lower);
     const priceUpper = await tickMath.getSqrtRatioAtTick(upper);
     const currentPrice = await pool0.price();
@@ -297,45 +293,40 @@ describe.only("Concentrated liquidity pool", function () {
 
     const dx = getDx(liquidity, currentPrice, priceUpper);
 
-    const [token0, token1]: string[] =
-      dai.address.toUpperCase() < weth.address.toUpperCase()
-        ? [dai.address, weth.address]
-        : [weth.address, dai.address];
+    await bento.transfer(dai.address, alice.address, pool0.address, dx);
 
-    await bento.transfer(token0, alice.address, pool0.address, dx);
-
-    await bento.transfer(token1, alice.address, pool0.address, dy);
+    await bento.transfer(weth.address, alice.address, pool0.address, dy);
 
     let mintData = ethers.utils.defaultAbiCoder.encode(
       ["int24", "int24", "int24", "int24", "uint128", "address"],
       [-887272, lower, lower, upper, liquidity, alice.address]
     );
 
-    await expect(pool0.mint(mintData)).to.be.revertedWith("UPPER_ODD")
+    await expect(pool0.mint(mintData)).to.be.revertedWith("Upper odd");
   });
 
   it("pool0 - shouldn't allow adding ticks outside of min bounds", async () => {
     const lower = -887272 - 1; // exceed MIN_TICK
     const upper = -lower - 1;
-    
+
     let mintData = ethers.utils.defaultAbiCoder.encode(
       ["int24", "int24", "int24", "int24", "uint128", "address"],
       [-887272, lower, lower, upper, getBigNumber(10), alice.address]
     );
 
-    await expect(pool0.mint(mintData)).to.be.revertedWith("T")
+    await expect(pool0.mint(mintData)).to.be.revertedWith("T");
   });
 
   it("pool0 - shouldn't allow adding ticks outside of max bounds", async () => {
     const lower = -887272;
     const upper = -lower; // exceed MAX_TICK
-    
+
     let mintData = ethers.utils.defaultAbiCoder.encode(
       ["int24", "int24", "int24", "int24", "uint128", "address"],
       [-887272, lower, lower, upper, getBigNumber(10), alice.address]
     );
 
-    await expect(pool0.mint(mintData)).to.be.revertedWith("T")
+    await expect(pool0.mint(mintData)).to.be.revertedWith("T");
   });
 
   // TO DO check that the existing ticks & liquidity make sense
@@ -368,26 +359,11 @@ describe.only("Concentrated liquidity pool", function () {
       await bento.balanceOf(usd.address, alice.address)
     );
 
-    expect(oldLiq).to.be.eq(
-      newLiq,
-      "Liquidity changed from 0 input"
-    );
-    expect(oldTick).to.be.eq(
-      newTick,
-      "Tick changed from 0 input"
-    );
-    expect(usdPaid).to.be.eq(
-      0,
-      "Token paid changed from 0 input"
-    );
-    expect(ethReceived).to.be.eq(
-      0,
-      "Token paid changed from 0 input"
-    );
-    expect(oldPrice).to.be.eq(
-      newPrice,
-      "Price changed from 0 input"
-    );
+    expect(oldLiq).to.be.eq(newLiq, "Liquidity changed from 0 input");
+    expect(oldTick).to.be.eq(newTick, "Tick changed from 0 input");
+    expect(usdPaid).to.be.eq(0, "Token paid changed from 0 input");
+    expect(ethReceived).to.be.eq(0, "Token paid changed from 0 input");
+    expect(oldPrice).to.be.eq(newPrice, "Price changed from 0 input");
   });
 
   it("pool1 - Should execute trade within current tick - one for zero", async () => {
