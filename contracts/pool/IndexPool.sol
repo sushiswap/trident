@@ -205,6 +205,7 @@ contract IndexPool is IPool, TridentERC20 {
         require(amountIn <= mul(inRecord.balance, MAX_IN_RATIO), "MAX_IN_RATIO");
 
         amountOut = _getAmountOut(inRecord.balance, inRecord.weight, outRecord.balance, outRecord.weight, amountIn);
+
         ITridentCallee(msg.sender).tridentSwapCallback(context);
         // @dev Check Trident router has sent amount for skim into pool.
         require(_balance(tokenIn) >= amountIn + inRecord.balance, "NOT_RECEIVED");
