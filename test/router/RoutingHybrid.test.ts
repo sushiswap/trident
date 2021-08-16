@@ -155,7 +155,9 @@ describe("HybridPool Typescript == Solidity check", function () {
         : getIntegerRandomValueWithMin(res1exp, MINIMUM_LIQUIDITY);
     await bento.transfer(usdt.address, alice.address, pool.address, bnVal0);
     await bento.transfer(usdc.address, alice.address, pool.address, bnVal1);
-    await pool.mint(alice.address);
+    await pool.mint(
+      ethers.utils.defaultAbiCoder.encode(["address"], [alice.address])
+    );
 
     const poolInfo = {
       type: "Hybrid",
@@ -175,7 +177,9 @@ describe("HybridPool Typescript == Solidity check", function () {
     const [t0, t1] = swapDirection
       ? [usdt.address, usdc.address]
       : [usdc.address, usdt.address];
-    const amountOutPoolBN = await pool.getAmountOut(t0, t1, bnValue);
+    const amountOutPoolBN = await pool.getAmountOut(
+      ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [t0, bnValue])
+    );
     const amountOutPool = amountOutPoolBN.toString();
 
     const amountOutPrediction = calcOutByIn(
