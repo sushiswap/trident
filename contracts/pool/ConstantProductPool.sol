@@ -102,14 +102,14 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
         uint256 computed = TridentMath.sqrt(balances.amount0 * balances.amount1);
         if (_totalSupply == 0) {
+            _mint(address(0), MINIMUM_LIQUIDITY);
             address migrator = masterDeployer.migrator();
             if (msg.sender == migrator) {
                 liquidity = IMigrator(migrator).desiredLiquidity();
-                require(liquidity > 0 && liquidity != type(uint256).max, "Bad desired liquidity");
+                require(liquidity > 0 && liquidity != type(uint256).max, "BAD_DESIRED_LIQUIDITY");
             } else {
-                require(migrator == address(0), "Must not have migrator");
-                liquidity = computed - MINIMUM_LIQUIDITY;
-                _mint(address(0), MINIMUM_LIQUIDITY);
+                require(migrator == address(0), "ONLY_MIGRATOR");
+                liquidity = computed;
             }
         } else {
             uint256 k = TridentMath.sqrt(reserves.amount0 * reserves.amount1);
