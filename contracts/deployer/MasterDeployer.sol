@@ -13,6 +13,7 @@ contract MasterDeployer is TridentOwnable {
     mapping(address => bool) public whitelistedFactories;
 
     uint256 public barFee;
+    address public migrator;
 
     address public immutable barFeeTo;
     address public immutable bento;
@@ -57,5 +58,9 @@ contract MasterDeployer is TridentOwnable {
 
     function poolsCount() external view returns (uint256 count) {
         count = pools.length;
+    }
+
+    function setMigrator(address _migrator) external onlyOwner {
+        migrator = _migrator;
     }
 }
