@@ -16,7 +16,7 @@ contract IndexPool is IPool, TridentERC20 {
 
     uint256 public immutable swapFee;
 
-    address internal immutable barFeeTo;
+    address public immutable barFeeTo;
     address public immutable bento;
     address public immutable masterDeployer;
 
@@ -39,7 +39,7 @@ contract IndexPool is IPool, TridentERC20 {
     uint256 internal constant MAX_OUT_RATIO = (BASE / 3) + 1;
 
     address[] internal tokens;
-    uint256 public totalWeight;
+    uint256 internal totalWeight;
 
     uint256 internal unlocked;
     modifier lock() {
@@ -81,7 +81,6 @@ contract IndexPool is IPool, TridentERC20 {
         // @dev This burns initial LP supply.
         _mint(address(0), INIT_POOL_SUPPLY); 
 
-        // @dev These low-level calls read variables from `masterDeployer`.
         (, bytes memory _bento) = _masterDeployer.staticcall(abi.encodeWithSelector(0x4da31827)); // @dev bento().
         (, bytes memory _barFeeTo) = _masterDeployer.staticcall(abi.encodeWithSelector(0x0c0a0cd2)); // @dev barFeeTo().
         
@@ -164,8 +163,6 @@ contract IndexPool is IPool, TridentERC20 {
     }
 
     function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
-        require(unlocked == 1, "LOCKED");
-        unlocked = 2;
         (address tokenIn, address tokenOut, address recipient, bool unwrapBento, uint256 amountIn) = abi.decode(
             data,
             (address, address, address, bool, uint256)
@@ -186,14 +183,11 @@ contract IndexPool is IPool, TridentERC20 {
         outRecord.balance -= amountOut;
 
         _transfer(tokenOut, amountOut, recipient, unwrapBento);
-        unlocked = 1;
 
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
 
     function flashSwap(bytes calldata data) public override lock returns (uint256 amountOut) {
-        require(unlocked == 1, "LOCKED");
-        unlocked = 2;
         (
             address tokenIn,
             address tokenOut,
@@ -211,7 +205,7 @@ contract IndexPool is IPool, TridentERC20 {
         require(amountIn <= mul(inRecord.balance, MAX_IN_RATIO), "MAX_IN_RATIO");
 
         amountOut = _getAmountOut(inRecord.balance, inRecord.weight, outRecord.balance, outRecord.weight, amountIn);
-        ITridentCallee(recipient).tridentCallback(tokenIn, tokenOut, amountIn, amountOut, context);
+        ITridentCallee(msg.sender).tridentSwapCallback(context);
         // @dev Check Trident router has sent amount for skim into pool.
         require(_balance(tokenIn) >= amountIn + inRecord.balance, "NOT_RECEIVED");
 
@@ -219,7 +213,6 @@ contract IndexPool is IPool, TridentERC20 {
         outRecord.balance -= amountOut;
 
         _transfer(tokenOut, amountOut, recipient, unwrapBento);
-        unlocked = 1;
 
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
