@@ -202,7 +202,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         if (tokenIn == address(token0)) {
             amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
             _transfer(token1, amountOut, recipient, unwrapBento);
-            ITridentCallee(recipient).tridentCallback(tokenIn, token1, amountIn, amountOut, context);
+            ITridentCallee(msg.sender).tridentSwapCallback(context);
             (uint256 balance0, uint256 balance1) = _balance();
             require(balance0 - _reserve0 >= amountIn, "INSUFFICIENT_AMOUNT_IN");
             _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
@@ -211,7 +211,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
             require(tokenIn == address(token1), "INVALID_INPUT_TOKEN");
             amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
             _transfer(token0, amountOut, recipient, unwrapBento);
-            ITridentCallee(recipient).tridentCallback(tokenIn, token0, amountIn, amountOut, context);
+            ITridentCallee(msg.sender).tridentSwapCallback(context);
             (uint256 balance0, uint256 balance1) = _balance();
             require(balance1 - _reserve1 >= amountIn, "INSUFFICIENT_AMOUNT_IN");
             _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
