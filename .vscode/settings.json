@@ -10,4 +10,5 @@
   "solidity.packageDefaultDependenciesDirectory": "node_modules",
   "solidity.enabledAsYouTypeCompilationErrorCheck": true,
   "solidity.validationDelay": 1500,
+  "solidity.defaultCompiler": "localFile",
 }

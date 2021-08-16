@@ -8,7 +8,7 @@ import "../interfaces/IPool.sol";
 import "../interfaces/ITridentCallee.sol";
 import "../libraries/TridentMath.sol";
 import "./TridentERC20.sol";
-import "hardhat/console.sol";
+import "../workInProgress/IMigrator.sol";
 
 /// @notice Trident exchange pool template with constant product formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares.
@@ -87,8 +87,15 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
         uint256 computed = TridentMath.sqrt(balance0 * balance1);
         if (_totalSupply == 0) {
-            liquidity = computed - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
+            address migrator = masterDeployer.migrator();
+            if (msg.sender == migrator) {
+                liquidity = IMigrator(migrator).desiredLiquidity();
+                require(liquidity > 0 && liquidity != type(uint256).max, "BAD_DESIRED_LIQUIDITY");
+            } else {
+                require(migrator == address(0), "ONLY_MIGRATOR");
+                liquidity = computed - MINIMUM_LIQUIDITY;
+            }
         } else {
             uint256 k = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
             liquidity = ((computed - k) * _totalSupply) / k;
