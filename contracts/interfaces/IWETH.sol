@@ -4,7 +4,8 @@ pragma solidity >=0.5.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-interface IWETH is IERC20 {
+/// @notice Wrapped ETH (v9) interface.
+interface IWETH {
     function deposit() external payable;
 
     function withdraw(uint256) external;
