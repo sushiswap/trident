@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity ^0.8.0;
+pragma solidity >=0.8.0;
 
 library TridentMath {
-    /// @notice Adapted from https://github.com/abdk-consulting/abdk-libraries-solidity/blob/master/ABDKMath64x64.sol.
-    /// Copyright © 2019 by ABDK Consulting, License-Identifier: BSD-4-Clause.
-    /// @dev Calculate sqrt (x) rounding down, where x is unsigned 256-bit integer number.
+    /// @notice Calculate sqrt (x) rounding down, where `x` is unsigned 256-bit integer number.
+    /// @dev Adapted from https://github.com/abdk-consulting/abdk-libraries-solidity/blob/master/ABDKMath64x64.sol, 
+    /// © 2019 ABDK Consulting, License-Identifier: BSD-4-Clause.
     /// @param x Unsigned 256-bit integer number.
-    /// @return calculated Unsigned 256-bit integer number.
-    function sqrt(uint256 x) internal pure returns (uint256 calculated) {
+    /// @return result Sqrt result.
+    function sqrt(uint256 x) internal pure returns (uint256 result) {
         unchecked {
-            if (x == 0) calculated = 0;
+            if (x == 0) result = 0;
             else {
                 uint256 xx = x;
                 uint256 r = 1;
@@ -49,7 +49,7 @@ library TridentMath {
                 r = (r + x / r) >> 1;
                 r = (r + x / r) >> 1; // @dev Seven iterations should be enough.
                 uint256 r1 = x / r;
-                calculated = r < r1 ? r : r1;
+                result = r < r1 ? r : r1;
             }
         }
     }
