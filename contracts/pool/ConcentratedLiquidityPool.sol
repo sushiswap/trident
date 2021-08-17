@@ -197,7 +197,9 @@ contract ConcentratedLiquidityPool is IPool {
             (bool, uint256, address, bool)
         );
 
+        uint256 protocolFee;
         amountOut;
+        uint256 feeAmount;
         {
             int24 nextTickToCross = zeroForOne ? nearestTick : ticks[nearestTick].nextTick;
             uint256 currentPrice = uint256(price);
@@ -209,9 +211,7 @@ contract ConcentratedLiquidityPool is IPool {
             while (input > 0) {
                 uint256 nextTickPrice = uint256(TickMath.getSqrtRatioAtTick(nextTickToCross));
                 uint256 output;
-                uint256 feeAmount;
                 bool cross = false;
-
                 if (zeroForOne) {
                     /// @dev x for y
                     // price is going down
@@ -272,6 +272,13 @@ contract ConcentratedLiquidityPool is IPool {
                 }
 
                 feeAmount = FullMath.mulDivRoundingUp(output, swapFee, 1e6);
+
+                // calc protocolFee and converting pips to bips
+                protocolFee += FullMath.mulDivRoundingUp(feeAmount, masterDeployer.barFee(), 1e4);
+
+                // updating feeAmount based on the protocolFee
+                feeAmount -= FullMath.mulDivRoundingUp(feeAmount, masterDeployer.barFee(), 1e4);
+
                 feeGrowthGlobal += FullMath.mulDiv(feeAmount, 0x100000000000000000000000000000000, currentLiquidity);
                 amountOut += output - feeAmount;
 
@@ -312,14 +319,18 @@ contract ConcentratedLiquidityPool is IPool {
             uint128 newBalance = reserve0 + uint128(inAmount);
             require(uint256(newBalance) <= amount0, "MISSING_X_DEPOSIT");
             reserve0 = newBalance;
-            reserve1 -= uint128(amountOut);
+            reserve1 -= (uint128(amountOut) + uint128(feeAmount) + uint128(protocolFee));
+            // transfer fees to bar
+            _transfer(token1, protocolFee, barFeeTo, false);
             _transfer(token1, amountOut, recipient, unwrapBento);
             emit Swap(recipient, token0, token1, inAmount, amountOut);
         } else {
             uint128 newBalance = reserve1 + uint128(inAmount);
             require(uint256(newBalance) <= amount1, "MISSING_Y_DEPOSIT");
             reserve1 = newBalance;
-            reserve0 -= uint128(amountOut);
+            reserve0 -= (uint128(amountOut) + uint128(feeAmount) + uint128(protocolFee));
+            // transfer fees to bar
+            _transfer(token0, protocolFee, barFeeTo, false);
             _transfer(token0, amountOut, recipient, unwrapBento);
             emit Swap(recipient, token1, token0, inAmount, amountOut);
         }
@@ -591,4 +602,14 @@ contract ConcentratedLiquidityPool is IPool {
 
         nearestTick = currentNearestTick;
     }
+
+    // function setProtcolFee(uint8 feeProtocol0, uint8 feeProtocol1) internal {
+    //     require(
+    //         (feeProtocol0 == 0 || (feeProtocol0 >= 4 && feeProtocol0 <= 10)) &&
+    //             (feeProtocol1 == 0 || (feeProtocol1 >= 4 && feeProtocol1 <= 10))
+    //     );
+    //     uint8 feeProtocolOld = slot0.feeProtocol;
+    //     slot0.feeProtocol = feeProtocol0 + (feeProtocol1 << 4);
+    //     emit SetFeeProtocol(feeProtocolOld % 16, feeProtocolOld >> 4, feeProtocol0, feeProtocol1);
+    // }
 }

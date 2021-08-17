@@ -56,7 +56,7 @@ describe.only("Concentrated liquidity pool", function () {
     await dai.approve(bento.address, totalSupply);
     await usd.approve(bento.address, totalSupply);
     const masterDeployer = await MasterDeployer.deploy(
-      10,
+      5, // 5 bps
       feeTo.address,
       bento.address
     );
