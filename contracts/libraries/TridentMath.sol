@@ -2,6 +2,7 @@
 
 pragma solidity >=0.8.0;
 
+/// @notice Trident sqrt helper library.
 library TridentMath {
     /// @notice Calculate sqrt (x) rounding down, where `x` is unsigned 256-bit integer number.
     /// @dev Adapted from https://github.com/abdk-consulting/abdk-libraries-solidity/blob/master/ABDKMath64x64.sol, 
