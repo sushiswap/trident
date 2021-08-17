@@ -602,14 +602,4 @@ contract ConcentratedLiquidityPool is IPool {
 
         nearestTick = currentNearestTick;
     }
-
-    // function setProtcolFee(uint8 feeProtocol0, uint8 feeProtocol1) internal {
-    //     require(
-    //         (feeProtocol0 == 0 || (feeProtocol0 >= 4 && feeProtocol0 <= 10)) &&
-    //             (feeProtocol1 == 0 || (feeProtocol1 >= 4 && feeProtocol1 <= 10))
-    //     );
-    //     uint8 feeProtocolOld = slot0.feeProtocol;
-    //     slot0.feeProtocol = feeProtocol0 + (feeProtocol1 << 4);
-    //     emit SetFeeProtocol(feeProtocolOld % 16, feeProtocolOld >> 4, feeProtocol0, feeProtocol1);
-    // }
 }
