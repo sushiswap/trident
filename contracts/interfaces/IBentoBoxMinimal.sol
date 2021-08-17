@@ -8,6 +8,17 @@ interface IBentoBoxMinimal {
     /// @notice Balance per ERC-20 token per account in shares.
     function balanceOf(address, address) external view returns (uint256);
     
+    /// @dev Helper function to represent an `amount` of `token` in shares.
+    /// @param token The ERC-20 token.
+    /// @param amount The `token` amount.
+    /// @param roundUp If the result `share` should be rounded up.
+    /// @return share The token amount represented in shares.
+    function toShare(
+        address token,
+        uint256 amount,
+        bool roundUp
+    ) external view returns (uint256 share);
+    
     /// @dev Helper function to represent shares back into the `token` amount.
     /// @param token The ERC-20 token.
     /// @param share The amount of shares.
