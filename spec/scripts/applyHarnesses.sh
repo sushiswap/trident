@@ -42,8 +42,14 @@ perl -0777 -i -pe 's/        external\n        payable/        public\n        v
 # external checkDeadline -> public virtual checkDeadline
 perl -0777 -i -pe 's/external checkDeadline/public virtual checkDeadline/g' contracts/TridentRouter.sol
 
-# ) external { -> ) public {
-perl -0777 -i -pe 's/\) external \{/\) public \{/g' contracts/TridentRouter.sol
+
+# virtualize 
+# ) external { -> ) public virtual {
+perl -0777 -i -pe 's/\) external \{/\) public virtual \{/g' contracts/TridentRouter.sol
+# ) public { -> ) public virtual {
+perl -0777 -i -pe 's/\) public \{/\) public virtual \{/g' contracts/TridentRouter.sol
+# ) internal { -> ) internal virtual {
+perl -0777 -i -pe 's/\) internal \{/\) internal virtual \{/g' contracts/TridentRouter.sol
 
 # calldata -> memory
 perl -0777 -i -pe 's/calldata/memory/g' contracts/TridentRouter.sol
