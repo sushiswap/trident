@@ -8,7 +8,6 @@ import "../pool/ConstantProductPoolFactory.sol";
 import "../deployer/MasterDeployer.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/IBentoBoxMinimal.sol";
-import "hardhat/console.sol";
 
 interface IERC20 {
     function totalSupply() external returns (uint256);
