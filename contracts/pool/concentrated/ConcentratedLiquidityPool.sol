@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-
 pragma solidity >=0.8.0;
 
 import "../deployer/MasterDeployer.sol";
@@ -30,6 +29,7 @@ contract ConcentratedLiquidityPool is IPool {
 
     uint128 public liquidity;
     uint160 public price; /// @dev sqrt of price aka. √(y/x), multiplied by 2^96.
+
     int24 public nearestTick; /// @dev Tick that is just below the current price.
 
     uint256 public feeGrowthGlobal0; /// @dev all fee growth counters are multiplied by 2^128
@@ -54,6 +54,10 @@ contract ConcentratedLiquidityPool is IPool {
         uint256 feeGrowthInside0Last;
         uint256 feeGrowthInside1Last;
     }
+    // univ3 1% -> 200 tickSpacing
+    // univ3 0.3% pool -> 60 tickSpacing -> 0.6% between ticks
+    // univ3 0.05% pool -> 10 tickSpacing -> 0.1% between ticks
+    // 100 tickSpacing -> 1% between ticks => 2% between ticks on starting position (*stable pairs are different)
 
     bytes32 public constant override poolIdentifier = "Trident:ConcentratedLiquidity";
 
@@ -84,7 +88,7 @@ contract ConcentratedLiquidityPool is IPool {
 
         ticks[TickMath.MIN_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0);
         ticks[TickMath.MAX_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0);
-
+        // floor tick
         nearestTick = TickMath.MIN_TICK;
 
         bento = IBentoBoxMinimal(MasterDeployer(_masterDeployer).bento());
@@ -222,7 +226,7 @@ contract ConcentratedLiquidityPool is IPool {
                         uint256 liquidityPadded = currentLiquidity << 96;
                         /// @dev Calculate new price after swap: L · √𝑃 / (L + Δx · √𝑃)
                         // alternatively: L / (L / √𝑃 + Δx).
-                        uint256 newPrice = uint160(
+                        uint256 newPrice = uint256(
                             FullMath.mulDivRoundingUp(
                                 liquidityPadded,
                                 currentPrice,
@@ -286,10 +290,10 @@ contract ConcentratedLiquidityPool is IPool {
                 amountOut += output - feeAmount;
 
                 if (cross) {
-                    ticks[nextTickToCross].feeGrowthOutside0 =
-                        feeGrowthGlobal -
-                        ticks[nextTickToCross].feeGrowthOutside0;
                     if (zeroForOne) {
+                        ticks[nextTickToCross].feeGrowthOutside0 =
+                            feeGrowthGlobal -
+                            ticks[nextTickToCross].feeGrowthOutside0;
                         /// @dev Goin' left.
                         if (nextTickToCross % 2 == 0) {
                             currentLiquidity -= ticks[nextTickToCross].liquidity;
@@ -299,6 +303,9 @@ contract ConcentratedLiquidityPool is IPool {
 
                         nextTickToCross = ticks[nextTickToCross].previousTick;
                     } else {
+                        ticks[nextTickToCross].feeGrowthOutside1 =
+                            feeGrowthGlobal -
+                            ticks[nextTickToCross].feeGrowthOutside1;
                         /// @dev Goin' right.
                         if (nextTickToCross % 2 == 0) {
                             currentLiquidity += ticks[nextTickToCross].liquidity;
@@ -359,7 +366,7 @@ contract ConcentratedLiquidityPool is IPool {
         balance1 = bento.balanceOf(token1, address(this));
     }
 
-    function getPositionAssets(
+    /* function getPositionAssets(
         uint256 priceLower,
         uint256 priceUpper,
         uint256 currentPrice,
@@ -393,7 +400,7 @@ contract ConcentratedLiquidityPool is IPool {
         }
 
         emit Sync(balance0, balance1);
-    }
+    } */
 
     function updatePosition(
         address owner,
@@ -424,14 +431,19 @@ contract ConcentratedLiquidityPool is IPool {
         position.feeGrowthInside1Last = growth1current;
     }
 
+    // feeGrowthGlobal (per uint liquidity)
+    // feeGrowthOutside
+
+    // general formula for fee growth inside a range: (global - below - above)
+
     //                  u         ▼         v
-    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|---------
+    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - feeGrowthOutside(u) - feeGrowthOutside(v))
 
     //             ▼    u                   v
-    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|---------
+    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - (global - feeGrowthOutside(u)) - feeGrowthOutside(v))
 
     //                  u                   v    ▼
-    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|---------
+    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - feeGrowthOutside(u) - (global - feeGrowthOutside(v)))
 
     // fees: global, outside u, outside v - we are interested in the 'xxxx' zone
     function rangeFeeGrowth(int24 lowerTick, int24 upperTick)
