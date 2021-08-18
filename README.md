@@ -1,5 +1,18 @@
 # Trident: SushiSwap V2
+
 TRIDENT 🔱 is a newly developed AMM from Sushi. Trident is not a fork of any existing AMM -- the SushiSwap core team began development with Andre Cronje as Deriswap. This development continued on as Mirin developed by LevX. On May 12th, 2021 we began building Trident in earnest on the Mirin/Deriswap foundation.
+
+## Deployment
+
+### Kovan
+
+| Contract                   | Address                                    |
+| -------------------------- | ------------------------------------------ |
+| TridentRouter              | 0xff10F40Ab67bab987d4A34b9e3Df20037E5172c5 |
+| MasterDeployer             | 0x312b493E71EF0aECdAF7480523C114c68a298B17 |
+| ConstantProductPoolFactory | 0xBa006909bA3D273735D9223f7404Ff8c3Dc11183 |
+| HybridPoolFactory          | 0x40051B2A78897FfDfB31C817b869e18Be495Ec2C |
+| IndexPoolFactory           | 0x5215637AcBfa396b1D948CEd2D47b5c28924482f |
 
 ## Extensibility
 
@@ -11,7 +24,7 @@ Initially Trident has been developed with four pool types.
 
 ### ConstantProductPool
 
-Constant product pools are the the pools that users will be most familar with. Constant product pools are 50/50 pool, meaning you provide 50% of each of Token X and Token Y. In this pool type, swaps occur over an x*y=k constant product formula.
+Constant product pools are the the pools that users will be most familar with. Constant product pools are 50/50 pool, meaning you provide 50% of each of Token X and Token Y. In this pool type, swaps occur over an x\*y=k constant product formula.
 
 ### HybridPool
 
@@ -51,7 +64,8 @@ At Sushi we beleive deeply in the open source ecosystem of defi. Our Trident con
 ## Post Launch Roadmap
 
 - Franchise pools
-    - Following the launch of Trident the organization will begin working on franchise pools. Franchise pools are a way to allow institutional to provide liquidity on decentralized exchanges while meeting the needs of their compliance. These pools will be differentiated from the main Trident AMM and will allow institutions to whitelist liquidity providers and swappers.
+
+  - Following the launch of Trident the organization will begin working on franchise pools. Franchise pools are a way to allow institutional to provide liquidity on decentralized exchanges while meeting the needs of their compliance. These pools will be differentiated from the main Trident AMM and will allow institutions to whitelist liquidity providers and swappers.
 
 - Storage Proof TWAP
-    - The Trident implementation will allow for the presentation of a storage proof to give two simultaneous snapshots of the cummulative price. To do this, the user using the TWAP price will present a merkle proof where the block root is less than 256 blocks behind the canonical head. On chain the contracts will validate the validity of the storage proof and value to allow an instant TWAP snapshot. We have repurposed another implementation for Kashi and is currently deployed on Polygon. We are worknig on a reduced gas consumption version for a deployment on Ethereum. 
+  - The Trident implementation will allow for the presentation of a storage proof to give two simultaneous snapshots of the cummulative price. To do this, the user using the TWAP price will present a merkle proof where the block root is less than 256 blocks behind the canonical head. On chain the contracts will validate the validity of the storage proof and value to allow an instant TWAP snapshot. We have repurposed another implementation for Kashi and is currently deployed on Polygon. We are worknig on a reduced gas consumption version for a deployment on Ethereum.

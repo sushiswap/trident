@@ -18,11 +18,7 @@ import "./cli";
 import { HardhatUserConfig } from "hardhat/config";
 import { removeConsoleLog } from "hardhat-preprocessor";
 
-const accounts = {
-  mnemonic:
-    process.env.MNEMONIC ||
-    "test test test test test test test test test test test junk",
-};
+const accounts = [process.env.DEPLOYER_KEY || "0x00"];
 
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
@@ -70,6 +66,7 @@ const config: HardhatUserConfig = {
       forking: {
         enabled: process.env.FORKING === "true",
         url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
+        blockNumber: 13000000,
       },
       allowUnlimitedContractSize: true,
       live: false,
@@ -271,7 +268,7 @@ const config: HardhatUserConfig = {
   solidity: {
     compilers: [
       {
-        version: "0.8.6",
+        version: "0.8.7",
         settings: {
           optimizer: {
             enabled: true,
@@ -316,7 +313,7 @@ const config: HardhatUserConfig = {
   },
   mocha: {
     timeout: 300000,
-    bail: true,
+    //bail: true,
   },
 };
 

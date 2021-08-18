@@ -8,7 +8,6 @@ import "../interfaces/IPool.sol";
 import "../interfaces/ITridentCallee.sol";
 import "../libraries/MathUtils.sol";
 import "./TridentERC20.sol";
-import "hardhat/console.sol";
 
 /// @notice Trident exchange pool template with hybrid like-kind formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares. However, the stabeswap invariant is applied to the underlying amounts.
@@ -201,7 +200,7 @@ contract HybridPool is IPool, TridentERC20 {
             amountIn = bento.toAmount(token0, amountIn, false);
             fee = (amountIn * swapFee) / MAX_FEE;
             amountOut = _getAmountOut(amountIn - fee, _reserve0, _reserve1, true);
-            _processSwap(tokenIn, token1, recipient, amountIn, amountOut, context, unwrapBento);
+            _processSwap(token1, recipient, amountOut, context, unwrapBento);
             uint256 balance0 = bento.toAmount(token0, bento.balanceOf(token0, address(this)), false);
             require(balance0 - _reserve0 >= amountIn, "HybridPool: Insuffficient amount in");
         } else {
@@ -209,7 +208,7 @@ contract HybridPool is IPool, TridentERC20 {
             amountIn = bento.toAmount(token1, amountIn, false);
             fee = (amountIn * swapFee) / MAX_FEE;
             amountOut = _getAmountOut(amountIn - fee, _reserve0, _reserve1, false);
-            _processSwap(tokenIn, token0, recipient, amountIn, amountOut, context, unwrapBento);
+            _processSwap(token0, recipient, amountOut, context, unwrapBento);
             uint256 balance1 = bento.toAmount(token1, bento.balanceOf(token0, address(this)), false);
             require(balance1 - _reserve1 >= amountIn, "HybridPool: Insufficient amount in");
         }
@@ -245,16 +244,14 @@ contract HybridPool is IPool, TridentERC20 {
     }
 
     function _processSwap(
-        address tokenIn,
         address tokenOut,
         address to,
-        uint256 amountIn,
         uint256 amountOut,
         bytes memory data,
         bool unwrapBento
     ) internal {
         _transferAmount(tokenOut, to, amountOut, unwrapBento);
-        if (data.length != 0) ITridentCallee(to).tridentCallback(tokenIn, tokenOut, amountIn, amountOut, data);
+        if (data.length != 0) ITridentCallee(msg.sender).tridentSwapCallback(data);
     }
 
     function _handleFee(address tokenIn, uint256 amountIn) internal returns (uint256 fee) {
