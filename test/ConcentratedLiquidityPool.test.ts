@@ -633,6 +633,15 @@ describe.only("Concentrated liquidity pool", function () {
 
     // TO DO
     it("shouldn't swap outside ticks where liquidity is 0");
+
+    it("Check one swap", async () => {
+      const swapData = ethers.utils.defaultAbiCoder.encode(
+        ["bool", "uint256", "address", "bool"],
+        [true, getBigNumber(1000), alice.address, false]
+      );
+      const out = await pool1.swap(swapData);
+      expect(out).gt(0);
+    });
   });
 });
 
