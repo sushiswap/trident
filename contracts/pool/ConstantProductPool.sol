@@ -7,6 +7,7 @@ import "../interfaces/ITridentCallee.sol";
 import "../libraries/TridentMath.sol";
 import "./TridentERC20.sol";
 import "../workInProgress/IMigrator.sol";
+import "../deployer/MasterDeployer.sol";
 
 /// @notice Trident exchange pool template with constant product formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares.
@@ -58,7 +59,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         require(tokenA != address(0), "ZERO_ADDRESS");
         require(tokenA != tokenB, "IDENTICAL_ADDRESSES");
         require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
-        
+
         (, bytes memory _bento) = _masterDeployer.staticcall(abi.encodeWithSelector(0x4da31827)); // @dev bento().
         (, bytes memory _barFeeTo) = _masterDeployer.staticcall(abi.encodeWithSelector(0x0c0a0cd2)); // @dev barFeeTo().
 
@@ -89,7 +90,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint256 computed = TridentMath.sqrt(balance0 * balance1);
         if (_totalSupply == 0) {
             _mint(address(0), MINIMUM_LIQUIDITY);
-            address migrator = masterDeployer.migrator();
+            address migrator = MasterDeployer(masterDeployer).migrator();
             if (msg.sender == migrator) {
                 liquidity = IMigrator(migrator).desiredLiquidity();
                 require(liquidity > 0 && liquidity != type(uint256).max, "BAD_DESIRED_LIQUIDITY");
@@ -256,10 +257,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint112 _reserve1,
         uint32 _blockTimestampLast
     ) internal {
-        require(
-            balance0 <= type(uint112).max && balance1 <= type(uint112).max,
-            "OVERFLOW"
-        );
+        require(balance0 <= type(uint112).max && balance1 <= type(uint112).max, "OVERFLOW");
 
         if (blockTimestampLast == 0) {
             // @dev TWAP support is disabled for gas efficiency.
@@ -322,7 +320,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
     ) internal {
         if (unwrapBento) {
             // @dev withdraw(address,address,address,uint256,uint256).
-            (bool success, ) = bento.call(abi.encodeWithSelector(0x97da6d30, token, address(this), to, 0, shares)); 
+            (bool success, ) = bento.call(abi.encodeWithSelector(0x97da6d30, token, address(this), to, 0, shares));
             require(success, "WITHDRAW_FAILED");
         } else {
             // @dev transfer(address,address,address,uint256).

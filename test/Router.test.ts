@@ -10,7 +10,6 @@ import { expect } from "chai";
 describe("Router", function () {
   let alice,
     aliceEncoded,
-    feeTo,
     weth,
     sushi,
     bento,
@@ -23,7 +22,7 @@ describe("Router", function () {
     daiWethPool;
 
   before(async function () {
-    [alice, feeTo] = await ethers.getSigners();
+    [alice] = await ethers.getSigners();
     aliceEncoded = ethers.utils.defaultAbiCoder.encode(
       ["address"],
       [alice.address]
@@ -42,7 +41,7 @@ describe("Router", function () {
     sushi = await ERC20.deploy("SUSHI", "SUSHI", getBigNumber("10000000"));
     dai = await ERC20.deploy("SUSHI", "SUSHI", getBigNumber("10000000"));
     bento = await Bento.deploy(weth.address);
-    masterDeployer = await Deployer.deploy(17, feeTo.address, bento.address);
+    masterDeployer = await Deployer.deploy(17, alice.address, bento.address);
     tridentPoolFactory = await PoolFactory.deploy(masterDeployer.address);
     router = await TridentRouter.deploy(bento.address, weth.address);
 
