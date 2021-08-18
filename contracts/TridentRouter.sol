@@ -6,7 +6,6 @@ import "./interfaces/IBentoBoxMinimal.sol";
 import "./interfaces/IPool.sol";
 import "./interfaces/ITridentRouter.sol";
 import "./utils/TridentHelper.sol";
-import "hardhat/console.sol";
 
 /// @notice Trident pool router contract.
 contract TridentRouter is ITridentRouter, TridentHelper {
