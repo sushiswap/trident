@@ -19,7 +19,7 @@ contract MasterDeployer is TridentOwnable {
     uint256 internal constant MAX_FEE = 10000; // @dev 100%.
 
     address[] public pools;
-    
+
     mapping(address => bool) public whitelistedFactories;
 
     constructor(
@@ -55,16 +55,12 @@ contract MasterDeployer is TridentOwnable {
         require(_barFee <= MAX_FEE, "INVALID_BAR_FEE");
         barFee = _barFee;
     }
-    
+
     function setMigrator(address _migrator) external onlyOwner {
         migrator = _migrator;
     }
 
     function poolsCount() external view returns (uint256 count) {
         count = pools.length;
-    }
-
-    function setMigrator(address _migrator) external onlyOwner {
-        migrator = _migrator;
     }
 }
