@@ -5,12 +5,10 @@ pragma solidity >=0.8.0;
 import "../interfaces/IPoolFactory.sol";
 import "../utils/TridentOwnable.sol";
 
-/// @notice Trident exchange pool deployer for whitelisted template factories.
+/// @notice Trident pool deployer contract with template factory whitelist.
 /// @author Mudit Gupta.
 contract MasterDeployer is TridentOwnable {
-    event NewPoolCreated(address indexed _factory, address indexed pool);
-
-    mapping(address => bool) public whitelistedFactories;
+    event DeployPool(address indexed _factory, address indexed pool);
 
     uint256 public barFee;
     address public migrator;
@@ -22,14 +20,16 @@ contract MasterDeployer is TridentOwnable {
 
     address[] public pools;
 
+    mapping(address => bool) public whitelistedFactories;
+
     constructor(
         uint256 _barFee,
         address _barFeeTo,
         address _bento
     ) {
-        require(_barFee <= MAX_FEE, "MasterDeployer: INVALID_BAR_FEE");
-        require(_barFeeTo != address(0), "MasterDeployer: ZERO_ADDRESS");
-        require(_bento != address(0), "MasterDeployer: ZERO_ADDRESS");
+        require(_barFee <= MAX_FEE, "INVALID_BAR_FEE");
+        require(_barFeeTo != address(0), "ZERO_ADDRESS");
+        require(_bento != address(0), "ZERO_ADDRESS");
 
         barFee = _barFee;
         barFeeTo = _barFeeTo;
@@ -37,10 +37,10 @@ contract MasterDeployer is TridentOwnable {
     }
 
     function deployPool(address _factory, bytes calldata _deployData) external returns (address pool) {
-        require(whitelistedFactories[_factory], "MasterDeployer: FACTORY_NOT_WHITELISTED");
+        require(whitelistedFactories[_factory], "FACTORY_NOT_WHITELISTED");
         pool = IPoolFactory(_factory).deployPool(_deployData);
         pools.push(pool);
-        emit NewPoolCreated(_factory, pool);
+        emit DeployPool(_factory, pool);
     }
 
     function addToWhitelist(address _factory) external onlyOwner {
@@ -52,15 +52,15 @@ contract MasterDeployer is TridentOwnable {
     }
 
     function setBarFee(uint256 _barFee) external onlyOwner {
-        require(_barFee <= MAX_FEE, "MasterDeployer: INVALID_BAR_FEE");
+        require(_barFee <= MAX_FEE, "INVALID_BAR_FEE");
         barFee = _barFee;
-    }
-
-    function poolsCount() external view returns (uint256 count) {
-        count = pools.length;
     }
 
     function setMigrator(address _migrator) external onlyOwner {
         migrator = _migrator;
+    }
+
+    function poolsCount() external view returns (uint256 count) {
+        count = pools.length;
     }
 }

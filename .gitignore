@@ -21,3 +21,5 @@ coverage.json
 
 # Temp/local stuff that shouldn't be pushed
 local/
+
+tenderly.yaml

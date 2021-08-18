@@ -274,7 +274,7 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
   }
 
   describe("Check regular liquidity values", function () {
-    for (let mintNum = 0; mintNum < 10; ++mintNum) {
+    for (let mintNum = 0; mintNum < 3; ++mintNum) {
       it(`Test ${mintNum + 1}`, async function () {
         const [poolRouterInfo, pool] = await createConstantProductPool(
           0.003,
@@ -283,15 +283,15 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
         );
 
         // test regular values
-        for (let swapNum = 0; swapNum < 30; ++swapNum) {
+        for (let swapNum = 0; swapNum < 3; ++swapNum) {
           await checkSwap(pool, poolRouterInfo, 17);
         }
         // test small values
-        for (let swapNum = 0; swapNum < 5; ++swapNum) {
+        for (let swapNum = 0; swapNum < 3; ++swapNum) {
           await checkSwap(pool, poolRouterInfo, 2);
         }
         //test extremely big values 2^112 = 10^33.7153
-        for (let swapNum = 0; swapNum < 10; ++swapNum) {
+        for (let swapNum = 0; swapNum < 3; ++swapNum) {
           await checkSwap(pool, poolRouterInfo, 32);
         }
       });
@@ -299,7 +299,7 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
   });
 
   describe("Check supersmall liquidity values", function () {
-    for (let mintNum = 0; mintNum < 10; ++mintNum) {
+    for (let mintNum = 0; mintNum < 3; ++mintNum) {
       it(`Test ${mintNum + 1}`, async function () {
         const [poolRouterInfo, pool] = await createConstantProductPool(
           0.003,
@@ -324,7 +324,7 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
   });
 
   describe("Check superbig liquidity values", function () {
-    for (let mintNum = 0; mintNum < 10; ++mintNum) {
+    for (let mintNum = 0; mintNum < 3; ++mintNum) {
       it(`Test ${mintNum + 1}`, async function () {
         const [poolRouterInfo, pool] = await createConstantProductPool(
           0.003,
@@ -349,8 +349,8 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
   });
 
   describe("Check different fees", function () {
-    for (let mintNum = 0; mintNum < 10; ++mintNum) {
-      const fee = (mintNum + 1) / 1000;
+    for (let mintNum = 0; mintNum < 3; ++mintNum) {
+      const fee = (mintNum * 4 + 1) / 1000;
       it(`fee = ${fee}`, async function () {
         const [poolRouterInfo, pool] = await createConstantProductPool(
           fee,
