@@ -634,12 +634,20 @@ describe.only("Concentrated liquidity pool", function () {
     it("shouldn't swap outside ticks where liquidity is 0");
 
     it("Swap should work", async () => {
+      await bento.transfer(
+        weth.address,
+        alice.address,
+        pool1.address,
+        getBigNumber(1)
+      );
       const swapData = ethers.utils.defaultAbiCoder.encode(
         ["bool", "uint256", "address", "bool"],
-        [true, getBigNumber(1000), alice.address, false]
+        [true, getBigNumber(1), alice.address, false]
       );
-      const out = await pool1.swap(swapData);
-      expect(out).gt(0);
+      const oldBalance = await bento.balanceOf(usd.address, alice.address);
+      await pool1.swap(swapData);
+      const newBalance = await bento.balanceOf(usd.address, alice.address);
+      expect(oldBalance.lt(newBalance)).to.be.true;
     });
   });
 });
