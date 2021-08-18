@@ -6,6 +6,7 @@ import { ERC20Mock } from "../typechain/ERC20Mock";
 import { BentoBoxV1 } from "../typechain/BentoBoxV1";
 import { ConcentratedLiquidityPool } from "../typechain/ConcentratedLiquidityPool";
 import { ConcentratedLiquidityPoolFactory } from "../typechain/ConcentratedLiquidityPoolFactory";
+import { ConcentratedLiquidityPoolHelper } from "../typechain/ConcentratedLiquidityPoolHelper";
 import { getSqrtX96Price } from "./utilities/sqrtPrice";
 import { BigNumber } from "ethers";
 
@@ -19,7 +20,8 @@ describe.only("Concentrated liquidity pool", function () {
     pool0: ConcentratedLiquidityPool,
     pool1: ConcentratedLiquidityPool,
     tickMath: TickMathTest,
-    bento: BentoBoxV1;
+    bento: BentoBoxV1,
+    poolHelper: ConcentratedLiquidityPoolHelper;
 
   const totalSupply = getBigNumber("100000000");
   const priceMultiplier = BigNumber.from("0x1000000000000000000000000");
@@ -29,6 +31,9 @@ describe.only("Concentrated liquidity pool", function () {
 
     const ERC20 = await ethers.getContractFactory("ERC20Mock");
     const Pool = await ethers.getContractFactory("ConcentratedLiquidityPool");
+    const PoolHelper = await ethers.getContractFactory(
+      "ConcentratedLiquidityPoolHelper"
+    );
     const Bento = await ethers.getContractFactory("BentoBoxV1");
     const MasterDeployer = await ethers.getContractFactory("MasterDeployer");
     const PoolFactory = await ethers.getContractFactory(
@@ -57,6 +62,7 @@ describe.only("Concentrated liquidity pool", function () {
     // and weth < usd so the prices make sense (token0/token1)
     tickMath = await TickMathTest.deploy();
     bento = await Bento.deploy(weth.address);
+    poolHelper = await PoolHelper.deploy();
     await weth.approve(bento.address, totalSupply);
     await dai.approve(bento.address, totalSupply);
     await usd.approve(bento.address, totalSupply);
@@ -255,6 +261,7 @@ describe.only("Concentrated liquidity pool", function () {
         dy.toString(),
         "Didn't calculate token1 (dy) amount correctly"
       );
+      // console.log(await poolHelper.getTickState(pool0.address, 10));
     });
 
     it("shouldn't allow adding lower odd ticks", async () => {

@@ -1,11 +1,8 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-or-later
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "hardhat/console.sol";
-
-pragma solidity ^0.8.2;
+pragma solidity >=0.8.0;
 
 /// @dev combines the nonfungible position manager and the staking contract in one
-contract CpcpWrapper {
+contract ConcentratedLiquidityPoolManager {
 
 }
