@@ -17,7 +17,7 @@ import "hardhat/console.sol";
 contract ConcentratedLiquidityPool is IPool {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
-    event Collect(address indexed sender, uint256 amount0fees, uint256 amount1fees);
+    event Collect(address indexed sender, uint256 amount0, uint256 amount1);
     event Sync(uint256 reserveShares0, uint256 reserveShares1);
     
     uint24 internal constant MAX_FEE = 10000; // @dev 100%.
@@ -91,7 +91,7 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     function mint(bytes calldata data) public override lock returns (uint256 minted) {
-        (int24 lowerOld, int24 lower, int24 upperOld, int24 upper, uint128 amount, ) = abi.decode(
+        (int24 lowerOld, int24 lower, int24 upperOld, int24 upper, uint128 amount, address recipient) = abi.decode(
             data,
             (int24, int24, int24, int24, uint128, address)
         );
@@ -99,21 +99,22 @@ contract ConcentratedLiquidityPool is IPool {
         uint160 priceLower = TickMath.getSqrtRatioAtTick(lower);
         uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper);
         uint160 currentPrice = price;
-
-        if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += amount;
-
+        // @dev This is safe because overflow is checked in position minter contract.
+        unchecked {
+            if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += amount;
+        }
         // @dev Fees should have been claimed before position updates.
-        updatePosition(msg.sender, lower, upper, int128(amount));
+        _updatePosition(msg.sender, lower, upper, int128(amount));
 
-        insertInLinkedList(lowerOld, lower, upperOld, upper, amount, currentPrice);
+        _insertInLinkedList(lowerOld, lower, upperOld, upper, amount, currentPrice);
 
-        (uint128 amount0, uint128 amount1) = getAmountsForLiquidity(
+        (uint128 amount0, uint128 amount1) = _getAmountsForLiquidity(
             uint256(priceLower),
             uint256(priceUpper),
             uint256(currentPrice),
             uint256(amount)
         );
-        
+        // @dev This is safe because overflow is checked in {getAmountsForLiquidity}.
         unchecked {
             if (amount0 != 0) {
                 amount0 += reserve0;
@@ -121,8 +122,8 @@ contract ConcentratedLiquidityPool is IPool {
                 (, bytes memory _balance0) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token0, address(this)));
                 uint256 balance0 = abi.decode(_balance0, (uint256));
                 require(uint256(amount0) <= balance0, "TOKEN0_MISSING");
-                reserve0 = amount0;
                 // @dev `reserve0 = bento.balanceOf(...)` doesn't help anyone and coins will be stuck.
+                reserve0 = amount0;
             }
 
             if (amount1 != 0) {
@@ -137,7 +138,7 @@ contract ConcentratedLiquidityPool is IPool {
         
         minted = amount;
 
-        emit Mint(msg.sender, amount0, amount1, msg.sender);
+        emit Mint(msg.sender, amount0, amount1, recipient);
     }
 
     function burn(bytes calldata data) public override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
@@ -149,59 +150,76 @@ contract ConcentratedLiquidityPool is IPool {
         uint160 priceLower = TickMath.getSqrtRatioAtTick(lower);
         uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper);
         uint160 currentPrice = price;
+        // @dev This is safe because user cannot have overflow amount of LP to burn.
+        unchecked {
+            if (priceLower < currentPrice && currentPrice < priceUpper) liquidity -= amount;
+        }
 
-        if (priceLower < currentPrice && currentPrice < priceUpper) liquidity -= amount;
-
-        (uint128 amount0, uint128 amount1) = getAmountsForLiquidity(
+        (uint256 amount0, uint256 amount1) = _getAmountsForLiquidity(
             uint256(priceLower),
             uint256(priceUpper),
             uint256(currentPrice),
             uint256(amount)
         );
 
-        (uint256 amount0fees, uint256 amount1fees) = updatePosition(msg.sender, lower, upper, -int128(amount));
-
+        (uint256 amount0fees, uint256 amount1fees) = _updatePosition(msg.sender, lower, upper, -int128(amount));
+        // @dev This is safe because overflow is checked in {updatePosition}.
+        unchecked {
+            amount0 += amount0fees;
+            amount1 += amount1fees;
+        }
+        
         withdrawnAmounts = new TokenAmount[](2);
         withdrawnAmounts[0] = TokenAmount({token: token0, amount: amount0});
         withdrawnAmounts[1] = TokenAmount({token: token1, amount: amount1});
         
-        unchecked {
-            _transfer(token0, amount0 + amount0fees, recipient, unwrapBento);
-            _transfer(token1, amount1 + amount1fees, recipient, unwrapBento);
-        }
+        _transfer(token0, amount0, recipient, unwrapBento);
+        _transfer(token1, amount1, recipient, unwrapBento);
 
-        removeFromLinkedList(lower, upper, amount);
+        _removeFromLinkedList(lower, upper, amount);
 
         emit Burn(msg.sender, amount0, amount1, recipient);
     }
     
-    function collect(int24 lower, int24 upper) public lock returns (uint256 amount0fees, uint256 amount1fees) {
-        (amount0fees, amount1fees) = updatePosition(msg.sender, lower, upper, 0);
-  
-        removeFromLinkedList(lower, upper, 0);
-
-        emit Collect(msg.sender, amount0fees, amount1fees);
-    }
-
-    function getAssets() public view override returns (address[] memory assets) {
-        assets = new address[](2);
-        assets[0] = token0;
-        assets[1] = token1;
-    }
-
     function burnSingle(bytes calldata) external override returns (uint256 amountOut) {
         // TODO
         return amountOut;
     }
+    
+    function collect(bytes calldata data) public lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
+        (int24 lower, int24 upper, address recipient, bool unwrapBento) = abi.decode(
+            data,
+            (int24, int24, address, bool)
+        );
 
-    function getAmountOut(bytes calldata) public view override returns (uint256 finalAmountOut) {
-        // TODO
-        return finalAmountOut;
-    }
+        uint160 priceLower = TickMath.getSqrtRatioAtTick(lower);
+        uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper);
+        uint160 currentPrice = price;
+  
+        (uint256 amount0, uint256 amount1) = _getAmountsForLiquidity(
+            uint256(priceLower),
+            uint256(priceUpper),
+            uint256(currentPrice),
+            0
+        );
 
-    function flashSwap(bytes calldata) external override returns (uint256 finalAmountOut) {
-        // TODO
-        return finalAmountOut;
+        (uint256 amount0fees, uint256 amount1fees) = _updatePosition(msg.sender, lower, upper, 0);
+        // @dev This is safe because overflow is checked in {updatePosition}.
+        unchecked {
+            amount0 += amount0fees;
+            amount1 += amount1fees;
+        }
+        
+        withdrawnAmounts = new TokenAmount[](2);
+        withdrawnAmounts[0] = TokenAmount({token: token0, amount: amount0});
+        withdrawnAmounts[1] = TokenAmount({token: token1, amount: amount1});
+        
+        _transfer(token0, amount0, recipient, unwrapBento);
+        _transfer(token1, amount1, recipient, unwrapBento);
+
+        _removeFromLinkedList(lower, upper, 0);
+
+        emit Collect(msg.sender, amount0, amount1);
     }
 
     /// @dev price is √(y/x)
@@ -356,6 +374,11 @@ contract ConcentratedLiquidityPool is IPool {
         }
     }
     
+    function flashSwap(bytes calldata) external override returns (uint256 finalAmountOut) {
+        // TODO
+        return finalAmountOut;
+    }
+    
     function _balance() internal view returns (uint256 balance0, uint256 balance1) {
         // @dev balanceOf(address,address).
         (, bytes memory _balance0) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token0, address(this)));
@@ -382,7 +405,7 @@ contract ConcentratedLiquidityPool is IPool {
         }
     }
 
-    function getPositionAssets(
+    function _getPositionAssets(
         uint256 priceLower,
         uint256 priceUpper,
         uint256 currentPrice,
@@ -417,8 +440,27 @@ contract ConcentratedLiquidityPool is IPool {
 
         emit Sync(balance0, balance1);
     }
+    
+    function _getAmountsForLiquidity(
+        uint256 priceLower,
+        uint256 priceUpper,
+        uint256 currentPrice,
+        uint256 liquidityAmount
+    ) internal returns (uint128 token0amount, uint128 token1amount) {
+        if (priceUpper <= currentPrice) {
+            // @dev Only supply token1 (token1 is Y).
+            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, priceUpper, true));
+        } else if (currentPrice <= priceLower) {
+            // @dev Only supply token0 (token0 is X).
+            token0amount = uint128(DyDxMath.getDx(liquidityAmount, priceLower, priceUpper, true));
+        } else {
+            // @dev Supply both tokens.
+            token0amount = uint128(DyDxMath.getDx(liquidityAmount, currentPrice, priceUpper, true));
+            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, currentPrice, true));
+        }
+    }
 
-    function updatePosition(
+    function _updatePosition(
         address owner,
         int24 lower,
         int24 upper,
@@ -447,115 +489,7 @@ contract ConcentratedLiquidityPool is IPool {
         position.feeGrowthInside1Last = growth1current;
     }
 
-    //                  u         ▼         v
-    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|---------
-
-    //             ▼    u                   v
-    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|---------
-
-    //                  u                   v    ▼
-    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|---------
-
-    /// @dev Fees: global, outside u, outside v - we are interested in the 'xxxx' zone.
-    function rangeFeeGrowth(int24 lowerTick, int24 upperTick)
-        public
-        view
-        returns (uint256 feeGrowthInside0, uint256 feeGrowthInside1)
-    {
-        int24 currentTick = nearestTick;
-
-        Tick storage lower = ticks[lowerTick];
-        Tick storage upper = ticks[upperTick];
-
-        // @dev Calculate fee growth below & above.
-        uint256 _feeGrowthGlobal0 = feeGrowthGlobal0;
-        uint256 _feeGrowthGlobal1 = feeGrowthGlobal1;
-        uint256 feeGrowthBelow0;
-        uint256 feeGrowthBelow1;
-        uint256 feeGrowthAbove0;
-        uint256 feeGrowthAbove1;
-
-        if (lowerTick <= currentTick) {
-            feeGrowthBelow0 = lower.feeGrowthOutside0;
-            feeGrowthBelow1 = lower.feeGrowthOutside1;
-        } else {
-            feeGrowthBelow0 = _feeGrowthGlobal0 - lower.feeGrowthOutside0;
-            feeGrowthBelow1 = _feeGrowthGlobal1 - lower.feeGrowthOutside1;
-        }
-
-        if (currentTick < upperTick) {
-            feeGrowthAbove0 = upper.feeGrowthOutside0;
-            feeGrowthAbove1 = upper.feeGrowthOutside1;
-        } else {
-            feeGrowthAbove0 = _feeGrowthGlobal0 - upper.feeGrowthOutside0;
-            feeGrowthAbove1 = _feeGrowthGlobal1 - upper.feeGrowthOutside1;
-        }
-
-        feeGrowthInside0 = _feeGrowthGlobal0 - feeGrowthBelow0 - feeGrowthAbove0;
-        feeGrowthInside1 = _feeGrowthGlobal1 - feeGrowthBelow1 - feeGrowthAbove1;
-    }
-
-    function getAmountsForLiquidity(
-        uint256 priceLower,
-        uint256 priceUpper,
-        uint256 currentPrice,
-        uint256 liquidityAmount
-    ) internal returns (uint128 token0amount, uint128 token1amount) {
-        if (priceUpper <= currentPrice) {
-            // @dev Only supply token1 (token1 is Y).
-            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, priceUpper, true));
-        } else if (currentPrice <= priceLower) {
-            // @dev Only supply token0 (token0 is X).
-            token0amount = uint128(DyDxMath.getDx(liquidityAmount, priceLower, priceUpper, true));
-        } else {
-            // @dev Supply both tokens.
-            token0amount = uint128(DyDxMath.getDx(liquidityAmount, currentPrice, priceUpper, true));
-            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, currentPrice, true));
-        }
-    }
-
-    function removeFromLinkedList(
-        int24 lower,
-        int24 upper,
-        uint128 amount
-    ) internal {
-        Tick storage current = ticks[lower];
-
-        if (lower != TickMath.MIN_TICK && current.liquidity == amount) {
-            // @dev Delete lower tick.
-            Tick storage previous = ticks[current.previousTick];
-            Tick storage next = ticks[current.nextTick];
-
-            previous.nextTick = current.nextTick;
-            next.previousTick = current.previousTick;
-
-            if (nearestTick == lower) nearestTick = current.previousTick;
-
-            delete ticks[lower];
-        } else {
-            current.liquidity -= amount;
-        }
-
-        current = ticks[upper];
-
-        if (upper != TickMath.MAX_TICK && current.liquidity == amount) {
-            // @dev Delete upper tick.
-
-            Tick storage previous = ticks[current.previousTick];
-            Tick storage next = ticks[current.nextTick];
-
-            previous.nextTick = current.nextTick;
-            next.previousTick = current.previousTick;
-
-            if (nearestTick == upper) nearestTick = current.previousTick;
-
-            delete ticks[upper];
-        } else {
-            current.liquidity -= amount;
-        }
-    }
-
-    function insertInLinkedList(
+    function _insertInLinkedList(
         int24 lowerOld,
         int24 lower,
         int24 upperOld,
@@ -619,5 +553,104 @@ contract ConcentratedLiquidityPool is IPool {
         if (currentNearestTick < upper && upper <= actualNearestTick) currentNearestTick = upper;
 
         nearestTick = currentNearestTick;
+    }
+    
+    function _removeFromLinkedList(
+        int24 lower,
+        int24 upper,
+        uint128 amount
+    ) internal {
+        Tick storage current = ticks[lower];
+
+        if (lower != TickMath.MIN_TICK && current.liquidity == amount) {
+            // @dev Delete lower tick.
+            Tick storage previous = ticks[current.previousTick];
+            Tick storage next = ticks[current.nextTick];
+
+            previous.nextTick = current.nextTick;
+            next.previousTick = current.previousTick;
+
+            if (nearestTick == lower) nearestTick = current.previousTick;
+
+            delete ticks[lower];
+        } else {
+            current.liquidity -= amount;
+        }
+
+        current = ticks[upper];
+
+        if (upper != TickMath.MAX_TICK && current.liquidity == amount) {
+            // @dev Delete upper tick.
+            Tick storage previous = ticks[current.previousTick];
+            Tick storage next = ticks[current.nextTick];
+
+            previous.nextTick = current.nextTick;
+            next.previousTick = current.previousTick;
+
+            if (nearestTick == upper) nearestTick = current.previousTick;
+
+            delete ticks[upper];
+        } else {
+            current.liquidity -= amount;
+        }
+    }
+
+    //                  u         ▼         v
+    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|---------
+
+    //             ▼    u                   v
+    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|---------
+
+    //                  u                   v    ▼
+    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|---------
+
+    /// @dev Fees: global, outside u, outside v - we are interested in the 'xxxx' zone.
+    function rangeFeeGrowth(int24 lowerTick, int24 upperTick)
+        public
+        view
+        returns (uint256 feeGrowthInside0, uint256 feeGrowthInside1)
+    {
+        int24 currentTick = nearestTick;
+
+        Tick storage lower = ticks[lowerTick];
+        Tick storage upper = ticks[upperTick];
+
+        // @dev Calculate fee growth below & above.
+        uint256 _feeGrowthGlobal0 = feeGrowthGlobal0;
+        uint256 _feeGrowthGlobal1 = feeGrowthGlobal1;
+        uint256 feeGrowthBelow0;
+        uint256 feeGrowthBelow1;
+        uint256 feeGrowthAbove0;
+        uint256 feeGrowthAbove1;
+
+        if (lowerTick <= currentTick) {
+            feeGrowthBelow0 = lower.feeGrowthOutside0;
+            feeGrowthBelow1 = lower.feeGrowthOutside1;
+        } else {
+            feeGrowthBelow0 = _feeGrowthGlobal0 - lower.feeGrowthOutside0;
+            feeGrowthBelow1 = _feeGrowthGlobal1 - lower.feeGrowthOutside1;
+        }
+
+        if (currentTick < upperTick) {
+            feeGrowthAbove0 = upper.feeGrowthOutside0;
+            feeGrowthAbove1 = upper.feeGrowthOutside1;
+        } else {
+            feeGrowthAbove0 = _feeGrowthGlobal0 - upper.feeGrowthOutside0;
+            feeGrowthAbove1 = _feeGrowthGlobal1 - upper.feeGrowthOutside1;
+        }
+
+        feeGrowthInside0 = _feeGrowthGlobal0 - feeGrowthBelow0 - feeGrowthAbove0;
+        feeGrowthInside1 = _feeGrowthGlobal1 - feeGrowthBelow1 - feeGrowthAbove1;
+    }
+
+    function getAssets() public view override returns (address[] memory assets) {
+        assets = new address[](2);
+        assets[0] = token0;
+        assets[1] = token1;
+    }
+    
+    function getAmountOut(bytes calldata) public view override returns (uint256 finalAmountOut) {
+        // TODO
+        return finalAmountOut;
     }
 }
