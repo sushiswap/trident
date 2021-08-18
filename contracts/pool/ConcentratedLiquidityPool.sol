@@ -35,8 +35,8 @@ contract ConcentratedLiquidityPool is IPool {
     uint256 public feeGrowthGlobal0; /// @dev all fee growth counters are multiplied by 2^128
     uint256 public feeGrowthGlobal1;
 
-    uint128 internal reserve0; /// @dev (bento share) balance tracker
-    uint128 internal reserve1;
+    uint128 public reserve0; /// @dev (bento share) balance tracker
+    uint128 public reserve1;
 
     mapping(int24 => Tick) public ticks;
     mapping(address => mapping(int24 => mapping(int24 => Position))) public positions;
@@ -104,6 +104,7 @@ contract ConcentratedLiquidityPool is IPool {
 
         if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += amount;
 
+        /// @dev fees should have been claimed before position updates!
         updatePosition(msg.sender, lower, upper, int128(amount));
 
         insertInLinkedList(lowerOld, lower, upperOld, upper, amount, currentPrice);
@@ -152,15 +153,14 @@ contract ConcentratedLiquidityPool is IPool {
             uint256(amount)
         );
 
-        updatePosition(msg.sender, lower, upper, -int128(amount));
+        (uint256 amount0fees, uint256 amount1fees) = updatePosition(msg.sender, lower, upper, -int128(amount));
 
         withdrawnAmounts = new TokenAmount[](2);
         withdrawnAmounts[0] = TokenAmount({token: token0, amount: amount0});
         withdrawnAmounts[1] = TokenAmount({token: token1, amount: amount1});
 
-        // a _transfer call also happens in updatePosition call - we should optimize this
-        _transfer(token0, amount0, recipient, unwrapBento);
-        _transfer(token1, amount1, recipient, unwrapBento);
+        _transfer(token0, amount0 + amount0fees, recipient, unwrapBento);
+        _transfer(token1, amount1 + amount1fees, recipient, unwrapBento);
 
         removeFromLinkedList(lower, upper, amount);
 
@@ -189,24 +189,24 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     /// @dev price is √(y/x)
-    // x is token0
-    // zero for one -> price will move down.
-    function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
+    /// @dev x is token0
+    /// @dev zero for one -> price will move down.
+    function swap(bytes calldata data) public override returns (uint256 amountOut) {
+        require(unlocked == 1, "LOCKED");
         (bool zeroForOne, uint256 inAmount, address recipient, bool unwrapBento) = abi.decode(
             data,
             (bool, uint256, address, bool)
         );
 
         uint256 protocolFee;
-        amountOut;
         uint256 feeAmount;
+        uint256 feeGrowthGlobal = zeroForOne ? feeGrowthGlobal1 : feeGrowthGlobal0; /// @dev take fees in the output token.
+
         {
             int24 nextTickToCross = zeroForOne ? nearestTick : ticks[nearestTick].nextTick;
             uint256 currentPrice = uint256(price);
             uint256 currentLiquidity = uint256(liquidity);
-
             uint256 input = inAmount;
-            uint256 feeGrowthGlobal = zeroForOne ? feeGrowthGlobal1 : feeGrowthGlobal0; /// @dev take fees in the output token.
 
             while (input > 0) {
                 uint256 nextTickPrice = uint256(TickMath.getSqrtRatioAtTick(nextTickToCross));
@@ -274,12 +274,15 @@ contract ConcentratedLiquidityPool is IPool {
                 feeAmount = FullMath.mulDivRoundingUp(output, swapFee, 1e6);
 
                 // calc protocolFee and converting pips to bips
+                // stack too deep when trying to store this in a variable
+                // TODO can get optimised after we put everthyng into structs
                 protocolFee += FullMath.mulDivRoundingUp(feeAmount, masterDeployer.barFee(), 1e4);
 
                 // updating feeAmount based on the protocolFee
                 feeAmount -= FullMath.mulDivRoundingUp(feeAmount, masterDeployer.barFee(), 1e4);
 
                 feeGrowthGlobal += FullMath.mulDiv(feeAmount, 0x100000000000000000000000000000000, currentLiquidity);
+
                 amountOut += output - feeAmount;
 
                 if (cross) {
@@ -316,6 +319,7 @@ contract ConcentratedLiquidityPool is IPool {
         (uint256 amount0, uint256 amount1) = _balance();
 
         if (zeroForOne) {
+            feeGrowthGlobal1 += feeGrowthGlobal;
             uint128 newBalance = reserve0 + uint128(inAmount);
             require(uint256(newBalance) <= amount0, "MISSING_X_DEPOSIT");
             reserve0 = newBalance;
@@ -325,6 +329,7 @@ contract ConcentratedLiquidityPool is IPool {
             _transfer(token1, amountOut, recipient, unwrapBento);
             emit Swap(recipient, token0, token1, inAmount, amountOut);
         } else {
+            feeGrowthGlobal1 += feeGrowthGlobal;
             uint128 newBalance = reserve1 + uint128(inAmount);
             require(uint256(newBalance) <= amount1, "MISSING_Y_DEPOSIT");
             reserve1 = newBalance;
@@ -411,9 +416,6 @@ contract ConcentratedLiquidityPool is IPool {
             position.liquidity,
             0x100000000000000000000000000000000
         );
-
-        if (amount0fees > 0) _transfer(token0, amount0fees, owner, false);
-        if (amount1fees > 0) _transfer(token1, amount1fees, owner, false);
 
         if (amount < 0) position.liquidity -= uint128(amount);
         if (amount > 0) position.liquidity += uint128(amount);
