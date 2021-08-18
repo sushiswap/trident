@@ -2,7 +2,7 @@
 
 pragma solidity >=0.8.0;
 
-/// @notice Interface for Trident pool interactions with data context.
+/// @notice Trident pool callback interface.
 interface ITridentCallee {
     function tridentSwapCallback(bytes calldata data) external;
 

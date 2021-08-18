@@ -2,7 +2,7 @@
 
 pragma solidity >=0.8.0;
 
-/// @notice Interface for Trident pool deployment.
+/// @notice Trident pool deployment interface.
 interface IPoolFactory {
-    function deployPool(bytes calldata _deployData) external returns (address);
+    function deployPool(bytes calldata _deployData) external returns (address pool);
 }
