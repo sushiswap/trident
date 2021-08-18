@@ -2,7 +2,7 @@
 
 pragma solidity >=0.8.0;
 
-/// @notice Trident exchange pool router interface.
+/// @notice Trident pool router interface.
 interface ITridentRouter {
     struct Path {
         address pool;
