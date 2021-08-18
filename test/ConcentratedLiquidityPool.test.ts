@@ -67,7 +67,7 @@ describe.only("Concentrated liquidity pool", function () {
     await dai.approve(bento.address, totalSupply);
     await usd.approve(bento.address, totalSupply);
     const masterDeployer = await MasterDeployer.deploy(
-      10,
+      5, // 5 bps
       feeTo.address,
       bento.address
     );
@@ -357,10 +357,9 @@ describe.only("Concentrated liquidity pool", function () {
       );
 
       const output = await (await pool0.swap(swapData)).wait();
-      const data = output.logs[1].data;
-      const _in = data.substring(0, 66);
-      const _out = "0x" + data.substring(66, 130);
-
+      const data = output.logs[2].data;
+      const _in = BigNumber.from(data.substring(0, 66));
+      // const _out = BigNumber.from("0x" + data.substring(66, 130));
       expect(_in).to.be.eq(dx);
       const lower = -80068;
       const upper = -69081;
