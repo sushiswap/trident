@@ -25,18 +25,15 @@ contract MasterDeployer is TridentOwnable {
     constructor(
         uint256 _barFee,
         address _barFeeTo,
-        address _bento,
-        address _migrator
+        address _bento
     ) {
         require(_barFee <= MAX_FEE, "INVALID_BAR_FEE");
         require(_barFeeTo != address(0), "ZERO_ADDRESS");
         require(_bento != address(0), "ZERO_ADDRESS");
-        require(_migrator != address(0), "ZERO_ADDRESS");
 
         barFee = _barFee;
         barFeeTo = _barFeeTo;
         bento = _bento;
-        migrator = _migrator;
     }
 
     function deployPool(address _factory, bytes calldata _deployData) external returns (address pool) {
