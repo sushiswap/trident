@@ -245,7 +245,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
             }
         }
         // @dev Deposit ERC-20 token into `recipient` `bento` account.
-        bento.deposit(token, msg.sender, recipient, amount, 0);
+        bento.deposit(token, msg.sender, recipient, 0, amount);
     }
 
     function _depositFromUserToBentoBox(
@@ -263,6 +263,6 @@ contract TridentRouter is ITridentRouter, TridentHelper {
             }
         }
         // @dev Deposit ERC-20 token into `recipient` `bento` account.
-        bento.deposit(token, sender, recipient, amount, 0);
+        bento.deposit(token, sender, recipient, 0, amount);
     }
 }
