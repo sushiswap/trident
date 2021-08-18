@@ -194,7 +194,7 @@ describe.only("Concentrated liquidity pool", function () {
     await pool1.mint(mintData);
   });
 
-  it("check swap", async () => {
+  it.skip("check swap", async () => {
     await checkSwap(pool1, 1000, true, alice);
 
     const min = -887272;
