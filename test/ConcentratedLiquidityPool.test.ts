@@ -289,7 +289,7 @@ describe.only("Concentrated liquidity pool", function () {
         [-887272, lower, lower, upper, liquidity, alice.address]
       );
 
-      await expect(pool0.mint(mintData)).to.be.revertedWith("Lower even");
+      await expect(pool0.mint(mintData)).to.be.revertedWith("LOWER_EVEN");
     });
 
     it("shouldn't allow adding upper even ticks", async () => {
@@ -317,7 +317,7 @@ describe.only("Concentrated liquidity pool", function () {
         [-887272, lower, lower, upper, liquidity, alice.address]
       );
 
-      await expect(pool0.mint(mintData)).to.be.revertedWith("Upper odd");
+      await expect(pool0.mint(mintData)).to.be.revertedWith("UPPER_ODD");
     });
 
     it("shouldn't allow adding ticks outside of min bounds", async () => {
@@ -632,6 +632,31 @@ describe.only("Concentrated liquidity pool", function () {
 
     // TO DO
     it("shouldn't swap outside ticks where liquidity is 0");
+
+    it("Swap output should be > 0 and < input/price", async () => {
+      const oldEthBalance = await bento.balanceOf(weth.address, alice.address);
+      const priceSqrt =
+        parseInt((await pool1.price()).toString()) / Math.pow(2, 96);
+      const price = priceSqrt * priceSqrt;
+
+      await bento.transfer(
+        usd.address,
+        alice.address,
+        pool1.address,
+        BigNumber.from(1000000)
+      );
+      const swapData = ethers.utils.defaultAbiCoder.encode(
+        ["bool", "uint256", "address", "bool"],
+        [false, BigNumber.from(1000000), alice.address, false]
+      );
+      await pool1.swap(swapData);
+      const ethReceived = (
+        await bento.balanceOf(weth.address, alice.address)
+      ).sub(oldEthBalance);
+
+      expect(ethReceived.toNumber()).gt(0);
+      expect(ethReceived.toNumber()).lt(1000000 / price);
+    });
   });
 });
 

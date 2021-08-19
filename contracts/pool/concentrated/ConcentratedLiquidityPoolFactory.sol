@@ -3,7 +3,7 @@
 pragma solidity >=0.8.0;
 
 import "./ConcentratedLiquidityPool.sol";
-import "./PairPoolDeployer.sol";
+import "../PairPoolDeployer.sol";
 
 /// @notice Contract for deploying Trident exchange Concentrated Liquidity Pool with configurations.
 /// @author Mudit Gupta.
