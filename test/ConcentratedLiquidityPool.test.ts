@@ -289,7 +289,7 @@ describe.only("Concentrated liquidity pool", function () {
         [-887272, lower, lower, upper, liquidity, alice.address]
       );
 
-      await expect(pool0.mint(mintData)).to.be.revertedWith("Lower even");
+      await expect(pool0.mint(mintData)).to.be.revertedWith("LOWER_EVEN");
     });
 
     it("shouldn't allow adding upper even ticks", async () => {
@@ -317,7 +317,7 @@ describe.only("Concentrated liquidity pool", function () {
         [-887272, lower, lower, upper, liquidity, alice.address]
       );
 
-      await expect(pool0.mint(mintData)).to.be.revertedWith("Upper odd");
+      await expect(pool0.mint(mintData)).to.be.revertedWith("UPPER_ODD");
     });
 
     it("shouldn't allow adding ticks outside of min bounds", async () => {
