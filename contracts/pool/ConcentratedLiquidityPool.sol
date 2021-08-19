@@ -19,7 +19,7 @@ contract ConcentratedLiquidityPool is IPool {
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Collect(address indexed sender, uint256 amount0, uint256 amount1);
     event Sync(uint256 reserveShares0, uint256 reserveShares1);
-    
+
     uint24 internal constant MAX_FEE = 10000; // @dev 100%.
     uint24 public immutable swapFee; // @dev 1000 corresponds to 0.1% fee.
 
@@ -119,7 +119,9 @@ contract ConcentratedLiquidityPool is IPool {
             if (amount0 != 0) {
                 amount0 += reserve0;
                 // @dev balanceOf(address,address).
-                (, bytes memory _balance0) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token0, address(this)));
+                (, bytes memory _balance0) = bento.staticcall(
+                    abi.encodeWithSelector(0xf7888aec, token0, address(this))
+                );
                 uint256 balance0 = abi.decode(_balance0, (uint256));
                 require(uint256(amount0) <= balance0, "TOKEN0_MISSING");
                 // @dev `reserve0 = bento.balanceOf(...)` doesn't help anyone and coins will be stuck.
@@ -129,13 +131,15 @@ contract ConcentratedLiquidityPool is IPool {
             if (amount1 != 0) {
                 amount1 += reserve1;
                 // @dev balanceOf(address,address).
-                (, bytes memory _balance1) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token1, address(this)));
+                (, bytes memory _balance1) = bento.staticcall(
+                    abi.encodeWithSelector(0xf7888aec, token1, address(this))
+                );
                 uint256 balance1 = abi.decode(_balance1, (uint256));
                 require(uint256(amount1) <= balance1, "TOKEN1_MISSING");
                 reserve1 = amount1;
             }
         }
-        
+
         minted = amount;
 
         emit Mint(msg.sender, amount0, amount1, recipient);
@@ -168,11 +172,11 @@ contract ConcentratedLiquidityPool is IPool {
             amount0 += amount0fees;
             amount1 += amount1fees;
         }
-        
+
         withdrawnAmounts = new TokenAmount[](2);
         withdrawnAmounts[0] = TokenAmount({token: token0, amount: amount0});
         withdrawnAmounts[1] = TokenAmount({token: token1, amount: amount1});
-        
+
         _transfer(token0, amount0, recipient, unwrapBento);
         _transfer(token1, amount1, recipient, unwrapBento);
 
@@ -180,12 +184,12 @@ contract ConcentratedLiquidityPool is IPool {
 
         emit Burn(msg.sender, amount0, amount1, recipient);
     }
-    
+
     function burnSingle(bytes calldata) external override returns (uint256 amountOut) {
         // TODO
         return amountOut;
     }
-    
+
     function collect(bytes calldata data) public lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
         (int24 lower, int24 upper, address recipient, bool unwrapBento) = abi.decode(
             data,
@@ -193,15 +197,15 @@ contract ConcentratedLiquidityPool is IPool {
         );
 
         (uint256 amount0fees, uint256 amount1fees) = _updatePosition(msg.sender, lower, upper, 0);
-        
+
         withdrawnAmounts = new TokenAmount[](2);
-        withdrawnAmounts[0] = TokenAmount({token: token0, amount: amount0});
-        withdrawnAmounts[1] = TokenAmount({token: token1, amount: amount1});
-        
+        withdrawnAmounts[0] = TokenAmount({token: token0, amount: amount0fees});
+        withdrawnAmounts[1] = TokenAmount({token: token1, amount: amount1fees});
+
         _transfer(token0, amount0fees, recipient, unwrapBento);
         _transfer(token1, amount1fees, recipient, unwrapBento);
 
-        emit Collect(msg.sender, amount0, amount1);
+        emit Collect(msg.sender, amount0fees, amount1fees);
     }
 
     /// @dev price is √(y/x)
@@ -287,7 +291,7 @@ contract ConcentratedLiquidityPool is IPool {
                 }
 
                 feeAmount = FullMath.mulDivRoundingUp(output, swapFee, 1e6);
-                
+
                 // @dev Calculate `protocolFee` and convert pips to bips
                 // - stack too deep when trying to store this in a variable
                 // - NB can get optimized after we put things into structs.
@@ -355,12 +359,12 @@ contract ConcentratedLiquidityPool is IPool {
             emit Swap(recipient, token1, token0, inAmount, amountOut);
         }
     }
-    
+
     function flashSwap(bytes calldata) external override returns (uint256 finalAmountOut) {
         // TODO
         return finalAmountOut;
     }
-    
+
     function _balance() internal view returns (uint256 balance0, uint256 balance1) {
         // @dev balanceOf(address,address).
         (, bytes memory _balance0) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token0, address(this)));
@@ -378,7 +382,7 @@ contract ConcentratedLiquidityPool is IPool {
     ) internal {
         if (unwrapBento) {
             // @dev withdraw(address,address,address,uint256,uint256).
-            (bool success, ) = bento.call(abi.encodeWithSelector(0x97da6d30, token, address(this), to, 0, shares)); 
+            (bool success, ) = bento.call(abi.encodeWithSelector(0x97da6d30, token, address(this), to, 0, shares));
             require(success, "WITHDRAW_FAILED");
         } else {
             // @dev transfer(address,address,address,uint256).
@@ -422,7 +426,7 @@ contract ConcentratedLiquidityPool is IPool {
 
         emit Sync(balance0, balance1);
     }
-    
+
     function _getAmountsForLiquidity(
         uint256 priceLower,
         uint256 priceUpper,
@@ -536,7 +540,7 @@ contract ConcentratedLiquidityPool is IPool {
 
         nearestTick = currentNearestTick;
     }
-    
+
     function _removeFromLinkedList(
         int24 lower,
         int24 upper,
@@ -630,7 +634,7 @@ contract ConcentratedLiquidityPool is IPool {
         assets[0] = token0;
         assets[1] = token1;
     }
-    
+
     function getAmountOut(bytes calldata) public view override returns (uint256 finalAmountOut) {
         // TODO
         return finalAmountOut;
