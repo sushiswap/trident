@@ -4,14 +4,21 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { BigNumber } from "ethers";
 import seedrandom from "seedrandom";
-import { calcOutByIn, calcInByOut, HybridDataFromParams } from "@sushiswap/sdk";
+import { calcOutByIn, calcInByOut } from "@sushiswap/sdk";
 import { getBigNumber } from "../utilities";
 
 const testSeed = "7"; // Change it to change random generator values
 const rnd = seedrandom(testSeed); // random [0, 1)
 
 const MINIMUM_LIQUIDITY = 1000;
-const A_PRECISION = 100;
+
+interface ExactInputSingleParams {
+  amountIn: BigNumber;
+  amountOutMinimum: BigNumber;
+  pool: string;
+  tokenIn: string;
+  data: string;
+}
 
 function getIntegerRandomValue(exp): [number, BigNumber] {
   if (exp <= 15) {
@@ -164,7 +171,7 @@ describe("HybridPool Typescript == Solidity check", function () {
       reserve0: bnVal0,
       reserve1: bnVal1,
       fee,
-      data: HybridDataFromParams(A),
+      A,
       deployData,
     };
 
@@ -174,22 +181,42 @@ describe("HybridPool Typescript == Solidity check", function () {
   let swapDirection = true;
   async function checkSwap(pool, poolRouterInfo, swapAmountExp) {
     const [jsValue, bnValue] = getIntegerRandomValue(swapAmountExp);
-    const [t0, t1] = swapDirection
+    const [t0, t1]: string[] = swapDirection
       ? [usdt.address, usdc.address]
       : [usdc.address, usdt.address];
-    const amountOutPoolBN = await pool.getAmountOut(
-      ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [t0, bnValue])
-    );
+
+    poolRouterInfo.reserve0 = await bento.balanceOf(usdt.address, pool.address);
+    poolRouterInfo.reserve1 = await bento.balanceOf(usdc.address, pool.address);
+
+    let balanceBefore: BigNumber = await bento.balanceOf(t1, alice.address);
+    let params: ExactInputSingleParams = {
+      amountIn: bnValue,
+      amountOutMinimum: 0,
+      pool: pool.address,
+      tokenIn: t0,
+      data: ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [t0, alice.address, false]
+      ),
+    };
+    const tx = await router.connect(alice).exactInputSingle(params);
+    let balanceAfter: BigNumber = await bento.balanceOf(t1, alice.address);
+
+    const amountOutPoolBN = balanceAfter.sub(balanceBefore);
     const amountOutPool = amountOutPoolBN.toString();
+    console.log("actual: ", amountOutPool);
 
     const amountOutPrediction = calcOutByIn(
       poolRouterInfo,
       jsValue,
       swapDirection
     );
+
+    console.log("prediction: ", amountOutPrediction);
     //console.log(Math.abs(amountOutPrediction/amountOutPool-1), amountOutPrediction, amountOutPool);
-    expect(areCloseValues(amountOutPrediction, amountOutPool, 1e-12)).equals(
-      true
+    expect(areCloseValues(amountOutPrediction, amountOutPoolBN, 1e-12)).equals(
+      true,
+      "swap amount not close enough to predicted amount"
     );
     const reserveOut = swapDirection
       ? poolRouterInfo.reserve1
@@ -198,6 +225,7 @@ describe("HybridPool Typescript == Solidity check", function () {
       swapDirection = !swapDirection;
       return;
     }
+
     const amounInExpected = calcInByOut(
       poolRouterInfo,
       amountOutPrediction,
@@ -213,7 +241,7 @@ describe("HybridPool Typescript == Solidity check", function () {
     expect(
       areCloseValues(amounInExpected, jsValue, 1e-12) ||
         areCloseValues(amountOutPrediction, amountOutPrediction2, 1e-12)
-    ).equals(true);
+    ).equals(true, "values not close enough");
     swapDirection = !swapDirection;
   }
 
