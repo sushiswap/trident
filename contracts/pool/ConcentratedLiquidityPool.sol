@@ -192,32 +192,14 @@ contract ConcentratedLiquidityPool is IPool {
             (int24, int24, address, bool)
         );
 
-        uint160 priceLower = TickMath.getSqrtRatioAtTick(lower);
-        uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper);
-        uint160 currentPrice = price;
-  
-        (uint256 amount0, uint256 amount1) = _getAmountsForLiquidity(
-            uint256(priceLower),
-            uint256(priceUpper),
-            uint256(currentPrice),
-            0
-        );
-
         (uint256 amount0fees, uint256 amount1fees) = _updatePosition(msg.sender, lower, upper, 0);
-        // @dev This is safe because overflow is checked in {updatePosition}.
-        unchecked {
-            amount0 += amount0fees;
-            amount1 += amount1fees;
-        }
         
         withdrawnAmounts = new TokenAmount[](2);
         withdrawnAmounts[0] = TokenAmount({token: token0, amount: amount0});
         withdrawnAmounts[1] = TokenAmount({token: token1, amount: amount1});
         
-        _transfer(token0, amount0, recipient, unwrapBento);
-        _transfer(token1, amount1, recipient, unwrapBento);
-
-        _removeFromLinkedList(lower, upper, 0);
+        _transfer(token0, amount0fees, recipient, unwrapBento);
+        _transfer(token1, amount1fees, recipient, unwrapBento);
 
         emit Collect(msg.sender, amount0, amount1);
     }
