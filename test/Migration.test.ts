@@ -3,7 +3,8 @@
 import { ethers } from "hardhat";
 import { expect } from "chai";
 
-describe("Migration", function () {
+// Still WIP
+describe.skip("Migration", function () {
   let chef, migrator, usdcWethLp, usdc, weth;
 
   const masterChefABI = [
