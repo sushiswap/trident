@@ -78,6 +78,8 @@ const config: HardhatUserConfig = {
       live: false,
       saveDeployments: true,
       tags: ["test", "local"],
+      // Solidity-coverage overrides gasPrice to 1 which is not compatible with EIP1559
+      hardfork: process.env.CODE_COVERAGE ? "berlin" : "london",
     },
     ropsten: {
       url: `https://ropsten.infura.io/v3/${process.env.INFURA_API_KEY}`,
