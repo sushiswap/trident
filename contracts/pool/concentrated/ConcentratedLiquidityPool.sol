@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-
 pragma solidity >=0.8.0;
 
-import "../interfaces/IMasterDeployer.sol";
-import "../interfaces/IPool.sol";
-import "../interfaces/ITridentCallee.sol";
-import "../libraries/concentratedPool/TickMath.sol";
-import "../libraries/concentratedPool/FullMath.sol";
-import "../libraries/concentratedPool/UnsafeMath.sol";
-import "../libraries/concentratedPool/DyDxMath.sol";
+import "../../interfaces/IMasterDeployer.sol";
+import "../../interfaces/IPool.sol";
+import "../../interfaces/ITridentCallee.sol";
+import "../../libraries/concentratedPool/TickMath.sol";
+import "../../libraries/concentratedPool/FullMath.sol";
+import "../../libraries/concentratedPool/UnsafeMath.sol";
+import "../../libraries/concentratedPool/DyDxMath.sol";
 import "hardhat/console.sol";
 
 /// @notice Trident exchange pool template with concentrated liquidity and constant product formula for swapping between an ERC-20 token pair.
@@ -29,15 +28,18 @@ contract ConcentratedLiquidityPool is IPool {
     address public immutable token0;
     address public immutable token1;
 
+    uint160 public price; /// @dev sqrt of price aka. √(y/x), multiplied by 2^96.
     uint128 public liquidity;
-    uint160 public price; // @dev Sqrt of price - √(y/x) - multiplied by 2^96.
-    int24 public nearestTick; // @dev Tick that is just below the current price.
-    /// @dev All fee growth counters are multiplied by 2^128.
-    uint256 public feeGrowthGlobal0;
+    int24 public nearestTick; /// @dev Tick that is just below the current price.
+
+    uint256 public feeGrowthGlobal0; /// @dev all fee growth counters are multiplied by 2^128
     uint256 public feeGrowthGlobal1;
 
-    uint128 public reserve0; // @dev Bento share balance tracker.
+    uint128 public reserve0; /// @dev Bento share balance tracker.
     uint128 public reserve1;
+
+    uint160 public secondsPerLiquidity; /// @dev multiplied by 2^128
+    uint32 public lastObservation;
 
     mapping(int24 => Tick) public ticks;
     mapping(address => mapping(int24 => mapping(int24 => Position))) public positions;
@@ -48,13 +50,22 @@ contract ConcentratedLiquidityPool is IPool {
         uint128 liquidity;
         uint256 feeGrowthOutside0; // @dev Per unit of liquidity.
         uint256 feeGrowthOutside1;
+        uint160 secondsPerLiquidityOutside;
     }
 
     struct Position {
         uint128 liquidity;
         uint256 feeGrowthInside0Last;
         uint256 feeGrowthInside1Last;
+        uint160 secondsPerLiquidityLast; // <- might want to store this in the manager contract only
     }
+
+    /*
+    univ3 1% -> 200 tickSpacing
+    univ3 0.3% pool -> 60 tickSpacing -> 0.6% between ticks
+    univ3 0.05% pool -> 10 tickSpacing -> 0.1% between ticks
+    100 tickSpacing -> 1% between ticks => 2% between ticks on starting position (*stable pairs are different)
+    */
 
     bytes32 public constant override poolIdentifier = "Trident:ConcentratedLiquidity";
 
@@ -81,8 +92,8 @@ contract ConcentratedLiquidityPool is IPool {
         token1 = _token1;
         swapFee = _swapFee;
         price = _price;
-        ticks[TickMath.MIN_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0);
-        ticks[TickMath.MAX_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0);
+        ticks[TickMath.MIN_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
+        ticks[TickMath.MAX_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
         nearestTick = TickMath.MIN_TICK;
         bento = _masterDeployer.bento();
         barFeeTo = _masterDeployer.barFeeTo();
@@ -222,6 +233,16 @@ contract ConcentratedLiquidityPool is IPool {
         uint256 feeGrowthGlobal = zeroForOne ? feeGrowthGlobal1 : feeGrowthGlobal0; // @dev Take fees in the output token.
 
         {
+            uint256 timestamp = block.timestamp;
+            uint256 diff = timestamp - uint256(lastObservation); // gonna overflow in 2106 🤔
+            if (diff > 0 && liquidity > 0) {
+                // univ3 does max(liquidity, 1) 🤔
+                lastObservation = uint32(timestamp);
+                secondsPerLiquidity += uint160((diff << 128) / liquidity);
+            }
+        }
+
+        {
             int24 nextTickToCross = zeroForOne ? nearestTick : ticks[nearestTick].nextTick;
             uint256 currentPrice = uint256(price);
             uint256 currentLiquidity = uint256(liquidity);
@@ -239,9 +260,9 @@ contract ConcentratedLiquidityPool is IPool {
                     if (input <= maxDx) {
                         // @dev We can swap only within the current range.
                         uint256 liquidityPadded = currentLiquidity << 96;
-                        // @dev Calculate new price after swap: L · √𝑃 / (L + Δx · √𝑃)
-                        // - alternatively: L / (L / √𝑃 + Δx).
-                        uint256 newPrice = uint160(
+                        /// @dev Calculate new price after swap: L · √𝑃 / (L + Δx · √𝑃)
+                        // alternatively: L / (L / √𝑃 + Δx).
+                        uint256 newPrice = uint256(
                             FullMath.mulDivRoundingUp(
                                 liquidityPadded,
                                 currentPrice,
@@ -305,34 +326,43 @@ contract ConcentratedLiquidityPool is IPool {
                 amountOut += output - feeAmount;
 
                 if (cross) {
-                    ticks[nextTickToCross].feeGrowthOutside0 =
-                        feeGrowthGlobal -
-                        ticks[nextTickToCross].feeGrowthOutside0;
+                    ticks[nextTickToCross].secondsPerLiquidityOutside =
+                        secondsPerLiquidity -
+                        ticks[nextTickToCross].secondsPerLiquidityOutside;
                     if (zeroForOne) {
-                        // @dev Going left.
+                        // Going left.
                         if (nextTickToCross % 2 == 0) {
                             currentLiquidity -= ticks[nextTickToCross].liquidity;
                         } else {
                             currentLiquidity += ticks[nextTickToCross].liquidity;
                         }
-
                         nextTickToCross = ticks[nextTickToCross].previousTick;
+                        ticks[nextTickToCross].feeGrowthOutside0 =
+                            feeGrowthGlobal -
+                            ticks[nextTickToCross].feeGrowthOutside0;
                     } else {
-                        // @dev Going right.
+                        // Going right.
                         if (nextTickToCross % 2 == 0) {
                             currentLiquidity += ticks[nextTickToCross].liquidity;
                         } else {
                             currentLiquidity -= ticks[nextTickToCross].liquidity;
                         }
-
                         nextTickToCross = ticks[nextTickToCross].nextTick;
+                        ticks[nextTickToCross].feeGrowthOutside1 =
+                            feeGrowthGlobal -
+                            ticks[nextTickToCross].feeGrowthOutside1;
                     }
                 }
             }
 
-            liquidity = uint128(currentLiquidity);
             price = uint160(currentPrice);
-            nearestTick = zeroForOne ? nextTickToCross : ticks[nextTickToCross].previousTick;
+
+            int24 newNearestTick = zeroForOne ? nextTickToCross : ticks[nextTickToCross].previousTick;
+
+            if (nearestTick != newNearestTick) {
+                nearestTick = newNearestTick;
+                liquidity = uint128(currentLiquidity);
+            }
         }
 
         (uint256 amount0, uint256 amount1) = _balance();
@@ -348,7 +378,7 @@ contract ConcentratedLiquidityPool is IPool {
             _transfer(token1, amountOut, recipient, unwrapBento);
             emit Swap(recipient, token0, token1, inAmount, amountOut);
         } else {
-            feeGrowthGlobal1 += feeGrowthGlobal;
+            feeGrowthGlobal0 += feeGrowthGlobal;
             uint128 newBalance = reserve1 + uint128(inAmount);
             require(uint256(newBalance) <= amount1, "TOKEN1_MISSING");
             reserve1 = newBalance;
@@ -391,56 +421,20 @@ contract ConcentratedLiquidityPool is IPool {
         }
     }
 
-    function _getPositionAssets(
-        uint256 priceLower,
-        uint256 priceUpper,
-        uint256 currentPrice,
-        uint256 liquidityAmount
-    ) internal returns (uint256 amount0, uint256 amount1) {
-        if (priceUpper <= currentPrice) {
-            // @dev Only supply token1 (token1 is Y).
-            amount1 = uint128(DyDxMath.getDy(liquidityAmount, priceLower, priceUpper, true));
-        } else if (currentPrice <= priceLower) {
-            // @dev Only supply token0 (token0 is X).
-            amount0 = uint128(DyDxMath.getDx(liquidityAmount, priceLower, priceUpper, true));
-        } else {
-            // @dev Supply both tokens.
-            amount0 = uint128(DyDxMath.getDx(liquidityAmount, currentPrice, priceUpper, true));
-            amount1 = uint128(DyDxMath.getDy(liquidityAmount, priceLower, currentPrice, true));
-        }
-
-        (uint256 balance0, uint256 balance1) = _balance();
-
-        if (amount0 != 0) {
-            amount0 += reserve0;
-            require(uint256(amount0) <= balance0, "TOKEN0_MISSING");
-            reserve0 = uint128(amount0);
-            // @dev `reserve0 = token0.balanceOf(address(this))` doesn't help anyone as coins will be stuck.
-        }
-
-        if (amount1 != 0) {
-            amount1 += reserve1;
-            require(uint256(amount1) <= balance1, "TOKEN1_MISSING");
-            reserve1 = uint128(amount1);
-        }
-
-        emit Sync(balance0, balance1);
-    }
-
     function _getAmountsForLiquidity(
         uint256 priceLower,
         uint256 priceUpper,
         uint256 currentPrice,
         uint256 liquidityAmount
-    ) internal returns (uint128 token0amount, uint128 token1amount) {
+    ) internal pure returns (uint128 token0amount, uint128 token1amount) {
         if (priceUpper <= currentPrice) {
-            // @dev Only supply token1 (token1 is Y).
+            /// @dev Only supply token1 (token1 is Y).
             token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, priceUpper, true));
         } else if (currentPrice <= priceLower) {
-            // @dev Only supply token0 (token0 is X).
+            /// @dev Only supply token0 (token0 is X).
             token0amount = uint128(DyDxMath.getDx(liquidityAmount, priceLower, priceUpper, true));
         } else {
-            // @dev Supply both tokens.
+            /// @dev Supply both tokens.
             token0amount = uint128(DyDxMath.getDx(liquidityAmount, currentPrice, priceUpper, true));
             token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, currentPrice, true));
         }
@@ -506,9 +500,16 @@ contract ConcentratedLiquidityPool is IPool {
             );
 
             if (lower <= currentNearestTick) {
-                ticks[lower] = Tick(lowerOld, old.nextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1);
+                ticks[lower] = Tick(
+                    lowerOld,
+                    old.nextTick,
+                    amount,
+                    feeGrowthGlobal0,
+                    feeGrowthGlobal1,
+                    secondsPerLiquidity
+                );
             } else {
-                ticks[lower] = Tick(lowerOld, old.nextTick, amount, 0, 0);
+                ticks[lower] = Tick(lowerOld, old.nextTick, amount, 0, 0, 0);
             }
 
             old.nextTick = lower;
@@ -524,9 +525,16 @@ contract ConcentratedLiquidityPool is IPool {
             require(old.liquidity != 0 && old.nextTick > upper && upperOld < upper, "UPPER_ORDER");
 
             if (upper <= currentNearestTick) {
-                ticks[upper] = Tick(upperOld, old.nextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1);
+                ticks[upper] = Tick(
+                    upperOld,
+                    old.nextTick,
+                    amount,
+                    feeGrowthGlobal0,
+                    feeGrowthGlobal1,
+                    secondsPerLiquidity
+                );
             } else {
-                ticks[upper] = Tick(upperOld, old.nextTick, amount, 0, 0);
+                ticks[upper] = Tick(upperOld, old.nextTick, amount, 0, 0, 0);
             }
 
             old.nextTick = upper;
@@ -549,7 +557,7 @@ contract ConcentratedLiquidityPool is IPool {
         Tick storage current = ticks[lower];
 
         if (lower != TickMath.MIN_TICK && current.liquidity == amount) {
-            // @dev Delete lower tick.
+            /// @dev Delete lower tick.
             Tick storage previous = ticks[current.previousTick];
             Tick storage next = ticks[current.nextTick];
 
@@ -581,16 +589,20 @@ contract ConcentratedLiquidityPool is IPool {
         }
     }
 
+    // Generic formula for fee growth inside a range: (globalGrowth - growthBelow - growthAbove)
+    // Available counters: global, outside u, outside v
+
     //                  u         ▼         v
-    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|---------
+    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - feeGrowthOutside(u) - feeGrowthOutside(v))
 
     //             ▼    u                   v
-    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|---------
+    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - (global - feeGrowthOutside(u)) - feeGrowthOutside(v))
 
     //                  u                   v    ▼
-    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|---------
+    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - feeGrowthOutside(u) - (global - feeGrowthOutside(v)))
 
-    /// @dev Fees: global, outside u, outside v - we are interested in the 'xxxx' zone.
+    /// @notice Calculates the fee growth inside a range (per unit of liquidity).
+    /// @dev Multiply rangeFeeGrowth delta by the provided liquidity to get accrued fees for some period.
     function rangeFeeGrowth(int24 lowerTick, int24 upperTick)
         public
         view
@@ -627,6 +639,31 @@ contract ConcentratedLiquidityPool is IPool {
 
         feeGrowthInside0 = _feeGrowthGlobal0 - feeGrowthBelow0 - feeGrowthAbove0;
         feeGrowthInside1 = _feeGrowthGlobal1 - feeGrowthBelow1 - feeGrowthAbove1;
+    }
+
+    function rangeSecondsInside(int24 lowerTick, int24 upperTick) public view returns (uint256 secondsInside) {
+        int24 currentTick = nearestTick;
+
+        Tick storage lower = ticks[lowerTick];
+        Tick storage upper = ticks[upperTick];
+
+        uint256 secondsGlobal = secondsPerLiquidity;
+        uint256 secondsBelow;
+        uint256 secondsAbove;
+
+        if (lowerTick <= currentTick) {
+            secondsBelow = lower.secondsPerLiquidityOutside;
+        } else {
+            secondsBelow = secondsGlobal - lower.secondsPerLiquidityOutside;
+        }
+
+        if (currentTick < upperTick) {
+            secondsAbove = upper.secondsPerLiquidityOutside;
+        } else {
+            secondsAbove = secondsGlobal - upper.secondsPerLiquidityOutside;
+        }
+
+        secondsInside = secondsGlobal - secondsBelow - secondsAbove;
     }
 
     function getAssets() public view override returns (address[] memory assets) {
