@@ -75,7 +75,7 @@ perl -0777 -i -pe 's/function burn\(bytes calldata data\) public/function burn\(
 perl -0777 -i -pe 's/function burnSingle\(bytes calldata data\) public/function burnSingle\(bytes memory data\) public virtual/g' contracts/pool/ConstantProductPool.sol
 perl -0777 -i -pe 's/function swap\(bytes calldata data\) public/function swap\(bytes memory data\) public virtual/g' contracts/pool/ConstantProductPool.sol
 perl -0777 -i -pe 's/function flashSwap\(bytes calldata data\) public/function flashSwap\(bytes memory data\) public virtual/g' contracts/pool/ConstantProductPool.sol
-perl -0777 -i -pe 's/internal view returns \(uint256 amountOut\)/internal virtual view returns \(uint256 amountOut\)/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/internal view returns \(uint256 amountOut\)/public virtual view returns \(uint256 amountOut\)/g' contracts/pool/ConstantProductPool.sol
 perl -0777 -i -pe 's/function getAmountOut\(bytes calldata data\) public/function getAmountOut\(bytes memory data\) public virtual/g' contracts/pool/ConstantProductPool.sol
 
 # internal -> public fee constants

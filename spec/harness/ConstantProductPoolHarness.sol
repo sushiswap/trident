@@ -52,7 +52,7 @@ contract ConstantProductPoolHarness is ConstantProductPool {
                               uint256 amountIn, bytes memory context)
             public returns (uint256 amountOut) {
         // TODO: would be applied for all rules
-        require(recipient != address(this), "recepient is current contract");
+        // require(recipient != address(this), "recepient is current contract");
         // require(recipient != token0, "recepient is token0");
         // require(recipient != token1, "recepient is token1");
 
