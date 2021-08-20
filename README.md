@@ -8,11 +8,11 @@ TRIDENT 🔱 is a newly developed AMM from Sushi. Trident is not a fork of any e
 
 | Contract                   | Address                                    |
 | -------------------------- | ------------------------------------------ |
-| TridentRouter              | 0xff10F40Ab67bab987d4A34b9e3Df20037E5172c5 |
-| MasterDeployer             | 0x312b493E71EF0aECdAF7480523C114c68a298B17 |
-| ConstantProductPoolFactory | 0xBa006909bA3D273735D9223f7404Ff8c3Dc11183 |
-| HybridPoolFactory          | 0x40051B2A78897FfDfB31C817b869e18Be495Ec2C |
-| IndexPoolFactory           | 0x5215637AcBfa396b1D948CEd2D47b5c28924482f |
+| TridentRouter              | 0xB6E90eBe44De40aEb0b987adC2D7d9dd0EC918d7 |
+| MasterDeployer             | 0x1E2d3ba40F973135f397fF7f2Ec0d1cC835E8b73 |
+| ConstantProductPoolFactory | 0x1026cbed7b7E851426b959BC69dcC1bf5876512d |
+| HybridPoolFactory          | 0xa19b3b22f29E23e4c04678C94CFC3e8f202137d8 |
+| IndexPoolFactory           | 0xb65Be5C721B6d6734825BA31526365b6697d9B71 |
 
 ## Extensibility
 
