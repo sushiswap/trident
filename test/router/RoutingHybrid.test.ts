@@ -188,6 +188,13 @@ describe("HybridPool Typescript == Solidity check", function () {
     const poolRouterInfo = { ...poolRouterInfo0 };
     poolRouterInfo.reserve0 = await bento.balanceOf(usdt.address, pool.address);
     poolRouterInfo.reserve1 = await bento.balanceOf(usdc.address, pool.address);
+    if (
+      poolRouterInfo.reserve0 < MINIMUM_LIQUIDITY ||
+      poolRouterInfo.reserve1 < MINIMUM_LIQUIDITY
+    ) {
+      console.log("Low liquidity - skip test");
+      return; // Too low liquidity
+    }
 
     let balanceBefore: BigNumber = await bento.balanceOf(t1, alice.address);
     let params: ExactInputSingleParams = {
@@ -265,14 +272,14 @@ describe("HybridPool Typescript == Solidity check", function () {
         }
         //test big values 2^112 = 10^33.7153
         for (let swapNum = 0; swapNum < 3; ++swapNum) {
-          await checkSwap(pool, poolRouterInfo, 25); // TODO: 33?
+          await checkSwap(pool, poolRouterInfo, 23);
         }
+        await checkSwap(pool, poolRouterInfo, 33);
       });
     }
   });
 
-  // TODO: unskip
-  describe.skip("Check supersmall liquidity values", function () {
+  describe("Check supersmall liquidity values", function () {
     for (let mintNum = 0; mintNum < 3; ++mintNum) {
       it(`Test ${mintNum + 1}`, async function () {
         const [poolRouterInfo, pool] = await createHybridPool(
@@ -282,18 +289,11 @@ describe("HybridPool Typescript == Solidity check", function () {
           4
         );
 
-        // test regular values
-        for (let swapNum = 0; swapNum < 3; ++swapNum) {
-          await checkSwap(pool, poolRouterInfo, 17);
-        }
         // test small values
-        for (let swapNum = 0; swapNum < 3; ++swapNum) {
-          await checkSwap(pool, poolRouterInfo, 2);
+        for (let swapNum = 0; swapNum < 5; ++swapNum) {
+          await checkSwap(pool, poolRouterInfo, 3);
         }
-        //test big values 2^112 = 10^33.7153
-        for (let swapNum = 0; swapNum < 3; ++swapNum) {
-          await checkSwap(pool, poolRouterInfo, 25); // TODO: 33?
-        }
+        await checkSwap(pool, poolRouterInfo, 7);
       });
     }
   });
@@ -324,8 +324,7 @@ describe("HybridPool Typescript == Solidity check", function () {
     }
   });
 
-  // TODO: unskip
-  describe.skip("Check different fees", function () {
+  describe("Check different fees", function () {
     for (let mintNum = 0; mintNum < 3; ++mintNum) {
       const fee = (mintNum + 1) / 1000;
       it(`fee = ${fee}`, async function () {
@@ -346,14 +345,15 @@ describe("HybridPool Typescript == Solidity check", function () {
         }
         //test extremely big values 2^112 = 10^33.7153
         for (let swapNum = 0; swapNum < 3; ++swapNum) {
-          await checkSwap(pool, poolRouterInfo, 25); // TODO: 33?
+          await checkSwap(pool, poolRouterInfo, 25);
         }
+        await checkSwap(pool, poolRouterInfo, 33);
       });
     }
   });
 
   describe("Check different A", function () {
-    const Avariants = [100, 450, 1000, 6000 /*30_000, 100_000, 1000_000*/]; // TODO: unskip
+    const Avariants = [100, 450, 1000, 6000, 30_000, 100_000, 1000_000];
     for (let i = 0; i < Avariants.length; ++i) {
       const A = Avariants[i];
       it(`A = ${A}`, async function () {
@@ -369,8 +369,9 @@ describe("HybridPool Typescript == Solidity check", function () {
         }
         //test extremely big values 2^112 = 10^33.7153
         for (let swapNum = 0; swapNum < 2; ++swapNum) {
-          await checkSwap(pool, poolRouterInfo, 25); // TODO: 33?
+          await checkSwap(pool, poolRouterInfo, 24);
         }
+        await checkSwap(pool, poolRouterInfo, 33);
       });
     }
   });
