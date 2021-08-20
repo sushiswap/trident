@@ -17,13 +17,13 @@ const aliceUSDCBalance: BigNumber = getBigNumber("100000000000000000");
 const ERCDeployAmount: BigNumber = getBigNumber("1000000000000000000");
 
 // what gets minted for alice on the pool
-const poolMintAmount: BigNumber = getBigNumber("100000000");
+const poolMintAmount: BigNumber = getBigNumber("1", 16);
 
 // token weights passed into the pool
 const tokenWeights: BigNumber[] = [getBigNumber("10"), getBigNumber("10")];
 
 // pool swap fee
-const poolSwapFee: number | BigNumber = 100;
+const poolSwapFee: number | BigNumber = getBigNumber("1", 13);
 
 // -------------         -------------
 
@@ -143,8 +143,8 @@ describe("IndexPool test", function () {
 
     await pool.mint(
       ethers.utils.defaultAbiCoder.encode(
-        ["uint256", "address"],
-        [poolMintAmount, alice.address]
+        ["address", "uint256"],
+        [alice.address, poolMintAmount]
       )
     );
 
@@ -177,8 +177,8 @@ describe("IndexPool test", function () {
         encodeSwapData(usdt.address, usdc.address, alice.address, false, 1)
       );
 
-    const out = calcOutByIn(poolInfo, 1, false);
-    console.log(out);
+    // const out = calcOutByIn(poolInfo, 1, false);
+    // console.log(out);
     // await expect(tx).to.eventually.be.rejectedWith(
     //   "VM Exception while processing transaction: reverted with panic code 0x11 (Arithmetic operation underflowed or overflowed outside of an unchecked block)"
     // );
