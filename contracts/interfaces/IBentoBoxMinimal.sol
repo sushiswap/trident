@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 pragma solidity >=0.8.0;
-import "../libraries/RebaseLibrary.sol";
 
 /// @notice Minimal BentoBox vault interface. 
 /// @dev `token` is aliased as `address` from `IERC20` for simplicity.
