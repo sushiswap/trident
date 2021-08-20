@@ -744,10 +744,10 @@
   resolved "https://registry.yarnpkg.com/@sushiswap/prettier-config/-/prettier-config-0.1.0.tgz#4fdddf1ba2590025f78adf6cb54ed016344958a4"
   integrity sha512-QD+xdR0VZbmqwSa1xMMkCh5KGCVQQLqN3VHS7VDh5rB4FtZKbUE8lNgKvtKwp38aG0zIlwZcbA+ASFBnWmbkJQ==
 
-"@sushiswap/sdk@5.0.0-canary.46":
-  version "5.0.0-canary.46"
-  resolved "https://registry.yarnpkg.com/@sushiswap/sdk/-/sdk-5.0.0-canary.46.tgz#109181beead4d30d2b06674eb7c0d7e6d9e5a986"
-  integrity sha512-CFTrfYkpCejt6mxh4STXSUBEj261EHzE1Nea8laemk4RNdvXfMtDTZ9UmH6rKRswYa5kew9owvVmUs2FckRa7Q==
+"@sushiswap/sdk@5.0.0-canary.47":
+  version "5.0.0-canary.47"
+  resolved "https://registry.yarnpkg.com/@sushiswap/sdk/-/sdk-5.0.0-canary.47.tgz#5cc3b4ade306096c29a5b89ce4d857b61a598969"
+  integrity sha512-Hd/GzKzxabbK9LliUh64kx5QgaGTZlmjsUay/x3+t3cQFZd+V0FPBit/5RUq0IOL75DfwWhem+S8Becpn1WLFA==
   dependencies:
     big.js "^6.1.0"
     decimal.js-light "^2.5.0"
