@@ -360,7 +360,6 @@ contract ConcentratedLiquidityPool is IPool {
             int24 newNearestTick = zeroForOne ? nextTickToCross : ticks[nextTickToCross].previousTick;
 
             if (nearestTick != newNearestTick) {
-                // we crossed some ticks n' shit
                 nearestTick = newNearestTick;
                 liquidity = uint128(currentLiquidity);
             }
