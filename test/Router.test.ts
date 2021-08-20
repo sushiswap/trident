@@ -242,12 +242,12 @@ describe("Router", function () {
       liquidityInput = [
         {
           token: weth.address,
-          native: false,
+          native: true,
           amount: BigNumber.from(10).pow(17),
         },
         {
           token: sushi.address,
-          native: false,
+          native: true,
           amount: BigNumber.from(10).pow(18),
         },
       ];
