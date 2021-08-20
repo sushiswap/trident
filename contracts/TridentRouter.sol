@@ -114,7 +114,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         address pool,
         uint256 minLiquidity,
         bytes calldata data
-    ) public returns (uint256 liquidity) {
+    ) public payable returns (uint256 liquidity) {
         for (uint256 i; i < tokenInput.length; i++) {
             if (tokenInput[i].native) {
                 _depositToBentoBox(tokenInput[i].token, pool, tokenInput[i].amount);
@@ -126,7 +126,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         require(liquidity >= minLiquidity, "NOT_ENOUGH_LIQUIDITY_MINTED");
     }
 
-    function addLiquidityLazy(address pool, bytes calldata data) public {
+    function addLiquidityLazy(address pool, bytes calldata data) public payable {
         cachedMsgSender = msg.sender;
         cachedPool = pool;
         // @dev The pool must ensure that there's not too much slippage.
