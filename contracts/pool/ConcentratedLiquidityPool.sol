@@ -338,7 +338,7 @@ contract ConcentratedLiquidityPool is IPool {
         (uint256 amount0, uint256 amount1) = _balance();
 
         if (zeroForOne) {
-            feeGrowthGlobal1 += feeGrowthGlobal;
+            feeGrowthGlobal0 += feeGrowthGlobal;
             uint128 newBalance = reserve0 + uint128(inAmount);
             require(uint256(newBalance) <= amount0, "TOKEN0_MISSING");
             reserve0 = newBalance;
