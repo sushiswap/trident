@@ -3,6 +3,7 @@
 pragma solidity >=0.8.0;
 
 import "../../interfaces/IPool.sol";
+import "./TridentNFT.sol";
 
 interface IConcentratedLiquidityPool is IPool {
     function feeGrowthGlobal0() external view returns (uint256);
@@ -116,12 +117,16 @@ contract ConcentratedLiquidityPoolManager is TridentNFT {
         _mint(recipient);
     }
 
-    function burn(IPool pool, bytes memory burnData, uint256 tokenId) public {
+    function burn(
+        IPool pool,
+        bytes memory burnData,
+        uint256 tokenId
+    ) public {
         (int24 lower, int24 upper, uint128 amount, address recipient, bool unwrapBento) = abi.decode(
             burnData,
             (int24, int24, uint128, address, bool)
         );
-        
+
         pool.burn(burnData);
         // TO-DO update position locally.... 🏄
         // @dev Burn Position NFT.
