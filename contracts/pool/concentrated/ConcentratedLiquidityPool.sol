@@ -379,7 +379,7 @@ contract ConcentratedLiquidityPool is IPool {
             _transfer(token1, amountOut, recipient, unwrapBento);
             emit Swap(recipient, token0, token1, inAmount, amountOut);
         } else {
-            feeGrowthGlobal1 += feeGrowthGlobal;
+            feeGrowthGlobal0 += feeGrowthGlobal;
             uint128 newBalance = reserve1 + uint128(inAmount);
             require(uint256(newBalance) <= amount1, "TOKEN1_MISSING");
             reserve1 = newBalance;
