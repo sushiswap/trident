@@ -29,6 +29,8 @@ methods {
     _balance() returns (uint256 balance0, uint256 balance1) envfree
     transferFrom(address, address, uint256)
     totalSupply() returns (uint256) envfree
+    getAmountOutWrapper(address tokenIn, uint256 amountIn) returns (uint256) envfree
+    balanceOf(address) returns (uint256) envfree
 
     // TODO: not working
     // TridentERC20 (permit)
@@ -64,7 +66,7 @@ methods {
 ////////////////////////////////////////////////////////////////////////////
 // REVIEW: This should fail (passing right now)
 invariant validityOfTokens()
-    token0() != 0 && token1() != 0 && token0() != token1()
+    token0() != 0 && token1() != 0 &&  token0() != token1()
 
 // REVIEW: This should fail (passing right now)
 invariant tokensNotMirin()
@@ -78,6 +80,27 @@ invariant reserveLessThanEqualToBalance()
 			requireInvariant validityOfTokens();
 		}
 	}
+
+invariant integrityOfTotalSupply()
+    totalSupply() == 0 => ( reserve0() == 0 && reserve1() == 0 ) {
+        preserved burnWrapper(address to ,bool b) with (env e) {
+            require e.msg.sender != currentContract;
+            require to != currentContract;
+            require totalSupply()==0 || balanceOf(e.msg.sender) < totalSupply() + 1000;
+        }
+        preserved burnSingleWrapper(address tokenOut, address to, bool b) with (env e) {
+             require e.msg.sender != currentContract;
+            require to != currentContract;
+            require totalSupply()==0 || balanceOf(e.msg.sender) < totalSupply() + 1000;
+        }
+        preserved  swapWrapper(address tokenIn, address recipient, bool unwrapBento) with (env e) {
+            requireInvariant reserveLessThanEqualToBalance;
+            uint256 amountIn = reserve0()-  bentoBox.balanceOf(token0(), currentContract);
+            require tokenIn == token0();
+            require amountIn >0  => getAmountOutWrapper(token0(), amountIn) > 0 ;
+        }
+
+    }
     
 ////////////////////////////////////////////////////////////////////////////
 //                                 Rules                                  //
@@ -102,7 +125,7 @@ rule noChangeToBalancedPoolAssets(method f) filtered { f ->
     
     validState(true);
     // require that the system has no mirin tokens
-    require balanceOf(e, currentContract) == 0;
+    require balanceOf(currentContract) == 0;
 
     calldataarg args;
     f(e, args);
@@ -134,18 +157,18 @@ rule afterOpBalanceEqualsReserve(method f) {
     address to;
     address tokenIn;
     address tokenOut;
-    address recepient;
+    address recipient;
     bool unwrapBento;
 
     require to != currentContract;
-    require recepient != currentContract;
+    require recipient != currentContract;
     
     if (f.selector == burnWrapper(address, bool).selector) {
         burnWrapper(e, to, unwrapBento);
     } else if (f.selector == burnSingleWrapper(address, address, bool).selector) {
         burnSingleWrapper(e, tokenOut, to, unwrapBento);
     } else if (f.selector == swapWrapper(address, address, bool).selector) {
-        swapWrapper(e, tokenIn, recepient, unwrapBento);
+        swapWrapper(e, tokenIn, recipient, unwrapBento);
     } else {
         calldataarg args;
         f(e, args);
@@ -172,7 +195,7 @@ rule afterOpBalanceEqualsReserve(method f) {
 rule mintingNotPossibleForBalancedPool() {
     env e;
 
-    require totalSupply() > 0; // REVIEW: failing without this
+    require totalSupply() > 0 || ( reserve0() == 0 || reserve1() == 0 ); // REVIEW: failing without this
 
     validState(true);
 
@@ -291,7 +314,7 @@ rule noChangeToOthersBalances(method f) {
             to != other && recepient != other;
 
     // recording other's mirin balance
-    uint256 _otherMirinBalance = balanceOf(e, other);
+    uint256 _otherMirinBalance = balanceOf(other);
 
     // recording other's tokens balance
     uint256 _totalOthertoken0 = tokenBalanceOf(token0(), other) + 
@@ -320,7 +343,7 @@ rule noChangeToOthersBalances(method f) {
     }
 
     // recording other's mirin balance
-    uint256 otherMirinBalance_ = balanceOf(e, other);
+    uint256 otherMirinBalance_ = balanceOf(other);
     
     // recording other's tokens balance
     uint256 totalOthertoken0_ = tokenBalanceOf(token0(), other) + 
@@ -398,9 +421,9 @@ rule sameUnderlyingRatioLiquidity(method f) filtered { f ->
 
     if (totalSupply() != 0) {
         // user's liquidity for token0 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
-        _liquidity0 = balanceOf(e1, e1.msg.sender) * reserve0() / totalSupply();
+        _liquidity0 = balanceOf(e1.msg.sender) * reserve0() / totalSupply();
         // user's liquidity for token1 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
-        _liquidity1 = balanceOf(e1, e1.msg.sender) * reserve1() / totalSupply();
+        _liquidity1 = balanceOf(e1.msg.sender) * reserve1() / totalSupply();
     } else {
         _liquidity0 = 0;
         _liquidity1 = 0;
@@ -414,9 +437,9 @@ rule sameUnderlyingRatioLiquidity(method f) filtered { f ->
 
     if (totalSupply() != 0) {
         // user's liquidity for token0 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
-        uint256 liquidity0_ = balanceOf(e3, e3.msg.sender) * reserve0() / totalSupply();
+        uint256 liquidity0_ = balanceOf(e3.msg.sender) * reserve0() / totalSupply();
         // user's liquidity for token1 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
-        uint256 liquidity1_ = balanceOf(e3, e3.msg.sender) * reserve1() / totalSupply();
+        uint256 liquidity1_ = balanceOf(e3.msg.sender) * reserve1() / totalSupply();
     } else {
         liquidity0_ = 0;
         liquidity1_ = 0;
@@ -586,7 +609,7 @@ rule zeroCharacteristicsOfGetAmountOut(uint256 _reserve0, uint256 _reserve1) {
     require _reserve0 * _reserve1 >= 1000;
     require MAX_FEE_MINUS_SWAP_FEE(e) <= MAX_FEE(e);
 
-    uint256 amountOut = getAmountOutWrapper(e, tokenIn, amountIn);
+    uint256 amountOut = getAmountOutWrapper(tokenIn, amountIn);
 
     if (amountIn == 0) {
         assert(amountOut == 0, "amountIn is 0, but amountOut is not 0");
@@ -617,7 +640,7 @@ rule maxAmountOut(uint256 _reserve0, uint256 _reserve1) {
     require _reserve0 > 0 && _reserve1 > 0;
     require MAX_FEE_MINUS_SWAP_FEE(e) <= MAX_FEE(e);
 
-    uint256 amountOut = getAmountOutWrapper(e, tokenIn, amountIn);
+    uint256 amountOut = getAmountOutWrapper(tokenIn, amountIn);
     // mathint maxValue = to_mathint(amountIn) * to_mathint(_reserve1) / to_mathint(_reserve0);
     // assert amountOut <= maxValue;
 
