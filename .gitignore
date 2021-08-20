@@ -5,9 +5,6 @@ node_modules/
 cache/
 artifacts/
 
-# Deployments
-deployments/
-
 # Typechain
 types/
 typechain/

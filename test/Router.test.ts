@@ -242,16 +242,18 @@ describe("Router", function () {
       liquidityInput = [
         {
           token: weth.address,
-          native: false,
+          native: true,
           amount: BigNumber.from(10).pow(17),
         },
         {
           token: sushi.address,
-          native: false,
+          native: true,
           amount: BigNumber.from(10).pow(18),
         },
       ];
-      await router.addLiquidity(liquidityInput, pool.address, 1, aliceEncoded);
+      await router.addLiquidity(liquidityInput, pool.address, 1, aliceEncoded, {
+        value: BigNumber.from(10).pow(17),
+      });
 
       let finalTotalSupply = await pool.totalSupply();
       let finalPoolWethBalance = await bento.balanceOf(

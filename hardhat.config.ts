@@ -18,7 +18,12 @@ import "./cli";
 import { HardhatUserConfig } from "hardhat/config";
 import { removeConsoleLog } from "hardhat-preprocessor";
 
-const accounts = [process.env.DEPLOYER_KEY || "0x00"];
+// const accounts = [process.env.DEPLOYER_KEY || "0x00"];
+const accounts = {
+  mnemonic:
+    process.env.MNEMONIC ||
+    "test test test test test test test test test test test junk",
+};
 
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
@@ -29,6 +34,7 @@ const config: HardhatUserConfig = {
     coinmarketcap: process.env.COINMARKETCAP_API_KEY,
     currency: "USD",
     enabled: process.env.REPORT_GAS === "true",
+    excludeContracts: ["BentoBoxV1", "ERC20Mock", "ERC20", "WETH9"],
   },
   namedAccounts: {
     deployer: {
