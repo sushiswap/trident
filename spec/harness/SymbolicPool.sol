@@ -16,36 +16,36 @@ contract SymbolicPool is IPool, TridentERC20 {
     IBentoBoxMinimal public bento;
     address public token0;
     address public token1;
-    address public token2;
     // There is a set of tokens this pool supports
     // the amount of holding the pool has for each token[i]
     mapping(address => uint256) public reserves; 
     // a symbolic representation of fixed conversion ratio between each two tokens
     mapping (address => mapping (address => uint256)) public rates; 
 
-    uint256 internal constant NUM_TOKENS = 3;
+    uint256 internal constant NUM_TOKENS = 2;
     
-    function swapWithoutContext(address tokenIn, address tokenOut,
-                                address recipient, bool unwrapBento) 
-                                external override returns(uint256 finalAmountOut) {
-        
-        uint256 amountIn = bento.balanceOf(tokenIn, address(this)) - reserves[tokenIn];
 
-        return basicSwap(tokenIn, address(tokenOut), recipient, amountIn);
-    }
+        function swap(bytes calldata data) external override returns (uint256) {
+            (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
+            require(tokenIn == address(token0));
+            address tokenOut = token1;
+            uint256 amountIn = bento.balanceOf(tokenIn,address(this)) - reserves[tokenIn];
+            return basicSwap(tokenIn, tokenOut, recipient,amountIn);
+        }
 
-    function swapWithContext(address tokenIn, address tokenOut,
-                             bytes calldata context, address recipient,
-                             bool unwrapBento, uint256 amountIn)
-                            external override returns(uint256 finalAmountOut) {
-        // TODO: add call to another contract
-        return basicSwap(address(tokenIn), address(tokenOut), recipient,amountIn);
-    }
+        function flashSwap(bytes calldata data) external override returns (uint256 amountOut) {
+            (address tokenIn, address recipient, bool unwrapBento, uint256 amountIn, bytes memory context) = abi.decode(data,(address, address, bool, uint256, bytes));
+            require(tokenIn == address(token0));
+            address tokenOut = token1;
+            amountOut = basicSwap(tokenIn, tokenOut, recipient,amountIn);
+            require(bento.balanceOf(tokenIn,address(this)) - reserves[tokenIn]>= amountIn, "INSUFFICIENT_AMOUNT_IN");
+        }
+
+
+
 
     function basicSwap(address tokenIn, address tokenOut, address recipient,
                        uint256 amountIn) internal  returns(uint256 finalAmountOut) {
-        // checking swapRouter, it should pass in amountIn of tokenIn
-        assert(bento.balanceOf(tokenIn,address(this)) - reserves[tokenIn] >= amountIn);
 
         // a symbolic value representing the computed amountOut which is a
         // function of the current reserve state and amountIn
@@ -59,24 +59,22 @@ contract SymbolicPool is IPool, TridentERC20 {
         update(tokenOut);
     }
 
-    function getOptimalLiquidityInAmounts(liquidityInput[] calldata liquidityInputs) 
-            external override returns(liquidityAmount[] memory liquidityOptimal) { }
-
+   
     // a basic one to one mapping
-    function mint(address to) external override returns(uint256 liquidity) {
+    function mint(bytes memory data) external override returns(uint256 liquidity) {
+        address to = abi.decode(data, (address));
         liquidity =  bento.balanceOf(address(token0),address(this)) - reserves[address(token0)];
         liquidity +=  bento.balanceOf(address(token1),address(this)) - reserves[address(token1)];
-        liquidity +=  bento.balanceOf(address(token2),address(this)) - reserves[address(token2)];
         _mint(to, liquidity);
         update(token0); 
-        update(token1);
-        update(token2);  
+        update(token1);  
     }
 
     // returns amount of shares in bentobox
     // TODO: not using unwrapBento ask Nurit
-    function burn(address to, bool unwrapBento) 
-            external override returns (liquidityAmount[] memory withdrawnAmounts) {
+    function burn(bytes memory data) 
+            external override returns (IPool.TokenAmount[] memory withdrawnAmounts) {
+        (address to, bool unwrapBento) = abi.decode(data, (address, bool));
         // how much liquidity passed to the pool for burning
         uint256 liquidity = balanceOf[address(this)];
         
@@ -84,24 +82,24 @@ contract SymbolicPool is IPool, TridentERC20 {
         
         uint256 split = getSplitValue(liquidity); 
         
-        withdrawnAmounts = new liquidityAmount[](NUM_TOKENS);
+        withdrawnAmounts = new TokenAmount[](2);
 
         bento.transfer(token0, address(this), to, split);
-        withdrawnAmounts[0] = liquidityAmount({token: address(token0), amount: split});
+        withdrawnAmounts[0] = TokenAmount({token: address(token0), amount: split});
         
         bento.transfer(token1, address(this), to, split);
-        withdrawnAmounts[1] = liquidityAmount({token: address(token1), amount: split});
+        withdrawnAmounts[1] = TokenAmount({token: address(token1), amount: split});
 
-        bento.transfer(token2, address(this), to, split);
-        withdrawnAmounts[2] = liquidityAmount({token: address(token2), amount: split});
         
         update(token0); 
         update(token1);
-        update(token2);  
+
     }
 
-    function burnLiquiditySingle(address tokenOut, address to, bool unwrapBento)
+    function burnSingle(bytes memory data)
             external override returns (uint256 amount) {
+        (address tokenOut, address to, bool unwrapBento) = abi.decode(data, (address, address, bool));
+        
         uint256 amount = balanceOf[address(this)];
 
         _burn(address(this), amount);
@@ -115,47 +113,22 @@ contract SymbolicPool is IPool, TridentERC20 {
         reserves[token] = bento.balanceOf(token,address(this));
     }
 
-    function tokensLength() public returns (uint256) {
-        return NUM_TOKENS; 
-    }
-
-    function isBalanced() public returns (bool res) {
-       return   reserves[token0] == bento.balanceOf(token0,address(this)) &&
-                reserves[token1] == bento.balanceOf(token1,address(this)) &&
-                reserves[token2] == bento.balanceOf(token2,address(this));
-    }
-    
-    
-    function getReserveOfToken(address token) public returns (uint256) {
-        return reserves[token];
-
-    }
 
     function getSplitValue(uint liquidity) private returns(uint256) {
-        return liquidity /  NUM_TOKENS; 
+        return liquidity /  2; 
         
     }
 
-    function poolType() external pure override returns (uint256) {
-        return 1;
-    }
+    function getAmountOut(bytes calldata data) external override view returns (uint256 finalAmountOut) { }
+    function getAssets() external override view returns (address[] memory) { }
+    function poolIdentifier() external override pure returns (bytes32) { return ""; }
 
-    function assets(uint256 index) external view override returns (address){
-        if (index == 0 )
-            return address(token0);
-        else if (index == 1)
-            return address(token1);
-        else if (index == 2)
-            return address(token2);
-        require(false);
-        return address(0);
-            
+    function reserve0() external  view returns (uint256) {
+        return reserves[token0];
+    } 
 
-    }
-
-    function assetsCount() external view override returns (uint256) {
-        return NUM_TOKENS;
-    }
-    
+    function reserve1() external  view returns (uint256) {
+        return reserves[token1];
+    } 
     
 }
