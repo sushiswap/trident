@@ -2,18 +2,17 @@
 
 pragma solidity >=0.8.0;
 
-import "../deployer/MasterDeployer.sol";
-import "../interfaces/IBentoBoxMinimal.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/ITridentCallee.sol";
 import "../libraries/TridentMath.sol";
 import "../libraries/RebaseLibrary.sol";
 import "./TridentERC20.sol";
-import "hardhat/console.sol";
+import "../workInProgress/IMigrator.sol";
+import "../deployer/MasterDeployer.sol";
 
 /// @notice Trident exchange pool template with constant product formula for swapping between an ERC-20 token pair.
-/// @dev The reserves are stored as bento shares. However, the constant product curve is applied to the underlying amounts.
-///      The API uses the underlying amounts.
+/// @dev The reserves are stored as bento shares.
+///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
 contract ConstantProductPool is IPool, TridentERC20 {
     using RebaseLibrary for Rebase;
 
@@ -30,8 +29,8 @@ contract ConstantProductPool is IPool, TridentERC20 {
     uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
 
     address public immutable barFeeTo;
-    IBentoBoxMinimal public immutable bento;
-    MasterDeployer public immutable masterDeployer;
+    address public immutable bento;
+    address public immutable masterDeployer;
     address public immutable token0;
     address public immutable token1;
 
@@ -45,9 +44,9 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
     bytes32 public constant override poolIdentifier = "Trident:ConstantProduct";
 
-    uint256 private unlocked = 1;
+    uint256 private unlocked;
     modifier lock() {
-        require(unlocked == 1, "MIRIN: LOCKED");
+        require(unlocked == 1, "LOCKED");
         unlocked = 2;
         _;
         unlocked = 1;
@@ -72,17 +71,20 @@ contract ConstantProductPool is IPool, TridentERC20 {
             (address, address, uint256, bool)
         );
 
-        require(tokenA != address(0), "ConstantProductPoolWithTWAP: ZERO_ADDRESS");
-        require(tokenA != tokenB, "ConstantProductPoolWithTWAP: IDENTICAL_ADDRESSES");
-        require(_swapFee <= MAX_FEE, "ConstantProductPoolWithTWAP: INVALID_SWAP_FEE");
+        require(tokenA != address(0), "ZERO_ADDRESS");
+        require(tokenA != tokenB, "IDENTICAL_ADDRESSES");
+        require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
+
+        (, bytes memory _bento) = _masterDeployer.staticcall(abi.encodeWithSelector(0x4da31827)); // @dev bento().
+        (, bytes memory _barFeeTo) = _masterDeployer.staticcall(abi.encodeWithSelector(0x0c0a0cd2)); // @dev barFeeTo().
 
         token0 = tokenA;
         token1 = tokenB;
         swapFee = _swapFee;
         MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
-        bento = IBentoBoxMinimal(MasterDeployer(_masterDeployer).bento());
-        barFeeTo = MasterDeployer(_masterDeployer).barFeeTo();
-        masterDeployer = MasterDeployer(_masterDeployer);
+        bento = abi.decode(_bento, (address));
+        barFeeTo = abi.decode(_barFeeTo, (address));
+        masterDeployer = _masterDeployer;
         unlocked = 1;
         if (_twapSupport) {
             blockTimestampLast = 1;
@@ -91,18 +93,26 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
     function mint(bytes calldata data) public override lock returns (uint256 liquidity) {
         address to = abi.decode(data, (address));
-        (Holdings memory reserves, uint32 _blockTimestampLast, Rebases memory rebase) = _getReserves();
-        Holdings memory balances = _balance(rebase);
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
+        (uint256 balance0, uint256 balance1) = _balance();
         uint256 _totalSupply = totalSupply;
-        _mintFee(reserves.amount0, reserves.amount1, _totalSupply);
 
-        uint256 amount0 = balances.amount0 - reserves.amount0;
-        uint256 amount1 = balances.amount1 - reserves.amount1;
+        _mintFee(_reserve0, _reserve1, _totalSupply);
+
+        uint256 amount0 = balance0 - _reserve0;
+        uint256 amount1 = balance1 - _reserve1;
 
         uint256 computed = TridentMath.sqrt(balances.amount0 * balances.amount1);
         if (_totalSupply == 0) {
-            liquidity = computed - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
+            address migrator = MasterDeployer(masterDeployer).migrator();
+            if (msg.sender == migrator) {
+                liquidity = IMigrator(migrator).desiredLiquidity();
+                require(liquidity > 0 && liquidity != type(uint256).max, "BAD_DESIRED_LIQUIDITY");
+            } else {
+                require(migrator == address(0), "ONLY_MIGRATOR");
+                liquidity = computed - MINIMUM_LIQUIDITY;
+            }
         } else {
             uint256 k = TridentMath.sqrt(reserves.amount0 * reserves.amount1);
             liquidity = ((computed - k) * _totalSupply) / k;
@@ -116,16 +126,15 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
     function burn(bytes calldata data) public override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
         (address to, bool unwrapBento) = abi.decode(data, (address, bool));
-        (Holdings memory reserves, uint32 _blockTimestampLast, Rebases memory rebase) = _getReserves();
-        Holdings memory balances = _balance(rebase);
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
+        (uint256 balance0, uint256 balance1) = _balance();
         uint256 _totalSupply = totalSupply;
-        _mintFee(reserves.amount0, reserves.amount1, _totalSupply);
         uint256 liquidity = balanceOf[address(this)];
 
-        uint256 shares0 = (liquidity * balances.shares0) / _totalSupply;
-        uint256 shares1 = (liquidity * balances.shares1) / _totalSupply;
-        uint256 amount0 = rebase.total0.toElastic(shares0);
-        uint256 amount1 = rebase.total0.toElastic(shares1);
+        _mintFee(_reserve0, _reserve1, _totalSupply);
+
+        uint256 amount0 = (liquidity * balance0) / _totalSupply;
+        uint256 amount1 = (liquidity * balance1) / _totalSupply;
 
         _burn(address(this), liquidity);
 
@@ -149,45 +158,34 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
     function burnSingle(bytes calldata data) public override lock returns (uint256 amount) {
         (address tokenOut, address to, bool unwrapBento) = abi.decode(data, (address, address, bool));
-        (Holdings memory reserves, uint32 _blockTimestampLast, Rebases memory rebase) = _getReserves();
-        Holdings memory balances = _balance(rebase);
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
+        (uint256 balance0, uint256 balance1) = _balance();
         uint256 _totalSupply = totalSupply;
-        _mintFee(reserves.amount0, reserves.amount1, _totalSupply);
+        uint256 liquidity = balanceOf[address(this)];
 
-        uint256 shares0;
-        uint256 shares1;
-        {
-            uint256 liquidity = balanceOf[address(this)];
-            shares0 = (liquidity * balances.shares0) / _totalSupply;
-            shares1 = (liquidity * balances.shares1) / _totalSupply;
-            _burn(address(this), liquidity);
-        }
-        uint256 amount0 = rebase.total0.toElastic(shares0);
-        uint256 amount1 = rebase.total1.toElastic(shares1);
+        _mintFee(_reserve0, _reserve1, _totalSupply);
 
-        if (tokenOut == address(token1)) {
+        uint256 amount0 = (liquidity * balance0) / _totalSupply;
+        uint256 amount1 = (liquidity * balance1) / _totalSupply;
+
+        _burn(address(this), liquidity);
+
+        if (tokenOut == token1) {
             // @dev Swap token0 for token1.
-            // @dev Calculate amountOut as if the user first withdrew balanced liquidity and then swapped token1 for token0.
-            uint256 swapAmount1 = _getAmountOut(amount0, reserves.amount0 - amount0, reserves.amount1 - amount1);
-            shares1 += rebase.total1.toBase(swapAmount1);
-            amount1 += swapAmount1;
-            amount0 = 0;
-            balances.amount1 -= amount1;
-            balances.shares1 -= shares1;
+            // Calculate amountOut as if the user first withdrew balanced liquidity and then swapped token0 for token1.
+            amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1);
+            _transfer(token1, amount1, to, unwrapBento);
+            balance1 -= amount1;
             amount = amount1;
-            _transferShares(token1, shares1, to, unwrapBento);
+            amount0 = 0;
         } else {
             // @dev Swap token1 for token0.
-            // @dev Calculate amountOut as if the user first withdrew balanced liquidity and then swapped token1 for token0.
-            require(tokenOut == address(token0), "INVALID_OUTPUT_TOKEN");
-            uint256 swapAmount0 = _getAmountOut(amount1, reserves.amount1 - amount1, reserves.amount0 - amount0);
-            shares0 += rebase.total0.toBase(swapAmount0);
-            amount0 += swapAmount0;
-            amount1 = 0;
-            balances.amount0 -= amount0;
-            balances.shares0 -= shares0;
+            require(tokenOut == token1, "INVALID_OUTPUT_TOKEN");
+            amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0);
+            _transfer(token0, amount0, to, unwrapBento);
+            balance0 -= amount0;
             amount = amount0;
-            _transferShares(token0, shares0, to, unwrapBento);
+            amount1 = 0;
         }
 
         _update(reserves, balances, _blockTimestampLast);
@@ -197,30 +195,25 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
     function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
-        (Holdings memory reserves, uint32 _blockTimestampLast, Rebases memory rebase) = _getReserves();
-        Holdings memory balances = _balance(rebase);
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
+        (uint256 balance0, uint256 balance1) = _balance();
         uint256 amountIn;
         address tokenOut;
-        uint256 sharesOut;
 
-        if (tokenIn == address(token0)) {
+        if (tokenIn == token0) {
             tokenOut = token1;
-            amountIn = balances.amount0 - reserves.amount0;
-            amountOut = _getAmountOut(amountIn, reserves.amount0, reserves.amount1);
-            sharesOut = rebase.total1.toBase(amountOut);
-            balances.amount1 -= amountOut;
-            balances.shares1 -= sharesOut;
+            amountIn = balance0 - _reserve0;
+            amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
+            balance1 -= amountOut;
         } else {
-            require(tokenIn == address(token1), "INVALID_INPUT_TOKEN");
+            require(tokenIn == token1, "INVALID_INPUT_TOKEN");
             tokenOut = token0;
-            amountIn = balances.amount1 - reserves.amount1;
-            amountOut = _getAmountOut(amountIn, reserves.amount1, reserves.amount0);
-            sharesOut = rebase.total0.toBase(amountOut);
-            balances.amount0 -= amountOut;
-            balances.shares0 -= sharesOut;
+            amountIn = balance1 - reserve1;
+            amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
+            balance0 -= amountOut;
         }
-        _transferShares(tokenOut, sharesOut, recipient, unwrapBento);
-        _update(reserves, balances, _blockTimestampLast);
+        _transfer(tokenOut, amountOut, recipient, unwrapBento);
+        _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
 
@@ -229,34 +222,26 @@ contract ConstantProductPool is IPool, TridentERC20 {
             data,
             (address, address, bool, uint256, bytes)
         );
-        (Holdings memory reserves, uint32 _blockTimestampLast, Rebases memory rebase) = _getReserves();
-        address tokenOut;
-        Holdings memory balances;
+        (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
 
-        if (tokenIn == address(token0)) {
-            tokenOut = token1;
-            amountOut = _getAmountOut(amountIn, reserves.amount0, reserves.amount1);
-            {
-                uint256 sharesOut = rebase.total1.toBase(amountOut);
-                _transferShares(tokenOut, sharesOut, recipient, unwrapBento);
-            }
-            ITridentCallee(recipient).tridentCallback(tokenIn, tokenOut, amountIn, amountOut, context);
-            balances = _balance(rebase);
-            require(balances.amount0 - reserves.amount0 >= amountIn, "INSUFFICIENT_AMOUNT_IN");
+        if (tokenIn == token0) {
+            amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
+            _transfer(token1, amountOut, recipient, unwrapBento);
+            ITridentCallee(msg.sender).tridentSwapCallback(context);
+            (uint256 balance0, uint256 balance1) = _balance();
+            require(balance0 - _reserve0 >= amountIn, "INSUFFICIENT_AMOUNT_IN");
+            _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
+            emit Swap(recipient, tokenIn, token1, amountIn, amountOut);
         } else {
-            require(tokenIn == address(token1), "INVALID_INPUT_TOKEN");
-            tokenOut = token0;
-            amountOut = _getAmountOut(amountIn, reserves.amount1, reserves.amount0);
-            {
-                uint256 sharesOut = rebase.total0.toBase(amountOut);
-                _transferShares(tokenOut, sharesOut, recipient, unwrapBento);
-            }
-            ITridentCallee(recipient).tridentCallback(tokenIn, tokenOut, amountIn, amountOut, context);
-            balances = _balance(rebase);
-            require(balances.amount1 - reserves.amount1 >= amountIn, "INSUFFICIENT_AMOUNT_IN");
+            require(tokenIn == token1, "INVALID_INPUT_TOKEN");
+            amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
+            _transfer(token0, amountOut, recipient, unwrapBento);
+            ITridentCallee(msg.sender).tridentSwapCallback(context);
+            (uint256 balance0, uint256 balance1) = _balance();
+            require(balance1 - _reserve1 >= amountIn, "INSUFFICIENT_AMOUNT_IN");
+            _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
+            emit Swap(recipient, tokenIn, token0, amountIn, amountOut);
         }
-        _update(reserves, balances, _blockTimestampLast);
-        emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
 
     function _getReserves()
@@ -284,18 +269,26 @@ contract ConstantProductPool is IPool, TridentERC20 {
         _balances.amount1 = _rebase.total1.toElastic(_balances.shares1);
     }
 
+    function _balance() internal view returns (uint256 balance0, uint256 balance1) {
+        // @dev balanceOf(address,address).
+        (, bytes memory _balance0) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token0, address(this)));
+        balance0 = abi.decode(_balance0, (uint256));
+        // @dev balanceOf(address,address).
+        (, bytes memory _balance1) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token1, address(this)));
+        balance1 = abi.decode(_balance1, (uint256));
+    }
+
     function _update(
         Holdings memory _reserves,
         Holdings memory _balances,
         uint32 _blockTimestampLast
     ) internal {
-        require(_balances.shares0 <= type(uint112).max && _balances.shares1 <= type(uint112).max, "SAHRES_OVERFLOW");
-        require(_balances.amount0 < type(uint128).max && _balances.amount1 < type(uint128).max, "AMOUNT_OVERFLOW");
+        require(balance0 <= type(uint112).max && balance1 <= type(uint112).max, "OVERFLOW");
 
-        if (_blockTimestampLast == 0) {
-            // TWAP support is disabled for gas efficiency
-            reserveShares0 = uint112(_balances.shares0);
-            reserveShares1 = uint112(_balances.shares1);
+        if (blockTimestampLast == 0) {
+            // @dev TWAP support is disabled for gas efficiency.
+            reserve0 = uint112(balance0);
+            reserve1 = uint112(balance1);
         } else {
             uint32 blockTimestamp = uint32(block.timestamp % 2**32);
             if (blockTimestamp != _blockTimestampLast && _reserves.amount0 != 0 && _reserves.amount1 != 0) {
@@ -324,11 +317,12 @@ contract ConstantProductPool is IPool, TridentERC20 {
         if (_kLast != 0) {
             computed = TridentMath.sqrt(_reserveAmount0 * _reserveAmount1);
             if (computed > _kLast) {
-                // @dev barFee % of increase in liquidity.
-                // @dev NB It's going to be slightly less than barFee % in reality due to the Math.
-                uint256 barFee = MasterDeployer(masterDeployer).barFee();
+                // @dev 'barFee' % of increase in liquidity.
+                // It's going to be slightly less than barFee % in reality due to the math.
+                (, bytes memory _barFee) = masterDeployer.staticcall(abi.encodeWithSelector(0xc14ad802)); // @dev barFee().
+                uint256 barFee = abi.decode(_barFee, (uint256));
                 uint256 liquidity = (_totalSupply * (computed - _kLast) * barFee) / computed / MAX_FEE;
-                if (liquidity > 0) {
+                if (liquidity != 0) {
                     _mint(barFeeTo, liquidity);
                 }
             }
@@ -351,9 +345,13 @@ contract ConstantProductPool is IPool, TridentERC20 {
         bool unwrapBento
     ) internal {
         if (unwrapBento) {
-            bento.withdraw(token, address(this), to, 0, shares);
+            // @dev withdraw(address,address,address,uint256,uint256).
+            (bool success, ) = bento.call(abi.encodeWithSelector(0x97da6d30, token, address(this), to, 0, shares));
+            require(success, "WITHDRAW_FAILED");
         } else {
-            bento.transfer(token, address(this), to, shares);
+            // @dev transfer(address,address,address,uint256).
+            (bool success, ) = bento.call(abi.encodeWithSelector(0xf18d03cc, token, address(this), to, shares));
+            require(success, "TRANSFER_FAILED");
         }
     }
 
@@ -365,11 +363,11 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
     function getAmountOut(bytes calldata data) public view override returns (uint256 finalAmountOut) {
         (address tokenIn, uint256 amountIn) = abi.decode(data, (address, uint256));
-        (Holdings memory reserves, , ) = _getReserves();
-        if (tokenIn == address(token0)) {
-            finalAmountOut = _getAmountOut(amountIn, reserves.amount0, reserves.amount1);
+        (uint112 _reserve0, uint112 _reserve1, ) = _getReserves();
+        if (tokenIn == token0) {
+            finalAmountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
         } else {
-            finalAmountOut = _getAmountOut(amountIn, reserves.amount1, reserves.amount0);
+            finalAmountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
         }
     }
 
@@ -377,9 +375,9 @@ contract ConstantProductPool is IPool, TridentERC20 {
         public
         view
         returns (
-            Holdings memory,
-            uint32,
-            Rebases memory
+            uint112 _reserve0,
+            uint112 _reserve1,
+            uint32 _blockTimestampLast
         )
     {
         return _getReserves();

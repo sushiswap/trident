@@ -12,7 +12,7 @@ const deployFunction: DeployFunction = async function ({
   console.log("Running MasterDeployer deploy script");
   const { deploy } = deployments;
 
-  const { deployer, feeTo } = await getNamedAccounts();
+  const { deployer } = await getNamedAccounts();
 
   const chainId = Number(await getChainId());
 
@@ -33,11 +33,13 @@ const deployFunction: DeployFunction = async function ({
     bentoBoxV1Address = BENTOBOX_ADDRESS[chainId as ChainId];
   }
 
-  await deploy("MasterDeployer", {
+  const { address } = await deploy("MasterDeployer", {
     from: deployer,
-    args: [17, feeTo, bentoBoxV1Address],
+    args: [17, deployer, bentoBoxV1Address],
     deterministicDeployment: false,
   });
+
+  console.log("MasterDeployer deployed at ", address);
 };
 
 export default deployFunction;

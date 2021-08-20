@@ -9,7 +9,7 @@ const deployFunction: DeployFunction = async function ({
   getNamedAccounts,
   getChainId,
 }: HardhatRuntimeEnvironment) {
-  console.log("Running SwapRouter deploy script");
+  console.log("Running TridentRouter deploy script");
   const { deploy } = deployments;
 
   const { deployer } = await getNamedAccounts();
@@ -36,19 +36,17 @@ const deployFunction: DeployFunction = async function ({
     wethAddress = WNATIVE[chainId as ChainId].address;
   }
 
-  const { address: masterDeployerAdress } = await ethers.getContract(
-    "MasterDeployer"
-  );
-
-  await deploy("SwapRouter", {
+  const { address } = await deploy("TridentRouter", {
     from: deployer,
     args: [bentoBoxV1Address, wethAddress],
     deterministicDeployment: false,
   });
+
+  console.log("TridentRouter deployed at ", address);
 };
 
 export default deployFunction;
 
 deployFunction.dependencies = ["MasterDeployer"];
 
-deployFunction.tags = ["SwapRouter"];
+deployFunction.tags = ["TridentRouter"];
