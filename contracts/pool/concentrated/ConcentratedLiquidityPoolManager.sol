@@ -11,7 +11,7 @@ interface IConcentratedLiquidityPool is IPool {
 }
 
 /// @dev combines the nonfungible position manager and the staking contract in one
-contract ConcentratedLiquidityPoolManager {
+contract ConcentratedLiquidityPoolManager is TridentNFT {
     struct Position {
         IConcentratedLiquidityPool pool;
         int24 lower;
@@ -112,12 +112,20 @@ contract ConcentratedLiquidityPoolManager {
         pool.mint(mintData);
 
         positions[positionCount++] = Position(pool, lower, upper, amount, recipient, uint32(block.number));
-
-        // todo mint nft here
+        // @dev Mint Position NFT.
+        _mint(recipient);
     }
 
-    function burn(IPool pool, bytes memory data) public {
-        // todo burn nft here
+    function burn(IPool pool, bytes memory burnData, uint256 tokenId) public {
+        (int24 lower, int24 upper, uint128 amount, address recipient, bool unwrapBento) = abi.decode(
+            burnData,
+            (int24, int24, uint128, address, bool)
+        );
+        
+        pool.burn(burnData);
+        // TO-DO update position locally.... 🏄
+        // @dev Burn Position NFT.
+        _burn(tokenId);
     }
 
     // transfers the funds
