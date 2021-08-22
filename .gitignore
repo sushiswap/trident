@@ -5,9 +5,6 @@ node_modules/
 cache/
 artifacts/
 
-# Deployments
-deployments/
-
 # Typechain
 types/
 typechain/
@@ -21,3 +18,5 @@ coverage.json
 
 # Temp/local stuff that shouldn't be pushed
 local/
+
+tenderly.yaml

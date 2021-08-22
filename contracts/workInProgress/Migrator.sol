@@ -2,13 +2,11 @@
 
 pragma solidity >=0.8.0;
 
-import "@sushiswap/core/contracts/uniswapv2/interfaces/IUniswapV2Pair.sol";
-import "@sushiswap/core/contracts/uniswapv2/interfaces/IUniswapV2Factory.sol";
+import "../pool/ConstantProductPool.sol";
 import "../pool/ConstantProductPoolFactory.sol";
 import "../deployer/MasterDeployer.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/IBentoBoxMinimal.sol";
-import "hardhat/console.sol";
 
 interface IERC20 {
     function totalSupply() external returns (uint256);
@@ -30,7 +28,7 @@ contract Migrator {
         factory = _factory;
     }
 
-    function migrate(IUniswapV2Pair orig) public returns (IPool) {
+    function migrate(ConstantProductPool orig) public returns (IPool) {
         require(msg.sender == chef, "!chef");
 
         address token0 = orig.token0();
@@ -54,10 +52,7 @@ contract Migrator {
 
         desiredLiquidity = lp;
 
-        (uint256 amount0, uint256 amount1) = orig.burn(address(bentoBox));
-
-        bentoBox.deposit(token0, address(bentoBox), address(pair), amount0, 0);
-        bentoBox.deposit(token1, address(bentoBox), address(pair), amount1, 0);
+        orig.burn(abi.encode(address(pair), false));
 
         pair.mint(abi.encode(msg.sender));
 

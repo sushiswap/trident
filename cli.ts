@@ -67,6 +67,26 @@ task("constant-product-pool:deploy", "Constant Product Pool deploy")
     console.log(events);
   });
 
+task("whitelist", "Whitelist Router on BentoBox").setAction(async function (
+  _,
+  { ethers, getChainId }
+) {
+  const dev = await ethers.getNamedSigner("dev");
+
+  const chainId = await getChainId();
+
+  const router = await ethers.getContract("TridentRouter");
+
+  const BentoBox = await ethers.getContractFactory("BentoBoxV1");
+  const bentoBox = BentoBox.attach(BENTOBOX_ADDRESS[chainId]);
+
+  await (
+    await bentoBox.connect(dev).whitelistMasterContract(router.address, true)
+  ).wait();
+
+  console.log("Router successfully whitelisted on BentoBox");
+});
+
 task("router:add-liquidity", "Router add liquidity")
   .addOptionalParam(
     "tokenA",
@@ -96,10 +116,13 @@ task("router:add-liquidity", "Router add liquidity")
   // .addParam("tokenBMinimum", "Token B Minimum")
   // .addParam("to", "To")
   // .addOptionalParam("deadline", "Deadline", MaxUint256)
-  .setAction(async function (args, { ethers, run }, runSuper) {
+  .setAction(async function (args, { ethers, run, getChainId }, runSuper) {
+    const chainId = await getChainId();
+
     const router = await ethers.getContract("TridentRouter");
+
     const BentoBox = await ethers.getContractFactory("BentoBoxV1");
-    const bentoBox = BentoBox.attach(BENTOBOX_ADDRESS[ChainId.ROPSTEN]);
+    const bentoBox = BentoBox.attach(BENTOBOX_ADDRESS[chainId]);
 
     const dev = await ethers.getNamedSigner("dev");
     const pool = "0x735C2c1564C0230041Ef8CA5A6F7e74bab8C3dcA"; // dai/weth

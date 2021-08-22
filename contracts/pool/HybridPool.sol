@@ -8,7 +8,6 @@ import "../interfaces/IPool.sol";
 import "../interfaces/ITridentCallee.sol";
 import "../libraries/MathUtils.sol";
 import "./TridentERC20.sol";
-import "hardhat/console.sol";
 
 /// @notice Trident exchange pool template with hybrid like-kind formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares. However, the stabeswap invariant is applied to the underlying amounts.
@@ -59,10 +58,7 @@ contract HybridPool is IPool, TridentERC20 {
 
     /// @dev Only set immutable variables here - state changes made here will not be used.
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (address tokenA, address tokenB, uint256 _swapFee, uint256 a) = abi.decode(
-            _deployData,
-            (address, address, uint256, uint256)
-        );
+        (address tokenA, address tokenB, uint256 _swapFee, uint256 a) = abi.decode(_deployData, (address, address, uint256, uint256));
 
         require(tokenA != address(0), "HybridPool: ZERO_ADDRESS");
         require(tokenA != tokenB, "HybridPool: IDENTICAL_ADDRESSES");

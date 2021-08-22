@@ -3,27 +3,21 @@
 pragma solidity >=0.8.0;
 
 import "./interfaces/IBentoBoxMinimal.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IPool.sol";
-import "./interfaces/IWETH.sol";
 import "./interfaces/ITridentRouter.sol";
-import "./utils/TridentBatcher.sol";
-import "hardhat/console.sol";
+import "./utils/TridentHelper.sol";
 
-/// @notice Trident exchange pool router.
-contract TridentRouter is ITridentRouter, TridentBatcher {
+/// @notice Trident pool router contract.
+contract TridentRouter is ITridentRouter, TridentHelper {
     /// @notice BentoBox token vault.
     IBentoBoxMinimal public immutable bento;
-    /// @notice ERC-20 token for wrapped ETH.
-    address public immutable wETH;
 
     address internal cachedMsgSender;
     address internal cachedPool;
 
-    constructor(IBentoBoxMinimal _bento, address _wETH) {
+    constructor(IBentoBoxMinimal _bento, address _wETH) TridentHelper(_wETH) {
         _bento.registerProtocol();
         bento = _bento;
-        wETH = _wETH;
     }
 
     receive() external payable {
@@ -54,11 +48,7 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
         require(amountOut >= amountOutMinimum, "TOO_LITTLE_RECEIVED");
     }
 
-    function exactInputSingleWithNativeToken(ExactInputSingleParams calldata params)
-        public
-        payable
-        returns (uint256 amountOut)
-    {
+    function exactInputSingleWithNativeToken(ExactInputSingleParams calldata params) public payable returns (uint256 amountOut) {
         _depositToBentoBox(params.tokenIn, params.pool, params.amountIn);
         amountOut = IPool(params.pool).swap(params.data);
         require(amountOut >= params.amountOutMinimum, "TOO_LITTLE_RECEIVED");
@@ -75,18 +65,9 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
     function complexPath(ComplexPathParams calldata params) public payable {
         for (uint256 i; i < params.initialPath.length; i++) {
             if (params.initialPath[i].native) {
-                _depositToBentoBox(
-                    params.initialPath[i].tokenIn,
-                    params.initialPath[i].pool,
-                    params.initialPath[i].amount
-                );
+                _depositToBentoBox(params.initialPath[i].tokenIn, params.initialPath[i].pool, params.initialPath[i].amount);
             } else {
-                bento.transfer(
-                    params.initialPath[i].tokenIn,
-                    msg.sender,
-                    params.initialPath[i].pool,
-                    params.initialPath[i].amount
-                );
+                bento.transfer(params.initialPath[i].tokenIn, msg.sender, params.initialPath[i].pool, params.initialPath[i].amount);
             }
             IPool(params.initialPath[i].pool).swap(params.initialPath[i].data);
         }
@@ -94,12 +75,7 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
         for (uint256 i; i < params.percentagePath.length; i++) {
             uint256 balanceShares = bento.balanceOf(params.percentagePath[i].tokenIn, address(this));
             uint256 transferShares = (balanceShares * params.percentagePath[i].balancePercentage) / uint256(10)**6;
-            bento.transfer(
-                params.percentagePath[i].tokenIn,
-                address(this),
-                params.percentagePath[i].pool,
-                transferShares
-            );
+            bento.transfer(params.percentagePath[i].tokenIn, address(this), params.percentagePath[i].pool, transferShares);
             IPool(params.percentagePath[i].pool).swap(params.percentagePath[i].data);
         }
 
@@ -120,7 +96,7 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
         address pool,
         uint256 minLiquidity,
         bytes calldata data
-    ) public returns (uint256 liquidity) {
+    ) public payable returns (uint256 liquidity) {
         for (uint256 i; i < tokenInput.length; i++) {
             if (tokenInput[i].native) {
                 _depositToBentoBox(tokenInput[i].token, pool, tokenInput[i].amount);
@@ -132,11 +108,10 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
         require(liquidity >= minLiquidity, "NOT_ENOUGH_LIQUIDITY_MINTED");
     }
 
-    function addLiquidityLazy(address pool, bytes calldata data) public {
+    function addLiquidityLazy(address pool, bytes calldata data) public payable {
         cachedMsgSender = msg.sender;
         cachedPool = pool;
-
-        // NB: The pool must ensure that there's not too much slippage
+        // @dev The pool must ensure that there's not too much slippage.
         IPool(pool).mint(data);
     }
 
@@ -167,7 +142,7 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
         bytes calldata data,
         uint256 minWithdrawal
     ) public {
-        // @dev Use liquidity = 0 for pre funding.
+        // @dev Use 'liquidity = 0' for prefunding.
         safeTransferFrom(pool, msg.sender, pool, liquidity);
         uint256 withdrawn = IPool(pool).burnSingle(data);
         require(withdrawn >= minWithdrawal, "TOO_LITTLE_RECEIVED");
@@ -178,14 +153,14 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
 
         TokenInput memory tokenInput = abi.decode(data, (TokenInput));
 
-        // Transfer the requested token to the pool.
+        // @dev Transfer the requested token to the pool.
         if (tokenInput.native) {
             _depositFromUserToBentoBox(tokenInput.token, cachedMsgSender, msg.sender, tokenInput.amount);
         } else {
             bento.transfer(tokenInput.token, cachedMsgSender, msg.sender, tokenInput.amount);
         }
 
-        // Resets the msg.sender's authorization
+        // @dev Resets the msg.sender's authorization.
         cachedMsgSender = address(1);
     }
 
@@ -194,7 +169,7 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
 
         TokenInput[] memory tokenInput = abi.decode(data, (TokenInput[]));
 
-        // Transfer the requested tokens to the pool.
+        // @dev Transfer the requested tokens to the pool.
         for (uint256 i; i < tokenInput.length; i++) {
             if (tokenInput[i].native) {
                 _depositFromUserToBentoBox(tokenInput[i].token, cachedMsgSender, msg.sender, tokenInput[i].amount);
@@ -203,7 +178,7 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
             }
         }
 
-        // Resets the msg.sender's authorization
+        // @dev Resets the msg.sender's authorization.
         cachedMsgSender = address(1);
     }
 
@@ -228,24 +203,21 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
     }
 
     function unwrapWETH(uint256 amountMinimum, address recipient) external {
-        uint256 balanceWETH = IERC20(wETH).balanceOf(address(this));
+        uint256 balanceWETH = balanceOfThis(wETH);
         require(balanceWETH >= amountMinimum, "INSUFFICIENT_WETH");
 
         if (balanceWETH != 0) {
-            IWETH(wETH).withdraw(balanceWETH);
+            withdrawFromWETH(balanceWETH);
             safeTransferETH(recipient, balanceWETH);
         }
     }
 
-    /// @param token The token to pay.
-    /// @param recipient The account that will receive payment.
-    /// @param amount The amount to pay.
     function _depositToBentoBox(
         address token,
         address recipient,
         uint256 amount
     ) internal {
-        if (token == wETH && address(this).balance > 0) {
+        if (token == wETH && address(this).balance != 0) {
             uint256 underlyingAmount = bento.toAmount(wETH, amount, true);
             if (address(this).balance > underlyingAmount) {
                 // @dev Deposit ETH into `recipient` `bento` account.
@@ -253,17 +225,17 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
                 return;
             }
         }
-        // @dev Deposit ERC20 token into `recipient` `bento` account.
-        bento.deposit(token, msg.sender, recipient, amount, 0);
+        // @dev Deposit ERC-20 token into `recipient` `bento` account.
+        bento.deposit(token, msg.sender, recipient, 0, amount);
     }
 
     function _depositFromUserToBentoBox(
         address token,
-        address from,
+        address sender,
         address recipient,
         uint256 amount
     ) internal {
-        if (token == wETH && address(this).balance > 0) {
+        if (token == wETH && address(this).balance != 0) {
             uint256 underlyingAmount = bento.toAmount(wETH, amount, true);
             if (address(this).balance > underlyingAmount) {
                 // @dev Deposit ETH into `recipient` `bento` account.
@@ -271,46 +243,7 @@ contract TridentRouter is ITridentRouter, TridentBatcher {
                 return;
             }
         }
-        // @dev Deposit ERC20 token into `recipient` `bento` account.
-        bento.deposit(token, from, recipient, amount, 0);
-    }
-
-    /// @notice Provides safe ERC20.transfer for tokens that do not consistently return true/false.
-    /// @dev Reverts on failed {transfer}.
-    /// @param token Address of ERC-20 token.
-    /// @param recipient Account to send tokens to.
-    /// @param amount The token amount to send.
-    function safeTransfer(
-        address token,
-        address recipient,
-        uint256 amount
-    ) internal {
-        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0xa9059cbb, recipient, amount)); // @dev transfer(address,uint256).
-        require(success && (data.length == 0 || abi.decode(data, (bool))), "TRANSFER_FAILED");
-    }
-
-    /// @notice Provides safe ERC20.transferFrom for tokens that do not consistently return true/false.
-    /// @dev Reverts on failed {transferFrom}.
-    /// @param token Address of ERC-20 token.
-    /// @param from Account to send tokens from.
-    /// @param recipient Account to send tokens to.
-    /// @param amount Token amount to send.
-    function safeTransferFrom(
-        address token,
-        address from,
-        address recipient,
-        uint256 amount
-    ) internal {
-        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x23b872dd, from, recipient, amount)); // @dev transferFrom(address,address,uint256).
-        require(success && (data.length == 0 || abi.decode(data, (bool))), "TRANSFER_FROM_FAILED");
-    }
-
-    /// @notice Provides safe ETH transfer.
-    /// @dev Reverts on failed {call}.
-    /// @param recipient Account to send ETH.
-    /// @param amount ETH amount to send.
-    function safeTransferETH(address recipient, uint256 amount) internal {
-        (bool success, ) = recipient.call{value: amount}("");
-        require(success, "ETH_TRANSFER_FAILED");
+        // @dev Deposit ERC-20 token into `recipient` `bento` account.
+        bento.deposit(token, sender, recipient, 0, amount);
     }
 }
