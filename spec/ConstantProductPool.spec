@@ -66,7 +66,7 @@ methods {
 ////////////////////////////////////////////////////////////////////////////
 // REVIEW: This should fail (passing right now)
 invariant validityOfTokens()
-    token0() != 0 && token1() != 0 &&  token0() != token1()
+    token0() != 0 && token1() != 0 && token0() != token1()
 
 // REVIEW: This should fail (passing right now)
 invariant tokensNotMirin()
@@ -82,36 +82,37 @@ invariant reserveLessThanEqualToBalance()
 	}
 
 invariant integrityOfTotalSupply()
-    totalSupply() == 0 => ( reserve0() == 0 && reserve1() == 0 ) {
-        preserved burnWrapper(address to ,bool b) with (env e) {
+    totalSupply() == 0 => (reserve0() == 0 && reserve1() == 0) {
+        preserved burnWrapper(address to, bool b) with (env e) {
             require e.msg.sender != currentContract;
             require to != currentContract;
-            require totalSupply()==0 || balanceOf(e.msg.sender) < totalSupply() + 1000;
-        }
-        preserved burnSingleWrapper(address tokenOut, address to, bool b) with (env e) {
-             require e.msg.sender != currentContract;
-            require to != currentContract;
-            require totalSupply()==0 || balanceOf(e.msg.sender) < totalSupply() + 1000;
-        }
-        preserved  swapWrapper(address tokenIn, address recipient, bool unwrapBento) with (env e) {
-            requireInvariant reserveLessThanEqualToBalance;
-            uint256 amountIn = reserve0()-  bentoBox.balanceOf(token0(), currentContract);
-            require tokenIn == token0();
-            require amountIn >0  => getAmountOutWrapper(token0(), amountIn) > 0 ;
+            require totalSupply() == 0 || balanceOf(e.msg.sender) < totalSupply() + 1000;
         }
 
+        preserved burnSingleWrapper(address tokenOut, address to, bool b) with (env e) {
+            require e.msg.sender != currentContract;
+            require to != currentContract;
+            require totalSupply() == 0 || balanceOf(e.msg.sender) < totalSupply() + 1000;
+        }
+
+        preserved swapWrapper(address tokenIn, address recipient, bool unwrapBento) with (env e) {
+            requireInvariant reserveLessThanEqualToBalance;
+            uint256 amountIn = reserve0() - bentoBox.balanceOf(token0(), currentContract);
+            require tokenIn == token0();
+            require amountIn > 0 => getAmountOutWrapper(token0(), amountIn) > 0;
+        }
     }
     
 ////////////////////////////////////////////////////////////////////////////
 //                                 Rules                                  //
 ////////////////////////////////////////////////////////////////////////////
-rule sanity(method f) {
-    env e;
-    calldataarg args;
-    f(e, args);
+// rule sanity(method f) {
+//     env e;
+//     calldataarg args;
+//     f(e, args);
 
-    assert(false);
-}
+//     assert(false);
+// }
 
 // Passing
 rule noChangeToBalancedPoolAssets(method f) filtered { f ->
@@ -195,7 +196,7 @@ rule afterOpBalanceEqualsReserve(method f) {
 rule mintingNotPossibleForBalancedPool() {
     env e;
 
-    require totalSupply() > 0 || ( reserve0() == 0 || reserve1() == 0 ); // REVIEW: failing without this
+    require totalSupply() > 0 || (reserve0() == 0 || reserve1() == 0); // REVIEW: failing without this
 
     validState(true);
 
@@ -302,16 +303,16 @@ rule mintingNotPossibleForBalancedPool() {
 //            "user's total balances changed");
 // }
 
-// TODO: add a rule noChangeToOthersBalances
 rule noChangeToOthersBalances(method f) {
     env e;
 
     address other;
     address to;
-    address recepient;
+    address recipient;
 
     require other != currentContract && e.msg.sender != other &&
-            to != other && recepient != other;
+            to != other && recipient != other;
+    require other != bentoBox;
 
     // recording other's mirin balance
     uint256 _otherMirinBalance = balanceOf(other);
@@ -327,16 +328,26 @@ rule noChangeToOthersBalances(method f) {
     address tokenOut;
 
     if (f.selector == mintWrapper(address).selector) {
+        require other != 0;
         mintWrapper(e, to);
     } else if (f.selector == burnWrapper(address, bool).selector) {
         burnWrapper(e, to, unwrapBento);
     } else if (f.selector == burnSingleWrapper(address, address, bool).selector) {
         burnSingleWrapper(e, tokenOut, to, unwrapBento);
     } else if (f.selector == swapWrapper(address, address, bool).selector) {
-        swapWrapper(e, tokenIn, recepient, unwrapBento);
+        swapWrapper(e, tokenIn, recipient, unwrapBento);
     }  else if (f.selector == flashSwapWrapper(address, address, bool, uint256, bytes).selector) {
         calldataarg args;
         flashSwapWrapper(e, args);
+    } else if (f.selector == transfer(address, uint256).selector) {
+        uint256 amount;
+        transfer(e, recipient, amount);
+    } else if (f.selector == transferFrom(address, address, uint256).selector) {
+        address from;
+        require from != other; // REVIEW: double check if this is safe
+        uint256 amount;
+
+        transferFrom(e, from, recipient, amount);
     } else {
         calldataarg args;
         f(e, args);
@@ -356,6 +367,7 @@ rule noChangeToOthersBalances(method f) {
     assert(_totalOthertoken1 == totalOthertoken1_, "other's token1 balance changed");
 }
 
+// Problem with burnSingle, can only burn token1
 rule burnTokenAdditivity() {
     env e;
     address to;
@@ -491,9 +503,6 @@ rule multiLessThanSingleAmountOut() {
     env e;
     uint256 amountInX;
     uint256 amountInY;
-
-    // need to replicate the exact state later on
-    storage initState = lastStorage;
     
     uint256 multiAmountOut1 = _getAmountOut(e, amountInX, reserve0(), reserve1());
     require reserve0() + amountInX <= max_uint256;
@@ -502,7 +511,7 @@ rule multiLessThanSingleAmountOut() {
     // checking for overflows
     require amountInX + amountInY <= max_uint256;
 
-    uint256 singleAmountOut = _getAmountOut(e, amountInX + amountInY, reserve0(), reserve1()) at initState;
+    uint256 singleAmountOut = _getAmountOut(e, amountInX + amountInY, reserve0(), reserve1());
 
     // TODO: Mudit wanted strictly greater
     assert(singleAmountOut >= multiAmountOut1 + multiAmountOut2, "multiple swaps better than one single swap");
@@ -654,8 +663,8 @@ rule nonZeroMint() {
 
     validState(false);
 
-    require reserve0() > bentoBox.balanceOf(token0(), currentContract) ||
-                reserve1() > bentoBox.balanceOf(token1(), currentContract);
+    require reserve0() < bentoBox.balanceOf(token0(), currentContract) ||
+                reserve1() < bentoBox.balanceOf(token1(), currentContract);
 
     uint256 liquidity = mintWrapper(e, to);
 
