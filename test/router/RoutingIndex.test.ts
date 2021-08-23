@@ -249,7 +249,7 @@ describe("IndexPool test", function () {
       t1.token.address,
       alice.address
     );
-    await router
+    await pool
       .connect(alice)
       .swap(
         encodeSwapData(
