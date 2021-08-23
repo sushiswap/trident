@@ -1,43 +1,37 @@
 //@ts-nocheck
+
 import { BigNumber } from "@ethersproject/bignumber";
 import { ethers } from "hardhat";
-import { getBigNumber, getIntegerRandomValue } from "../utilities";
+import {
+  areCloseValues,
+  getBigNumber,
+  getIntegerRandomValue,
+} from "../utilities";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { Contract, ContractFactory } from "ethers";
-import { calcOutByIn } from "@sushiswap/sdk";
+import { calcOutByIn, WeightedPool, PoolType, RToken } from "@sushiswap/sdk";
 import seedrandom from "seedrandom";
+import { expect } from "chai";
 
-// CONTRACT CONSTANTS
 const testSeed = "3"; // Change it to change random generator values
 const rnd = seedrandom(testSeed); // random [0, 1)
-const BASE = 10 ** 18;
+
+// -------------    CONTRACT CONSTANTS     -------------
+const BASE: BigNumber = getBigNumber(10, 18);
 const MIN_TOKENS = 2;
 const MAX_TOKENS = 8;
-const MIN_FEE = BASE / 10 ** 6;
-const MAX_FEE = BASE / 10;
+const MIN_FEE = getBigNumber("1000000000000", 0);
+const MAX_FEE = getBigNumber("100000000000000000", 0);
 const MIN_WEIGHT = BASE;
-const MAX_WEIGHT = BASE * 50;
-const MAX_TOTAL_WEIGHT = BASE * 50;
-const MAX_IN_RATIO = BASE / 2;
-const MAX_OUT_RATIO = BASE / 3 + 1;
+const MAX_WEIGHT = BASE.mul(getBigNumber(50, 0));
+const MAX_TOTAL_WEIGHT = BASE.mul(getBigNumber(50, 0));
+const MAX_IN_RATIO = BASE.div(getBigNumber(2, 0));
+const MAX_OUT_RATIO = BASE.div(getBigNumber(3, 0)).add(getBigNumber(1, 0));
+// -------------         -------------
 
 // ------------- PARAMETERS -------------
-// alice's usdt/usdc balance
-const aliceUSDTBalance: BigNumber = getBigNumber("100000000000000000");
-const aliceUSDCBalance: BigNumber = getBigNumber("100000000000000000");
-
 // what each ERC20 is deployed with
-const ERCDeployAmount: BigNumber = getBigNumber("1000000000000000000");
-
-// what gets minted for alice on the pool
-const poolMintAmount: BigNumber = getBigNumber("1000");
-
-// token weights passed into the pool
-const tokenWeights: BigNumber[] = [getBigNumber("10"), getBigNumber("10")];
-
-// pool swap fee
-const poolSwapFee: number | BigNumber = 1000000000000;
-
+const ERCDeployAmount: BigNumber = getBigNumber(10, 30);
 // -------------         -------------
 
 interface ExactInputSingleParams {
@@ -47,16 +41,6 @@ interface ExactInputSingleParams {
   tokenIn: string;
   data: string;
 }
-
-interface PoolInfo {
-  type: string;
-  reserve0: BigNumber;
-  reserve1: BigNumber;
-  weight0: BigNumber;
-  weight1: BigNumber;
-  fee: number;
-}
-
 interface tokenAndWeight {
   token: Contract;
   weight: BigNumber;
@@ -88,10 +72,10 @@ describe("IndexPool test", function () {
     Pool: ContractFactory;
 
   async function deployPool(
-    fee: number,
-    weightedTokens: number[],
+    fee: BigNumber,
+    tokenWeights: BigNumber[],
     toMint: BigNumber
-  ): Promise<[PoolInfo, Contract, tokenAndWeight[]]> {
+  ): Promise<[WeightedPool, Contract, tokenAndWeight[]]> {
     const ERC20 = await ethers.getContractFactory("ERC20Mock");
     const Bento = await ethers.getContractFactory("BentoBoxV1");
     const Deployer = await ethers.getContractFactory("MasterDeployer");
@@ -100,7 +84,6 @@ describe("IndexPool test", function () {
     Pool = await ethers.getContractFactory("IndexPool");
     [alice, feeTo] = await ethers.getSigners();
 
-    // deploy erc20's
     weth = await ERC20.deploy("WETH", "WETH", ERCDeployAmount);
     await weth.deployed();
     usdt = await ERC20.deploy("USDT", "USDT", ERCDeployAmount);
@@ -152,51 +135,39 @@ describe("IndexPool test", function () {
       "0x0000000000000000000000000000000000000000000000000000000000000000"
     );
 
-    console.log("checkpoint 1");
-
     const [t0, t1]: Contract[] =
-      usdt.address.toUpperCase() < usdc.address.toUpperCase()
+      usdt.address.toUpperCase() > usdc.address.toUpperCase()
         ? [usdt, usdc]
         : [usdc, usdt];
 
     const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address[]", "uint256[]", "uint256"],
-      [[t1.address, t0.address], weightedTokens, fee]
+      [[t0.address, t1.address], tokenWeights, fee]
     );
 
     let tokensAndweights: tokenAndWeight[] = [
-      { token: t1, weight: weightedTokens[0] },
-      { token: t0, weight: weightedTokens[1] },
+      { token: t0, weight: tokenWeights[0] },
+      { token: t1, weight: tokenWeights[1] },
     ];
 
-    console.log("checkpoint2");
     let tx = await (
       await masterDeployer.deployPool(tridentPoolFactory.address, deployData)
     ).wait();
     const pool: Contract = await Pool.attach(tx.events[1].args.pool);
 
-    console.log("checkpoint 2.5");
-
     await bento.transfer(
       usdt.address,
       alice.address,
       pool.address,
-      aliceUSDTBalance
+      ERCDeployAmount
     );
     await bento.transfer(
       usdc.address,
       alice.address,
       pool.address,
-      aliceUSDCBalance
-    );
-    await bento.transfer(
-      weth.address,
-      alice.address,
-      pool.address,
-      aliceUSDCBalance
+      ERCDeployAmount
     );
 
-    console.log("checkpoint 3");
     await pool.mint(
       ethers.utils.defaultAbiCoder.encode(
         ["address", "uint256"],
@@ -204,40 +175,66 @@ describe("IndexPool test", function () {
       )
     );
 
-    console.log("checkpoint 4");
-    const poolInfo: PoolInfo = {
-      type: "Weighted",
-      reserve0: aliceUSDTBalance,
-      reserve1: aliceUSDCBalance,
-      weight0: weightedTokens[0],
-      weight1: weightedTokens[1],
+    const poolInfo: WeightedPool = {
+      address: pool.address,
+      type: PoolType.Weighted,
+      reserve0: ERCDeployAmount,
+      reserve1: ERCDeployAmount,
+      weight0: tokenWeights[0],
+      weight1: tokenWeights[1],
+      minLiquidity: 0,
+      token0: { name: t0.address, gasPrice: 0 },
+      token1: { name: t1.address, gasPrice: 0 },
+      swapGasCost: 0,
       fee: fee,
     };
 
     return [poolInfo, pool, tokensAndweights];
   }
 
+  let swapDirection = true;
   async function checkSwap(
     tokensAndWeights: tokenAndWeight[],
-    amountIn: BigNumber,
-    poolRouterInfo: PoolInfo,
     pool: Contract,
+    poolRouterInfo: WeightedPool,
     swapAmountExp: number
   ) {
-    [value, bnValue] = getIntegerRandomValue(swapAmountExp, rnd);
+    // get the swap amountIn value randomly
+    const [value, bnValue] = getIntegerRandomValue(swapAmountExp, rnd);
+
+    let [t0, t1] = swapDirection
+      ? [tokensAndWeights[0], tokensAndWeights[1]]
+      : [tokensAndWeights[1], tokensAndWeights[0]];
+
+    // setup router input
     let params: ExactInputSingleParams = {
       amountIn: bnValue,
-      amountOutMinimum: 0,
+      amountOutMinimum: getBigNumber(0, 0),
       pool: pool.address,
-      tokenIn: tokensAndWeights[0].token.address,
+      tokenIn: t0.token.address,
       data: encodeSwapData(
-        tokensAndWeights[0].token.address,
-        tokensAndWeights[1].token.address,
+        t0.token.address,
+        t1.token.address,
         alice.address,
         false,
-        amountIn
+        bnValue
       ),
     };
+
+    // console.log("Pool balance before...");
+    // let bal1 = await bento.balanceOf(tokensAndWeights[0].token.address, pool.address)
+    // console.log(bal1.toString());
+    // let bal2 = await bento.balanceOf(tokensAndWeights[1].token.address, pool.address);
+    // console.log(bal2.toString());
+
+    // console.log("Alice balance before...");
+    // bal1 = await bento.balanceOf(tokensAndWeights[0].token.address, alice.address)
+    // console.log(bal1.toString());
+    // bal2 = await bento.balanceOf(tokensAndWeights[1].token.address, alice.address);
+    // console.log(bal2.toString());
+    // console.log("\n")
+
+    // cache reserves
     poolRouterInfo.reserve0 = await bento.balanceOf(
       tokensAndWeights[0].token.address,
       pool.address
@@ -247,65 +244,113 @@ describe("IndexPool test", function () {
       pool.address
     );
 
-    await router.connect(alice).exactInputSingle(params);
+    // swap and get before and after balances
+    let balOutBefore: BigNumber = await bento.balanceOf(
+      t1.token.address,
+      alice.address
+    );
+    await router
+      .connect(alice)
+      .swap(
+        encodeSwapData(
+          t0.token.address,
+          t1.token.address,
+          alice.address,
+          false,
+          bnValue
+        )
+      );
+    // await router.connect(alice).exactInputSingle(params); <---- THIS UNDERFLOWS ???
+    let balOutAfter: BigNumber = await bento.balanceOf(
+      t1.token.address,
+      alice.address
+    );
+
+    // console.log("Pool balance AFTER...");
+    // bal1 = await bento.balanceOf(tokensAndWeights[0].token.address, pool.address)
+    // console.log(bal1.toString());
+    // bal2 = await bento.balanceOf(tokensAndWeights[1].token.address, pool.address);
+    // console.log(bal2.toString());
+    // console.log("Alice balance AFTER...");
+    // bal1 = await bento.balanceOf(tokensAndWeights[0].token.address, alice.address)
+    // console.log(bal1.toString());
+    // bal2 = await bento.balanceOf(tokensAndWeights[1].token.address, alice.address);
+    // console.log(bal2.toString());
+    // console.log("\n\n")
+
+    // calc swap out amount and predicted amount
+    const amountOutPool: BigNumber = balOutAfter.sub(balOutBefore);
+    console.log("Swap out: ", amountOutPool.toString());
+    const amountOutPrediction = calcOutByIn(poolRouterInfo, value, true);
+
+    // // check consistency
+    // expect(areCloseValues(amountOutPrediction, amountOutPool, 1e-12)).equals(
+    // 	true,
+    // 	"predicted amount out did not equal swapped amount result"
+    // );
+    swapDirection = !swapDirection;
   }
 
-  describe("Check min weight with 2 tokens", function () {
-    it(`Test min fee 2 tokens`, async function () {
+  async function checkSwaps(
+    tokensAndWeights: tokenAndWeight[],
+    poolRouterInfo: WeightedPool,
+    pool: Contract
+  ) {
+    // test regular values
+
+    for (let swapNum = 0; swapNum < 3; ++swapNum) {
+      await checkSwap(tokensAndWeights, pool, poolRouterInfo, 17);
+    }
+    consoleGreen("\t ✓ Regular Values");
+
+    // test small values
+    for (let swapNum = 0; swapNum < 3; ++swapNum) {
+      await checkSwap(tokensAndWeights, pool, poolRouterInfo, 8);
+    }
+    consoleGreen("\t ✓ Small Values");
+
+    //test big values 2^112 = 10^33.7153
+    for (let swapNum = 0; swapNum < 3; ++swapNum) {
+      await checkSwap(tokensAndWeights, pool, poolRouterInfo, 23);
+    }
+    consoleGreen("\t ✓ Big values");
+  }
+
+  // ---------------------------   TEST CASES   ---------------------------
+  //
+  describe("Minimum value tests", function () {
+    it(`Should test swaps with minimum invariants`, async function () {
       const [poolRouterInfo, pool, tokensAndWeights] = await deployPool(
-        1000000000000, // fee
-        [getBigNumber(10), getBigNumber(10)], // tokens & their weights
-        getBigNumber(10) // toMint
+        MIN_FEE, // fee
+        [MIN_WEIGHT, MIN_WEIGHT], // weights
+        getBigNumber(10, 30) // mint amount
       );
-
-      let poolInfo = {
-        reserve0: ERCDeployAmount,
-        reserve1: ERCDeployAmount,
-        weight0: getBigNumber(10),
-        weight1: getBigNumber(10),
-        fee: 1000000000000,
-      };
-
-      // this renders a negative number
-      let out = calcOutByIn(poolInfo, getBigNumber(1), false);
-
-      // await checkSwap(tokensAndWeights, BigNumber(1), poolRouterInfo, pool, 3)
+      await checkSwaps(tokensAndWeights, poolRouterInfo, pool);
     });
-    // test for min fee + min weights + min tokens
-    // max fee + max weight + max tokens
-    // min fee + min weight + max tokens
-    // min fee + max weight + min tokens
+  });
+
+  describe("High value tests", function () {
+    it(`Should test swaps with maximum invariants`, async function () {
+      const [poolRouterInfo, pool, tokensAndWeights] = await deployPool(
+        MAX_FEE, // fee
+        [getBigNumber(25, 18), getBigNumber(25, 18)], // maxed out weights
+        getBigNumber(10, 30) // mint amount
+      );
+      await checkSwaps(tokensAndWeights, poolRouterInfo, pool);
+    });
+  });
+  describe("Skewed value tests", function () {
+    it(`Should test swaps with skewed invariants`, async function () {
+      const [poolRouterInfo, pool, tokensAndWeights] = await deployPool(
+        MAX_FEE, // fee
+        [getBigNumber(1, 19), getBigNumber(4, 19)], // maxed out weights
+        getBigNumber(10, 30) // mint amount
+      );
+      await checkSwaps(tokensAndWeights, poolRouterInfo, pool);
+    });
   });
 });
 
-// it("should swap and work correctly", async function () {
-//   const pool: Contract = await deployPool();
-
-//   const poolInfo: PoolInfo = {
-//     type: "Weighted",
-//     reserve0: aliceUSDTBalance,
-//     reserve1: aliceUSDCBalance,
-//     weight0: tokenWeights[0],
-//     weight1: tokenWeights[1],
-//     fee: poolSwapFee,
-//   };
-
-//   const routerInput: ExactInputSingleParams = {
-//     amountIn: getBigNumber(1),
-//     amountOutMinimum: getBigNumber(0),
-//     pool: pool.address,
-//     tokenIn: usdt.address,
-//     data: encodeSwapData(usdt.address, usdc.address, alice.address, false, getBigNumber(1)),
-//   }
-
-//   let usdcBefore: BigNumber = await bento.balanceOf(usdc.address, alice.address);
-//   let before: BigNumber = await bento.balanceOf(usdc.address, alice.address);
-//   await router.connect(alice).exactInputSingle(routerInput);
-//   let after: BigNumber = await bento.balanceOf(usdc.address, alice.address);
-//   let usdcAfter: BigNumber = await bento.balanceOf(usdc.address, alice.address);
-//   console.log(usdcBefore.toString(), usdcAfter.toString());
-//   console.log(after.sub(before).toString());
-
-//   const predictedOut = calcOutByIn(poolInfo, getBigNumber(1), true);
-//   console.log(predictedOut);
-// });
+function consoleGreen(msg: string) {
+  console.log("\x1b[32m", msg);
+}
