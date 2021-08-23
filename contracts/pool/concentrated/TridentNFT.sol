@@ -35,11 +35,9 @@ contract TridentNFT {
     }
 
     function _mint(address recipient) internal {
-        totalSupply++;
-        uint256 tokenId = totalSupply;
         balanceOf[recipient]++;
-        ownerOf[tokenId] = recipient;
-        emit Transfer(address(0), recipient, tokenId);
+        ownerOf[totalSupply] = recipient;
+        emit Transfer(address(0), recipient, totalSupply++);
     }
 
     function _burn(uint256 tokenId) internal {
