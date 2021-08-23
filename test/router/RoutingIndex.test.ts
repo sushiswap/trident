@@ -17,7 +17,7 @@ const testSeed = "3"; // Change it to change random generator values
 const rnd = seedrandom(testSeed); // random [0, 1)
 
 // -------------    CONTRACT CONSTANTS     -------------
-const BASE: BigNumber = getBigNumber(10, 18);
+const BASE: BigNumber = getBigNumber(1, 18);
 const MIN_TOKENS = 2;
 const MAX_TOKENS = 8;
 const MIN_FEE = getBigNumber("1000000000000", 0);
@@ -31,7 +31,7 @@ const MAX_OUT_RATIO = BASE.div(getBigNumber(3, 0)).add(getBigNumber(1, 0));
 
 // ------------- PARAMETERS -------------
 // what each ERC20 is deployed with
-const ERCDeployAmount: BigNumber = getBigNumber(10, 30);
+const ERCDeployAmount: BigNumber = getBigNumber(1, 30);
 // -------------         -------------
 
 interface ExactInputSingleParams {
@@ -175,19 +175,16 @@ describe("IndexPool test", function () {
       )
     );
 
-    const poolInfo: WeightedPool = {
+    const poolInfo = new WeightedPool({
       address: pool.address,
-      type: PoolType.Weighted,
       reserve0: ERCDeployAmount,
       reserve1: ERCDeployAmount,
-      weight0: tokenWeights[0],
-      weight1: tokenWeights[1],
-      minLiquidity: 0,
+      weight0: parseInt(tokenWeights[0].toString()) / 1e18,
+      weight1: parseInt(tokenWeights[1].toString()) / 1e18,
       token0: { name: t0.address, gasPrice: 0 },
       token1: { name: t1.address, gasPrice: 0 },
-      swapGasCost: 0,
-      fee: fee,
-    };
+      fee: parseInt(fee.toString()) / 1e18,
+    });
 
     return [poolInfo, pool, tokensAndweights];
   }
@@ -283,11 +280,16 @@ describe("IndexPool test", function () {
     console.log("Swap out: ", amountOutPool.toString());
     const amountOutPrediction = calcOutByIn(poolRouterInfo, value, true);
 
-    // // check consistency
-    // expect(areCloseValues(amountOutPrediction, amountOutPool, 1e-12)).equals(
-    // 	true,
-    // 	"predicted amount out did not equal swapped amount result"
-    // );
+    // check consistency
+    console.log(
+      Math.abs(amountOutPrediction / amountOutPool - 1),
+      amountOutPrediction,
+      amountOutPool.toString()
+    );
+    expect(areCloseValues(amountOutPrediction, amountOutPool, 1e-12)).equals(
+      true,
+      "predicted amount out did not equal swapped amount result"
+    );
     swapDirection = !swapDirection;
   }
 
@@ -323,7 +325,7 @@ describe("IndexPool test", function () {
       const [poolRouterInfo, pool, tokensAndWeights] = await deployPool(
         MIN_FEE, // fee
         [MIN_WEIGHT, MIN_WEIGHT], // weights
-        getBigNumber(10, 30) // mint amount
+        ERCDeployAmount // mint amount
       );
       await checkSwaps(tokensAndWeights, poolRouterInfo, pool);
     });
