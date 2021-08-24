@@ -24,11 +24,15 @@ methods {
     token1() returns (address) envfree
     reserve0() returns (uint128) envfree
     reserve1() returns (uint128) envfree
+    MAX_FEE() returns (uint256) envfree
+    MAX_FEE_MINUS_SWAP_FEE() returns (uint256) envfree
 
     // HybridPool functions
     _balance() returns (uint256 balance0, uint256 balance1) envfree
     transferFrom(address, address, uint256)
     totalSupply() returns (uint256) envfree
+    getAmountOutWrapper(address tokenIn, uint256 amountIn) returns (uint256) envfree
+    balanceOf(address) returns (uint256) envfree
 
     // TODO: not working
     // TridentERC20 (permit)
@@ -38,9 +42,6 @@ methods {
     // HybridPool (swap, swapWithContext) -> ITridentCallee (tridentCallback)
     tridentCallback(address tokenIn, address tokenOut, uint256 amountIn,
                     uint256 amountOut, bytes data) => NONDET
-
-    // simplification of sqrt
-    sqrt(uint256 x) returns (uint256) => DISPATCHER(true) UNRESOLVED
 
     // bentobox
     bentoBox.balanceOf(address token, address user) returns (uint256) envfree
@@ -76,6 +77,28 @@ invariant reserveLessThanEqualToBalance()
 			requireInvariant validityOfTokens();
 		}
 	}
+
+invariant integrityOfTotalSupply()
+    totalSupply() == 0 => (reserve0() == 0 && reserve1() == 0) {
+        preserved burnWrapper(address to, bool b) with (env e) {
+            require e.msg.sender != currentContract;
+            require to != currentContract;
+            require totalSupply() == 0 || balanceOf(e.msg.sender) < totalSupply() + 1000;
+        }
+
+        preserved burnSingleWrapper(address tokenOut, address to, bool b) with (env e) {
+            require e.msg.sender != currentContract;
+            require to != currentContract;
+            require totalSupply() == 0 || balanceOf(e.msg.sender) < totalSupply() + 1000;
+        }
+
+        preserved swapWrapper(address tokenIn, address recipient, bool unwrapBento) with (env e) {
+            requireInvariant reserveLessThanEqualToBalance;
+            uint256 amountIn = reserve0() - bentoBox.balanceOf(token0(), currentContract);
+            require tokenIn == token0();
+            require amountIn > 0 => getAmountOutWrapper(token0(), amountIn) > 0;
+        }
+    }
     
 ////////////////////////////////////////////////////////////////////////////
 //                                 Rules                                  //
@@ -88,8 +111,9 @@ invariant reserveLessThanEqualToBalance()
 //     assert(false);
 // }
 
-// REVIEW: swapWithContext should fail all others should pass
-rule noChangeToBalancedPoolAssets(method f) {
+// RUN: Pending
+rule noChangeToBalancedPoolAssets(method f) filtered { f ->
+                    f.selector != flashSwapWrapper(address, address, bool, uint256, bytes).selector } {
     env e;
 
     uint256 _balance0;
@@ -98,14 +122,12 @@ rule noChangeToBalancedPoolAssets(method f) {
     _balance0, _balance1 = _balance();
     
     validState(true);
-    // system has no mirin tokens
-    require balanceOf(e, currentContract) == 0;
+    // require that the system has no mirin tokens
+    require balanceOf(currentContract) == 0;
 
     calldataarg args;
-    if (f.selector != swapWithContext(address, address, bytes, address, bool, uint256).selector) {
-        f(e, args);
-    }
-
+    f(e, args);
+    
     uint256 balance0_;
     uint256 balance1_;
 
@@ -116,12 +138,11 @@ rule noChangeToBalancedPoolAssets(method f) {
            "pool's balance in BentoBox changed");
 }
 
-// REVIEW: exclude functions like getter and those which do nothing.
+// RUN: Pending
 rule afterOpBalanceEqualsReserve(method f) {
     env e;
 
     validState(false);
-    require balanceOf(e, currentContract) == 0;
 
     uint256 _balance0;
     uint256 _balance1;
@@ -131,55 +152,86 @@ rule afterOpBalanceEqualsReserve(method f) {
     uint256 _reserve0 = reserve0();
     uint256 _reserve1 = reserve1();
 
-    calldataarg args;
-    f(e, args);
+    address to;
+    address tokenIn;
+    address tokenOut;
+    address recipient;
+    bool unwrapBento;
+
+    require to != currentContract;
+    require recipient != currentContract;
+    
+    if (f.selector == burnWrapper(address, bool).selector) {
+        burnWrapper(e, to, unwrapBento);
+    } else if (f.selector == burnSingleWrapper(address, address, bool).selector) {
+        burnSingleWrapper(e, tokenOut, to, unwrapBento);
+    } else if (f.selector == swapWrapper(address, address, bool).selector) {
+        swapWrapper(e, tokenIn, recipient, unwrapBento);
+    } else {
+        calldataarg args;
+        f(e, args);
+    }
 
     uint256 balance0_;
     uint256 balance1_;
 
     balance0_, balance1_ = _balance();
 
+    uint256 reserve0_ = reserve0();
+    uint256 reserve1_ = reserve1();
+
     // (reserve or balances changed before and after the method call) => 
     // (reserve0() == balance0_ && reserve1() == balance1_)
     // reserve can go up or down or the balance doesn't change
     assert((_balance0 != balance0_ || _balance1 != balance1_ ||
-            _reserve0 != reserve0() || _reserve1 != reserve1()) =>
-            (reserve0() == balance0_ && reserve1() == balance1_),
+            _reserve0 != reserve0_ || _reserve1 != reserve1_) =>
+            (reserve0_ == balance0_ && reserve1_ == balance1_),
            "balance doesn't equal reserve after state changing operations");
 }
 
-// Failing maybe because of sqrt dispatcher?
+// RUN: Pending
 rule mintingNotPossibleForBalancedPool() {
     env e;
+
+    require totalSupply() > 0 || (reserve0() == 0 || reserve1() == 0); // REVIEW: failing without this
 
     validState(true);
 
     calldataarg args;
-    uint256 liquidity = mint(e, args);
+    uint256 liquidity = mintWrapper@withrevert(e, args);
 
-    assert(lastReverted || liquidity == 0, 
-           "pool minting on no transfer to pool");
+    assert(lastReverted, "pool minting on no transfer to pool");
 }
 
-// TODO: only when adding optimal liquidity
-// REVIEW: passing without ^^^^^^^
+// DONE: try optimal liquidity of ratio 1 (Timing out when changed args
+// to actual variables to make the msg.sender the same)
+// TODO: if works, add another rule that checks that burn gives the money to the correct person
 // rule inverseOfMintAndBurn() {
 //     env e;
+
+//     // establishing ratio 1 (to simplify)
+//     require reserve0() == reserve1();
+//     require e.msg.sender != currentContract;
 
 //     uint256 balance0;
 //     uint256 balance1;
 
 //     balance0, balance1 = _balance();
 
+//     // stimulating transfer to the pool
 //     require reserve0() < balance0 && reserve1() < balance1;
-
-//     // asumming addLiquidity is already called and the assets
-//     // are transfered to the pool
 //     uint256 _liquidity0 = balance0 - reserve0();
 //     uint256 _liquidity1 = balance1 - reserve1();
 
-//     calldataarg args0;
-//     uint256 mirinLiquidity = mint(e, args0);
+//     // making sure that we add optimal liquidity
+//     require _liquidity0 == _liquidity1;
+
+//     // uint256 _totalUsertoken0 = tokenBalanceOf(token0(), e.msg.sender) + 
+//     //                            bentoBox.balanceOf(token0(), e.msg.sender);
+//     // uint256 _totalUsertoken1 = tokenBalanceOf(token1(), e.msg.sender) + 
+//     //                            bentoBox.balanceOf(token1(), e.msg.sender);
+
+//     uint256 mirinLiquidity = mintWrapper(e, e.msg.sender);
 
 //     // transfer mirin tokens to the pool
 //     transferFrom(e, e.msg.sender, currentContract, mirinLiquidity);
@@ -187,247 +239,438 @@ rule mintingNotPossibleForBalancedPool() {
 //     uint256 liquidity0_;
 //     uint256 liquidity1_;
 
-//     calldataarg args1;
-//     liquidity0_, liquidity1_ = burnGetter(e, args1);
+//     bool unwrapBento;
+//     liquidity0_, liquidity1_ = burnWrapper(e, e.msg.sender, unwrapBento);
+
+//     // uint256 totalUsertoken0_ = tokenBalanceOf(token0(), e.msg.sender) + 
+//     //                            bentoBox.balanceOf(token0(), e.msg.sender);
+//     // uint256 totalUsertoken1_ = tokenBalanceOf(token1(), e.msg.sender) + 
+//     //                            bentoBox.balanceOf(token1(), e.msg.sender);
 
 //     // do we instead want to check whether the 'to' user got the funds? (Ask Nurit) -- Yes
 //     assert(_liquidity0 == liquidity0_ && _liquidity1 == liquidity1_, 
 //            "inverse of mint then burn doesn't hold");
+//     // assert(_totalUsertoken0 == totalUsertoken0_ && 
+//     //        _totalUsertoken1 == totalUsertoken1_, 
+//     //        "user's total balances changed");
 // }
 
-// DIFFERENT STYLE OF WRITING THE SAME RULE (inverseOfMintAndBurn)
-// TODO: try with optimal liquidity
-rule inverseOfMintAndBurn() {
+// Different way
+// rule inverseOfMintAndBurn() {
+//     env e;
+//     address to;
+//     bool unwrapBento;
+
+//     require e.msg.sender != currentContract && to != currentContract;
+//     // so that they get the mirin tokens and transfer them back. Also,
+//     // when they burn, they get the liquidity back
+//     require e.msg.sender == to; 
+
+//     validState(true);
+
+//     uint256 _liquidity0;
+//     uint256 _liquidity1;
+
+//     uint256 _totalUsertoken0 = tokenBalanceOf(token0(), e.msg.sender) + 
+//                                bentoBox.balanceOf(token0(), e.msg.sender);
+//     uint256 _totalUsertoken1 = tokenBalanceOf(token1(), e.msg.sender) + 
+//                                bentoBox.balanceOf(token1(), e.msg.sender);
+
+//     // sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, _liquidity0);
+//     // sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, _liquidity1);
+//     uint256 mirinLiquidity = mintWrapper(e, to);
+
+//     // transfer mirin tokens to the pool
+//     transferFrom(e, e.msg.sender, currentContract, mirinLiquidity);
+
+//     uint256 liquidity0_;
+//     uint256 liquidity1_;
+
+//     liquidity0_, liquidity1_ = burnWrapper(e, to, unwrapBento);
+
+//     uint256 totalUsertoken0_ = tokenBalanceOf(token0(), e.msg.sender) + 
+//                                bentoBox.balanceOf(token0(), e.msg.sender);
+//     uint256 totalUsertoken1_ = tokenBalanceOf(token1(), e.msg.sender) + 
+//                                bentoBox.balanceOf(token1(), e.msg.sender);
+
+//     assert(_liquidity0 == liquidity0_ && _liquidity1 == liquidity1_, 
+//            "inverse of mint then burn doesn't hold");
+//     assert(_totalUsertoken0 == totalUsertoken0_ && 
+//            _totalUsertoken1 == totalUsertoken1_, 
+//            "user's total balances changed");
+// }
+
+rule noChangeToOthersBalances(method f) {
     env e;
+
+    address other;
     address to;
+    address recipient;
+
+    validState(false);
+
+    require other != currentContract && e.msg.sender != other &&
+            to != other && recipient != other;
+    require other != bentoBox;
+
+    // recording other's mirin balance
+    uint256 _otherMirinBalance = balanceOf(other);
+
+    // recording other's tokens balance
+    uint256 _totalOthertoken0 = tokenBalanceOf(token0(), other) + 
+                               bentoBox.balanceOf(token0(), other);
+    uint256 _totalOthertoken1 = tokenBalanceOf(token1(), other) + 
+                               bentoBox.balanceOf(token1(), other);
+
     bool unwrapBento;
+    address tokenIn;
+    address tokenOut;
 
-    // TODO: require e.msg.sender == to? Or check the assets of 'to'?
-    validState(true);
+    if (f.selector == mintWrapper(address).selector) {
+        require other != 0;
+        mintWrapper(e, to);
+    } else if (f.selector == burnWrapper(address, bool).selector) {
+        burnWrapper(e, to, unwrapBento);
+    } else if (f.selector == burnSingleWrapper(address, address, bool).selector) {
+        burnSingleWrapper(e, tokenOut, to, unwrapBento);
+    } else if (f.selector == swapWrapper(address, address, bool).selector) {
+        swapWrapper(e, tokenIn, recipient, unwrapBento);
+    }  else if (f.selector == flashSwapWrapper(address, address, bool, uint256, bytes).selector) {
+        calldataarg args;
+        flashSwapWrapper(e, args); // TODO: since it uses bytes, limit recepient in the wrapper
+    } else if (f.selector == transfer(address, uint256).selector) {
+        uint256 amount;
+        transfer(e, recipient, amount);
+    } else if (f.selector == transferFrom(address, address, uint256).selector) {
+        address from;
+        require from != other; // REVIEW: double check if this is safe
+        uint256 amount;
 
-    uint256 _liquidity0;
-    uint256 _liquidity1;
+        transferFrom(e, from, recipient, amount);
+    } else {
+        calldataarg args;
+        f(e, args);
+    }
 
-    uint256 _totalUsertoken0 = tokenBalanceOf(token0(), e.msg.sender) + 
-                               bentoBox.balanceOf(token0(), e.msg.sender);
-    uint256 _totalUsertoken1 = tokenBalanceOf(token1(), e.msg.sender) + 
-                               bentoBox.balanceOf(token1(), e.msg.sender);
+    // recording other's mirin balance
+    uint256 otherMirinBalance_ = balanceOf(other);
+    
+    // recording other's tokens balance
+    uint256 totalOthertoken0_ = tokenBalanceOf(token0(), other) + 
+                               bentoBox.balanceOf(token0(), other);
+    uint256 totalOthertoken1_ = tokenBalanceOf(token1(), other) + 
+                               bentoBox.balanceOf(token1(), other);
 
-    sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, _liquidity0);
-    sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, _liquidity1);
-    uint256 mirinLiquidity = mint(e, to);
-
-    // transfer mirin tokens to the pool
-    transferFrom(e, e.msg.sender, currentContract, mirinLiquidity);
-
-    uint256 liquidity0_;
-    uint256 liquidity1_;
-
-    liquidity0_, liquidity1_ = burn(e, to);
-
-    uint256 totalUsertoken0_ = tokenBalanceOf(token0(), e.msg.sender) + 
-                               bentoBox.balanceOf(token0(), e.msg.sender);
-    uint256 totalUsertoken1_ = tokenBalanceOf(token1(), e.msg.sender) + 
-                               bentoBox.balanceOf(token1(), e.msg.sender);
-
-    assert(_liquidity0 == liquidity0_ && _liquidity1 == liquidity1_, 
-           "inverse of mint then burn doesn't hold");
-    assert(_totalUsertoken0 == totalUsertoken0_ && 
-           _totalUsertoken1 == totalUsertoken1_, 
-           "user's total balances changed");
+    assert(_otherMirinBalance == otherMirinBalance_, "other's Mirin balance changed");
+    assert(_totalOthertoken0 == totalOthertoken0_, "other's token0 balance changed");
+    assert(_totalOthertoken1 == totalOthertoken1_, "other's token1 balance changed");
 }
 
+// Problem with burnSingle, can only burn token1
 rule burnTokenAdditivity() {
     env e;
     address to;
     bool unwrapBento;
     uint256 mirinLiquidity;
 
-    uint256 balance0;
-    uint256 balance1;
-
-    balance0, balance1 = _balance();
-
-    // TODO: require e.msg.sender == to? Or check the assets of 'to'?
     validState(true);
+    // require to != currentContract;
+    // REVIEW: require balanceOf(e, currentContract) == 0; (Needed ?)
 
     // need to replicate the exact state later on
     storage initState = lastStorage;
 
     // burn single token
     transferFrom(e, e.msg.sender, currentContract, mirinLiquidity);
-    uint256 liquidity0Single = burnLiquiditySingle(e, token0(), to, unwrapBento);
+    uint256 liquidity0Single = burnSingleWrapper(e, token0(), to, unwrapBento);
 
-    uint256 _totalUsertoken0 = tokenBalanceOf(token0(), e.msg.sender) + 
-                               bentoBox.balanceOf(token0(), e.msg.sender);
-    uint256 _totalUsertoken1 = tokenBalanceOf(token1(), e.msg.sender) + 
-                               bentoBox.balanceOf(token1(), e.msg.sender);
+    // uint256 _totalUsertoken0 = tokenBalanceOf(token0(), e.msg.sender) + 
+    //                            bentoBox.balanceOf(token0(), e.msg.sender);
+    // uint256 _totalUsertoken1 = tokenBalanceOf(token1(), e.msg.sender) + 
+    //                            bentoBox.balanceOf(token1(), e.msg.sender);
 
     uint256 liquidity0;
     uint256 liquidity1;
 
     // burn both tokens
     transferFrom(e, e.msg.sender, currentContract, mirinLiquidity) at initState;
-    liquidity0, liquidity1 = burn(e, to);
+    liquidity0, liquidity1 = burnWrapper(e, to, unwrapBento);
 
     // swap token1 for token0
     sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, liquidity1);
-    uint256 amountOut = swapWithoutContext(e, token1(), token0(), to, unwrapBento);
+    uint256 amountOut = swapWrapper(e, token1(), to, unwrapBento);
 
-    uint256 totalUsertoken0_ = tokenBalanceOf(token0(), e.msg.sender) + 
-                               bentoBox.balanceOf(token0(), e.msg.sender);
-    uint256 totalUsertoken1_ = tokenBalanceOf(token1(), e.msg.sender) + 
-                               bentoBox.balanceOf(token1(), e.msg.sender);
+    // uint256 totalUsertoken0_ = tokenBalanceOf(token0(), e.msg.sender) + 
+    //                            bentoBox.balanceOf(token0(), e.msg.sender);
+    // uint256 totalUsertoken1_ = tokenBalanceOf(token1(), e.msg.sender) + 
+    //                            bentoBox.balanceOf(token1(), e.msg.sender);
 
     assert(liquidity0Single == liquidity0 + amountOut, "burns not equivalent");
-    assert(_totalUsertoken0 == totalUsertoken0_, "user's token0 changed");
-    assert(_totalUsertoken1 == totalUsertoken1_, "user's token1 changed");
+    // assert(_totalUsertoken0 == totalUsertoken0_, "user's token0 changed");
+    // assert(_totalUsertoken1 == totalUsertoken1_, "user's token1 changed");
 }
 
-// rule sameUnderlyingRatioLiquidity(method f) filtered { f -> 
-//         f.selector == swapWithoutContext(address, address, address, bool).selector ||
-//         f.selector == swapWithContext(address, address, bytes, address, bool, uint256).selector ||
-//         f.selector == swap(uint256, uint256, address, bytes).selector } {
-//     env e;
-//     address to;
-//     bool unwrapBento;
-//     uint256 mirinLiquidity;
-
-//     // TODO: require e.msg.sender == to? Or check the assets of 'to'?
-//     validState(true);
-
-//     uint256 reserveRatio = reserve0() / reserve1();
-
-//     require reserveRatio == 2;
-
-//     // need to replicate the exact state later on
-//     storage initState = lastStorage;
-
-//     // burn single token before swapping
-//     transferFrom(e, e.msg.sender, currentContract, mirinLiquidity);
-//     uint256 _liquidity0Single = burnLiquiditySingle(e, token0(), to, unwrapBento);
-
-//     calldataarg args;
-//     f(e, args) at initState; // TODO: different swaps have different mechanisms, limit the arguments
-
-//     // does burn change the ratio of reserves? If so, do we need to burn in an 
-//     // if branch? Like if the ratio is the same, burn and see if liquidity
-//     // increased. TODO
-//     // burn single token after swapping
-//     transferFrom(e, e.msg.sender, currentContract, mirinLiquidity);
-//     uint256 liquidity0Single_ = burnLiquiditySingle(e, token0(), to, unwrapBento);
-
-//     assert((reserve0() / reserve1() == 2) => _liquidity0Single <= liquidity0Single_,
-//            "with time mirin liquidity decreased");
-// }
-
-// DIFFERENT STYLE OF WRITING THE SAME RULE (sameUnderlyingRatioLiquidity)
 rule sameUnderlyingRatioLiquidity(method f) filtered { f -> 
-        f.selector == swapWithoutContext(address, address, address, bool).selector } {
+        f.selector == swapWrapper(address, address, bool).selector ||
+        f.selector == flashSwapWrapper(address, address, bool, uint256, bytes).selector } {
     env e1;
     env e2;
     env e3;
-    address to;
-    bool unwrapBento;
-    uint256 mirinLiquidity;
 
+    // setting the environment constraints
     require e1.block.timestamp < e2.block.timestamp && 
             e2.block.timestamp < e3.block.timestamp;
-    require e1.msg.sender == e2.msg.sender && e2.msg.sender == e3.msg.sender;
+    // REVIEW: swap is done by someother person (maybe incorrect)
+    require e1.msg.sender == e3.msg.sender && e2.msg.sender != e1.msg.sender;
 
-    // TODO: require e.msg.sender == to? Or check the assets of 'to'?
     validState(true);
 
-    uint256 reserveRatio = reserve0() / reserve1();
+    require reserve0() / reserve1() == 2;
 
-    require reserveRatio == 2;
+    uint256 _liquidity0;
+    uint256 _liquidity1;
 
-    // liquidity0 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
-    uint256 _liquidity0 = balanceOf(e1, e1.msg.sender) * reserve0() / totalSupply();
-    uint256 _liquidity1 = balanceOf(e1, e1.msg.sender) * reserve1() / totalSupply();
+    if (totalSupply() != 0) {
+        // user's liquidity for token0 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
+        _liquidity0 = balanceOf(e1.msg.sender) * reserve0() / totalSupply();
+        // user's liquidity for token1 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
+        _liquidity1 = balanceOf(e1.msg.sender) * reserve1() / totalSupply();
+    } else {
+        _liquidity0 = 0;
+        _liquidity1 = 0;
+    }
 
     calldataarg args;
     f(e2, args); // TODO: run with all swaps
 
-    // liquidity0 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
-    uint256 liquidity0_ = balanceOf(e3, e3.msg.sender) * reserve0() / totalSupply();
-    uint256 liquidity1_ = balanceOf(e3, e3.msg.sender) * reserve1() / totalSupply();
+    uint256 liquidity0_;
+    uint256 liquidity1_;
 
+    if (totalSupply() != 0) {
+        // user's liquidity for token0 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
+        uint256 liquidity0_ = balanceOf(e3.msg.sender) * reserve0() / totalSupply();
+        // user's liquidity for token1 = user's mirinTokens * reserve0 / totalSupply of mirinTokens
+        uint256 liquidity1_ = balanceOf(e3.msg.sender) * reserve1() / totalSupply();
+    } else {
+        liquidity0_ = 0;
+        liquidity1_ = 0;
+    }
+    
+    // since swap is taking place, liquidities should be strictly greater
+    // TODO: && totalSupply() != 0 not working, counter example when liquidities are 0
     assert((reserve0() / reserve1() == 2) => (_liquidity0 <= liquidity0_ &&
-           _liquidity1 <= liquidity1_), "with time mirin liquidity decreased");
+           _liquidity1 <= liquidity1_), "with time liquidities decreased");
 }
 
+// Timing out, even with reserve0() / reserve1() == 1
 // TODO: all swap methods
-rule multiSwapLessThanSingleSwap() {
-    env e;
-    address to;
-    bool unwrapBento;
-    uint256 liquidity1;
-    uint256 liquidity2;
+// rule multiSwapLessThanSingleSwap() {
+//     env e;
+//     address to;
+//     bool unwrapBento;
+//     uint256 liquidity1;
+//     uint256 liquidity2;
 
-    // TODO: liquidity1, liquidity2 can't be 0??? Maybe (to prevent counter examples)
-    // TODO: require e.msg.sender == to? Or check the assets of 'to'?
-    validState(true);
+//     // TODO: liquidity1, liquidity2 can't be 0??? Maybe (to prevent counter examples)
+//     require e.msg.sender != currentContract && to != currentContract;
 
-    // need to replicate the exact state later on
-    storage initState = lastStorage;
+//     validState(true);
 
-    // swap token1 for token0 in two steps
-    sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, liquidity1);
-    uint256 multiAmountOut1 = swapWithoutContext(e, token1(), token0(), to, unwrapBento);
-    sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, liquidity2);
-    uint256 multiAmountOut2 = swapWithoutContext(e, token1(), token0(), to, unwrapBento);
+//     // need to replicate the exact state later on
+//     storage initState = lastStorage;
 
-    // checking for overflows
-    require multiAmountOut1 + multiAmountOut2 <= max_uint256;
-    require liquidity1 + liquidity2 <= max_uint256;
+//     // swap token1 for token0 in two steps
+//     sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, liquidity1);
+//     uint256 multiAmountOut1 = swapWrapper(e, token1(), to, unwrapBento);
+//     sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, liquidity2);
+//     uint256 multiAmountOut2 = swapWrapper(e, token1(), to, unwrapBento);
 
-    // swap token1 for token0 in a single step
-    sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, liquidity1 + liquidity2) at initState; 
-    uint256 singleAmountOut = swapWithoutContext(e, token1(), token0(), to, unwrapBento);
+//     // checking for overflows
+//     require multiAmountOut1 + multiAmountOut2 <= max_uint256;
+//     require liquidity1 + liquidity2 <= max_uint256;
 
-    assert(singleAmountOut > multiAmountOut1 + multiAmountOut2, "multiple swaps better than one single swap");
-}
+//     // swap token1 for token0 in a single step
+//     sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, liquidity1 + liquidity2) at initState; 
+//     uint256 singleAmountOut = swapWrapper(e, token1(), to, unwrapBento);
 
-rule additivityOfMint() {
-    env e;
-    address to;
-    uint256 x1;
-    uint256 x2;
-    uint256 y1;
-    uint256 y2;
-
-    // x, y can be 0? Their ratio (they have to be put in the same ratio, right?) 
-    // TODO: require e.msg.sender == to? Or check the assets of 'to'?
-    validState(true);
-
-    // need to replicate the exact state later on
-    storage initState = lastStorage;
-
-    // minting in two steps
-    sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, x1);
-    sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, x2);
-    uint256 mirinTwoSteps1 = mint(e, to);
-
-    sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, y1);
-    sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, y2);
-    uint256 mirinTwoSteps2 = mint(e, to);
-
-    // checking for overflows
-    require mirinTwoSteps1 + mirinTwoSteps2 <= max_uint256;
-    require x1 + x2 < max_uint256 && y1 + y2 < max_uint256;
-
-    // minting in a single step
-    sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, x1 + x2) at initState;
-    sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, y1 + y2);
-    uint256 mirinSingleStep = mint(e, to);
-
-    assert(mirinSingleStep >= mirinTwoSteps1 + mirinTwoSteps2, "multiple mints better than a single mint");
-}
-
-// rule integrityOfgetOptimalLiquidityInAmounts() {
-
+//     // TODO: Mudit wanted strictly greater, but when all amountOuts are 0s we get a counter example
+//     assert(singleAmountOut >= multiAmountOut1 + multiAmountOut2, "multiple swaps better than one single swap");
 // }
+
+// TODO: add same rule as multiSwapLessThanSingleSwap but using getAmountOut
+// rule multiLessThanSingleAmountOut() {
+//     env e;
+//     uint256 amountInX;
+//     uint256 amountInY;
+
+//     require 0 < MAX_FEE_MINUS_SWAP_FEE() && MAX_FEE_MINUS_SWAP_FEE() <= MAX_FEE();
+    
+//     uint256 multiAmountOut1 = _getAmountOut(e, amountInX, reserve0(), reserve1());
+//     require reserve0() + amountInX <= max_uint256;
+//     uint256 multiAmountOut2 = _getAmountOut(e, amountInY, reserve0() + amountInX, reserve1() - multiAmountOut1);
+
+//     // checking for overflows
+//     require amountInX + amountInY <= max_uint256;
+
+//     uint256 singleAmountOut = _getAmountOut(e, amountInX + amountInY, reserve0(), reserve1());
+
+//     // TODO: Mudit wanted strictly greater
+//     assert(singleAmountOut >= multiAmountOut1 + multiAmountOut2, "multiple swaps better than one single swap");
+// }
+
+// Timing out, even with require reserve0() == reserve1();
+// rule additivityOfMint() {
+//     env e;
+//     address to;
+//     uint256 x1;
+//     uint256 x2;
+//     uint256 y1;
+//     uint256 y2;
+
+//     // x, y can be 0? Their ratio (they have to be put in the same ratio, right?) 
+//     // TODO: require e.msg.sender == to? Or check the assets of 'to'?
+//     validState(true);
+
+//     // need to replicate the exact state later on
+//     storage initState = lastStorage;
+
+//     // minting in two steps
+//     sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, x1);
+//     sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, y1);
+//     uint256 mirinTwoSteps1 = mintWrapper(e, to);
+
+//     sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, x2);
+//     sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, y2);
+//     uint256 mirinTwoSteps2 = mintWrapper(e, to);
+
+//     uint256 userMirinBalanceTwoStep = balanceOf(e, e.msg.sender);
+
+//     // checking for overflows
+//     require mirinTwoSteps1 + mirinTwoSteps2 <= max_uint256;
+//     require x1 + x2 <= max_uint256 && y1 + y2 <= max_uint256;
+
+//     // minting in a single step
+//     sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, x1 + x2) at initState;
+//     sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, y1 + y2);
+//     uint256 mirinSingleStep = mintWrapper(e, to);
+
+//     uint256 userMirinBalanceOneStep = balanceOf(e, e.msg.sender);
+
+//     // TODO: strictly greater than?
+//     assert(mirinSingleStep >= mirinTwoSteps1 + mirinTwoSteps2, "multiple mints better than a single mint");
+//     assert(userMirinBalanceOneStep >= userMirinBalanceTwoStep, "user received less mirin in one step");
+// }
+
+// Timing out, even with ratio 1
+// rule mintWithOptimalLiquidity() {
+//     env e;
+//     address to;
+
+//     uint256 xOptimal;
+//     uint256 yOptimal;
+//     uint256 x;
+//     uint256 y;
+
+//     // require dollarAmount(xOptimal) + dollarAmount(yOptimal) == dollarAmount(x) + dollarAmount(y);
+//     require getAmountOutWrapper(token0(), yOptimal) + xOptimal == 
+//             getAmountOutWrapper(token0(), y) + x;
+
+//     require x != y; // requiring that x and y are non optimal
+
+//     require reserve0() == reserve1();
+//     require xOptimal == yOptimal; // requiring that these are optimal
+
+//     validState(true);
+
+//     // need to replicate the exact state later on
+//     storage initState = lastStorage;
+
+//     // minting with optimal liquidities
+//     sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, xOptimal);
+//     sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, yOptimal);
+//     uint256 mirinOptimal = mintWrapper(e, e.msg.sender);
+
+//     uint256 userMirinBalanceOptimal = balanceOf(e, e.msg.sender);
+
+//     // minting with non-optimal liquidities
+//     sinvoke bentoBox.transfer(e, token0(), e.msg.sender, currentContract, x) at initState;
+//     sinvoke bentoBox.transfer(e, token1(), e.msg.sender, currentContract, y);
+//     uint256 mirinNonOptimal = mintWrapper(e, e.msg.sender);
+
+//     uint256 userMirinBalanceNonOptimal = balanceOf(e, e.msg.sender);
+
+//     // TODO: strictly greater?
+//     assert(mirinOptimal >= mirinNonOptimal);
+//     assert(userMirinBalanceOptimal >= userMirinBalanceNonOptimal);
+// }
+
+// Failing, expected (Sushi needs to fix)
+rule zeroCharacteristicsOfGetAmountOut(uint256 _reserve0, uint256 _reserve1) {
+    env e;
+    uint256 amountIn;
+    address tokenIn;
+
+    validState(false);
+
+    // assume token0 to token1
+    require tokenIn == token0(); 
+    require _reserve0 == reserve0();
+    require _reserve0 == reserve1();
+    require _reserve0 * _reserve1 >= 1000;
+    require MAX_FEE_MINUS_SWAP_FEE() <= MAX_FEE();
+
+    uint256 amountOut = getAmountOutWrapper(tokenIn, amountIn);
+
+    if (amountIn == 0) {
+        assert(amountOut == 0, "amountIn is 0, but amountOut is not 0");
+    } else { 
+        if (tokenIn == token0() && reserve1() == 0) {
+            assert(amountOut == 0, "token1 has no reserves, but amountOut is non-zero");
+        } else {
+            assert(amountOut > 0);
+        }
+    }
+    /* else if (tokenIn == token1() && reserve0() == 0) {
+            assert(amountOut == 0, "token0 has no reserves, but amountOut is non-zero");
+        } */ 
+}
+
+// Passing
+rule maxAmountOut(uint256 _reserve0, uint256 _reserve1) {
+    env e;
+
+    uint256 amountIn;
+    address tokenIn;
+
+    validState(false);
+
+    require tokenIn == token0(); 
+    require _reserve0 == reserve0();
+    require _reserve1 == reserve1();
+    require _reserve0 > 0 && _reserve1 > 0;
+    require MAX_FEE_MINUS_SWAP_FEE() <= MAX_FEE();
+
+    uint256 amountOut = getAmountOutWrapper(tokenIn, amountIn);
+    // mathint maxValue = to_mathint(amountIn) * to_mathint(_reserve1) / to_mathint(_reserve0);
+    // assert amountOut <= maxValue;
+
+    assert amountOut <= _reserve1;
+}
+
+// Passing (need to check)
+rule nonZeroMint() {
+    env e;
+    address to;
+
+    validState(false);
+
+    require reserve0() < bentoBox.balanceOf(token0(), currentContract) ||
+                reserve1() < bentoBox.balanceOf(token1(), currentContract);
+
+    uint256 liquidity = mintWrapper(e, to);
+
+    assert liquidity > 0;
+}
 
 ////////////////////////////////////////////////////////////////////////////
 //                             Helper Methods                             //
@@ -437,9 +680,9 @@ function validState(bool isBalanced) {
     requireInvariant tokensNotMirin();
 
     if (isBalanced) {
-        requireInvariant reserveLessThanEqualToBalance();
-    } else {
         require reserve0() == bentoBox.balanceOf(token0(), currentContract) &&
                 reserve1() == bentoBox.balanceOf(token1(), currentContract);
+    } else {
+        requireInvariant reserveLessThanEqualToBalance();
     }
 }

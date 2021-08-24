@@ -24,6 +24,8 @@ methods {
     token1() returns (address) envfree
     reserve0() returns (uint112) envfree
     reserve1() returns (uint112) envfree
+    MAX_FEE() returns (uint256) envfree
+    MAX_FEE_MINUS_SWAP_FEE() returns (uint256) envfree
 
     // ConstantProductPool functions
     _balance() returns (uint256 balance0, uint256 balance1) envfree
@@ -310,6 +312,8 @@ rule noChangeToOthersBalances(method f) {
     address to;
     address recipient;
 
+    validState(false);
+
     require other != currentContract && e.msg.sender != other &&
             to != other && recipient != other;
     require other != bentoBox;
@@ -338,7 +342,7 @@ rule noChangeToOthersBalances(method f) {
         swapWrapper(e, tokenIn, recipient, unwrapBento);
     }  else if (f.selector == flashSwapWrapper(address, address, bool, uint256, bytes).selector) {
         calldataarg args;
-        flashSwapWrapper(e, args);
+        flashSwapWrapper(e, args); // TODO: since it uses bytes, limit recepient in the wrapper
     } else if (f.selector == transfer(address, uint256).selector) {
         uint256 amount;
         transfer(e, recipient, amount);
@@ -376,7 +380,7 @@ rule burnTokenAdditivity() {
 
     validState(true);
     // require to != currentContract;
-    // REVIEW: require balanceOf(e, currentContract) == 0; (Passing with or without)
+    // REVIEW: require balanceOf(e, currentContract) == 0; (Needed ?)
 
     // need to replicate the exact state later on
     storage initState = lastStorage;
@@ -503,6 +507,8 @@ rule multiLessThanSingleAmountOut() {
     env e;
     uint256 amountInX;
     uint256 amountInY;
+
+    require 0 < MAX_FEE_MINUS_SWAP_FEE() && MAX_FEE_MINUS_SWAP_FEE() <= MAX_FEE();
     
     uint256 multiAmountOut1 = _getAmountOut(e, amountInX, reserve0(), reserve1());
     require reserve0() + amountInX <= max_uint256;
@@ -571,8 +577,8 @@ rule multiLessThanSingleAmountOut() {
 //     uint256 y;
 
 //     // require dollarAmount(xOptimal) + dollarAmount(yOptimal) == dollarAmount(x) + dollarAmount(y);
-//     require getAmountOutWrapper(e, token0(), yOptimal) + xOptimal == 
-//             getAmountOutWrapper(e, token0(), y) + x;
+//     require getAmountOutWrapper(token0(), yOptimal) + xOptimal == 
+//             getAmountOutWrapper(token0(), y) + x;
 
 //     require x != y; // requiring that x and y are non optimal
 
@@ -616,7 +622,7 @@ rule zeroCharacteristicsOfGetAmountOut(uint256 _reserve0, uint256 _reserve1) {
     require _reserve0 == reserve0();
     require _reserve0 == reserve1();
     require _reserve0 * _reserve1 >= 1000;
-    require MAX_FEE_MINUS_SWAP_FEE(e) <= MAX_FEE(e);
+    require MAX_FEE_MINUS_SWAP_FEE() <= MAX_FEE();
 
     uint256 amountOut = getAmountOutWrapper(tokenIn, amountIn);
 
@@ -647,7 +653,7 @@ rule maxAmountOut(uint256 _reserve0, uint256 _reserve1) {
     require _reserve0 == reserve0();
     require _reserve1 == reserve1();
     require _reserve0 > 0 && _reserve1 > 0;
-    require MAX_FEE_MINUS_SWAP_FEE(e) <= MAX_FEE(e);
+    require MAX_FEE_MINUS_SWAP_FEE() <= MAX_FEE();
 
     uint256 amountOut = getAmountOutWrapper(tokenIn, amountIn);
     // mathint maxValue = to_mathint(amountIn) * to_mathint(_reserve1) / to_mathint(_reserve0);

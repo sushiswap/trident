@@ -85,8 +85,8 @@ perl -0777 -i -pe 's/internal view returns \(uint256 amountOut\)/public virtual 
 perl -0777 -i -pe 's/function getAmountOut\(bytes calldata data\) public/function getAmountOut\(bytes memory data\) public virtual/g' contracts/pool/ConstantProductPool.sol
 
 # internal -> public fee constants
-perl -0777 -i -pe 's/uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE/uint256 public immutable MAX_FEE_MINUS_SWAP_FEE/g' contracts/pool/ConstantProductPool.sol
 perl -0777 -i -pe 's/uint256 internal constant MAX_FEE = 10000;/uint256 public constant MAX_FEE = 10000;/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE/uint256 public immutable MAX_FEE_MINUS_SWAP_FEE/g' contracts/pool/ConstantProductPool.sol
 
 ##################################################
 #                    HybridPool                  #
@@ -94,16 +94,21 @@ perl -0777 -i -pe 's/uint256 internal constant MAX_FEE = 10000;/uint256 public c
 # remove hardhat console
 perl -0777 -i -pe 's/import \"hardhat/\/\/ import \"hardhat/g' contracts/pool/HybridPool.sol
 
-# add import for Simplifications and Simplifications object in HybridPool
-perl -0777 -i -pe 's/import \"..\/deployer\/MasterDeployer.sol\";/import \"..\/deployer\/MasterDeployer.sol\";\nimport \"..\/..\/spec\/harness\/Simplifications.sol\";/g' contracts/pool/HybridPool.sol
-perl -0777 -i -pe 's/address public immutable barFeeTo;/address public immutable barFeeTo;\n    Simplifications public simplified;/g' contracts/pool/HybridPool.sol
-
-# simplifying sqrt TridentMath.sqrt(balance0 * balance1) in HybridPool
-perl -0777 -i -pe 's/TridentMath.sqrt\(/simplified.sqrt\(/g' contracts/pool/HybridPool.sol
-
 # _balance: internal -> public
 perl -0777 -i -pe 's/_balance\(\) internal view/_balance\(\) public view/g' contracts/pool/HybridPool.sol
 
 # reserve: internal -> public
 perl -0777 -i -pe 's/uint128 internal reserve0;/uint128 public reserve0;/g' contracts/pool/HybridPool.sol
 perl -0777 -i -pe 's/uint128 internal reserve1;/uint128 public reserve1;/g' contracts/pool/HybridPool.sol
+
+# virtualizing mint, burn, burnSingle, swap, flashSwap, _getAmountOut, getAmountOut
+perl -0777 -i -pe 's/function mint\(bytes calldata data\) public/function mint\(bytes memory data\) public virtual/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/function burn\(bytes calldata data\) public/function burn\(bytes memory data\) public virtual/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/function burnSingle\(bytes calldata data\) public/function burnSingle\(bytes memory data\) public virtual/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/function swap\(bytes calldata data\) public/function swap\(bytes memory data\) public virtual/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/function flashSwap\(bytes calldata data\) public/function flashSwap\(bytes memory data\) public virtual/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/public view returns \(uint256\)/public virtual view returns \(uint256\)/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/function getAmountOut\(bytes calldata data\) public/function getAmountOut\(bytes memory data\) public virtual/g' contracts/pool/HybridPool.sol
+
+# internal -> public fee constants
+perl -0777 -i -pe 's/uint256 internal constant MAX_FEE = 10000;/uint256 public constant MAX_FEE = 10000;/g' contracts/pool/HybridPool.sol
