@@ -51,10 +51,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
     /// @dev Only set immutable variables here - state changes made here will not be used.
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (address tokenA, address tokenB, uint256 _swapFee, bool _twapSupport) = abi.decode(
-            _deployData,
-            (address, address, uint256, bool)
-        );
+        (address tokenA, address tokenB, uint256 _swapFee, bool _twapSupport) = abi.decode(_deployData, (address, address, uint256, bool));
 
         require(tokenA != address(0), "ZERO_ADDRESS");
         require(tokenA != tokenB, "IDENTICAL_ADDRESSES");
@@ -163,7 +160,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
             amount0 = 0;
         } else {
             // @dev Swap token1 for token0.
-            require(tokenOut == token1, "INVALID_OUTPUT_TOKEN");
+            require(tokenOut == token0, "INVALID_OUTPUT_TOKEN");
             amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0);
             _transfer(token0, amount0, to, unwrapBento);
             balance0 -= amount0;
@@ -265,7 +262,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
             reserve1 = uint112(balance1);
         } else {
             uint32 blockTimestamp = uint32(block.timestamp % 2**32);
-            if (blockTimestamp != _blockTimestampLast && _reserve0 != 0) {
+            if (blockTimestamp != _blockTimestampLast && _reserve0 != 0 && _reserve1 != 0) {
                 unchecked {
                     uint32 timeElapsed = blockTimestamp - _blockTimestampLast;
                     uint256 price0 = (uint256(_reserve1) << PRECISION) / _reserve0;
