@@ -72,8 +72,8 @@ contract ConstantProductPoolHarness is ConstantProductPool {
     }
 
     // overrides /////////////////
-    // WARNING: Be careful of interlocking "lock"
-    // modifier if adding to the overrided code blocks
+    // WARNING: Be careful of interlocking "lock" modifier
+    // if adding to the overrided code blocks
     function mint(bytes memory data) 
             public override lock returns (uint256 liquidity) { }
 
