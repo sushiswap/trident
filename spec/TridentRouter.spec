@@ -26,10 +26,6 @@ using SymbolicPool as pool
 methods {
   
     // bentobox
-    bento.toAmount(address token, uint256 share, bool roundUp)
-        returns (uint256) envfree 
-    bento.toShare(address token, uint256 amount, bool roundUp) 
-        returns (uint256) envfree 
     bento.transfer(address token, address from, address to, uint256 shares)  
     bento.deposit(address, address, address, uint256, uint256) returns (uint256 amountOut, uint256 shareOut) 
     bento.balanceOf(address token, address user) returns (uint256) envfree 
@@ -147,17 +143,17 @@ rule integrityOfAddLiquidity(address token, uint256 x, uint256 amount) {
     uint256 nativeBalance = tokenBalanceOf(token, user);
     uint256 bentoBalance = bento.balanceOf(token, user);
     require (nativeBalance < max_uint64 && bentoBalance < max_uint64 );
-    mathint userTokenBalanceBefore = tokenBalanceOf(token, user) + bento.toAmount(token, bento.balanceOf(token, user), false);
+    mathint userTokenBalanceBefore = tokenBalanceOf(token, user) + bento.balanceOf(token, user);
     uint256 poolTokenBalanceBefore = bento.balanceOf(token, pool);
     uint256 userLiquidityBalanceBefore = pool.balanceOf(user);
     uint256 liquidity = callAddLiquidity(e, token, amount, isNative, zeroAddress, zeroAmount, isNative, pool, user, minLiquidity);
     
-    mathint userTokenBalanceAfter = tokenBalanceOf(token, user) + bento.toAmount(token, bento.balanceOf(token, user), false);
+    mathint userTokenBalanceAfter = tokenBalanceOf(token, user) + bento.balanceOf(token, user);
     uint256 poolTokenBalanceAfter = bento.balanceOf(token, pool);
     uint256 userLiquidityBalanceAfter = pool.balanceOf(user);
 
     assert userTokenBalanceAfter == userTokenBalanceBefore - amount;
-    assert poolTokenBalanceAfter == poolTokenBalanceBefore + bento.toShare(token, amount, false);
+    assert poolTokenBalanceAfter == poolTokenBalanceBefore + amount;
     require userLiquidityBalanceBefore + liquidity <= max_uint256;
     assert userLiquidityBalanceAfter == userLiquidityBalanceBefore + liquidity;
 
@@ -165,9 +161,7 @@ rule integrityOfAddLiquidity(address token, uint256 x, uint256 amount) {
     assert liquidity >= minLiquidity;
 }
 
-/*
-passing https://vaas-stg.certora.com/output/23658/3ab8750e04f4fdf4a35f/?anonymousKey=c5a8b48db3924b393fed0967334143f31f4dd089 
-*/
+
 rule inverseOfMintAndBurnSingle(address token, uint256 amount) {
     env e;
 
