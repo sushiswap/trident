@@ -43,7 +43,7 @@ contract ConcentratedLiquidityPool is IPool {
     uint256 public feeGrowthGlobal0; /// @dev all fee growth counters are multiplied by 2^128
     uint256 public feeGrowthGlobal1;
 
-    uint256 barFee;
+    uint256 public barFee;
     uint128 public token0ProtocolFee;
     uint128 public token1ProtocolFee;
 
