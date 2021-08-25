@@ -68,6 +68,17 @@ contract ConcentratedLiquidityPool is IPool {
         uint160 secondsPerLiquidityLast; // <- might want to store this in the manager contract only
     }
 
+    struct SwapCache {
+        uint256 feeAmount;
+        uint256 totalFeeAmount;
+        uint256 protocolFee;
+        uint256 feeGrowthGlobal;
+        uint256 currentPrice;
+        uint256 currentLiquidity;
+        uint256 input;
+        int24 nextTickToCross;
+    }
+
     /*
     univ3 1% -> 200 tickSpacing
     univ3 0.3% pool -> 60 tickSpacing -> 0.6% between ticks
@@ -217,17 +228,6 @@ contract ConcentratedLiquidityPool is IPool {
         emit Collect(msg.sender, amount0fees, amount1fees);
     }
 
-    struct SwapCache {
-        uint256 feeAmount;
-        uint256 totalFeeAmount;
-        uint256 protocolFee;
-        uint256 feeGrowthGlobal;
-        int24 nextTickToCross;
-        uint256 currentPrice;
-        uint256 currentLiquidity;
-        uint256 input;
-    }
-
     /// @dev price is √(y/x)
     /// - x is token0
     /// - zero for one -> price will move down.
@@ -239,10 +239,10 @@ contract ConcentratedLiquidityPool is IPool {
             totalFeeAmount: 0,
             protocolFee: 0,
             feeGrowthGlobal: zeroForOne ? feeGrowthGlobal1 : feeGrowthGlobal0,
-            nextTickToCross: zeroForOne ? nearestTick : ticks[nearestTick].nextTick,
             currentPrice: uint256(price),
             currentLiquidity: uint256(liquidity),
-            input: inAmount
+            input: inAmount,
+            nextTickToCross: zeroForOne ? nearestTick : ticks[nearestTick].nextTick
         });
 
         {
@@ -313,7 +313,6 @@ contract ConcentratedLiquidityPool is IPool {
             }
 
             cache.feeAmount = FullMath.mulDivRoundingUp(output, swapFee, 1e6);
-
             // @dev Calculate `protocolFee` and convert pips to bips
             // - stack too deep when trying to store this in a variable
             // - NB can get optimized after we put things into structs.
