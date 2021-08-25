@@ -195,6 +195,7 @@ rule afterOpBalanceEqualsReserve(method f) {
 }
 
 // Passing
+// Mudit: check require again, should pass without it
 rule mintingNotPossibleForBalancedPool() {
     env e;
 
@@ -211,6 +212,7 @@ rule mintingNotPossibleForBalancedPool() {
 // DONE: try optimal liquidity of ratio 1 (Timing out when changed args
 // to actual variables to make the msg.sender the same)
 // TODO: if works, add another rule that checks that burn gives the money to the correct person
+// Mudit: can fail due to rounding error (-1 for the after liquidities)
 // rule inverseOfMintAndBurn() {
 //     env e;
 
@@ -314,6 +316,7 @@ rule noChangeToOthersBalances(method f) {
 
     validState(false);
 
+    // Mudit: to == other => other's balances only increase or stay the same
     require other != currentContract && e.msg.sender != other &&
             to != other && recipient != other;
     require other != bentoBox;
@@ -348,7 +351,7 @@ rule noChangeToOthersBalances(method f) {
         transfer(e, recipient, amount);
     } else if (f.selector == transferFrom(address, address, uint256).selector) {
         address from;
-        require from != other; // REVIEW: double check if this is safe
+        require from != other;
         uint256 amount;
 
         transferFrom(e, from, recipient, amount);
@@ -469,6 +472,7 @@ rule sameUnderlyingRatioLiquidity(method f) filtered { f ->
 
 // Timing out, even with reserve0() / reserve1() == 1
 // TODO: all swap methods
+// Mudit: singleAmountOut == multiAmountOut1 + multiAmountOut2
 // rule multiSwapLessThanSingleSwap() {
 //     env e;
 //     address to;
@@ -503,6 +507,7 @@ rule sameUnderlyingRatioLiquidity(method f) filtered { f ->
 // }
 
 // TODO: add same rule as multiSwapLessThanSingleSwap but using getAmountOut
+// Mudit: singleAmountOut == multiAmountOut1 + multiAmountOut2
 rule multiLessThanSingleAmountOut() {
     env e;
     uint256 amountInX;
@@ -604,7 +609,7 @@ rule multiLessThanSingleAmountOut() {
 
 //     uint256 userMirinBalanceNonOptimal = balanceOf(e, e.msg.sender);
 
-//     // TODO: strictly greater?
+//     // TODO: strictly greater? (Mudit: when the difference is small, the final amount would be the same)
 //     assert(mirinOptimal >= mirinNonOptimal);
 //     assert(userMirinBalanceOptimal >= userMirinBalanceNonOptimal);
 // }
@@ -629,9 +634,9 @@ rule zeroCharacteristicsOfGetAmountOut(uint256 _reserve0, uint256 _reserve1) {
     if (amountIn == 0) {
         assert(amountOut == 0, "amountIn is 0, but amountOut is not 0");
     } else { 
-        if (tokenIn == token0() && reserve1() == 0) {
+        if (tokenIn == token0() && reserve1() == 0) { // Mudit: if either of the reserves is 0 then getAmountOut should revert
             assert(amountOut == 0, "token1 has no reserves, but amountOut is non-zero");
-        } else {
+        } else { // Mudit: if (amountIn > ratio of the reserves)
             assert(amountOut > 0);
         }
     }
@@ -659,7 +664,7 @@ rule maxAmountOut(uint256 _reserve0, uint256 _reserve1) {
     // mathint maxValue = to_mathint(amountIn) * to_mathint(_reserve1) / to_mathint(_reserve0);
     // assert amountOut <= maxValue;
 
-    assert amountOut <= _reserve1;
+    assert amountOut <= _reserve1; // Mudit: needs to be strictly less than
 }
 
 // Passing (need to check)
