@@ -43,6 +43,7 @@ contract ConcentratedLiquidityPool is IPool {
     uint256 public feeGrowthGlobal0; /// @dev all fee growth counters are multiplied by 2^128
     uint256 public feeGrowthGlobal1;
 
+    uint256 barFee;
     uint128 public token0ProtocolFee;
     uint128 public token1ProtocolFee;
 
@@ -116,6 +117,7 @@ contract ConcentratedLiquidityPool is IPool {
         nearestTick = TickMath.MIN_TICK;
         bento = _masterDeployer.bento();
         barFeeTo = _masterDeployer.barFeeTo();
+        barFee = _masterDeployer.barFee();
         masterDeployer = _masterDeployer;
         unlocked = 1;
     }
@@ -322,7 +324,7 @@ contract ConcentratedLiquidityPool is IPool {
             amountOut += output - cache.feeAmount;
 
             // @dev Calculate `protocolFee` and convert pips to bips
-            uint256 feeDelta = FullMath.mulDivRoundingUp(cache.feeAmount, masterDeployer.barFee(), 1e4);
+            uint256 feeDelta = FullMath.mulDivRoundingUp(cache.feeAmount, barFee, 1e4);
 
             cache.protocolFee += feeDelta;
 
@@ -655,6 +657,10 @@ contract ConcentratedLiquidityPool is IPool {
         _transfer(token1, token1ProtocolFee - 1, barFeeTo, false);
         token0ProtocolFee = 1;
         token1ProtocolFee = 1;
+    }
+
+    function updateBarFee() public {
+        barFee = masterDeployer.barFee();
     }
 
     function getAmountOut(bytes calldata) public view override returns (uint256 finalAmountOut) {
