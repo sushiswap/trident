@@ -505,6 +505,17 @@ describe.only("Concentrated liquidity pool", function () {
       expect(ethReceived.toNumber()).gt(0);
       expect(ethReceived.toNumber()).lt(1000000 / price);
     });
+
+    it("should collect protocol fee", async () => {
+      const token0ProtocolFeeOld = await pool1.token0ProtocolFee();
+      const token1ProtocolFeeOld = await pool1.token1ProtocolFee();
+      await pool1.collectProtocolFee();
+      const token0ProtocolFee = await pool1.token0ProtocolFee();
+      const token1ProtocolFee = await pool1.token1ProtocolFee();
+
+      expect(token0ProtocolFee.eq(1)).to.be.eq(true, "token0 - Protocol Fee reset to 1");
+      expect(token1ProtocolFee.eq(1)).to.be.eq(true, "token1 - Protocol Fee reset to 1");
+    });
   });
 });
 

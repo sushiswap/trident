@@ -43,6 +43,9 @@ contract ConcentratedLiquidityPool is IPool {
     uint256 public feeGrowthGlobal0; /// @dev all fee growth counters are multiplied by 2^128
     uint256 public feeGrowthGlobal1;
 
+    uint128 public token0ProtocolFee;
+    uint128 public token1ProtocolFee;
+
     uint128 public reserve0; /// @dev Bento share balance tracker.
     uint128 public reserve1;
 
@@ -313,17 +316,20 @@ contract ConcentratedLiquidityPool is IPool {
             }
 
             cache.feeAmount = FullMath.mulDivRoundingUp(output, swapFee, 1e6);
-            // @dev Calculate `protocolFee` and convert pips to bips
-            // - stack too deep when trying to store this in a variable
-            // - NB can get optimized after we put things into structs.
-            cache.protocolFee += FullMath.mulDivRoundingUp(cache.feeAmount, masterDeployer.barFee(), 1e4);
 
-            // @dev Updating `feeAmount` based on the protocolFee.
-            cache.feeAmount -= FullMath.mulDivRoundingUp(cache.feeAmount, masterDeployer.barFee(), 1e4);
-
-            cache.feeGrowthGlobal += FullMath.mulDiv(cache.feeAmount, 0x100000000000000000000000000000000, cache.currentLiquidity);
+            cache.totalFeeAmount += cache.feeAmount;
 
             amountOut += output - cache.feeAmount;
+
+            // @dev Calculate `protocolFee` and convert pips to bips
+            uint256 feeDelta = FullMath.mulDivRoundingUp(cache.feeAmount, masterDeployer.barFee(), 1e4);
+
+            cache.protocolFee += feeDelta;
+
+            // @dev Updating `feeAmount` based on the protocolFee.
+            cache.feeAmount -= feeDelta;
+
+            cache.feeGrowthGlobal += FullMath.mulDiv(cache.feeAmount, 0x100000000000000000000000000000000, cache.currentLiquidity);
 
             if (cross) {
                 ticks[cache.nextTickToCross].secondsPerLiquidityOutside =
@@ -367,9 +373,8 @@ contract ConcentratedLiquidityPool is IPool {
             uint128 newBalance = reserve0 + uint128(inAmount);
             require(uint256(newBalance) <= amount0, "TOKEN0_MISSING");
             reserve0 = newBalance;
-            reserve1 -= (uint128(amountOut) + uint128(cache.feeAmount) + uint128(cache.protocolFee));
-            // @dev Transfer fees to bar.
-            _transfer(token1, cache.protocolFee, barFeeTo, false);
+            reserve1 -= (uint128(amountOut) + uint128(cache.totalFeeAmount));
+            token1ProtocolFee += uint128(cache.protocolFee);
             _transfer(token1, amountOut, recipient, unwrapBento);
             emit Swap(recipient, token0, token1, inAmount, amountOut);
         } else {
@@ -377,9 +382,8 @@ contract ConcentratedLiquidityPool is IPool {
             uint128 newBalance = reserve1 + uint128(inAmount);
             require(uint256(newBalance) <= amount1, "TOKEN1_MISSING");
             reserve1 = newBalance;
-            reserve0 -= (uint128(amountOut) + uint128(cache.feeAmount) + uint128(cache.protocolFee));
-            // @dev Transfer fees to bar.
-            _transfer(token0, cache.protocolFee, barFeeTo, false);
+            reserve0 -= (uint128(amountOut) + uint128(cache.totalFeeAmount));
+            token0ProtocolFee += uint128(cache.protocolFee);
             _transfer(token0, amountOut, recipient, unwrapBento);
             emit Swap(recipient, token1, token0, inAmount, amountOut);
         }
@@ -644,6 +648,13 @@ contract ConcentratedLiquidityPool is IPool {
         assets = new address[](2);
         assets[0] = token0;
         assets[1] = token1;
+    }
+
+    function collectProtocolFee() public {
+        _transfer(token0, token0ProtocolFee - 1, barFeeTo, false);
+        _transfer(token1, token1ProtocolFee - 1, barFeeTo, false);
+        token0ProtocolFee = 1;
+        token1ProtocolFee = 1;
     }
 
     function getAmountOut(bytes calldata) public view override returns (uint256 finalAmountOut) {
