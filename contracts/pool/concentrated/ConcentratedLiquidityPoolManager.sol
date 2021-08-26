@@ -2,19 +2,19 @@
 
 pragma solidity >=0.8.0;
 
-import "../../interfaces/IConcentratedLiquidityPool.sol";
 import "../../interfaces/IPool.sol";
+import "../../interfaces/IBentoBoxMinimal.sol";
 import "./TridentNFT.sol";
 
-/// @notice Trident Concentrated Liquidity Pool periphery contract that combines non-fungible position management and staking.
-contract ConcentratedLiquidityPoolManager is TridentNFT {
-    event AddIncentive(IConcentratedLiquidityPool indexed pool, Incentive indexed incentive);
-    event ReclaimIncentive(IConcentratedLiquidityPool indexed pool, uint256 indexed incentiveId);
-    event Subscribe(uint256 indexed positionId, uint256 indexed incentiveId);
-    event ClaimReward(uint256 indexed positionId, uint256 indexed incentiveId, address indexed recipient);
-    event Mint(address indexed pool, bytes mintData);
-    event Burn(IPool indexed pool, bytes burnData, uint256 indexed tokenId);
+interface IConcentratedLiquidityPool is IPool {
+    function feeGrowthGlobal0() external view returns (uint256);
 
+    function rangeSecondsInside(int24 lowerTick, int24 upperTick) external view returns (uint256);
+}
+
+/// @dev combines the nonfungible position manager and the staking contract in one
+contract ConcentratedLiquidityPoolManager is TridentNFT {
+    // TODO add events
     struct Position {
         IConcentratedLiquidityPool pool;
         uint128 liquidity;
@@ -26,90 +26,80 @@ contract ConcentratedLiquidityPoolManager is TridentNFT {
         address owner;
         address token;
         uint256 rewardsUnclaimed;
-        uint160 secondsClaimed; // @dev x128.
+        uint160 secondsClaimed; // x128
         uint32 startTime;
         uint32 endTime;
         uint32 expiry;
     }
 
     struct Stake {
-        uint160 secondsInsideLast; // @dev x128.
-        bool initialized;
-    }
-    /// @dev `ITridentRouter`.
-    struct TokenInput {
-        address token;
-        bool native;
-        uint256 amount;
+        uint160 secondsInsideLast; // x128
+        uint8 initialized;
     }
 
     mapping(IConcentratedLiquidityPool => uint256) public incentiveCount;
+
     mapping(IConcentratedLiquidityPool => mapping(uint256 => Incentive)) public incentives;
+
     mapping(uint256 => Position) public positions;
+
     mapping(uint256 => mapping(uint256 => Stake)) public stakes;
 
-    address public immutable bento;
-    address public immutable wETH;
+    IBentoBoxMinimal public immutable bento;
 
-    constructor(address _bento, address _wETH) {
+    constructor(IBentoBoxMinimal _bento) {
         bento = _bento;
-        wETH = _wETH;
     }
 
     function addIncentive(IConcentratedLiquidityPool pool, Incentive memory incentive) public {
         uint32 current = uint32(block.timestamp);
-        require(current <= incentive.startTime, "ALREADY_STARTED");
-        require(current <= incentive.endTime, "ALREADY_ENDED");
-        require(incentive.startTime < incentive.endTime, "START_PAST_END");
-        require(incentive.endTime + 5 weeks < incentive.expiry, "END_PAST_BUFFER");
-        require(incentive.rewardsUnclaimed != 0, "NO_REWARDS");
+        require(current <= incentive.startTime, "");
+        require(current <= incentive.endTime, "");
+        require(incentive.startTime < incentive.endTime, "");
+        require(incentive.endTime + 5 weeks < incentive.expiry, "");
+        require(incentive.rewardsUnclaimed > 0, "");
         incentives[pool][incentiveCount[pool]++] = incentive;
-        _transfer(incentive.token, msg.sender, address(this), incentive.rewardsUnclaimed, false);
-        emit AddIncentive(pool, incentive);
+        bento.transfer(incentive.token, msg.sender, address(this), incentive.rewardsUnclaimed);
     }
 
-    /// @dev Withdraws any unclaimed incentive rewards.
+    /// @notice Withdraws any uncalimed incentive rewards
     function reclaimIncentive(
         IConcentratedLiquidityPool pool,
         uint256 incentiveId,
         uint256 amount,
-        address receiver,
-        bool unwrapBento
+        address receiver
     ) public {
         Incentive storage incentive = incentives[pool][incentiveId];
-        require(incentive.owner == msg.sender, "NOT_OWNER");
-        require(incentive.expiry < block.timestamp, "EXPIRED");
-        require(incentive.rewardsUnclaimed >= amount, "ALREADY_CLAIMED");
-        _transfer(incentive.token, address(this), receiver, amount, unwrapBento);
-        emit ReclaimIncentive(pool, incentiveId);
+        require(incentive.owner == msg.sender, "");
+        require(incentive.expiry < uint32(block.timestamp), "");
+        require(incentive.rewardsUnclaimed >= amount, "");
+        bento.transfer(incentive.token, address(this), receiver, amount);
     }
 
-    /// @dev Subscribes a non-fungible position token to an incentive.
+    // subscribe an nft position to the incentive
     function subscribe(uint256 positionId, uint256 incentiveId) public {
         Position memory position = positions[positionId];
         IConcentratedLiquidityPool pool = position.pool;
         Incentive memory incentive = incentives[pool][positionId];
         Stake storage stake = stakes[positionId][incentiveId];
-        require(position.liquidity != 0, "INACTIVE");
-        require(stake.secondsInsideLast == 0, "SUBSCRIBED");
-        require(incentiveId <= incentiveCount[pool], "NOT_INCENTIVE");
-        require(block.timestamp > incentive.startTime && block.timestamp < incentive.endTime, "TIMED_OUT");
-        stakes[positionId][incentiveId] = Stake(uint160(pool.rangeSecondsInside(position.lower, position.upper)), true);
-        emit Subscribe(positionId, incentiveId);
+        require(position.liquidity > 0, "!exsists");
+        require(stake.secondsInsideLast == 0, "subscribed");
+        require(incentiveId <= incentiveCount[pool], "!incentive");
+        require(block.timestamp > incentive.startTime && block.timestamp < incentive.endTime, "");
+        stakes[positionId][incentiveId] = Stake(uint160(pool.rangeSecondsInside(position.lower, position.upper)), uint8(1));
     }
 
     function claimReward(
         uint256 positionId,
         uint256 incentiveId,
-        address recipient,
-        bool unwrapBento
+        address recipient
     ) public {
-        require(ownerOf[positionId] == msg.sender, "OWNER");
+        require(ownerOf[positionId] == msg.sender, "");
         Position memory position = positions[positionId];
         IConcentratedLiquidityPool pool = position.pool;
         Incentive storage incentive = incentives[position.pool][positionId];
         Stake storage stake = stakes[positionId][incentiveId];
-        require(stake.initialized, "UNINITIALIZED");
+        require(stake.initialized > 0, "");
         uint256 secondsPerLiquidityInside = pool.rangeSecondsInside(position.lower, position.upper) - stake.secondsInsideLast;
         uint256 secondsInside = secondsPerLiquidityInside * position.liquidity;
         uint256 maxTime = incentive.endTime < block.timestamp ? block.timestamp : incentive.endTime;
@@ -118,8 +108,7 @@ contract ConcentratedLiquidityPoolManager is TridentNFT {
         incentive.rewardsUnclaimed -= rewards;
         incentive.secondsClaimed += uint160(secondsInside);
         stake.secondsInsideLast += uint160(secondsPerLiquidityInside);
-        _transfer(incentive.token, address(this), recipient, rewards, unwrapBento);
-        emit ClaimReward(positionId, incentiveId, recipient);
+        bento.transfer(incentive.token, address(this), recipient, rewards);
     }
 
     function getReward(uint256 positionId, uint256 incentiveId) public view returns (uint256 rewards, uint256 secondsInside) {
@@ -127,7 +116,7 @@ contract ConcentratedLiquidityPoolManager is TridentNFT {
         IConcentratedLiquidityPool pool = position.pool;
         Incentive memory incentive = incentives[pool][positionId];
         Stake memory stake = stakes[positionId][incentiveId];
-        if (stake.initialized) {
+        if (stake.initialized > 0) {
             secondsInside = (pool.rangeSecondsInside(position.lower, position.upper) - stake.secondsInsideLast) * position.liquidity;
             uint256 maxTime = incentive.endTime < block.timestamp ? block.timestamp : incentive.endTime;
             uint256 secondsUnclaimed = (maxTime - incentive.startTime) << (128 - incentive.secondsClaimed);
@@ -135,74 +124,27 @@ contract ConcentratedLiquidityPoolManager is TridentNFT {
         }
     }
 
-    function mint(TokenInput[] memory tokenInput, address pool, bytes memory mintData) public {
+    function mint(IConcentratedLiquidityPool pool, bytes memory mintData) public {
         (, int24 lower, , int24 upper, uint128 amount, address recipient) = abi.decode(
             mintData,
             (int24, int24, int24, int24, uint128, address)
         );
-        for (uint256 i; i < tokenInput.length; i++) {
-            if (tokenInput[i].native) {
-                _depositToBentoBox(tokenInput[i].token, pool, tokenInput[i].amount);
-            } else {
-                _transfer(tokenInput[i].token, msg.sender, pool, tokenInput[i].amount, false);
-            }
-        }
-        IPool(pool).mint(mintData);
-        positions[totalSupply] = Position(IConcentratedLiquidityPool(pool), amount, lower, upper);
-        // @dev Mint Position 'NFT'.
+        pool.mint(mintData);
+        positions[totalSupply] = Position(pool, amount, lower, upper);
+        /// @dev Mint Position NFT.
         _mint(recipient);
-        emit Mint(pool, mintData);
     }
-    
+
     function burn(
         IPool pool,
         bytes memory burnData,
         uint256 tokenId
     ) public {
         pool.burn(burnData);
-        // @dev Burn Position 'NFT'.
+        // @dev Burn Position NFT.
         _burn(tokenId);
-        emit Burn(pool, burnData, tokenId);
     }
 
-    function _depositToBentoBox(
-        address token,
-        address recipient,
-        uint256 amount
-    ) internal {
-        if (token == wETH && address(this).balance != 0) {
-            // @dev toAmount(address,uint256,bool).
-            (, bytes memory _underlyingAmount) = bento.call(abi.encodeWithSelector(0x56623118, wETH, amount, true));
-            uint256 underlyingAmount = abi.decode(_underlyingAmount, (uint256));
-            if (address(this).balance > underlyingAmount) {
-                // @dev Deposit ETH into `recipient` `bento` account -
-                // deposit(address,address,address,uint256,uint256).
-                (bool success0, ) = bento.call{value: underlyingAmount}(abi.encodeWithSelector(0x02b9446c, token, msg.sender, recipient, amount));
-                require(success0, "DEPOSIT_FAILED");
-                return;
-            }
-        }
-        // @dev Deposit ERC-20 token into `recipient` `bento` account
-        // - deposit(address,address,address,uint256,uint256).
-        (bool success1, ) = bento.call(abi.encodeWithSelector(0x02b9446c, token, msg.sender, recipient, amount));
-        require(success1, "DEPOSIT_FAILED");
-    }
-
-    function _transfer(
-        address token,
-        address from,
-        address to,
-        uint256 shares,
-        bool unwrapBento
-    ) internal {
-        if (unwrapBento) {
-            // @dev withdraw(address,address,address,uint256,uint256).
-            (bool success, ) = bento.call(abi.encodeWithSelector(0x97da6d30, token, from, to, 0, shares));
-            require(success, "WITHDRAW_FAILED");
-        } else {
-            // @dev transfer(address,address,address,uint256).
-            (bool success, ) = bento.call(abi.encodeWithSelector(0xf18d03cc, token, from, to, shares));
-            require(success, "TRANSFER_FAILED");
-        }
-    }
+    // TODO transfers the funds
+    function mintCallback() external {}
 }
