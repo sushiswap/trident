@@ -1,23 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 pragma solidity >=0.8.0;
-pragma abicoder v2;
 
+import "../../interfaces/IConcentratedLiquidityPool.sol";
 import "../../libraries/concentratedPool/TickMath.sol";
 
-// todo import interface for this
-interface IConcentratedLiquidityPool {
-    struct Tick {
-        int24 previousTick;
-        int24 nextTick;
-        uint128 liquidity;
-        uint256 feeGrowthOutside0;
-        uint256 feeGrowthOutside1;
-    }
-
-    function ticks(int24 _tick) external view returns (Tick memory tick);
-}
-
+/// @notice Trident Concentrated Liquidity Pool periphery contract to read state.
 contract ConcentratedLiquidityPoolHelper {
     struct SimpleTick {
         int24 index;
@@ -28,7 +16,7 @@ contract ConcentratedLiquidityPoolHelper {
         SimpleTick[] memory ticks = new SimpleTick[](tickCount); // todo save tickCount in the core contract
 
         IConcentratedLiquidityPool.Tick memory tick;
-        uint24 i = 0;
+        uint24 i;
         int24 current = TickMath.MIN_TICK;
 
         while (current != TickMath.MAX_TICK) {
