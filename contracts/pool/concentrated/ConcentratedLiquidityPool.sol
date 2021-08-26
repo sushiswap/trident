@@ -33,6 +33,10 @@ contract ConcentratedLiquidityPool is IPool {
 
     uint256 public feeGrowthGlobal0; // @dev all fee growth counters are multiplied by 2^128
     uint256 public feeGrowthGlobal1;
+    
+    uint256 public barFee;
+    uint128 public token0ProtocolFee;
+    uint128 public token1ProtocolFee;
 
     uint128 public reserve0; // @dev Bento share balance tracker.
     uint128 public reserve1;
@@ -62,6 +66,17 @@ contract ConcentratedLiquidityPool is IPool {
         uint256 feeGrowthInside1Last;
         uint160 secondsPerLiquidityLast; // <- might want to store this in the manager contract only
     }
+    
+    struct SwapCache {
+        uint256 feeAmount;
+        uint256 totalFeeAmount;
+        uint256 protocolFee;
+        uint256 feeGrowthGlobal;
+        uint256 currentPrice;
+        uint256 currentLiquidity;
+        uint256 input;
+        int24 nextTickToCross;
+    }
 
     /*
     univ3 1% -> 200 tickSpacing
@@ -88,6 +103,7 @@ contract ConcentratedLiquidityPool is IPool {
         
         (, bytes memory _bento) = _masterDeployer.staticcall(abi.encodeWithSelector(0x4da31827)); // @dev bento().
         (, bytes memory _barFeeTo) = _masterDeployer.staticcall(abi.encodeWithSelector(0x0c0a0cd2)); // @dev barFeeTo().
+        //(, bytes memory _barFee) = masterDeployer.staticcall(abi.encodeWithSelector(0xc14ad802)); // @dev barFee().
 
         token0 = _token0;
         token1 = _token1;
@@ -99,6 +115,7 @@ contract ConcentratedLiquidityPool is IPool {
         nearestTick = TickMath.MIN_TICK;
         bento = abi.decode(_bento, (address));
         barFeeTo = abi.decode(_barFeeTo, (address));
+        //barFee = abi.decode(_barFee, (uint256));
         masterDeployer = _masterDeployer;
         unlocked = 1;
     }
@@ -194,7 +211,11 @@ contract ConcentratedLiquidityPool is IPool {
         emit Burn(msg.sender, amount0, amount1, recipient);
     }
 
-    function burnSingle(bytes calldata) external override returns (uint256 amountOut) {
+    function burnSingle(bytes calldata data) public override returns (uint256 amountOut) {
+        (int24 lower, int24 upper, uint128 amount, address tokenOut, address recipient, bool unwrapBento) = abi.decode(
+            data,
+            (int24, int24, uint128, address, address, bool)
+        );
         // TODO
         return amountOut;
     }
@@ -213,25 +234,23 @@ contract ConcentratedLiquidityPool is IPool {
 
         emit Collect(msg.sender, amount0fees, amount1fees);
     }
-    
-    struct SwapFeeCache {
-        uint256 protocolFee;
-        uint256 feeAmount;
-        uint256 feeGrowthGlobal;
-    }
 
     /// @dev price is √(y/x)
     /// - x is token0
     /// - zero for one -> price will move down.
     function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
-        (bool zeroForOne, uint256 inAmount, address recipient, bool unwrapBento) = abi.decode(data, (bool, uint256, address, bool));
-        
-        SwapFeeCache memory cache =
-            SwapFeeCache({
-                protocolFee: 0,
-                feeAmount: 0,
-                feeGrowthGlobal: zeroForOne ? feeGrowthGlobal1 : feeGrowthGlobal0 // @dev Take fees in the output token.
-            });
+        (bool zeroForOne, uint256 amountIn, address recipient, bool unwrapBento) = abi.decode(data, (bool, uint256, address, bool));
+
+        SwapCache memory cache = SwapCache({
+            feeAmount: 0,
+            totalFeeAmount: 0,
+            protocolFee: 0,
+            feeGrowthGlobal: zeroForOne ? feeGrowthGlobal1 : feeGrowthGlobal0,
+            currentPrice: uint256(price),
+            currentLiquidity: uint256(liquidity),
+            input: amountIn,
+            nextTickToCross: zeroForOne ? nearestTick : ticks[nearestTick].nextTick
+        });
 
         {
             uint256 timestamp = block.timestamp;
@@ -243,149 +262,97 @@ contract ConcentratedLiquidityPool is IPool {
             }
         }
 
-        {
-            int24 nextTickToCross = zeroForOne ? nearestTick : ticks[nearestTick].nextTick;
-            uint256 currentPrice = uint256(price);
-            uint256 currentLiquidity = uint256(liquidity);
-            uint256 input = inAmount;
+        amountOut = _getAmountOut(amountIn, zeroForOne);
 
-            while (input != 0) {
-                uint256 nextTickPrice = uint256(TickMath.getSqrtRatioAtTick(nextTickToCross));
-                uint256 output;
-                bool cross = false;
-                if (zeroForOne) {
-                    // @dev x for y
-                    // - price is going down
-                    // - max swap input within current tick range: Δx = Δ(1/√𝑃) · L.
-                    uint256 maxDx = DyDxMath.getDx(currentLiquidity, nextTickPrice, currentPrice, false);
-                    if (input <= maxDx) {
-                        // @dev We can swap only within the current range.
-                        uint256 liquidityPadded = currentLiquidity << 96;
-                        // @dev Calculate new price after swap: L · √𝑃 / (L + Δx · √𝑃)
-                        // - alternatively: L / (L / √𝑃 + Δx).
-                        uint256 newPrice = uint256(
-                            FullMath.mulDivRoundingUp(liquidityPadded, currentPrice, liquidityPadded + currentPrice * input)
-                        );
+        int24 newNearestTick = zeroForOne ? cache.nextTickToCross : ticks[cache.nextTickToCross].previousTick;
 
-                        if (!(nextTickPrice <= newPrice && newPrice < currentPrice)) {
-                            // @dev Overflow -> use a modified version of the formula.
-                            newPrice = uint160(UnsafeMath.divRoundingUp(liquidityPadded, liquidityPadded / currentPrice + input));
-                        }
-                        // @dev Calculate output of swap
-                        // - Δy = Δ√P · L.
-                        output = DyDxMath.getDy(currentLiquidity, newPrice, currentPrice, false);
-                        currentPrice = newPrice;
-                        input = 0;
-                    } else {
-                        // @dev Swap & cross the tick.
-                        output = DyDxMath.getDy(currentLiquidity, nextTickPrice, currentPrice, false);
-                        currentPrice = nextTickPrice;
-                        cross = true;
-                        input -= maxDx;
-                    }
-                } else {
-                    // @dev Price is going up
-                    // - max swap within current tick range: Δy = Δ√P · L.
-                    uint256 maxDy = DyDxMath.getDy(currentLiquidity, currentPrice, nextTickPrice, false);
-                    if (input <= maxDy) {
-                        // @dev We can swap only within the current range
-                        // - calculate new price after swap ( ΔP = Δy/L ).
-                        uint256 newPrice = currentPrice + FullMath.mulDiv(input, 0x1000000000000000000000000, currentLiquidity);
-                        // @dev Calculate output of swap
-                        // - Δx = Δ(1/√P) · L.
-                        output = DyDxMath.getDx(currentLiquidity, currentPrice, newPrice, false);
-                        currentPrice = newPrice;
-                        input = 0;
-                    } else {
-                        // @dev Swap & cross the tick.
-                        output = DyDxMath.getDx(currentLiquidity, currentPrice, nextTickPrice, false);
-                        currentPrice = nextTickPrice;
-                        cross = true;
-                        input -= maxDy;
-                    }
-                }
-
-                cache.feeAmount = FullMath.mulDivRoundingUp(output, swapFee, 1e6);
-                
-                (, bytes memory _barFee) = masterDeployer.staticcall(abi.encodeWithSelector(0xc14ad802)); // @dev barFee().
-                uint256 barFee = abi.decode(_barFee, (uint256));
-
-                // @dev Calculate `protocolFee` and convert pips to bips
-                // - stack too deep when trying to store this in a variable
-                // - NB can get optimized after we put things into structs.
-                cache.protocolFee += FullMath.mulDivRoundingUp(cache.feeAmount, barFee, 1e4);
-
-                // @dev Updating `feeAmount` based on the protocolFee.
-                cache.feeAmount -= FullMath.mulDivRoundingUp(cache.feeAmount, barFee, 1e4);
-
-                cache.feeGrowthGlobal += FullMath.mulDiv(cache.feeAmount, 0x100000000000000000000000000000000, currentLiquidity);
-
-                amountOut += output - cache.feeAmount;
-
-                if (cross) {
-                    ticks[nextTickToCross].secondsPerLiquidityOutside =
-                        secondsPerLiquidity -
-                        ticks[nextTickToCross].secondsPerLiquidityOutside;
-                    if (zeroForOne) {
-                        // Going left.
-                        if (nextTickToCross % 2 == 0) {
-                            currentLiquidity -= ticks[nextTickToCross].liquidity;
-                        } else {
-                            currentLiquidity += ticks[nextTickToCross].liquidity;
-                        }
-                        nextTickToCross = ticks[nextTickToCross].previousTick;
-                        ticks[nextTickToCross].feeGrowthOutside0 = cache.feeGrowthGlobal - ticks[nextTickToCross].feeGrowthOutside0;
-                    } else {
-                        // Going right.
-                        if (nextTickToCross % 2 == 0) {
-                            currentLiquidity += ticks[nextTickToCross].liquidity;
-                        } else {
-                            currentLiquidity -= ticks[nextTickToCross].liquidity;
-                        }
-                        nextTickToCross = ticks[nextTickToCross].nextTick;
-                        ticks[nextTickToCross].feeGrowthOutside1 = cache.feeGrowthGlobal - ticks[nextTickToCross].feeGrowthOutside1;
-                    }
-                }
-            }
-
-            price = uint160(currentPrice);
-
-            int24 newNearestTick = zeroForOne ? nextTickToCross : ticks[nextTickToCross].previousTick;
-
-            if (nearestTick != newNearestTick) {
-                nearestTick = newNearestTick;
-                liquidity = uint128(currentLiquidity);
-            }
+        if (nearestTick != newNearestTick) {
+            nearestTick = newNearestTick;
+            liquidity = uint128(cache.currentLiquidity);
         }
 
         (uint256 amount0, uint256 amount1) = _balance();
 
         if (zeroForOne) {
             feeGrowthGlobal0 += cache.feeGrowthGlobal;
-            uint128 newBalance = reserve0 + uint128(inAmount);
+            uint128 newBalance = reserve0 + uint128(amountIn);
             require(uint256(newBalance) <= amount0, "TOKEN0_MISSING");
             reserve0 = newBalance;
-            reserve1 -= (uint128(amountOut) + uint128(cache.feeAmount) + uint128(cache.protocolFee));
-            // @dev Transfer fees to bar.
-            _transfer(token1, cache.protocolFee, barFeeTo, false);
+            reserve1 -= (uint128(amountOut) + uint128(cache.totalFeeAmount));
+            token1ProtocolFee += uint128(cache.protocolFee);
             _transfer(token1, amountOut, recipient, unwrapBento);
-            emit Swap(recipient, token0, token1, inAmount, amountOut);
+            emit Swap(recipient, token0, token1, amountIn, amountOut);
         } else {
             feeGrowthGlobal0 += cache.feeGrowthGlobal;
-            uint128 newBalance = reserve1 + uint128(inAmount);
+            uint128 newBalance = reserve1 + uint128(amountIn);
             require(uint256(newBalance) <= amount1, "TOKEN1_MISSING");
             reserve1 = newBalance;
-            reserve0 -= (uint128(amountOut) + uint128(cache.feeAmount) + uint128(cache.protocolFee));
-            // @dev Transfer fees to bar.
-            _transfer(token0, cache.protocolFee, barFeeTo, false);
+            reserve0 -= (uint128(amountOut) + uint128(cache.totalFeeAmount));
+            token0ProtocolFee += uint128(cache.protocolFee);
             _transfer(token0, amountOut, recipient, unwrapBento);
-            emit Swap(recipient, token1, token0, inAmount, amountOut);
+            emit Swap(recipient, token1, token0, amountIn, amountOut);
         }
     }
+    
+    function flashSwap(bytes calldata data) public override returns (uint256 amountOut) {
+        (bool zeroForOne, uint256 amountIn, address recipient, bool unwrapBento, bytes memory context) = abi.decode(
+            data, 
+            (bool, uint256, address, bool, bytes)
+        );
+        
+        SwapCache memory cache = SwapCache({
+            feeAmount: 0,
+            totalFeeAmount: 0,
+            protocolFee: 0,
+            feeGrowthGlobal: zeroForOne ? feeGrowthGlobal1 : feeGrowthGlobal0,
+            currentPrice: uint256(price),
+            currentLiquidity: uint256(liquidity),
+            input: amountIn,
+            nextTickToCross: zeroForOne ? nearestTick : ticks[nearestTick].nextTick
+        });
 
-    function flashSwap(bytes calldata) external override returns (uint256 finalAmountOut) {
-        // TODO
-        return finalAmountOut;
+        {
+            uint256 timestamp = block.timestamp;
+            uint256 diff = timestamp - uint256(lastObservation); // gonna overflow in 2106 🤔
+            if (diff != 0 && liquidity != 0) {
+                // univ3 does max(liquidity, 1) 🤔
+                lastObservation = uint32(timestamp);
+                secondsPerLiquidity += uint160((diff << 128) / liquidity);
+            }
+        }
+
+        amountOut = _getAmountOut(amountIn, zeroForOne);
+
+        int24 newNearestTick = zeroForOne ? cache.nextTickToCross : ticks[cache.nextTickToCross].previousTick;
+
+        if (nearestTick != newNearestTick) {
+            nearestTick = newNearestTick;
+            liquidity = uint128(cache.currentLiquidity);
+        }
+
+        (uint256 amount0, uint256 amount1) = _balance();
+
+        if (zeroForOne) {
+            feeGrowthGlobal0 += cache.feeGrowthGlobal;
+            uint128 newBalance = reserve0 + uint128(amountIn);
+            require(uint256(newBalance) <= amount0, "TOKEN0_MISSING");
+            reserve0 = newBalance;
+            reserve1 -= (uint128(amountOut) + uint128(cache.totalFeeAmount));
+            token1ProtocolFee += uint128(cache.protocolFee);
+            _transfer(token1, amountOut, recipient, unwrapBento);
+            ITridentCallee(msg.sender).tridentSwapCallback(context);
+            emit Swap(recipient, token0, token1, amountIn, amountOut);
+        } else {
+            feeGrowthGlobal0 += cache.feeGrowthGlobal;
+            uint128 newBalance = reserve1 + uint128(amountIn);
+            require(uint256(newBalance) <= amount1, "TOKEN1_MISSING");
+            reserve1 = newBalance;
+            reserve0 -= (uint128(amountOut) + uint128(cache.totalFeeAmount));
+            token0ProtocolFee += uint128(cache.protocolFee);
+            _transfer(token0, amountOut, recipient, unwrapBento);
+            ITridentCallee(msg.sender).tridentSwapCallback(context);
+            emit Swap(recipient, token1, token0, amountIn, amountOut);
+        }
     }
 
     function _balance() internal view returns (uint256 balance0, uint256 balance1) {
@@ -412,6 +379,123 @@ contract ConcentratedLiquidityPool is IPool {
             (bool success, ) = bento.call(abi.encodeWithSelector(0xf18d03cc, token, address(this), to, shares));
             require(success, "TRANSFER_FAILED");
         }
+    }
+    
+    function _getAmountOut(
+        uint256 amountIn,
+        bool zeroForOne
+    ) internal returns (uint256 amountOut) {
+        SwapCache memory cache = SwapCache({
+            feeAmount: 0,
+            totalFeeAmount: 0,
+            protocolFee: 0,
+            feeGrowthGlobal: zeroForOne ? feeGrowthGlobal1 : feeGrowthGlobal0,
+            currentPrice: uint256(price),
+            currentLiquidity: uint256(liquidity),
+            input: amountIn,
+            nextTickToCross: zeroForOne ? nearestTick : ticks[nearestTick].nextTick
+        });
+        
+        while (cache.input != 0) {
+            uint256 nextTickPrice = uint256(TickMath.getSqrtRatioAtTick(cache.nextTickToCross));
+            uint256 output; // @dev '= 0'.
+            bool cross; // @dev '= false'.
+            if (zeroForOne) {
+                // @dev x for y
+                // - price is going down
+                // - max swap input within current tick range: Δx = Δ(1/√𝑃) · L.
+                uint256 maxDx = DyDxMath.getDx(cache.currentLiquidity, nextTickPrice, cache.currentPrice, false);
+                if (cache.input <= maxDx) {
+                    // @dev We can swap only within the current range.
+                    uint256 liquidityPadded = cache.currentLiquidity << 96;
+                    /// @dev Calculate new price after swap: L · √𝑃 / (L + Δx · √𝑃)
+                    // alternatively: L / (L / √𝑃 + Δx).
+                    uint256 newPrice = uint256(
+                        FullMath.mulDivRoundingUp(liquidityPadded, cache.currentPrice, liquidityPadded + cache.currentPrice * cache.input)
+                    );
+
+                    if (!(nextTickPrice <= newPrice && newPrice < cache.currentPrice)) {
+                        // @dev Overflow -> use a modified version of the formula.
+                        newPrice = uint160(UnsafeMath.divRoundingUp(liquidityPadded, liquidityPadded / cache.currentPrice + cache.input));
+                    }
+                    // @dev Calculate output of swap.
+                    // - Δy = Δ√P · L.
+                    output = DyDxMath.getDy(cache.currentLiquidity, newPrice, cache.currentPrice, false);
+                    cache.currentPrice = newPrice;
+                    cache.input; // @dev '= 0'.
+                } else {
+                    // @dev Swap & cross the tick.
+                    output = DyDxMath.getDy(cache.currentLiquidity, nextTickPrice, cache.currentPrice, false);
+                    cache.currentPrice = nextTickPrice;
+                    cross = true;
+                    cache.input -= maxDx;
+                }
+            } else {
+                // @dev Price is going up
+                // - max swap within current tick range: Δy = Δ√P · L.
+                uint256 maxDy = DyDxMath.getDy(cache.currentLiquidity, cache.currentPrice, nextTickPrice, false);
+                if (cache.input <= maxDy) {
+                    // @dev We can swap only within the current range
+                    // - calculate new price after swap ( ΔP = Δy/L ).
+                    uint256 newPrice = cache.currentPrice +
+                        FullMath.mulDiv(cache.input, 0x1000000000000000000000000, cache.currentLiquidity);
+                    // @dev Calculate output of swap
+                    // - Δx = Δ(1/√P) · L.
+                    output = DyDxMath.getDx(cache.currentLiquidity, cache.currentPrice, newPrice, false);
+                    cache.currentPrice = newPrice;
+                    cache.input; // @dev '= 0'.
+                } else {
+                    // @dev Swap & cross the tick.
+                    output = DyDxMath.getDx(cache.currentLiquidity, cache.currentPrice, nextTickPrice, false);
+                    cache.currentPrice = nextTickPrice;
+                    cross = true;
+                    cache.input -= maxDy;
+                }
+            }
+
+            cache.feeAmount = FullMath.mulDivRoundingUp(output, swapFee, 1e6);
+
+            cache.totalFeeAmount += cache.feeAmount;
+
+            amountOut += output - cache.feeAmount;
+
+            // @dev Calculate `protocolFee` and convert pips to bips
+            uint256 feeDelta = FullMath.mulDivRoundingUp(cache.feeAmount, barFee, 1e4);
+
+            cache.protocolFee += feeDelta;
+
+            // @dev Updating `feeAmount` based on the protocolFee.
+            cache.feeAmount -= feeDelta;
+
+            cache.feeGrowthGlobal += FullMath.mulDiv(cache.feeAmount, 0x100000000000000000000000000000000, cache.currentLiquidity);
+
+            if (cross) {
+                ticks[cache.nextTickToCross].secondsPerLiquidityOutside =
+                    secondsPerLiquidity -
+                    ticks[cache.nextTickToCross].secondsPerLiquidityOutside;
+                if (zeroForOne) {
+                    // Going left.
+                    if (cache.nextTickToCross % 2 == 0) {
+                        cache.currentLiquidity -= ticks[cache.nextTickToCross].liquidity;
+                    } else {
+                        cache.currentLiquidity += ticks[cache.nextTickToCross].liquidity;
+                    }
+                    cache.nextTickToCross = ticks[cache.nextTickToCross].previousTick;
+                    ticks[cache.nextTickToCross].feeGrowthOutside0 = cache.feeGrowthGlobal - ticks[cache.nextTickToCross].feeGrowthOutside0;
+                } else {
+                    // Going right.
+                    if (cache.nextTickToCross % 2 == 0) {
+                        cache.currentLiquidity += ticks[cache.nextTickToCross].liquidity;
+                    } else {
+                        cache.currentLiquidity -= ticks[cache.nextTickToCross].liquidity;
+                    }
+                    cache.nextTickToCross = ticks[cache.nextTickToCross].nextTick;
+                    ticks[cache.nextTickToCross].feeGrowthOutside1 = cache.feeGrowthGlobal - ticks[cache.nextTickToCross].feeGrowthOutside1;
+                }
+            }
+        }
+
+        price = uint160(cache.currentPrice);
     }
 
     function _getAmountsForLiquidity(
@@ -645,5 +729,17 @@ contract ConcentratedLiquidityPool is IPool {
     function getAmountOut(bytes calldata) public view override returns (uint256 finalAmountOut) {
         // TODO
         return finalAmountOut;
+    }
+    
+    function collectProtocolFee() public {
+        _transfer(token0, token0ProtocolFee - 1, barFeeTo, false);
+        _transfer(token1, token1ProtocolFee - 1, barFeeTo, false);
+        token0ProtocolFee = 1;
+        token1ProtocolFee = 1;
+    }
+    
+    function updateBarFee() public {
+        (, bytes memory _barFee) = masterDeployer.staticcall(abi.encodeWithSelector(0xc14ad802)); // @dev barFee().
+        barFee = abi.decode(_barFee, (uint256));
     }
 }
