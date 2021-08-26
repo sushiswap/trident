@@ -295,7 +295,7 @@ describe.only("Concentrated liquidity pool", function () {
       );
 
       const output = await (await pool0.swap(swapData)).wait();
-      const data = output.logs[2].data;
+      const data = output.logs[1].data;
       const _in = BigNumber.from(data.substring(0, 66));
       // const _out = BigNumber.from("0x" + data.substring(66, 130));
       expect(_in).to.be.eq(dx);

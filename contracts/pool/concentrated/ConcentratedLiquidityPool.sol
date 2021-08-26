@@ -252,9 +252,8 @@ contract ConcentratedLiquidityPool is IPool {
 
         {
             uint256 timestamp = block.timestamp;
-            uint256 diff = timestamp - uint256(lastObservation); // gonna overflow in 2106 🤔
+            uint256 diff = timestamp - uint256(lastObservation); // underflow in 2106
             if (diff > 0 && liquidity > 0) {
-                // univ3 does max(liquidity, 1) 🤔
                 lastObservation = uint32(timestamp);
                 secondsPerLiquidity += uint160((diff << 128) / liquidity);
             }
