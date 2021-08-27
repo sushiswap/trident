@@ -2,8 +2,6 @@
 
 pragma solidity >=0.8.0;
 
-import "./ConstantProductPool.sol";
-
 /// @notice Trident exchange pool deployer for whitelisted pair template factories.
 /// @author Mudit Gupta.
 contract PairPoolDeployer {

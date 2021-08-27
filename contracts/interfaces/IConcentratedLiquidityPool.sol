@@ -2,8 +2,10 @@
 
 pragma solidity >=0.8.0;
 
+import "./IPool.sol";
+
 /// @notice Trident Concentrated Liquidity Pool interface.
-interface IConcentratedLiquidityPool {
+interface IConcentratedLiquidityPool is IPool {
     struct Tick {
         int24 previousTick;
         int24 nextTick;
