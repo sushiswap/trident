@@ -21,10 +21,10 @@ perl -0777 -i -pe 's/\) public payable allowed\(from\)/\) public virtual payable
 perl -0777 -i -pe 's/\) public allowed\(from\) returns/\) public virtual allowed\(from\) returns/g' contracts/flat/BentoBoxV1Flat.sol
 
 ##################################################
-#                 TridentBatcher                 #
+#                  TridentHelper                 #
 ##################################################
 # virtualizing batch function
-perl -0777 -i -pe 's/function batch\(bytes\[\] calldata data\) external/function batch\(bytes\[\] calldata data\) external virtual/g' contracts/utils/TridentBatcher.sol
+perl -0777 -i -pe 's/function batch\(bytes\[\] calldata data\) external/function batch\(bytes\[\] calldata data\) external virtual/g' contracts/utils/TridentHelper.sol
 
 ##################################################
 #                   TridentRouter                #
@@ -42,7 +42,6 @@ perl -0777 -i -pe 's/        external\n        payable/        public\n        v
 # external checkDeadline -> public virtual checkDeadline
 perl -0777 -i -pe 's/external checkDeadline/public virtual checkDeadline/g' contracts/TridentRouter.sol
 
-
 # virtualize 
 # ) external { -> ) public virtual {
 perl -0777 -i -pe 's/\) external \{/\) public virtual \{/g' contracts/TridentRouter.sol
@@ -57,16 +56,40 @@ perl -0777 -i -pe 's/calldata/memory/g' contracts/TridentRouter.sol
 ##################################################
 #               ConstantProductPool              #
 ##################################################
-# remove hardhat console
-perl -0777 -i -pe 's/import \"hardhat/\/\/ import \"hardhat/g' contracts/pool/ConstantProductPool.sol
-
-# add import for Simplifications and Simplifications object in ConstantProductPool
-perl -0777 -i -pe 's/import \"..\/deployer\/MasterDeployer.sol\";/import \"..\/deployer\/MasterDeployer.sol\";\nimport \"..\/..\/spec\/harness\/Simplifications.sol\";/g' contracts/pool/ConstantProductPool.sol
+# add import for Simplifications, IBentoBoxMinimal, and Simplifications object in ConstantProductPool
+perl -0777 -i -pe 's/import \"..\/deployer\/MasterDeployer.sol\";/import \"..\/deployer\/MasterDeployer.sol\";\nimport \"..\/..\/spec\/harness\/Simplifications.sol\";\nimport \"..\/interfaces\/IBentoBoxMinimal.sol\";/g' contracts/pool/ConstantProductPool.sol
 perl -0777 -i -pe 's/address public immutable barFeeTo;/address public immutable barFeeTo;\n    Simplifications public simplified;/g' contracts/pool/ConstantProductPool.sol
+
+# BentoBox and MasterDeployer object
+perl -0777 -i -pe 's/address public immutable bento;/IBentoBoxMinimal public immutable bento;/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/address public immutable masterDeployer;/MasterDeployer public immutable masterDeployer;/g' contracts/pool/ConstantProductPool.sol
+
+perl -0777 -i -pe 's/\(, bytes memory _bento\)/\/\/ \(, bytes memory _bento\)/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/\(, bytes memory _barFeeTo\)/\/\/ \(, bytes memory _barFeeTo\)/g' contracts/pool/ConstantProductPool.sol
+
+perl -0777 -i -pe 's/bento = abi.decode\(_bento, \(address\)\);/bento = IBentoBoxMinimal\(MasterDeployer\(_masterDeployer\).bento\(\)\);/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/barFeeTo = abi.decode\(_barFeeTo, \(address\)\);/barFeeTo = MasterDeployer\(_masterDeployer\).barFeeTo\(\);/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/masterDeployer = _masterDeployer;/masterDeployer = MasterDeployer\(_masterDeployer\);/g' contracts/pool/ConstantProductPool.sol
+
+perl -0777 -i -pe 's/address migrator = MasterDeployer\masterDeployer\).migrator\(\);/address migrator = masterDeployer.migrator\(\);/g' contracts/pool/ConstantProductPool.sol
+
+perl -0777 -i -pe 's/\(, bytes memory _balance0\)/\/\/ \(, bytes memory _balance0\)/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/\(, bytes memory _balance1\)/\/\/ \(, bytes memory _balance1\)/g' contracts/pool/ConstantProductPool.sol
+
+perl -0777 -i -pe 's/balance0 = abi.decode\(_balance0, \(uint256\)\);/balance0 = bento.balanceOf\(token0, address\(this\)\);/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/balance1 = abi.decode\(_balance1, \(uint256\)\);/balance1 = bento.balanceOf\(token1, address\(this\)\);/g' contracts/pool/ConstantProductPool.sol
+
+perl -0777 -i -pe 's/\(, bytes memory _barFee\)/\/\/ \(, bytes memory _barFee\)/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/uint256 barFee = abi.decode\(_barFee, \(uint256\)\);/uint256 barFee = MasterDeployer\(masterDeployer\).barFee\(\);/g' contracts/pool/ConstantProductPool.sol
+
+perl -0777 -i -pe 's/require\(success, \"WITHDRAW_FAILED\"\);/\/\/ require\(success, \"WITHDRAW_FAILED\"\);/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/require\(success, \"TRANSFER_FAILED\"\);/\/\/ require\(success, \"TRANSFER_FAILED\"\);/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/\(bool success, \) = bento.call\(abi.encodeWithSelector\(0x97da6d30, token, address\(this\), to, 0, shares\)\);/bento.withdraw\(token, address\(this\), to, 0, shares\);/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/\(bool success, \) = bento.call\(abi.encodeWithSelector\(0xf18d03cc, token, address\(this\), to, shares\)\);/bento.transfer\(token, address\(this\), to, shares\);/g' contracts/pool/ConstantProductPool.sol
 
 # simplifying sqrt TridentMath.sqrt(balance0 * balance1) in ConstantProductPool
 perl -0777 -i -pe 's/contract ConstantProductPool is IPool, TridentERC20/contract ConstantProductPool is IPool, TridentERC20, Simplifications/g' contracts/pool/ConstantProductPool.sol
-perl -0777 -i -pe 's/TridentMath.sqrt\(/sqrt\(/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/TridentMath.sqrt\(/simplified.sqrt\(/g' contracts/pool/ConstantProductPool.sol
 
 # _balance: internal -> public
 perl -0777 -i -pe 's/_balance\(\) internal view/_balance\(\) public view/g' contracts/pool/ConstantProductPool.sol

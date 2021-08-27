@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract ConstantProductPoolHarness is ConstantProductPool {
     // state variables ///////////
     // mapping(uint256 => mapping(uint256 => mapping(uint256 => uint256))) public amountOutHarness;
+    address public otherHarness;
 
     // constructor ///////////////
     constructor(bytes memory _deployData, address _masterDeployer)
@@ -58,6 +59,17 @@ contract ConstantProductPoolHarness is ConstantProductPool {
 
         // require(tokenIn == token0, "wrong token");
         // require(tokenOut == token1, "wrong token");
+
+        bytes memory data = abi.encode(tokenIn, recipient,  unwrapBento, amountIn, context);
+
+        return super.flashSwap(data);
+    }
+
+    // for noChangeToOthersBalances
+    function flashSwapWithConditions(address tokenIn, address recipient, bool unwrapBento,
+                                     uint256 amountIn, bytes memory context)
+            public returns (uint256 amountOut) {
+        require(otherHarness != recipient, "recepient is other");
 
         bytes memory data = abi.encode(tokenIn, recipient,  unwrapBento, amountIn, context);
 

@@ -24,8 +24,12 @@ methods {
     token1() returns (address) envfree
     reserve0() returns (uint112) envfree
     reserve1() returns (uint112) envfree
+    otherHarness() returns (address) envfree // for noChangeToOthersBalances
+
+    // ConstantProductPool constants
     MAX_FEE() returns (uint256) envfree
     MAX_FEE_MINUS_SWAP_FEE() returns (uint256) envfree
+    barFeeTo() returns (address) envfree
 
     // ConstantProductPool functions
     _balance() returns (uint256 balance0, uint256 balance1) envfree
@@ -34,14 +38,13 @@ methods {
     getAmountOutWrapper(address tokenIn, uint256 amountIn) returns (uint256) envfree
     balanceOf(address) returns (uint256) envfree
 
-    // TODO: not working
-    // TridentERC20 (permit)
+    // TridentERC20 (permit method)
     ecrecover(bytes32 digest, uint8 v, bytes32 r, bytes32 s) 
-              returns (address) => NONDET
+              returns (address) => NONDET // TODO: check with Nurit
 
-    // ConstantProductPool (swap, swapWithContext) -> ITridentCallee (tridentCallback)
-    tridentCallback(address tokenIn, address tokenOut, uint256 amountIn,
-                    uint256 amountOut, bytes data) => NONDET
+    // ITridentCallee
+    tridentSwapCallback(bytes) => NONDET // TODO: check with Nurit
+    tridentMintCallback(bytes) => NONDET // TODO: check with Nurit
 
     // simplification of sqrt
     sqrt(uint256 x) returns (uint256) => DISPATCHER(true) UNRESOLVED
@@ -55,8 +58,12 @@ methods {
     balanceOf(address account) returns (uint256) => DISPATCHER(true) UNRESOLVED
     tokenBalanceOf(address token, address user) returns (uint256 balance) envfree 
 
-    // MasterDeployer(masterDeployer).barFee()
-    barFee() => NONDET
+    // MasterDeployer
+    barFee() => CONSTANT // TODO: check with Nurit
+    migrator() => NONDET // TODO: check with Nurit
+
+    // IMigrator
+    desiredLiquidity() => NONDET // TODO: check with Nurit
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -196,10 +203,14 @@ rule afterOpBalanceEqualsReserve(method f) {
 
 // Passing
 // Mudit: check require again, should pass without it
+// TRIED: doesn't
 rule mintingNotPossibleForBalancedPool() {
     env e;
 
-    require totalSupply() > 0 || (reserve0() == 0 || reserve1() == 0); // REVIEW: failing without this
+    // REVIEW: not pssing wih this
+    require totalSupply() > 0 || (reserve0() == 0 && reserve1() == 0);
+
+    // require totalSupply() > 0; // REVIEW: failing without this
 
     validState(true);
 
@@ -213,6 +224,7 @@ rule mintingNotPossibleForBalancedPool() {
 // to actual variables to make the msg.sender the same)
 // TODO: if works, add another rule that checks that burn gives the money to the correct person
 // Mudit: can fail due to rounding error (-1 for the after liquidities)
+// TRIED: still times out
 // rule inverseOfMintAndBurn() {
 //     env e;
 
@@ -320,6 +332,9 @@ rule noChangeToOthersBalances(method f) {
     require other != currentContract && e.msg.sender != other &&
             to != other && recipient != other;
     require other != bentoBox;
+    require other != barFeeTo();
+
+    require otherHarness() == other; 
 
     // recording other's mirin balance
     uint256 _otherMirinBalance = balanceOf(other);
@@ -343,9 +358,10 @@ rule noChangeToOthersBalances(method f) {
         burnSingleWrapper(e, tokenOut, to, unwrapBento);
     } else if (f.selector == swapWrapper(address, address, bool).selector) {
         swapWrapper(e, tokenIn, recipient, unwrapBento);
-    }  else if (f.selector == flashSwapWrapper(address, address, bool, uint256, bytes).selector) {
+    }  else if (f.selector == flashSwapWrapper(address, address, bool, uint256, bytes).selector ||
+                f.selector == flashSwapWithConditions(address, address, bool, uint256, bytes).selector) {
         calldataarg args;
-        flashSwapWrapper(e, args); // TODO: since it uses bytes, limit recepient in the wrapper
+        flashSwapWithConditions(e, args);
     } else if (f.selector == transfer(address, uint256).selector) {
         uint256 amount;
         transfer(e, recipient, amount);
@@ -506,7 +522,6 @@ rule sameUnderlyingRatioLiquidity(method f) filtered { f ->
 //     assert(singleAmountOut >= multiAmountOut1 + multiAmountOut2, "multiple swaps better than one single swap");
 // }
 
-// TODO: add same rule as multiSwapLessThanSingleSwap but using getAmountOut
 // Mudit: singleAmountOut == multiAmountOut1 + multiAmountOut2
 rule multiLessThanSingleAmountOut() {
     env e;
@@ -664,10 +679,12 @@ rule maxAmountOut(uint256 _reserve0, uint256 _reserve1) {
     // mathint maxValue = to_mathint(amountIn) * to_mathint(_reserve1) / to_mathint(_reserve0);
     // assert amountOut <= maxValue;
 
-    assert amountOut <= _reserve1; // Mudit: needs to be strictly less than
+    // Mudit: needs to be strictly less than
+    // TRIED: works!!!!
+    assert amountOut < _reserve1; 
 }
 
-// Passing (need to check)
+// Passing (need to review)
 rule nonZeroMint() {
     env e;
     address to;
