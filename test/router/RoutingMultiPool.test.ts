@@ -9,11 +9,30 @@ import {
 import * as sdk from "@sushiswap/sdk";
 import seedrandom from "seedrandom";
 import { ConstantProductPool } from "@sushiswap/sdk";
+import { string } from "hardhat/internal/core/params/argumentTypes";
 
 const testSeed = "7";
 const rnd = seedrandom(testSeed);
 
 const ERC20DeployAmount = getBigNumber("1000000000000000000");
+
+interface SwapParams {
+  tokenIn: string;
+  recipient: string;
+  unwrapBento: string;
+}
+
+interface Path {
+  pool: string;
+  data: string;
+}
+interface ExactInputParams {
+  tokenIn: string;
+  tokenOut: string;
+  amountIn: BigNumber;
+  amountOutMinimum: BigNumber;
+  path: Path[];
+}
 
 interface HybridPoolParams {
   A: number;
@@ -202,13 +221,38 @@ describe("MultiPool Routing Tests", function () {
       t1.address,
       alice.address
     );
-    // let inputParams  ??
-    // const tx = await router.connect(alice). what router function to call??
+
+    //  -- ROUTER PARAMS --
+    let paths: Path[] = [
+      {
+        pool: hybridPool.address,
+        data: ethers.utils.defaultAbiCoder.encode(
+          ["address", "address", "bool"],
+          [t0.address, alice.address, false]
+        ),
+      },
+      {
+        pool: cpPool.address,
+        data: ethers.utils.defaultAbiCoder.encode(
+          ["address", "address", "bool"],
+          [t0.address, alice.address, false]
+        ),
+      },
+    ];
+    let inputParams: ExactInputParams = {
+      tokenIn: t0.address,
+      tokenOut: t1.address,
+      amountIn: swapExpBN,
+      amountOutMinimum: getBigNumber(0),
+      path: paths,
+    };
+
+    // execute transaction
+    const tx = await router.connect(alice).exactInput(inputParams);
     let balanceAfter: BigNumber = await bento.balanceOf(
       t1.address,
       alice.address
     );
-
     const amountOutPoolBN = balanceAfter.sub(balanceBefore);
 
     // const amountOutPrediction = sdk. where is find router multi??
@@ -232,6 +276,8 @@ describe("MultiPool Routing Tests", function () {
 
     const [[hybridPool, hybridPoolInfo], [cpPool, cpPoolInfo]] =
       await MakePools(hybridParams, cpParams);
+
+    // normal values
     await checkSwaps(
       [usdc, usdt],
       [17, 2, 23],
