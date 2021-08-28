@@ -5,6 +5,10 @@ import {
   areCloseValues,
   getBigNumber,
   getIntegerRandomValue,
+  HybridPoolParams,
+  ConstantProductPoolParams,
+  Path,
+  ExactInputParams,
 } from "../utilities";
 import {
   createConstantProductPool,
@@ -12,62 +16,26 @@ import {
 } from "../utilities/pools";
 import * as sdk from "@sushiswap/sdk";
 import seedrandom from "seedrandom";
-import { ConstantProductPool } from "@sushiswap/sdk";
-import { string } from "hardhat/internal/core/params/argumentTypes";
-import { expect } from "chai";
 
 const testSeed = "7";
 const rnd = seedrandom(testSeed);
 
 const ERC20DeployAmount = getBigNumber("1000000000000000000");
 
-interface SwapParams {
-  tokenIn: string;
-  recipient: string;
-  unwrapBento: string;
-}
-
-interface Path {
-  pool: string;
-  data: string;
-}
-interface ExactInputParams {
-  tokenIn: string;
-  tokenOut: string;
-  amountIn: BigNumber;
-  amountOutMinimum: BigNumber;
-  path: Path[];
-}
-
-interface HybridPoolParams {
-  A: number;
-  fee: number;
-  reserve0Exponent: number;
-  reserve1Exponent: number;
-  minLiquidity: number;
-}
-
-interface ConstProdParams {
-  fee: number;
-  reserve0Exponent: number;
-  reserve1Exponent: number;
-  minLiquidity: number;
-}
-
 describe("MultiPool Routing Tests", function () {
   let alice: SignerWithAddress,
     feeTo: SignerWithAddress,
     usdt: Contract,
     usdc: Contract,
+    dai: Contract,
     weth: Contract,
     bento: Contract,
     masterDeployer: Contract,
-    tridentPoolFactory: Contract,
     router: Contract;
 
   async function MakePools(
     hybridParams: HybridPoolParams,
-    cpParams: ConstProdParams
+    cpParams: ConstantProductPoolParams
   ): Promise<
     [[Contract, sdk.HybridPool], [Contract, sdk.ConstantProductPool]]
   > {
@@ -76,12 +44,12 @@ describe("MultiPool Routing Tests", function () {
     const ERC20 = await ethers.getContractFactory("ERC20Mock");
     const Bento = await ethers.getContractFactory("BentoBoxV1");
     const Deployer = await ethers.getContractFactory("MasterDeployer");
+    const SwapRouter = await ethers.getContractFactory("TridentRouter");
+    const HybridFactory = await ethers.getContractFactory("HybridPoolFactory");
+    const HybridPoolContract = await ethers.getContractFactory("HybridPool");
     const ConstProdFactory = await ethers.getContractFactory(
       "ConstantProductPoolFactory"
     );
-    const HybridFactory = await ethers.getContractFactory("HybridPoolFactory");
-    const SwapRouter = await ethers.getContractFactory("TridentRouter");
-    const HybridPoolContract = await ethers.getContractFactory("HybridPool");
     const ConstantProductPoolContract = await ethers.getContractFactory(
       "ConstantProductPool"
     );
@@ -93,6 +61,7 @@ describe("MultiPool Routing Tests", function () {
     await usdt.deployed();
     usdc = await ERC20.deploy("USDC", "USDC", ERC20DeployAmount);
     await usdc.deployed();
+    dai = await ERC20.deploy("DAI", "DAI", ERC20DeployAmount);
 
     // deploy bento
     bento = await Bento.deploy(weth.address);
@@ -124,6 +93,7 @@ describe("MultiPool Routing Tests", function () {
 
     await usdc.approve(bento.address, ERC20DeployAmount);
     await usdt.approve(bento.address, ERC20DeployAmount);
+    await dai.approve(bento.address, ERC20DeployAmount);
 
     await bento.deposit(
       usdc.address,
@@ -139,6 +109,13 @@ describe("MultiPool Routing Tests", function () {
       ERC20DeployAmount,
       0
     );
+    await bento.deposit(
+      dai.address,
+      alice.address,
+      alice.address,
+      ERC20DeployAmount,
+      0
+    );
 
     await bento.setMasterContractApproval(
       alice.address,
@@ -149,6 +126,7 @@ describe("MultiPool Routing Tests", function () {
       "0x0000000000000000000000000000000000000000000000000000000000000000"
     );
 
+    // HybridPool has USDC <> USDT
     const [hPool, hPoolInfo] = await createHybridPool(
       usdc,
       usdt,
@@ -162,9 +140,10 @@ describe("MultiPool Routing Tests", function () {
       bento,
       alice
     );
+    // ConstantProductPool has USDT <> DAI
     const [cpPool, cpPoolInfo] = await createConstantProductPool(
-      usdc,
       usdt,
+      dai,
       cpParams.fee,
       cpParams.minLiquidity,
       [cpParams.reserve0Exponent, cpParams.reserve1Exponent],
@@ -267,7 +246,8 @@ describe("MultiPool Routing Tests", function () {
     swapDirection = !swapDirection;
   }
 
-  it("Should deploy the pools!", async function () {
+  // check normal values
+  it("Should Test Normal Values", async function () {
     const hybridParams: HybridPoolParams = {
       A: 6000,
       fee: 0.003,
@@ -276,7 +256,7 @@ describe("MultiPool Routing Tests", function () {
       minLiquidity: 1000,
     };
 
-    const cpParams: ConstProdParams = {
+    const cpParams: ConstantProductPoolParams = {
       fee: 0.003,
       reserve0Exponent: 19,
       reserve1Exponent: 19,
@@ -288,8 +268,66 @@ describe("MultiPool Routing Tests", function () {
 
     // normal values
     await checkSwaps(
-      [usdc, usdt],
+      [usdc, dai],
       [17, 2, 23],
+      hybridPool,
+      cpPool,
+      hybridPoolInfo,
+      cpPoolInfo
+    );
+  });
+
+  // check big liquidity values
+  it("Should test big liquidty values", async function () {
+    const hybridParams: HybridPoolParams = {
+      A: 200_000,
+      fee: 0.003,
+      reserve0Exponent: 33,
+      reserve1Exponent: 33,
+      minLiquidity: 1000,
+    };
+
+    const cpParams: ConstantProductPoolParams = {
+      fee: 0.003,
+      reserve0Exponent: 33,
+      reserve1Exponent: 33,
+      minLiquidity: 1000,
+    };
+
+    const [[hybridPool, hybridPoolInfo], [cpPool, cpPoolInfo]] =
+      await MakePools(hybridParams, cpParams);
+
+    await checkSwaps(
+      [usdc, dai],
+      [17, 2, 33],
+      hybridPool,
+      cpPool,
+      hybridPoolInfo,
+      cpPoolInfo
+    );
+  });
+
+  it("Should Test small liquidity values", async function () {
+    const hybridParams: HybridPoolParams = {
+      A: 200_000,
+      fee: 0.003,
+      reserve0Exponent: 4,
+      reserve1Exponent: 4,
+      minLiquidity: 1000,
+    };
+
+    const cpParams: ConstantProductPoolParams = {
+      fee: 0.003,
+      reserve0Exponent: 4,
+      reserve1Exponent: 4,
+      minLiquidity: 1000,
+    };
+    const [[hybridPool, hybridPoolInfo], [cpPool, cpPoolInfo]] =
+      await MakePools(hybridParams, cpParams);
+
+    await checkSwaps(
+      [usdc, dai],
+      [3, 7],
       hybridPool,
       cpPool,
       hybridPoolInfo,

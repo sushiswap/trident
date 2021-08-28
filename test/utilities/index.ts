@@ -1,5 +1,5 @@
 import { BigNumber, BigNumberish } from "@ethersproject/bignumber";
-
+import * as sdk from "@sushiswap/sdk";
 export const BASE_TEN = 10;
 export const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000";
 
@@ -40,5 +40,7 @@ export function areCloseValues(v1: any, v2: any, threshold: any) {
   if (v1 < 1 / threshold) return Math.abs(v1 - v2) <= 1.1;
   return Math.abs(v1 / v2 - 1) < threshold;
 }
+
+export * from "./interfaces";
 
 export * from "./time";
