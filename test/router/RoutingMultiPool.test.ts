@@ -1,7 +1,11 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { BigNumber, Contract } from "ethers";
 import { ethers } from "hardhat";
-import { getBigNumber, getIntegerRandomValue } from "../utilities";
+import {
+  areCloseValues,
+  getBigNumber,
+  getIntegerRandomValue,
+} from "../utilities";
 import {
   createConstantProductPool,
   createHybridPool,
@@ -10,6 +14,7 @@ import * as sdk from "@sushiswap/sdk";
 import seedrandom from "seedrandom";
 import { ConstantProductPool } from "@sushiswap/sdk";
 import { string } from "hardhat/internal/core/params/argumentTypes";
+import { expect } from "chai";
 
 const testSeed = "7";
 const rnd = seedrandom(testSeed);
@@ -255,7 +260,11 @@ describe("MultiPool Routing Tests", function () {
     );
     const amountOutPoolBN = balanceAfter.sub(balanceBefore);
 
+    // cant do this yet cause findRouterMulti function net exposed by sdk yet?
     // const amountOutPrediction = sdk. where is find router multi??
+    // expect(areCloseValues(amountOutPrediction, amountOutPoolBN)).to.equal(true, "predicted amount did not equal actual swapped amount");
+
+    swapDirection = !swapDirection;
   }
 
   it("Should deploy the pools!", async function () {
