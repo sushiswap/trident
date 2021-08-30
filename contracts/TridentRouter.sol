@@ -7,11 +7,13 @@ import "./interfaces/IPool.sol";
 import "./interfaces/ITridentRouter.sol";
 import "./utils/TridentHelper.sol";
 
-/// @notice Trident pool router contract.
+/// @notice Router contract that helps in swapping accross Trident pools
 contract TridentRouter is ITridentRouter, TridentHelper {
     /// @notice BentoBox token vault.
     IBentoBoxMinimal public immutable bento;
 
+    /// @dev Used to ensure that `tridentSwapCallback` is called only by the authorized address.
+    /// These are set when someone calls a flash swap and reset afterwards.
     address internal cachedMsgSender;
     address internal cachedPool;
 
@@ -24,79 +26,119 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         require(msg.sender == wETH);
     }
 
+    /// @notice Swaps token A to token B directly. Swaps are done on bentobox tokens.
+    /// @param params This includes the address of token A, and the pool, amount of token A to swap,
+    /// mininum amount of token B after the swap and data required by the pool for the swap.
+    /// @dev Ensure that the pool is trusted before calling this function. The pool can steal users' tokens.
     function exactInputSingle(ExactInputSingleParams calldata params) public payable returns (uint256 amountOut) {
+        // Pre fund the pool with token A.
         bento.transfer(params.tokenIn, msg.sender, params.pool, params.amountIn);
+        // Trigger the swap in the Pool.
         amountOut = IPool(params.pool).swap(params.data);
+        // Ensure that the slippage wasn't too much. This assumes that the pool is honest.
         require(amountOut >= params.amountOutMinimum, "TOO_LITTLE_RECEIVED");
     }
 
+    /// @notice Swaps token A to token B indirectly by using multiple hops.
+    /// @param params This includes the addresses of the tokens, and the pools, amount of token A to swap,
+    /// mininum amount of token B after the swap and data required by the pools for the swaps.
+    /// @dev Ensure that the pools are trusted before calling this function. The pools can steal users' tokens.
     function exactInput(ExactInputParams calldata params) public payable returns (uint256 amountOut) {
-        // @dev Pay the first pool directly.
+        // Pay the first pool directly.
         bento.transfer(params.tokenIn, msg.sender, params.path[0].pool, params.amountIn);
+        // Call every pool in the path.
+        // Pool N should transfer its output tokens to pool N+1 directly.
+        // Last pool should transfer its output tokens to the user.
+        // If the user wants to unwrap weth, the final destination should be this contract and
+        // a batch call should be made to `unwrapWETH`.
         for (uint256 i; i < params.path.length; i++) {
             amountOut = IPool(params.path[i].pool).swap(params.path[i].data);
         }
+        // Ensure that the slippage wasn't too much. This assumes that the pool is honest.
         require(amountOut >= params.amountOutMinimum, "TOO_LITTLE_RECEIVED");
     }
 
+    /// @notice Swaps token A to token B by using callbacks.
+    /// @param params This includes the addresses of the pools,
+    /// mininum amount of token B after the swap and data required by the pools for the swaps.
+    /// @dev Ensure that the pools are trusted before calling this function. The pools can steal users' tokens.
+    /// This function will unlikely be used in production but it shows how to use callbacks. One usecase will be arbitrage.
     function exactInputLazy(uint256 amountOutMinimum, Path[] calldata path) public payable returns (uint256 amountOut) {
+        // Call every pool in the path.
+        // Pool N should transfer its output tokens to pool N+1 directly.
+        // Last pool should transfer its output tokens to the user.
         for (uint256 i; i < path.length; i++) {
+            // The cached message sender is used as the funder when the callback happens.
             cachedMsgSender = msg.sender;
+            // Cached pool must be the address that calls the callback.
             cachedPool = path[i].pool;
-            amountOut = IPool(path[i].pool).swap(path[i].data);
+            amountOut = IPool(path[i].pool).flashSwap(path[i].data);
         }
+
+        // Resets the `cachedPool` to get a refund.
+        // 1 is used as the default value to avoid the storage slot being released.
+        cachedPool = address(1);
         require(amountOut >= amountOutMinimum, "TOO_LITTLE_RECEIVED");
     }
 
-    function exactInputSingleWithNativeToken(ExactInputSingleParams calldata params)
-        public
-        payable
-        returns (uint256 amountOut)
-    {
+    /// @notice Swaps token A to token B directly. It's same as `exactInputSingle` except
+    /// it takes raw ERC20 tokens from the users and deposits them into bentobox.
+    /// @param params This includes the address of token A, and the pool, amount of token A to swap,
+    /// mininum amount of token B after the swap and data required by the pool for the swap.
+    /// @dev Ensure that the pool is trusted before calling this function. The pool can steal users' tokens.
+    function exactInputSingleWithNativeToken(ExactInputSingleParams calldata params) public payable returns (uint256 amountOut) {
+        // Deposits the native ERC20 token from the user into the pool's bentobox.
         _depositToBentoBox(params.tokenIn, params.pool, params.amountIn);
+        // Trigger the swap in the Pool.
         amountOut = IPool(params.pool).swap(params.data);
+        // Ensure that the slippage wasn't too much. This assumes that the pool is honest.
         require(amountOut >= params.amountOutMinimum, "TOO_LITTLE_RECEIVED");
     }
 
+    /// @notice Swaps token A to token B indirectly by using multiple hops. It's same as `exactInput` except
+    /// it takes raw ERC20 tokens from the users and deposits them into bentobox.
+    /// @param params This includes the addresses of the tokens, and the pools, amount of token A to swap,
+    /// mininum amount of token B after the swap and data required by the pools for the swaps.
+    /// @dev Ensure that the pools are trusted before calling this function. The pools can steal users' tokens.
     function exactInputWithNativeToken(ExactInputParams calldata params) public payable returns (uint256 amountOut) {
+        // Deposits the native ERC20 token from the user into the pool's bentobox.
         _depositToBentoBox(params.tokenIn, params.path[0].pool, params.amountIn);
+        // Call every pool in the path.
+        // Pool N should transfer its output tokens to pool N+1 directly.
+        // Last pool should transfer its output tokens to the user.
         for (uint256 i; i < params.path.length; i++) {
             amountOut = IPool(params.path[i].pool).swap(params.path[i].data);
         }
+        // Ensure that the slippage wasn't too much. This assumes that the pool is honest.
         require(amountOut >= params.amountOutMinimum, "TOO_LITTLE_RECEIVED");
     }
 
+    /// @notice Swaps multiple input tokens to multiple output tokens using multiple paths, in different percentages.
+    /// For example, you can swap 50 DAI + 100 USDC into 60% ETH and 40% BTC.
+    /// @param params This includes everything needed for the swap. Look at the `ComplexPathParams` struct for more details.
+    /// @dev This function is not optimized for single swaps and should only be used in complex cases where
+    /// the amounts are large enough that minimizing slippage by using multiple paths is worth the extra gas.
     function complexPath(ComplexPathParams calldata params) public payable {
+        // Deposit all initial tokens to respective pools and initiate the initial swaps.
+        // Input tokens come from the user, output goes to next pools.
         for (uint256 i; i < params.initialPath.length; i++) {
             if (params.initialPath[i].native) {
-                _depositToBentoBox(
-                    params.initialPath[i].tokenIn,
-                    params.initialPath[i].pool,
-                    params.initialPath[i].amount
-                );
+                _depositToBentoBox(params.initialPath[i].tokenIn, params.initialPath[i].pool, params.initialPath[i].amount);
             } else {
-                bento.transfer(
-                    params.initialPath[i].tokenIn,
-                    msg.sender,
-                    params.initialPath[i].pool,
-                    params.initialPath[i].amount
-                );
+                bento.transfer(params.initialPath[i].tokenIn, msg.sender, params.initialPath[i].pool, params.initialPath[i].amount);
             }
             IPool(params.initialPath[i].pool).swap(params.initialPath[i].data);
         }
 
+        // Do all the middle swaps. Input comes from previous pools, output goes to next pools.
         for (uint256 i; i < params.percentagePath.length; i++) {
             uint256 balanceShares = bento.balanceOf(params.percentagePath[i].tokenIn, address(this));
             uint256 transferShares = (balanceShares * params.percentagePath[i].balancePercentage) / uint256(10)**6;
-            bento.transfer(
-                params.percentagePath[i].tokenIn,
-                address(this),
-                params.percentagePath[i].pool,
-                transferShares
-            );
+            bento.transfer(params.percentagePath[i].tokenIn, address(this), params.percentagePath[i].pool, transferShares);
             IPool(params.percentagePath[i].pool).swap(params.percentagePath[i].data);
         }
 
+        // Do all the final swaps. Input comes from previous pools, output goes to the user.
         for (uint256 i; i < params.output.length; i++) {
             uint256 balanceShares = bento.balanceOf(params.output[i].token, address(this));
             uint256 balanceAmount = bento.toAmount(params.output[i].token, balanceShares, false);
@@ -109,12 +151,18 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         }
     }
 
+    /// @notice Add liquidity to a pool.
+    /// @param tokenInput Token address and amount to add as liquidity.
+    /// @param pool Pool address to add liquidity to.
+    /// @param minLiquidity Minimum output liquidity. Caps slippage.
+    /// @param data Data required by the pool to add liquidity.
     function addLiquidity(
         TokenInput[] memory tokenInput,
         address pool,
         uint256 minLiquidity,
         bytes calldata data
     ) public payable returns (uint256 liquidity) {
+        // Send all input tokens to the pool
         for (uint256 i; i < tokenInput.length; i++) {
             if (tokenInput[i].native) {
                 _depositToBentoBox(tokenInput[i].token, pool, tokenInput[i].amount);
@@ -126,13 +174,21 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         require(liquidity >= minLiquidity, "NOT_ENOUGH_LIQUIDITY_MINTED");
     }
 
+    /// @notice Add liqudiity to a pool using callbacks. Same stuff as `addLiquidity` but now with callbacks.
+    /// The input tokens are sent to the pool during the callback.
     function addLiquidityLazy(address pool, bytes calldata data) public payable {
         cachedMsgSender = msg.sender;
         cachedPool = pool;
         // @dev The pool must ensure that there's not too much slippage.
         IPool(pool).mint(data);
+        cachedPool = address(1);
     }
 
+    /// @notice burn liqudity tokens to get back bento tokens.
+    /// @param pool Pool address.
+    /// @param liquidity Amount of liquidity tokens to burn.
+    /// @param data Data required by the pool to burn liquidity.
+    /// @param minWithdrawals Minimum amount of bento tokens to be returned.
     function burnLiquidity(
         address pool,
         uint256 liquidity,
@@ -154,6 +210,12 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         }
     }
 
+    /// @notice burn liqudity tokens to get back bento tokens.
+    /// The tokens are swapped automatically and the output is in a single token.
+    /// @param pool Pool address.
+    /// @param liquidity Amount of liquidity tokens to burn.
+    /// @param data Data required by the pool to burn liquidity.
+    /// @param minWithdrawals Minimum amount of token to be returned.
     function burnLiquiditySingle(
         address pool,
         uint256 liquidity,
@@ -166,6 +228,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         require(withdrawn >= minWithdrawal, "TOO_LITTLE_RECEIVED");
     }
 
+    /// @notice used by the flashSwap functionality to take input tokens from the user.
     function tridentSwapCallback(bytes calldata data) external {
         require(msg.sender == cachedPool, "UNAUTHORIZED_CALLBACK");
 
@@ -182,6 +245,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         cachedMsgSender = address(1);
     }
 
+    /// @notice can be used by the mint functionality to take tokens from the user.
     function tridentMintCallback(bytes calldata data) external {
         require(msg.sender == cachedPool, "UNAUTHORIZED_CALLBACK");
 
@@ -200,6 +264,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         cachedMsgSender = address(1);
     }
 
+    /// @notice recover mistakenly sent bento tokens.
     function sweepBentoBoxToken(
         address token,
         uint256 amount,
@@ -208,6 +273,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         bento.transfer(token, address(this), recipient, amount);
     }
 
+    /// @notice recover mistakenly sent ERC20 tokens.
     function sweepNativeToken(
         address token,
         uint256 amount,
@@ -216,10 +282,12 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         safeTransfer(token, recipient, amount);
     }
 
+    /// @notice recover mistakenly sent ETH.
     function refundETH() external payable {
         if (address(this).balance != 0) safeTransferETH(msg.sender, address(this).balance);
     }
 
+    /// @notice Unwrap this contracts WETH into ETH
     function unwrapWETH(uint256 amountMinimum, address recipient) external {
         uint256 balanceWETH = balanceOfThis(wETH);
         require(balanceWETH >= amountMinimum, "INSUFFICIENT_WETH");
