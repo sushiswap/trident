@@ -892,10 +892,10 @@
   "resolved" "https://registry.npmjs.org/@sushiswap/prettier-config/-/prettier-config-0.1.0.tgz"
   "version" "0.1.0"
 
-"@sushiswap/sdk@5.0.0-canary.52":
-  "integrity" "sha512-2/UMjwhKjFTgPE2wiKOEyiDhwfgwPX7lI76nvAWIvTc8HQA0Yn08pU4fjjBhDGNCbMiXiMTAWNA2s9braqipQA=="
-  "resolved" "https://registry.npmjs.org/@sushiswap/sdk/-/sdk-5.0.0-canary.52.tgz"
-  "version" "5.0.0-canary.52"
+"@sushiswap/sdk@5.0.0-canary.53":
+  "integrity" "sha512-KW3SU+oW/+OQ/S/xf9I0tk8ZwAqespkG+UmITFE7YpDmuPabkp45FX/Man7DFPCwguUdE7OMAzpLPSi0jQuCSg=="
+  "resolved" "https://registry.npmjs.org/@sushiswap/sdk/-/sdk-5.0.0-canary.53.tgz"
+  "version" "5.0.0-canary.53"
   dependencies:
     "big.js" "^6.1.0"
     "decimal.js-light" "^2.5.0"

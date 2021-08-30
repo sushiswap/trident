@@ -219,10 +219,11 @@ describe("MultiPool Routing Tests", function () {
         pool: cpPool.address,
         data: ethers.utils.defaultAbiCoder.encode(
           ["address", "address", "bool"],
-          [t0.address, alice.address, false]
+          [t1.address, alice.address, false]
         ),
       },
     ];
+
     let inputParams: ExactInputParams = {
       tokenIn: t0.address,
       tokenOut: t1.address,
@@ -232,13 +233,28 @@ describe("MultiPool Routing Tests", function () {
     };
 
     // execute transaction
-    const tx = await router.connect(alice).exactInput(inputParams);
-    let balanceAfter: BigNumber = await bento.balanceOf(
-      t1.address,
-      alice.address
-    );
-    const amountOutPoolBN = balanceAfter.sub(balanceBefore);
+    // const tx = await router.connect(alice).exactInput(inputParams);
+    // let balanceAfter: BigNumber = await bento.balanceOf(
+    //   t1.address,
+    //   alice.address
+    // );
 
+    // const amountOutPoolBN = balanceAfter.sub(balanceBefore);
+    const amountOutPrediction: sdk.MultiRoute | undefined =
+      sdk.findMultiRouting(
+        { address: t0.address, name: "t0" },
+        { address: t1.address, name: "t1" },
+        swapExp,
+        [hybridPoolInfo, cpPoolInfo],
+        { address: t0.address, name: "t1" },
+        1
+      );
+
+    amountOutPrediction == undefined
+      ? console.log("error calculating route")
+      : console.log(amountOutPrediction);
+
+    // console.log(amountOutPrediction)
     // cant do this yet cause findRouterMulti function net exposed by sdk yet?
     // const amountOutPrediction = sdk. where is find router multi??
     // expect(areCloseValues(amountOutPrediction, amountOutPoolBN)).to.equal(true, "predicted amount did not equal actual swapped amount");
