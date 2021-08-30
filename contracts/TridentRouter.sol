@@ -59,8 +59,8 @@ contract TridentRouter is ITridentRouter, TridentHelper {
     }
 
     /// @notice Swaps token A to token B by using callbacks.
-    /// @param params This includes the addresses of the pools,
-    /// mininum amount of token B after the swap and data required by the pools for the swaps.
+    /// @param path Addresses of the pools and data required by the pools for the swaps.
+    /// @param amountOutMinimum mininum amount of token B after the swap.
     /// @dev Ensure that the pools are trusted before calling this function. The pools can steal users' tokens.
     /// This function will unlikely be used in production but it shows how to use callbacks. One usecase will be arbitrage.
     function exactInputLazy(uint256 amountOutMinimum, Path[] calldata path) public payable returns (uint256 amountOut) {
@@ -215,7 +215,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
     /// @param pool Pool address.
     /// @param liquidity Amount of liquidity tokens to burn.
     /// @param data Data required by the pool to burn liquidity.
-    /// @param minWithdrawals Minimum amount of token to be returned.
+    /// @param minWithdrawal Minimum amount of token to be returned.
     function burnLiquiditySingle(
         address pool,
         uint256 liquidity,
