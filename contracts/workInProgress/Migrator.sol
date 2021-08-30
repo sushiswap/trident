@@ -4,11 +4,11 @@ pragma solidity >=0.8.0;
 
 // @notice Trident pool migrator contract for legacy SushiSwap.
 contract Migrator {
-    address public bento;
-    address public masterChef;
-    address public masterDeployer;
-    address public pairPoolDeployer;
-    address public wETH;
+    address public immutable bento;
+    address public immutable masterChef;
+    address public immutable masterDeployer;
+    address public immutable pairPoolDeployer;
+    address public immutable wETH;
     uint256 public desiredLiquidity;
 
     constructor(
