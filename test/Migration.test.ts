@@ -83,11 +83,18 @@ describe.skip("Migration", function () {
     );
     const factory = await Factory.deploy(masterDeployer.address);
 
+    const PairDeployer = await ethers.getContractFactory(
+      "PairPoolDeployer"
+    );
+    const pairDeployer = await PairDeployer.deploy(masterDeployer.address);
+
     const Migrator = await ethers.getContractFactory("Migrator");
     migrator = await Migrator.deploy(
-      chef.address,
       bentoBox.address,
-      factory.address
+      chef.address,
+      masterDeployer.address,
+      pairDeployer.address,
+      weth.address
     );
 
     await chef.setMigrator(migrator.address);
