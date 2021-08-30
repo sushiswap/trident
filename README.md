@@ -48,6 +48,14 @@ Trident as a native application on our BentoBox platform. BentoBox is our archit
 
 So for instance, if a user were to place a limit order or provide liquidity for a pool the underlying tokens would be making additional yield even if no swaps were occurring.
 
+## Architecture
+
+- MasterDeployer is used to add/remove factories for various pool types. Users call MasterDeployer to deploy new pools from the whitelisted factories.
+- MasterDeployer also controls the fee percentage that goes to xSUSHI and the fee address.
+- MasterDeployer has an owner (ops multisig), that'll control these parameters.
+- TridentRouter is the main contract that allows interacting with various pools. It is used to initiate swaps and manage liquidity.
+- TridentRouter is the contract that gets whitelisted in BentoBox as the master app.
+
 ## Tines: Routing Engine
 
 Tines is our new routing engine designed for our front end. Tines is an efficient multihop multiroute swap router. Tines will query our many pool types and consider factors such as gas costs, price impacts, and graph topology to generate a best price solution.

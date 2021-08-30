@@ -49,7 +49,6 @@ contract ConstantProductPool is IPool, TridentERC20 {
         unlocked = 1;
     }
 
-    /// @dev Only set immutable variables here - state changes made here will not be used.
     constructor(bytes memory _deployData, address _masterDeployer) {
         (address tokenA, address tokenB, uint256 _swapFee, bool _twapSupport) = abi.decode(_deployData, (address, address, uint256, bool));
 
@@ -73,6 +72,8 @@ contract ConstantProductPool is IPool, TridentERC20 {
         }
     }
 
+    // @dev Mints LP tokens. Should be called via the router after transferring Bento tokens.
+    // The router must ensure that sufficient LP tokens are minted by using the return value of this fn.
     function mint(bytes calldata data) public override lock returns (uint256 liquidity) {
         address to = abi.decode(data, (address));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
@@ -106,6 +107,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         emit Mint(msg.sender, amount0, amount1, to);
     }
 
+    // @dev burns LP tokens sent to this contract. The router must ensure that use gets sufficent output tokens.
     function burn(bytes calldata data) public override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
         (address to, bool unwrapBento) = abi.decode(data, (address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
@@ -136,6 +138,8 @@ contract ConstantProductPool is IPool, TridentERC20 {
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
+    // @dev burns LP tokens sent to this contract and swaps one of the output tokens for another.
+    // i.e. The user gets a single token out by burning LP tokens.
     function burnSingle(bytes calldata data) public override lock returns (uint256 amount) {
         (address tokenOut, address to, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
@@ -173,6 +177,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
+    // @dev swaps one token for another. The router must pre fund this contract and ensure there isn't too much slippage.
     function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
@@ -197,6 +202,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
 
+    // @dev swaps one token for another. The router must must support swap callbacks and ensure there isn't too much slippage.
     function flashSwap(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento, uint256 amountIn, bytes memory context) = abi.decode(
             data,
