@@ -10,6 +10,11 @@ import "./TridentNFT.sol";
 contract ConcentratedLiquidityPosition is TridentNFT {
     event Mint(IConcentratedLiquidityPool indexed pool, bytes mintData);
     event Burn(IConcentratedLiquidityPool indexed pool, bytes burnData, uint256 indexed tokenId);
+    
+    address public immutable bento;
+    address public immutable wETH;
+    
+    mapping(uint256 => Position) public positions;
 
     struct Position {
         IConcentratedLiquidityPool pool;
@@ -17,11 +22,6 @@ contract ConcentratedLiquidityPosition is TridentNFT {
         int24 lower;
         int24 upper;
     }
-
-    mapping(uint256 => Position) public positions;
-
-    address public immutable bento;
-    address public immutable wETH;
 
     constructor(address _bento, address _wETH) {
         bento = _bento;
@@ -57,7 +57,6 @@ contract ConcentratedLiquidityPosition is TridentNFT {
         address recipient,
         bool unwrapBento
     ) public {
-        require(msg.sender == ownerOf[tokenId], "");
         Position memory position = positions[tokenId];
         bytes memory burnData = abi.encode(position.lower, position.upper, amount, recipient, unwrapBento);
         position.pool.burn(burnData);
@@ -65,7 +64,7 @@ contract ConcentratedLiquidityPosition is TridentNFT {
             position.liquidity -= amount;
         } else {
             delete positions[tokenId];
-            _burn(tokenId);
+            _burn(msg.sender, tokenId);
         }
         emit Burn(position.pool, burnData, tokenId);
     }
@@ -82,17 +81,17 @@ contract ConcentratedLiquidityPosition is TridentNFT {
             if (address(this).balance > underlyingAmount) {
                 // @dev Deposit ETH into `recipient` `bento` account -
                 // deposit(address,address,address,uint256,uint256).
-                (bool success0, ) = bento.call{value: underlyingAmount}(
+                (bool ethDepositSuccess, ) = bento.call{value: underlyingAmount}(
                     abi.encodeWithSelector(0x02b9446c, token, msg.sender, recipient, amount)
                 );
-                require(success0, "DEPOSIT_FAILED");
+                require(ethDepositSuccess, "ETH_DEPOSIT_FAILED");
                 return;
             }
         }
         // @dev Deposit ERC-20 token into `recipient` `bento` account
         // - deposit(address,address,address,uint256,uint256).
-        (bool success1, ) = bento.call(abi.encodeWithSelector(0x02b9446c, token, msg.sender, recipient, amount));
-        require(success1, "DEPOSIT_FAILED");
+        (bool depositSuccess, ) = bento.call(abi.encodeWithSelector(0x02b9446c, token, msg.sender, recipient, amount));
+        require(depositSuccess, "DEPOSIT_FAILED");
     }
 
     function _transfer(
@@ -104,12 +103,12 @@ contract ConcentratedLiquidityPosition is TridentNFT {
     ) internal {
         if (unwrapBento) {
             // @dev withdraw(address,address,address,uint256,uint256).
-            (bool success, ) = bento.call(abi.encodeWithSelector(0x97da6d30, token, from, to, 0, shares));
-            require(success, "WITHDRAW_FAILED");
+            (bool withdrawSuccess, ) = bento.call(abi.encodeWithSelector(0x97da6d30, token, from, to, 0, shares));
+            require(withdrawSuccess, "WITHDRAW_FAILED");
         } else {
             // @dev transfer(address,address,address,uint256).
-            (bool success, ) = bento.call(abi.encodeWithSelector(0xf18d03cc, token, from, to, shares));
-            require(success, "TRANSFER_FAILED");
+            (bool transferSuccess, ) = bento.call(abi.encodeWithSelector(0xf18d03cc, token, from, to, shares));
+            require(transferSuccess, "TRANSFER_FAILED");
         }
     }
 }
