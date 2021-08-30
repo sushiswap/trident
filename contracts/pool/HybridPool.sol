@@ -58,10 +58,7 @@ contract HybridPool is IPool, TridentERC20 {
 
     /// @dev Only set immutable variables here - state changes made here will not be used.
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (address tokenA, address tokenB, uint256 _swapFee, uint256 a) = abi.decode(
-            _deployData,
-            (address, address, uint256, uint256)
-        );
+        (address tokenA, address tokenB, uint256 _swapFee, uint256 a) = abi.decode(_deployData, (address, address, uint256, uint256));
 
         require(tokenA != address(0), "HybridPool: ZERO_ADDRESS");
         require(tokenA != tokenB, "HybridPool: IDENTICAL_ADDRESSES");
@@ -151,7 +148,7 @@ contract HybridPool is IPool, TridentERC20 {
             amount0 = 0;
         } else {
             // @dev Swap token1 for token0.
-            require(tokenOut == address(token1), "INVALID_OUTPUT_TOKEN");
+            require(tokenOut == address(token0), "INVALID_OUTPUT_TOKEN");
             uint256 fee = _handleFee(token1, amount1);
             amount0 += _getAmountOut(amount1 - fee, _reserve0 - amount0, _reserve1 - amount1, false);
             _transferAmount(token0, to, amount0, unwrapBento);
