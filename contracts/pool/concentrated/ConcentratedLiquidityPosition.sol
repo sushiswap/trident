@@ -16,6 +16,8 @@ contract ConcentratedLiquidityPosition is TridentNFT {
         uint128 liquidity;
         int24 lower;
         int24 upper;
+        uint256 feeGrowthOutside0; // @dev Per unit of liquidity.
+        uint256 feeGrowthOutside1;
     }
 
     mapping(uint256 => Position) public positions;
@@ -45,7 +47,8 @@ contract ConcentratedLiquidityPosition is TridentNFT {
             }
         }
         pool.mint(mintData);
-        positions[totalSupply] = Position(IConcentratedLiquidityPool(pool), amount, lower, upper);
+        (uint256 feeGrowthInside0, uint256 feeGrowthInside1) = pool.rangeFeeGrowth(lower, upper);
+        positions[totalSupply] = Position(IConcentratedLiquidityPool(pool), amount, lower, upper, feeGrowthInside0, feeGrowthInside1);
         // @dev Mint Position 'NFT'.
         _mint(recipient);
         emit Mint(pool, mintData);

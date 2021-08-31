@@ -20,4 +20,6 @@ interface IConcentratedLiquidityPool is IPool {
     function feeGrowthGlobal0() external view returns (uint256);
 
     function rangeSecondsInside(int24 lowerTick, int24 upperTick) external view returns (uint256);
+
+    function rangeFeeGrowth(int24 lowerTick, int24 upperTick) external view returns (uint256 feeGrowthInside0, uint256 feeGrowthInside1);
 }
