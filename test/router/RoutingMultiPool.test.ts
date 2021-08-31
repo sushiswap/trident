@@ -21,6 +21,7 @@ const testSeed = "7";
 const rnd = seedrandom(testSeed);
 
 const ERC20DeployAmount = getBigNumber("1000000000000000000");
+const gasPrice = 1 * 200 * 1e-9;
 
 describe("MultiPool Routing Tests", function () {
   let alice: SignerWithAddress,
@@ -206,27 +207,29 @@ describe("MultiPool Routing Tests", function () {
       alice.address
     );
 
+    // constant product has USDT <> DAI
+    // Hybrid pool has      USDC <> USDT
     //  -- ROUTER PARAMS --
     let paths: Path[] = [
       {
         pool: hybridPool.address,
         data: ethers.utils.defaultAbiCoder.encode(
           ["address", "address", "bool"],
-          [t0.address, alice.address, false]
+          [usdc.address, alice.address, false]
         ),
       },
       {
         pool: cpPool.address,
         data: ethers.utils.defaultAbiCoder.encode(
           ["address", "address", "bool"],
-          [t1.address, alice.address, false]
+          [dai.address, alice.address, false]
         ),
       },
     ];
 
     let inputParams: ExactInputParams = {
-      tokenIn: t0.address,
-      tokenOut: t1.address,
+      tokenIn: usdc.address,
+      tokenOut: dai.address,
       amountIn: swapExpBN,
       amountOutMinimum: getBigNumber(0),
       path: paths,
@@ -240,14 +243,16 @@ describe("MultiPool Routing Tests", function () {
     // );
 
     // const amountOutPoolBN = balanceAfter.sub(balanceBefore);
+
     const amountOutPrediction: sdk.MultiRoute | undefined =
       sdk.findMultiRouting(
-        { address: t0.address, name: "t0" },
-        { address: t1.address, name: "t1" },
+        { address: usdc.address, name: usdc.address },
+        { address: dai.address, name: dai.address },
         swapExp,
         [hybridPoolInfo, cpPoolInfo],
-        { address: t0.address, name: "t1" },
-        1
+        { address: usdt.address, name: usdt.address },
+        gasPrice,
+        100
       );
 
     amountOutPrediction == undefined

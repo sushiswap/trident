@@ -69,11 +69,11 @@ export async function createHybridPool(
 
   const hybridPoolInfo = new sdk.HybridPool({
     A,
-    reserve0,
-    reserve1,
+    reserve0: reserve0BN,
+    reserve1: reserve1BN,
     address: hybridPool.address,
-    token0: { address: t0.address, name: "ERC20" },
-    token1: { address: t1.address, name: "ERC20" },
+    token0: { address: t0.address, name: t0.address },
+    token1: { address: t1.address, name: t1.address },
     fee: fee,
   });
 
@@ -142,8 +142,8 @@ export async function createConstantProductPool(
     reserve0: reserve0BN,
     reserve1: reserve1BN,
     address: constantProductPool.address,
-    token0: { address: t0.address, name: "ERC20" },
-    token1: { address: t1.address, name: "ERC20" },
+    token0: { address: t0.address, name: t0.address },
+    token1: { address: t1.address, name: t1.address },
     fee,
   });
 
