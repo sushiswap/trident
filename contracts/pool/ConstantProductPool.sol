@@ -80,8 +80,8 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint256 _totalSupply = totalSupply;
 
         _mintFee(_reserve0, _reserve1, _totalSupply);
+        // @dev These are safe from underflow - reserves `_update` after withdrawals and will be less than routed balances. 
         unchecked {
-            // @dev These are safe from underflow - reserves `_update` after withdrawals and will be less than routed balances. 
             uint256 amount0 = balance0 - _reserve0;
             uint256 amount1 = balance1 - _reserve1;
             emit Mint(msg.sender, amount0, amount1, recipient);
@@ -100,7 +100,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
                 liquidity = computed - MINIMUM_LIQUIDITY;
             }
         } else {
-            uint256 k = TridentMath.sqrt(_reserve0 * _reserve1);
+            uint256 k = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
             liquidity = ((computed - k) * _totalSupply) / k;
         }
         require(liquidity != 0, "INSUFFICIENT_LIQUIDITY_MINTED");
