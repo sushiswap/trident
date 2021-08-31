@@ -13,8 +13,8 @@ import "../deployer/MasterDeployer.sol";
 /// @dev The reserves are stored as bento shares.
 ///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
 contract ConstantProductPool is IPool, TridentERC20 {
-    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
-    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
+    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
+    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Sync(uint256 reserve0, uint256 reserve1);
 
     uint256 internal constant MINIMUM_LIQUIDITY = 1000;
@@ -41,7 +41,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
     bytes32 public constant override poolIdentifier = "Trident:ConstantProduct";
 
-    uint256 private unlocked;
+    uint256 internal unlocked;
     modifier lock() {
         require(unlocked == 1, "LOCKED");
         unlocked = 2;
@@ -50,32 +50,30 @@ contract ConstantProductPool is IPool, TridentERC20 {
     }
 
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (address tokenA, address tokenB, uint256 _swapFee, bool _twapSupport) = abi.decode(_deployData, (address, address, uint256, bool));
+        (address _token0, address _token1, uint256 _swapFee, bool _twapSupport) = abi.decode(_deployData, (address, address, uint256, bool));
 
-        require(tokenA != address(0), "ZERO_ADDRESS");
-        require(tokenA != tokenB, "IDENTICAL_ADDRESSES");
+        require(_token0 != address(0), "ZERO_ADDRESS");
+        require(_token0 != _token1, "IDENTICAL_ADDRESSES");
         require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
 
         (, bytes memory _bento) = _masterDeployer.staticcall(abi.encodeWithSelector(0x4da31827)); // @dev bento().
         (, bytes memory _barFeeTo) = _masterDeployer.staticcall(abi.encodeWithSelector(0x0c0a0cd2)); // @dev barFeeTo().
 
-        token0 = tokenA;
-        token1 = tokenB;
+        token0 = _token0;
+        token1 = _token1;
         swapFee = _swapFee;
         MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
         bento = abi.decode(_bento, (address));
         barFeeTo = abi.decode(_barFeeTo, (address));
         masterDeployer = _masterDeployer;
         unlocked = 1;
-        if (_twapSupport) {
-            blockTimestampLast = 1;
-        }
+        if (_twapSupport) blockTimestampLast = 1;
     }
 
-    // @dev Mints LP tokens. Should be called via the router after transferring Bento tokens.
-    // The router must ensure that sufficient LP tokens are minted by using the return value of this fn.
+    /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
+    /// The router must ensure that sufficient LP tokens are minted by using the return value.
     function mint(bytes calldata data) public override lock returns (uint256 liquidity) {
-        address to = abi.decode(data, (address));
+        address recipient = abi.decode(data, (address));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 _totalSupply = totalSupply;
@@ -84,32 +82,32 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
-
         uint256 computed = TridentMath.sqrt(balance0 * balance1);
+        
         if (_totalSupply == 0) {
             _mint(address(0), MINIMUM_LIQUIDITY);
             address migrator = MasterDeployer(masterDeployer).migrator();
             if (msg.sender == migrator) {
                 liquidity = IMigrator(migrator).desiredLiquidity();
-                require(liquidity > 0 && liquidity != type(uint256).max, "BAD_DESIRED_LIQUIDITY");
+                require(liquidity != 0 && liquidity != type(uint256).max, "BAD_DESIRED_LIQUIDITY");
             } else {
                 require(migrator == address(0), "ONLY_MIGRATOR");
                 liquidity = computed - MINIMUM_LIQUIDITY;
             }
         } else {
-            uint256 k = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
+            uint256 k = TridentMath.sqrt(_reserve0 * _reserve1);
             liquidity = ((computed - k) * _totalSupply) / k;
         }
-        require(liquidity > 0, "INSUFFICIENT_LIQUIDITY_MINTED");
-        _mint(to, liquidity);
+        require(liquidity != 0, "INSUFFICIENT_LIQUIDITY_MINTED");
+        _mint(recipient, liquidity);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         kLast = computed;
-        emit Mint(msg.sender, amount0, amount1, to);
+        emit Mint(msg.sender, amount0, amount1, recipient);
     }
 
-    // @dev burns LP tokens sent to this contract. The router must ensure that use gets sufficent output tokens.
+    /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
     function burn(bytes calldata data) public override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
-        (address to, bool unwrapBento) = abi.decode(data, (address, bool));
+        (address recipient, bool unwrapBento) = abi.decode(data, (address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 _totalSupply = totalSupply;
@@ -121,9 +119,8 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint256 amount1 = (liquidity * balance1) / _totalSupply;
 
         _burn(address(this), liquidity);
-
-        _transfer(token0, amount0, to, unwrapBento);
-        _transfer(token1, amount1, to, unwrapBento);
+        _transfer(token0, amount0, recipient, unwrapBento);
+        _transfer(token1, amount1, recipient, unwrapBento);
 
         balance0 -= amount0;
         balance1 -= amount1;
@@ -134,14 +131,13 @@ contract ConstantProductPool is IPool, TridentERC20 {
         withdrawnAmounts = new TokenAmount[](2);
         withdrawnAmounts[0] = TokenAmount({token: address(token0), amount: amount0});
         withdrawnAmounts[1] = TokenAmount({token: address(token1), amount: amount1});
-
-        emit Burn(msg.sender, amount0, amount1, to);
+        emit Burn(msg.sender, amount0, amount1, recipient);
     }
 
-    // @dev burns LP tokens sent to this contract and swaps one of the output tokens for another.
-    // i.e. The user gets a single token out by burning LP tokens.
-    function burnSingle(bytes calldata data) public override lock returns (uint256 amount) {
-        (address tokenOut, address to, bool unwrapBento) = abi.decode(data, (address, address, bool));
+    /// @dev Burns LP tokens sent to this contract and swaps one of the output tokens for another
+    /// - i.e., the user gets a single token out by burning LP tokens.
+    function burnSingle(bytes calldata data) public override lock returns (uint256 amountOut) {
+        (address tokenOut, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 _totalSupply = totalSupply;
@@ -153,31 +149,29 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint256 amount1 = (liquidity * balance1) / _totalSupply;
 
         _burn(address(this), liquidity);
-
         if (tokenOut == token1) {
-            // @dev Swap token0 for token1.
-            // Calculate amountOut as if the user first withdrew balanced liquidity and then swapped token0 for token1.
+            // @dev Swap `token0` for `token1` 
+            // - calculate `amountOut` as if the user first withdrew balanced liquidity and then swapped `token0` for `token1`.
             amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1);
-            _transfer(token1, amount1, to, unwrapBento);
+            _transfer(token1, amount1, recipient, unwrapBento);
             balance1 -= amount1;
-            amount = amount1;
+            amountOut = amount1;
             amount0 = 0;
         } else {
-            // @dev Swap token1 for token0.
+            // @dev Swap `token1` for `token0`.
             require(tokenOut == token0, "INVALID_OUTPUT_TOKEN");
             amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0);
-            _transfer(token0, amount0, to, unwrapBento);
+            _transfer(token0, amount0, recipient, unwrapBento);
             balance0 -= amount0;
-            amount = amount0;
+            amountOut = amount0;
             amount1 = 0;
         }
-
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         kLast = TridentMath.sqrt(balance0 * balance1);
-        emit Burn(msg.sender, amount0, amount1, to);
+        emit Burn(msg.sender, amount0, amount1, recipient);
     }
 
-    // @dev swaps one token for another. The router must pre fund this contract and ensure there isn't too much slippage.
+    /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
     function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
@@ -202,7 +196,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
 
-    // @dev swaps one token for another. The router must must support swap callbacks and ensure there isn't too much slippage.
+    /// @dev Swaps one token for another. The router must support swap callbacks and ensure there isn't too much slippage.
     function flashSwap(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento, uint256 amountIn, bytes memory context) = abi.decode(
             data,
@@ -261,7 +255,6 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint32 _blockTimestampLast
     ) internal {
         require(balance0 <= type(uint112).max && balance1 <= type(uint112).max, "OVERFLOW");
-
         if (blockTimestampLast == 0) {
             // @dev TWAP support is disabled for gas efficiency.
             reserve0 = uint112(balance0);
@@ -281,7 +274,6 @@ contract ConstantProductPool is IPool, TridentERC20 {
             reserve1 = uint112(balance1);
             blockTimestampLast = blockTimestamp;
         }
-
         emit Sync(balance0, balance1);
     }
 
