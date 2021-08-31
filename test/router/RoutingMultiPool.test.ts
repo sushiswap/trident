@@ -244,13 +244,15 @@ describe("MultiPool Routing Tests", function () {
 
     // const amountOutPoolBN = balanceAfter.sub(balanceBefore);
 
+    // ConstantProductPool has t0 = USDT <> t1 = DAI
+    // HybridPool has          t0 = USDC <> t1 = USDT
     const amountOutPrediction: sdk.MultiRoute | undefined =
       sdk.findMultiRouting(
-        { address: usdc.address, name: usdc.address },
-        { address: dai.address, name: dai.address },
+        hybridPoolInfo.token0, // USDC
+        cpPoolInfo.token1, // DAI
         swapExp,
         [hybridPoolInfo, cpPoolInfo],
-        { address: usdt.address, name: usdt.address },
+        cpPoolInfo.token0, // USDT
         gasPrice,
         100
       );

@@ -21,10 +21,6 @@ export async function createHybridPool(
   bento: Contract,
   alice: SignerWithAddress
 ): Promise<[Contract, sdk.HybridPool]> {
-  const [t0, t1]: Contract[] =
-    tokenA.address.toUpperCase() < tokenB.address.toUpperCase()
-      ? [tokenA, tokenB]
-      : [tokenB, tokenA];
   const [reserve0, reserve0BN] = getIntegerRandomValueWithMin(
     reservesExponents[0],
     minLiquidity,
@@ -39,7 +35,7 @@ export async function createHybridPool(
   const fee = Math.round(swapFee * 10_000);
   const deployData = ethers.utils.defaultAbiCoder.encode(
     ["address", "address", "uint256", "uint256"],
-    [t0.address, t1.address, fee, A]
+    [tokenA.address, tokenB.address, fee, A]
   );
 
   const hybridPool: Contract = await PoolFactory.attach(
@@ -51,13 +47,13 @@ export async function createHybridPool(
   );
 
   await bento.transfer(
-    t0.address,
+    tokenA.address,
     alice.address,
     hybridPool.address,
     reserve0BN
   );
   await bento.transfer(
-    t1.address,
+    tokenB.address,
     alice.address,
     hybridPool.address,
     reserve1BN
@@ -72,8 +68,8 @@ export async function createHybridPool(
     reserve0: reserve0BN,
     reserve1: reserve1BN,
     address: hybridPool.address,
-    token0: { address: t0.address, name: t0.address },
-    token1: { address: t1.address, name: t1.address },
+    token0: { address: tokenA.address, name: tokenA.address },
+    token1: { address: tokenB.address, name: tokenB.address },
     fee: fee,
   });
 
@@ -92,10 +88,6 @@ export async function createConstantProductPool(
   bento: Contract,
   alice: SignerWithAddress
 ): Promise<[Contract, sdk.ConstantProductPool]> {
-  const [t0, t1]: Contract[] =
-    tokenA.address.toUpperCase() < tokenB.address.toUpperCase()
-      ? [tokenA, tokenB]
-      : [tokenB, tokenA];
   const [reserve0, reserve0BN] = getIntegerRandomValueWithMin(
     reservesExponents[0],
     minLiquidity,
@@ -110,7 +102,7 @@ export async function createConstantProductPool(
   const fee = Math.round(swapFee * 10_000);
   const deployData = ethers.utils.defaultAbiCoder.encode(
     ["address", "address", "uint256", "bool"],
-    [t0.address, t1.address, fee, true]
+    [tokenA.address, tokenB.address, fee, true]
   );
 
   const constantProductPool: Contract = await PoolFactory.attach(
@@ -122,13 +114,13 @@ export async function createConstantProductPool(
   );
 
   await bento.transfer(
-    t0.address,
+    tokenA.address,
     alice.address,
     constantProductPool.address,
     reserve0BN
   );
   await bento.transfer(
-    t1.address,
+    tokenB.address,
     alice.address,
     constantProductPool.address,
     reserve1BN
@@ -142,8 +134,8 @@ export async function createConstantProductPool(
     reserve0: reserve0BN,
     reserve1: reserve1BN,
     address: constantProductPool.address,
-    token0: { address: t0.address, name: t0.address },
-    token1: { address: t1.address, name: t1.address },
+    token0: { address: tokenA.address, name: tokenA.address },
+    token1: { address: tokenB.address, name: tokenB.address },
     fee,
   });
 
