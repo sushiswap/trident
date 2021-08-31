@@ -95,7 +95,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
                 liquidity = computed - MINIMUM_LIQUIDITY;
             }
         } else {
-            uint256 k = TridentMath.sqrt(_reserve0 * _reserve1);
+            uint256 k = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
             liquidity = ((computed - k) * _totalSupply) / k;
         }
         require(liquidity != 0, "INSUFFICIENT_LIQUIDITY_MINTED");
