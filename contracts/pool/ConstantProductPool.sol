@@ -361,12 +361,14 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint256 _reserve0,
         uint256 _reserve1
     ) internal view returns (uint256 token0Fee, uint256 token1Fee) {
+        if (_reserve0 == 0 || _reserve1 == 0) return (0, 0);
+
         uint256 amount1Optimal = (_amount0 * _reserve1) / _reserve0;
         if (amount1Optimal <= _amount1) {
-            token1Fee = ((swapFee * (_amount1 - amount1Optimal)) / 2) * MAX_FEE;
+            token1Fee = (swapFee * (_amount1 - amount1Optimal)) / (2 * MAX_FEE);
         } else {
             uint256 amount0Optimal = (_amount1 * _reserve0) / _reserve1;
-            token0Fee = ((swapFee * (_amount0 - amount0Optimal)) / 2) * MAX_FEE;
+            token0Fee = (swapFee * (_amount0 - amount0Optimal)) / (2 * MAX_FEE);
         }
     }
 }
