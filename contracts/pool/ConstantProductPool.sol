@@ -89,7 +89,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
-        (uint256 fee0, uint256 fee1) = _unoptimalMintFee(amount0, amount1, _reserve0, _reserve1);
+        (uint256 fee0, uint256 fee1) = _nonOptimalMintFee(amount0, amount1, _reserve0, _reserve1);
         uint256 computed = TridentMath.sqrt((balance0 - fee0) * (balance1 - fee1));
 
         if (_totalSupply == 0) {
@@ -342,7 +342,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
     }
     
     /// @dev This fee is charged to cover for `swapFee` when users add unbalanced liquidity.
-    function _unoptimalMintFee(
+    function _nonOptimalMintFee(
         uint256 _amount0,
         uint256 _amount1,
         uint256 _reserve0,
