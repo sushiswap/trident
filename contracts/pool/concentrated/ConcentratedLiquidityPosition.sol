@@ -10,10 +10,10 @@ import "./TridentNFT.sol";
 contract ConcentratedLiquidityPosition is TridentNFT {
     event Mint(IConcentratedLiquidityPool indexed pool, bytes mintData);
     event Burn(IConcentratedLiquidityPool indexed pool, bytes burnData, uint256 indexed tokenId);
-    
+
     address public immutable bento;
     address public immutable wETH;
-    
+
     mapping(uint256 => Position) public positions;
 
     struct Position {
@@ -21,6 +21,8 @@ contract ConcentratedLiquidityPosition is TridentNFT {
         uint128 liquidity;
         int24 lower;
         int24 upper;
+        uint256 feeGrowthInside0; // @dev Per unit of liquidity.
+        uint256 feeGrowthInside1;
     }
 
     constructor(address _bento, address _wETH) {
@@ -32,7 +34,7 @@ contract ConcentratedLiquidityPosition is TridentNFT {
         ITridentRouter.TokenInput[] memory tokenInput,
         IConcentratedLiquidityPool pool,
         bytes memory mintData
-    ) public {
+    ) external {
         (, int24 lower, , int24 upper, uint128 amount, address recipient) = abi.decode(
             mintData,
             (int24, int24, int24, int24, uint128, address)
@@ -45,7 +47,8 @@ contract ConcentratedLiquidityPosition is TridentNFT {
             }
         }
         pool.mint(mintData);
-        positions[totalSupply] = Position(IConcentratedLiquidityPool(pool), amount, lower, upper);
+        (uint256 feeGrowthInside0, uint256 feeGrowthInside1) = pool.rangeFeeGrowth(lower, upper);
+        positions[totalSupply] = Position(IConcentratedLiquidityPool(pool), amount, lower, upper, feeGrowthInside0, feeGrowthInside1);
         // @dev Mint Position 'NFT'.
         _mint(recipient);
         emit Mint(pool, mintData);
@@ -56,7 +59,8 @@ contract ConcentratedLiquidityPosition is TridentNFT {
         uint128 amount,
         address recipient,
         bool unwrapBento
-    ) public {
+    ) external {
+        require(msg.sender == ownerOf[tokenId], "");
         Position memory position = positions[tokenId];
         bytes memory burnData = abi.encode(position.lower, position.upper, amount, recipient, unwrapBento);
         position.pool.burn(burnData);
@@ -67,6 +71,24 @@ contract ConcentratedLiquidityPosition is TridentNFT {
             _burn(msg.sender, tokenId);
         }
         emit Burn(position.pool, burnData, tokenId);
+    }
+
+    function collect(
+        uint256 tokenId,
+        address recipient,
+        bool unwrapBento
+    ) external returns (uint256 token0amount, uint256 token1amount) {
+        require(msg.sender == ownerOf[tokenId], "");
+        Position storage position = positions[tokenId];
+        bytes memory collectData = abi.encode(position.lower, position.upper, recipient, false);
+        (uint256 feeGrowthInside0, uint256 feeGrowthInside1) = position.pool.rangeFeeGrowth(position.lower, position.upper);
+        position.pool.collect(collectData);
+        token0amount = (feeGrowthInside0 - position.feeGrowthInside0) * position.liquidity;
+        token1amount = (feeGrowthInside1 - position.feeGrowthInside1) * position.liquidity;
+        position.feeGrowthInside0 = feeGrowthInside0;
+        position.feeGrowthInside1 = feeGrowthInside1;
+        _transfer(position.pool.token0(), address(this), recipient, token0amount, unwrapBento);
+        _transfer(position.pool.token1(), address(this), recipient, token1amount, unwrapBento);
     }
 
     function _depositToBentoBox(

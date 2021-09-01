@@ -117,7 +117,7 @@ contract ConcentratedLiquidityPool is IPool {
         unlocked = 1;
     }
 
-    function mint(bytes calldata data) public override lock returns (uint256 minted) {
+    function mint(bytes calldata data) external override lock returns (uint256 minted) {
         (int24 lowerOld, int24 lower, int24 upperOld, int24 upper, uint128 amount, address recipient) = abi.decode(
             data,
             (int24, int24, int24, int24, uint128, address)
@@ -168,7 +168,7 @@ contract ConcentratedLiquidityPool is IPool {
         emit Mint(msg.sender, amount0, amount1, recipient);
     }
 
-    function burn(bytes calldata data) public override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
+    function burn(bytes calldata data) external override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
         (int24 lower, int24 upper, uint128 amount, address recipient, bool unwrapBento) = abi.decode(
             data,
             (int24, int24, uint128, address, bool)
@@ -213,7 +213,7 @@ contract ConcentratedLiquidityPool is IPool {
         return amountOut;
     }
 
-    function collect(bytes calldata data) public lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
+    function collect(bytes calldata data) external lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
         (int24 lower, int24 upper, address recipient, bool unwrapBento) = abi.decode(data, (int24, int24, address, bool));
 
         (uint256 amount0fees, uint256 amount1fees) = _updatePosition(msg.sender, lower, upper, 0);
@@ -231,7 +231,7 @@ contract ConcentratedLiquidityPool is IPool {
     /// @dev price is √(y/x)
     /// - x is token0
     /// - zero for one -> price will move down.
-    function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
+    function swap(bytes calldata data) external override lock returns (uint256 amountOut) {
         (bool zeroForOne, uint256 inAmount, address recipient, bool unwrapBento) = abi.decode(data, (bool, uint256, address, bool));
 
         SwapCache memory cache = SwapCache({

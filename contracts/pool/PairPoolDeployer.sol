@@ -5,12 +5,13 @@ pragma solidity >=0.8.0;
 /// @notice Trident exchange pool deployer for whitelisted pair template factories.
 /// @author Mudit Gupta.
 contract PairPoolDeployer {
+    address public immutable masterDeployer;
+    
     mapping(address => mapping(address => address[])) public pools;
     mapping(bytes => address) public configAddress;
-    address public immutable masterDeployer;
 
     constructor(address _masterDeployer) {
-        require(_masterDeployer != address(0), "PairPoolDeployer: ZERO_ADDRESS");
+        require(_masterDeployer != address(0), "ZERO_ADDRESS");
         masterDeployer = _masterDeployer;
     }
 
@@ -20,20 +21,20 @@ contract PairPoolDeployer {
         bytes memory creationCode,
         bytes memory deployData
     ) internal returns (address pair) {
-        require(token0 < token1, "PairPoolDeployer: INVALID_TOKEN_ORDER");
-        require(configAddress[deployData] == address(0), "PairPoolDeployer: POOL_ALREADY_DEPLOYED");
-
-        // NB Salt is not actually needed since creationCodeWithConfig already contains the salt.
+        require(token0 < token1, "INVALID_TOKEN_ORDER");
+        require(configAddress[deployData] == address(0), "POOL_ALREADY_DEPLOYED");
+        // @dev Salt is not actually needed since `creationCodeWithConfig` already contains the salt.
         bytes32 salt = keccak256(deployData);
-
+        // @dev Data padded after the creation code becomes input to the contructor of the deployed contract.
         bytes memory creationCodeWithConfig = abi.encodePacked(creationCode, abi.encode(deployData, masterDeployer));
-
+        // @dev Deploy the contract - revert if deployment fails.
         assembly {
             pair := create2(0, add(creationCodeWithConfig, 32), mload(creationCodeWithConfig), salt)
             if iszero(extcodesize(pair)) {
                 revert(0, 0)
             }
         }
+        // @dev Store the address of the deployed contract.
         pools[token0][token1].push(pair);
         configAddress[deployData] = pair;
     }

@@ -58,10 +58,7 @@ contract HybridPool is IPool, TridentERC20 {
 
     /// @dev Only set immutable variables here - state changes made here will not be used.
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (address tokenA, address tokenB, uint256 _swapFee, uint256 a) = abi.decode(
-            _deployData,
-            (address, address, uint256, uint256)
-        );
+        (address tokenA, address tokenB, uint256 _swapFee, uint256 a) = abi.decode(_deployData, (address, address, uint256, uint256));
 
         require(tokenA != address(0), "HybridPool: ZERO_ADDRESS");
         require(tokenA != tokenB, "HybridPool: IDENTICAL_ADDRESSES");
@@ -88,8 +85,9 @@ contract HybridPool is IPool, TridentERC20 {
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
+        (uint256 fee0, uint256 fee1) = _unoptimalMintFee(amount0, amount1, _reserve0, _reserve1);
 
-        uint256 newLiq = _computeLiquidity(balance0, balance1);
+        uint256 newLiq = _computeLiquidity(balance0 - fee0, balance1 - fee1);
         if (_totalSupply == 0) {
             liquidity = newLiq - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
@@ -151,7 +149,7 @@ contract HybridPool is IPool, TridentERC20 {
             amount0 = 0;
         } else {
             // @dev Swap token1 for token0.
-            require(tokenOut == address(token1), "INVALID_OUTPUT_TOKEN");
+            require(tokenOut == address(token0), "INVALID_OUTPUT_TOKEN");
             uint256 fee = _handleFee(token1, amount1);
             amount0 += _getAmountOut(amount1 - fee, _reserve0 - amount0, _reserve1 - amount1, false);
             _transferAmount(token0, to, amount0, unwrapBento);
@@ -164,8 +162,7 @@ contract HybridPool is IPool, TridentERC20 {
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
-    function swap(bytes calldata data) public override returns (uint256 finalAmountOut) {
-        require(unlocked == 1, "LOCKED");
+    function swap(bytes calldata data) public override lock returns (uint256 finalAmountOut) {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint256 _reserve0, uint256 _reserve1) = _reserve();
         (uint256 balance0, uint256 balance1) = _balance();
@@ -425,5 +422,23 @@ contract HybridPool is IPool, TridentERC20 {
             }
         }
         return y;
+    }
+
+    // @dev this fee is charged to cover for swap fee when people add unbalanced liquidity.
+    function _unoptimalMintFee(
+        uint256 _amount0,
+        uint256 _amount1,
+        uint256 _reserve0,
+        uint256 _reserve1
+    ) internal view returns (uint256 token0Fee, uint256 token1Fee) {
+        if (_reserve0 == 0 || _reserve1 == 0) return (0, 0);
+
+        uint256 amount1Optimal = (_amount0 * _reserve1) / _reserve0;
+        if (amount1Optimal <= _amount1) {
+            token1Fee = (swapFee * (_amount1 - amount1Optimal)) / (2 * MAX_FEE);
+        } else {
+            uint256 amount0Optimal = (_amount1 * _reserve0) / _reserve1;
+            token0Fee = (swapFee * (_amount0 - amount0Optimal)) / (2 * MAX_FEE);
+        }
     }
 }
