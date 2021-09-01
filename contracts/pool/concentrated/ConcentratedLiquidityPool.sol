@@ -8,6 +8,7 @@ import "../../libraries/concentratedPool/FullMath.sol";
 import "../../libraries/concentratedPool/UnsafeMath.sol";
 import "../../libraries/concentratedPool/DyDxMath.sol";
 import "../../libraries/concentratedPool/SwapLib.sol";
+import "../../libraries/concentratedPool/Ticks.sol";
 import "hardhat/console.sol";
 
 // TODO remove need for interface by calling the master deployer via low level calls
@@ -23,7 +24,8 @@ interface IMasterDeployer {
 /// @dev The reserves are stored as bento shares.
 ///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
 contract ConcentratedLiquidityPool is IPool {
-    using SwapLib for mapping(int24 => SwapLib.Tick);
+    using Ticks for mapping(int24 => Ticks.Tick);
+
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Collect(address indexed sender, uint256 amount0, uint256 amount1);
@@ -55,17 +57,8 @@ contract ConcentratedLiquidityPool is IPool {
     uint160 public secondsPerLiquidity; /// @dev multiplied by 2^128
     uint32 public lastObservation;
 
-    mapping(int24 => SwapLib.Tick) public ticks;
+    mapping(int24 => Ticks.Tick) public ticks;
     mapping(address => mapping(int24 => mapping(int24 => Position))) public positions;
-
-    struct Tick {
-        int24 previousTick;
-        int24 nextTick;
-        uint128 liquidity;
-        uint256 feeGrowthOutside0; // @dev Per unit of liquidity.
-        uint256 feeGrowthOutside1;
-        uint160 secondsPerLiquidityOutside;
-    }
 
     struct Position {
         uint128 liquidity;
@@ -114,8 +107,8 @@ contract ConcentratedLiquidityPool is IPool {
         token1 = _token1;
         swapFee = _swapFee;
         price = _price;
-        ticks[TickMath.MIN_TICK] = SwapLib.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
-        ticks[TickMath.MAX_TICK] = SwapLib.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
+        ticks[TickMath.MIN_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
+        ticks[TickMath.MAX_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
         nearestTick = TickMath.MIN_TICK;
         bento = _masterDeployer.bento();
         barFeeTo = _masterDeployer.barFeeTo();
@@ -330,7 +323,7 @@ contract ConcentratedLiquidityPool is IPool {
             );
 
             if (cross) {
-                (cache.currentLiquidity, cache.nextTickToCross) = SwapLib.cross(
+                (cache.currentLiquidity, cache.nextTickToCross) = Ticks.cross(
                     ticks,
                     cache.nextTickToCross,
                     secondsPerLiquidity,
@@ -475,14 +468,14 @@ contract ConcentratedLiquidityPool is IPool {
             ticks[lower].liquidity += amount;
         } else {
             // @dev Inserting a new tick.
-            SwapLib.Tick storage old = ticks[lowerOld];
+            Ticks.Tick storage old = ticks[lowerOld];
 
             require((old.liquidity != 0 || lowerOld == TickMath.MIN_TICK) && lowerOld < lower && lower < old.nextTick, "LOWER_ORDER");
 
             if (lower <= currentNearestTick) {
-                ticks[lower] = SwapLib.Tick(lowerOld, old.nextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
+                ticks[lower] = Ticks.Tick(lowerOld, old.nextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
             } else {
-                ticks[lower] = SwapLib.Tick(lowerOld, old.nextTick, amount, 0, 0, 0);
+                ticks[lower] = Ticks.Tick(lowerOld, old.nextTick, amount, 0, 0, 0);
             }
 
             old.nextTick = lower;
@@ -493,14 +486,14 @@ contract ConcentratedLiquidityPool is IPool {
             ticks[upper].liquidity += amount;
         } else {
             // @dev Inserting a new tick.
-            SwapLib.Tick storage old = ticks[upperOld];
+            Ticks.Tick storage old = ticks[upperOld];
 
             require(old.liquidity != 0 && old.nextTick > upper && upperOld < upper, "UPPER_ORDER");
 
             if (upper <= currentNearestTick) {
-                ticks[upper] = SwapLib.Tick(upperOld, old.nextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
+                ticks[upper] = Ticks.Tick(upperOld, old.nextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
             } else {
-                ticks[upper] = SwapLib.Tick(upperOld, old.nextTick, amount, 0, 0, 0);
+                ticks[upper] = Ticks.Tick(upperOld, old.nextTick, amount, 0, 0, 0);
             }
 
             old.nextTick = upper;
@@ -520,12 +513,12 @@ contract ConcentratedLiquidityPool is IPool {
         int24 upper,
         uint128 amount
     ) internal {
-        SwapLib.Tick storage current = ticks[lower];
+        Ticks.Tick storage current = ticks[lower];
 
         if (lower != TickMath.MIN_TICK && current.liquidity == amount) {
             /// @dev Delete lower tick.
-            SwapLib.Tick storage previous = ticks[current.previousTick];
-            SwapLib.Tick storage next = ticks[current.nextTick];
+            Ticks.Tick storage previous = ticks[current.previousTick];
+            Ticks.Tick storage next = ticks[current.nextTick];
 
             previous.nextTick = current.nextTick;
             next.previousTick = current.previousTick;
@@ -541,8 +534,8 @@ contract ConcentratedLiquidityPool is IPool {
 
         if (upper != TickMath.MAX_TICK && current.liquidity == amount) {
             // @dev Delete upper tick.
-            SwapLib.Tick storage previous = ticks[current.previousTick];
-            SwapLib.Tick storage next = ticks[current.nextTick];
+            Ticks.Tick storage previous = ticks[current.previousTick];
+            Ticks.Tick storage next = ticks[current.nextTick];
 
             previous.nextTick = current.nextTick;
             next.previousTick = current.previousTick;
@@ -572,8 +565,8 @@ contract ConcentratedLiquidityPool is IPool {
     function rangeFeeGrowth(int24 lowerTick, int24 upperTick) public view returns (uint256 feeGrowthInside0, uint256 feeGrowthInside1) {
         int24 currentTick = nearestTick;
 
-        SwapLib.Tick storage lower = ticks[lowerTick];
-        SwapLib.Tick storage upper = ticks[upperTick];
+        Ticks.Tick storage lower = ticks[lowerTick];
+        Ticks.Tick storage upper = ticks[upperTick];
 
         // @dev Calculate fee growth below & above.
         uint256 _feeGrowthGlobal0 = feeGrowthGlobal0;
@@ -606,8 +599,8 @@ contract ConcentratedLiquidityPool is IPool {
     function rangeSecondsInside(int24 lowerTick, int24 upperTick) public view returns (uint256 secondsInside) {
         int24 currentTick = nearestTick;
 
-        SwapLib.Tick storage lower = ticks[lowerTick];
-        SwapLib.Tick storage upper = ticks[upperTick];
+        Ticks.Tick storage lower = ticks[lowerTick];
+        Ticks.Tick storage upper = ticks[upperTick];
 
         uint256 secondsGlobal = secondsPerLiquidity;
         uint256 secondsBelow;
