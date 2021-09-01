@@ -1,6 +1,7 @@
 // @ts-nocheck
 
-import { initialize } from "./harness";
+import { initialize, addLiquidity } from "./harness";
+import { getBigNumber } from "./harness/helpers";
 
 describe("Router", function () {
   before(async function () {
@@ -8,8 +9,8 @@ describe("Router", function () {
   });
 
   describe("Pool", function () {
-    it("Should add liquidity directly to the pool", async function () {
-      console.log("got here");
+    it("Should add balanced liquidity to a balanced pool", async function () {
+      await addLiquidity(0, getBigNumber(100), getBigNumber(100));
     });
   });
 });
