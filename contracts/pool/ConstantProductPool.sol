@@ -22,6 +22,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
     uint8 internal constant PRECISION = 112;
     uint256 internal constant MAX_FEE = 10000; // @dev 100%.
     uint256 internal constant MAX_FEE_SQUARE = 100000000;
+    uint256 internal constant E18 = uint256(10)**18;
     uint256 public immutable swapFee;
     uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
 
@@ -86,14 +87,16 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
         _mintFee(_reserve0, _reserve1, _totalSupply);
 
-        uint256 computed = TridentMath.sqrt(balance0 * balance1);
+        uint256 amount0 = balance0 - _reserve0;
+        uint256 amount1 = balance1 - _reserve1;
+        (uint256 fee0, uint256 fee1) = _unoptimalMintFee(amount0, amount1, _reserve0, _reserve1);
+        uint256 computed = TridentMath.sqrt((balance0 - fee0) * (balance1 - fee1));
+
         if (_totalSupply == 0) {
             _mint(address(0), MINIMUM_LIQUIDITY);
-            (, bytes memory _migrator) = masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.migrator.selector));
-            address migrator = abi.decode(_migrator, (address));
+            address migrator = IMasterDeployer(masterDeployer).migrator();
             if (msg.sender == migrator) {
-                (, bytes memory _liquidity) = migrator.staticcall(abi.encodeWithSelector(IMigrator.desiredLiquidity.selector));
-                liquidity = abi.decode(_liquidity, (uint256));
+                liquidity = IMigrator(migrator).desiredLiquidity();
                 require(liquidity != 0 && liquidity != type(uint256).max, "BAD_DESIRED_LIQUIDITY");
             } else {
                 require(migrator == address(0), "ONLY_MIGRATOR");
@@ -106,13 +109,8 @@ contract ConstantProductPool is IPool, TridentERC20 {
         require(liquidity != 0, "INSUFFICIENT_LIQUIDITY_MINTED");
         _mint(recipient, liquidity);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        kLast = computed;
-        // @dev These are safe from underflow - reserves `_update` after withdrawals and will be less than routed balances. 
-        unchecked {
-            uint256 amount0 = balance0 - _reserve0;
-            uint256 amount1 = balance1 - _reserve1;
-            emit Mint(msg.sender, amount0, amount1, recipient);
-        }
+        kLast = TridentMath.sqrt(balance0 * balance1);
+        emit Mint(msg.sender, amount0, amount1, recipient);
     }
 
     /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
@@ -162,7 +160,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         _burn(address(this), liquidity);
         unchecked {
             if (tokenOut == token1) {
-                // @dev Swap `token0` for `token1` 
+                // @dev Swap `token0` for `token1`
                 // - calculate `amountOut` as if the user first withdrew balanced liquidity and then swapped `token0` for `token1`.
                 amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1);
                 _transfer(token1, amount1, recipient, unwrapBento);
@@ -340,6 +338,23 @@ contract ConstantProductPool is IPool, TridentERC20 {
             // @dev transfer(address,address,address,uint256).
             (bool success, ) = bento.call(abi.encodeWithSelector(0xf18d03cc, token, address(this), to, shares));
             require(success, "TRANSFER_FAILED");
+        }
+    }
+    
+    /// @dev This fee is charged to cover for `swapFee` when users add unbalanced liquidity.
+    function _unoptimalMintFee(
+        uint256 _amount0,
+        uint256 _amount1,
+        uint256 _reserve0,
+        uint256 _reserve1
+    ) internal view returns (uint256 token0Fee, uint256 token1Fee) {
+        if (_reserve0 == 0 || _reserve1 == 0) return (0, 0);
+        uint256 amount1Optimal = (_amount0 * _reserve1) / _reserve0;
+        if (amount1Optimal <= _amount1) {
+            token1Fee = (swapFee * (_amount1 - amount1Optimal)) / (2 * MAX_FEE);
+        } else {
+            uint256 amount0Optimal = (_amount1 * _reserve0) / _reserve1;
+            token0Fee = (swapFee * (_amount0 - amount0Optimal)) / (2 * MAX_FEE);
         }
     }
 
