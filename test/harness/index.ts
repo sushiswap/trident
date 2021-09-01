@@ -1,20 +1,23 @@
 // @ts-nocheck
 
 import { BigNumber, utils } from "ethers";
-import { Multicall } from "../../typechain/Multicall";
 import { ethers } from "hardhat";
 import { expect } from "chai";
-import { getBigNumber, sqrt, ZERO, TWO } from "./helpers";
-import { Token } from "@sushiswap/sdk";
-
-const MAX_FEE = BigNumber.from(10000);
+import {
+  encodedSwapData,
+  getBigNumber,
+  randBetween,
+  sqrt,
+  ZERO,
+  TWO,
+  MAX_FEE,
+} from "./helpers";
 
 let accounts = [];
 // First token is used as weth
 let tokens = [];
 let pools = [];
 let bento, masterDeployer, router;
-let poolTokens = new Map();
 let aliceEncoded;
 
 export async function initialize() {
@@ -37,15 +40,15 @@ export async function initialize() {
   const Pool = await ethers.getContractFactory("ConstantProductPool");
 
   let promises = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 10; i++) {
     promises.push(ERC20.deploy("Token" + i, "TOK" + i, getBigNumber(1000000)));
   }
   tokens = await Promise.all(promises);
 
   bento = await Bento.deploy(tokens[0].address);
   masterDeployer = await Deployer.deploy(
-    17,
-    accounts[0].address,
+    randBetween(1, 9999),
+    accounts[1].address,
     bento.address
   );
   router = await TridentRouter.deploy(bento.address, tokens[0].address);
@@ -87,45 +90,39 @@ export async function initialize() {
 
   // Create pools
   promises = [];
-  for (let i = 0; i < tokens.length; i++) {
-    for (let j = i + 1; j < tokens.length; j++) {
-      // Pool deploy data
-      let token0, token1;
-      if (tokens[i].address < tokens[j].address) {
-        token0 = tokens[i];
-        token1 = tokens[j];
-      } else {
-        token0 = tokens[j];
-        token1 = tokens[i];
-      }
-      const deployData = utils.defaultAbiCoder.encode(
-        ["address", "address", "uint8", "bool"],
-        [token0.address, token1.address, 30, false]
-      );
-      const salt = utils.keccak256(deployData);
-      const constructorParams = utils.defaultAbiCoder
-        .encode(["bytes", "address"], [deployData, masterDeployer.address])
-        .substring(2);
-      const initCodeHash = utils.keccak256(Pool.bytecode + constructorParams);
-      const poolAddress = utils.getCreate2Address(
-        poolFactory.address,
-        salt,
-        initCodeHash
-      );
-      poolTokens.set(poolAddress, [token0, token1]);
-      pools.push(Pool.attach(poolAddress));
-
-      promises.push(masterDeployer.deployPool(poolFactory.address, deployData));
+  for (let i = 0; i < tokens.length - 1; i++) {
+    // Pool deploy data
+    let token0, token1;
+    if (tokens[i].address < tokens[i + 1].address) {
+      token0 = tokens[i];
+      token1 = tokens[i + 1];
+    } else {
+      token0 = tokens[i + 1];
+      token1 = tokens[i];
     }
+    const deployData = utils.defaultAbiCoder.encode(
+      ["address", "address", "uint8", "bool"],
+      [token0.address, token1.address, 30, false]
+    );
+    const salt = utils.keccak256(deployData);
+    const constructorParams = utils.defaultAbiCoder
+      .encode(["bytes", "address"], [deployData, masterDeployer.address])
+      .substring(2);
+    const initCodeHash = utils.keccak256(Pool.bytecode + constructorParams);
+    const poolAddress = utils.getCreate2Address(
+      poolFactory.address,
+      salt,
+      initCodeHash
+    );
+    pools.push(Pool.attach(poolAddress));
+    promises.push(masterDeployer.deployPool(poolFactory.address, deployData));
   }
   await Promise.all(promises);
 
   // Add initial liquidity of 1k tokens each to every pool
-  promises = [];
   for (let i = 0; i < pools.length; i++) {
-    promises.push(addLiquidity(i, getBigNumber(1000), getBigNumber(1000)));
+    await addLiquidity(i, getBigNumber(1000), getBigNumber(1000));
   }
-  await Promise.all(promises);
 }
 
 export async function addLiquidity(
@@ -135,10 +132,20 @@ export async function addLiquidity(
   native0 = false,
   native1 = false
 ) {
-  let pool = pools[poolNumber];
-  let [token0, token1] = poolTokens.get(pool.address);
+  const pool = pools[poolNumber];
+  const token0 = tokens[poolNumber];
+  const token1 = tokens[poolNumber + 1];
 
-  // [iTS, iPB0, iPB1, iUB0, iUB1, iUNB0, iUNB1]
+  // [
+  //   Total supply,
+  //   Pool's token0 bento balance,
+  //   Pool's token1 bento balance,
+  //   Alice's token0 bento balance,
+  //   Alice's token1 bento balance,
+  //   Alice's token0 native balance,
+  //   Alice's token1 native balance,
+  //   Alice's LP balance
+  // ]
   const initialBalances = await getBalances(
     pool,
     accounts[0].address,
@@ -164,6 +171,248 @@ export async function addLiquidity(
     masterDeployer.barFee(),
     pools[poolNumber].swapFee(),
   ]);
+
+  const [computedLiquidity, expectedIncreaseInTotalSupply] =
+    liquidityCalculations(
+      initialBalances,
+      amount0,
+      amount1,
+      kLast,
+      barFee,
+      swapFee
+    );
+
+  await router.addLiquidity(
+    liquidityInput,
+    pool.address,
+    computedLiquidity,
+    aliceEncoded
+  );
+
+  const finalBalances = await getBalances(
+    pool,
+    accounts[0].address,
+    token0,
+    token1
+  );
+
+  // Total supply increased
+  expect(finalBalances[0]).eq(
+    initialBalances[0].add(expectedIncreaseInTotalSupply)
+  );
+  // Pool balances increased
+  expect(finalBalances[1]).eq(initialBalances[1].add(amount0));
+  expect(finalBalances[2]).eq(initialBalances[2].add(amount1));
+  // Users' token balances decreased
+  if (native0) {
+    expect(finalBalances[3]).eq(initialBalances[3]);
+    expect(finalBalances[5]).eq(initialBalances[5].sub(amount0));
+  } else {
+    expect(finalBalances[3]).eq(initialBalances[3].sub(amount0));
+    expect(finalBalances[5]).eq(initialBalances[5]);
+  }
+  if (native1) {
+    expect(finalBalances[4]).eq(initialBalances[4]);
+    expect(finalBalances[6]).eq(initialBalances[6].sub(amount1));
+  } else {
+    expect(finalBalances[4]).eq(initialBalances[4].sub(amount1));
+    expect(finalBalances[6]).eq(initialBalances[6]);
+  }
+  // Users' LP balance increased
+  expect(finalBalances[7]).eq(initialBalances[7].add(computedLiquidity));
+}
+
+export async function swap(
+  hops,
+  amountIn,
+  reverse = false,
+  nativeIn = false,
+  nativeOut = false
+) {
+  if (hops <= 0) return;
+
+  // [[pool0token0. pool0token1, pool1token0....], [userTokenInBento, userTokenOutBento, userTokenInNative, userTokenOutNative]]
+  const [initialPoolBalances, initialUserBalances] = await getSwapBalances(
+    hops,
+    accounts[0].address
+  );
+  const amountOuts = await getSwapAmounts(
+    hops,
+    amountIn,
+    initialPoolBalances,
+    reverse
+  );
+
+  const tokenIn = reverse ? tokens[hops].address : tokens[0].address;
+  const tokenOut = reverse ? tokens[0].address : tokens[hops].address;
+
+  if (hops == 1) {
+    const params = {
+      amountIn: amountIn,
+      amountOutMinimum: amountOuts[0],
+      pool: pools[0].address,
+      tokenIn: tokenIn,
+      data: ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [tokenIn, accounts[0].address, nativeOut]
+      ),
+    };
+    if (nativeIn) {
+      await router.exactInputSingleWithNativeToken(params);
+    } else {
+      await router.exactInputSingle(params);
+    }
+  } else {
+    const path = getPath(hops, reverse, nativeOut, accounts[0].address);
+    const amountOutMinimum = reverse
+      ? amountOuts[0]
+      : amountOuts[amountOuts.length - 1];
+    const params = {
+      tokenIn: tokenIn,
+      amountIn: amountIn,
+      amountOutMinimum: 1, // TODO: Fix
+      path: path,
+    };
+    if (nativeIn) {
+      await router.exactInputWithNativeToken(params);
+    } else {
+      await router.exactInput(params);
+    }
+  }
+
+  const [finalPoolBalances, finalUserBalances] = await getSwapBalances(
+    hops,
+    accounts[0].address
+  );
+}
+
+async function getBalances(pool, user, token0, token1) {
+  return Promise.all([
+    pool.totalSupply(),
+    bento.balanceOf(token0.address, pool.address),
+    bento.balanceOf(token1.address, pool.address),
+    bento.balanceOf(token0.address, user),
+    bento.balanceOf(token1.address, user),
+    token0.balanceOf(user),
+    token1.balanceOf(user),
+    pool.balanceOf(user),
+  ]);
+}
+
+async function getSwapBalances(hops, user) {
+  let promises = [];
+  for (let i = 0; i < hops; i++) {
+    promises.push(bento.balanceOf(tokens[i].address, pools[i].address)),
+      promises.push(bento.balanceOf(tokens[i + 1].address, pools[i].address));
+  }
+  const poolBalances = await Promise.all(promises);
+  const userBalances = await Promise.all([
+    bento.balanceOf(user, tokens[0].address),
+    bento.balanceOf(user, tokens[hops + 1].address),
+    tokens[0].balanceOf(user),
+    tokens[hops + 1].balanceOf(user),
+  ]);
+  return [poolBalances, userBalances];
+}
+
+async function getSwapAmounts(hops, amountIn, poolBalances, reverse = false) {
+  let promises = [];
+  for (let i = 0; i < hops; i++) {
+    promises.push(pools[i].swapFee());
+  }
+  const poolFees = await Promise.all(promises);
+  let amountOuts = [];
+
+  if (reverse) {
+    for (let i = 0; i < hops; i++) {
+      const poolIndex = hops - i - 1;
+      amountOuts.push(
+        getAmountOut(
+          amountIn,
+          poolBalances[poolIndex + 1],
+          poolBalances[poolIndex],
+          poolFees[poolIndex]
+        )
+      );
+      amountIn = amountOuts[i];
+    }
+    amountOuts.reverse();
+    return amountOuts;
+  }
+
+  for (let i = 0; i < hops; i++) {
+    amountOuts.push(
+      getAmountOut(amountIn, poolBalances[i], poolBalances[i + 1], poolFees[i])
+    );
+    amountIn = amountOuts[i];
+  }
+  return amountOuts;
+}
+
+function getAmountOut(amountIn, reserveIn, reserveOut, swapFee) {
+  const amountInWithFee = amountIn.mul(MAX_FEE.sub(swapFee));
+  return amountInWithFee
+    .mul(reserveOut)
+    .div(reserveIn.mul(MAX_FEE).add(amountInWithFee));
+}
+
+function getPath(hops, reverse, nativeOut, user) {
+  let path = [];
+
+  if (reverse) {
+    for (let i = 0; i < hops; i++) {
+      const poolIndex = hops - i - 1;
+      path.push({
+        pool: pools[poolIndex].address,
+        data: encodedSwapData(
+          tokens[poolIndex + 1].address,
+          i == hops - 1 ? user : pools[poolIndex - 1].address,
+          i == hops - 1 ? nativeOut : false
+        ),
+      });
+    }
+    return path;
+  }
+
+  for (let i = 0; i < hops; i++) {
+    path.push({
+      pool: pools[i].address,
+      data: encodedSwapData(
+        tokens[i].address,
+        i == hops - 1 ? user : pools[i + 1].address,
+        i == hops - 1 ? nativeOut : false
+      ),
+    });
+  }
+  return path;
+}
+
+function unoptimalMintFee(amount0, amount1, reserve0, reserve1, swapFee) {
+  if (reserve0.isZero() || reserve1.isZero()) return [ZERO, ZERO];
+
+  const amount1Optimal = amount0.mul(reserve1).div(reserve0);
+  if (amount1Optimal.lte(amount1)) {
+    return [
+      ZERO,
+      swapFee.mul(amount1.sub(amount1Optimal)).div(MAX_FEE.mul(TWO)),
+    ];
+  } else {
+    const amount0Optimal = amount1.mul(reserve0).div(reserve1);
+    return [
+      swapFee.mul(amount0.sub(amount0Optimal)).div(MAX_FEE.mul(TWO)),
+      ZERO,
+    ];
+  }
+}
+
+function liquidityCalculations(
+  initialBalances,
+  amount0,
+  amount1,
+  kLast,
+  barFee,
+  swapFee
+) {
   const preMintComputed = sqrt(initialBalances[1].mul(initialBalances[2]));
   const feeMint = preMintComputed.isZero()
     ? ZERO
@@ -187,50 +436,10 @@ export async function addLiquidity(
     ? computed.sub(BigNumber.from(1000))
     : computed
         .sub(preMintComputed)
-        .mul(initialBalances[0])
+        .mul(updatedTotalSupply)
         .div(preMintComputed);
-
-  await router.addLiquidity(
-    liquidityInput,
-    pool.address,
-    computedLiquidity,
-    aliceEncoded
-  );
-
-  const finalBalances = await getBalances(
-    pool,
-    accounts[0].address,
-    token0,
-    token1
-  );
-}
-
-async function getBalances(pool, user, token0, token1) {
-  return Promise.all([
-    pool.totalSupply(),
-    bento.balanceOf(token0.address, pool.address),
-    bento.balanceOf(token1.address, pool.address),
-    bento.balanceOf(token0.address, user),
-    bento.balanceOf(token1.address, user),
-    token0.balanceOf(user),
-    token1.balanceOf(user),
-  ]);
-}
-
-function unoptimalMintFee(amount0, amount1, reserve0, reserve1, swapFee) {
-  if (reserve0.isZero() || reserve1.isZero()) return [ZERO, ZERO];
-
-  const amount1Optimal = amount0.mul(reserve1).div(reserve0);
-  if (amount1Optimal.lte(amount1)) {
-    return [
-      ZERO,
-      swapFee.mul(amount1.sub(amount1Optimal)).div(MAX_FEE.mul(TWO)),
-    ];
-  } else {
-    const amount1Optimal = amount1.mul(reserve0).div(reserve1);
-    return [
-      swapFee.mul(amount0.sub(amount0Optimal)).div(MAX_FEE.mul(TWO)),
-      ZERO,
-    ];
-  }
+  const expectedIncreaseInTotalSupply = computedLiquidity
+    .add(feeMint)
+    .add(preMintComputed.isZero() ? BigNumber.from(1000) : ZERO);
+  return [computedLiquidity, expectedIncreaseInTotalSupply];
 }
