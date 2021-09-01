@@ -22,6 +22,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
     uint8 internal constant PRECISION = 112;
     uint256 internal constant MAX_FEE = 10000; // @dev 100%.
     uint256 internal constant MAX_FEE_SQUARE = 100000000;
+    uint256 internal constant E18 = uint256(10)**18;
     uint256 public immutable swapFee;
     uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
 
@@ -82,8 +83,9 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
-        uint256 computed = TridentMath.sqrt(balance0 * balance1);
-        
+        (uint256 fee0, uint256 fee1) = _unoptimalMintFee(amount0, amount1, _reserve0, _reserve1);
+        uint256 computed = TridentMath.sqrt((balance0 - fee0) * (balance1 - fee1));
+
         if (_totalSupply == 0) {
             _mint(address(0), MINIMUM_LIQUIDITY);
             address migrator = MasterDeployer(masterDeployer).migrator();
@@ -101,7 +103,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         require(liquidity != 0, "INSUFFICIENT_LIQUIDITY_MINTED");
         _mint(recipient, liquidity);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        kLast = computed;
+        kLast = TridentMath.sqrt(balance0 * balance1);
         emit Mint(msg.sender, amount0, amount1, recipient);
     }
 
@@ -150,7 +152,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
         _burn(address(this), liquidity);
         if (tokenOut == token1) {
-            // @dev Swap `token0` for `token1` 
+            // @dev Swap `token0` for `token1`
             // - calculate `amountOut` as if the user first withdrew balanced liquidity and then swapped `token0` for `token1`.
             amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1);
             _transfer(token1, amount1, recipient, unwrapBento);
@@ -350,5 +352,21 @@ contract ConstantProductPool is IPool, TridentERC20 {
         )
     {
         return _getReserves();
+    }
+
+    // @dev this fee is charged to cover for swap fee when people add unbalanced liquidity.
+    function _unoptimalMintFee(
+        uint256 _amount0,
+        uint256 _amount1,
+        uint256 _reserve0,
+        uint256 _reserve1
+    ) internal view returns (uint256 token0Fee, uint256 token1Fee) {
+        uint256 amount1Optimal = (_amount0 * _reserve1) / _reserve0;
+        if (amount1Optimal <= _amount1) {
+            token1Fee = ((swapFee * (_amount1 - amount1Optimal)) / 2) * MAX_FEE;
+        } else {
+            uint256 amount0Optimal = (_amount1 * _reserve0) / _reserve1;
+            token0Fee = ((swapFee * (_amount0 - amount0Optimal)) / 2) * MAX_FEE;
+        }
     }
 }
