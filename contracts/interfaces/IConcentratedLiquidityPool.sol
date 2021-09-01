@@ -15,9 +15,17 @@ interface IConcentratedLiquidityPool is IPool {
         uint160 secondsPerLiquidityOutside;
     }
 
+    function token0() external view returns (address);
+
+    function token1() external view returns (address);
+
     function ticks(int24 _tick) external view returns (Tick memory tick);
 
     function feeGrowthGlobal0() external view returns (uint256);
 
     function rangeSecondsInside(int24 lowerTick, int24 upperTick) external view returns (uint256);
+
+    function rangeFeeGrowth(int24 lowerTick, int24 upperTick) external view returns (uint256 feeGrowthInside0, uint256 feeGrowthInside1);
+
+    function collect(bytes calldata data) external returns (IPool.TokenAmount[] memory withdrawnAmounts);
 }
