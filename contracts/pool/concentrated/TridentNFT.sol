@@ -40,12 +40,13 @@ contract TridentNFT {
         emit Transfer(address(0), recipient, totalSupply++);
     }
 
-    function _burn(uint256 tokenId) internal {
+    function _burn(address sender, uint256 tokenId) internal {
+        require(sender == ownerOf[tokenId], "NOT_OWNER");
         totalSupply--;
-        balanceOf[msg.sender]--;
+        balanceOf[sender]--;
         getApproved[tokenId] = address(0);
         ownerOf[tokenId] = address(0);
-        emit Transfer(msg.sender, address(0), tokenId);
+        emit Transfer(sender, address(0), tokenId);
     }
 
     function transfer(address recipient, uint256 tokenId) external {
