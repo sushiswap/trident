@@ -2,6 +2,8 @@
 
 pragma solidity >=0.8.0;
 
+import "../interfaces/IMasterDeployer.sol";
+import "../workInProgress/IMigrator.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/ITridentCallee.sol";
 import "../libraries/TridentMath.sol";
@@ -28,7 +30,8 @@ contract ConstantProductPool is IPool, TridentERC20 {
     address public immutable masterDeployer;
     address public immutable token0;
     address public immutable token1;
-
+    
+    uint256 public barFee;
     uint256 public price0CumulativeLast;
     uint256 public price1CumulativeLast;
     uint256 public kLast;
@@ -53,9 +56,10 @@ contract ConstantProductPool is IPool, TridentERC20 {
         require(_token0 != address(0), "ZERO_ADDRESS");
         require(_token0 != _token1, "IDENTICAL_ADDRESSES");
         require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
-
-        (, bytes memory _bento) = _masterDeployer.staticcall(abi.encodeWithSelector(0x4da31827)); // @dev bento().
-        (, bytes memory _barFeeTo) = _masterDeployer.staticcall(abi.encodeWithSelector(0x0c0a0cd2)); // @dev barFeeTo().
+        
+        (, bytes memory _barFee) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
+        (, bytes memory _barFeeTo) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFeeTo.selector)); 
+        (, bytes memory _bento) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.bento.selector));
 
         token0 = _token0;
         token1 = _token1;
@@ -64,8 +68,9 @@ contract ConstantProductPool is IPool, TridentERC20 {
         unchecked {
             MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
         }
-        bento = abi.decode(_bento, (address));
+        barFee = abi.decode(_barFee, (uint256));
         barFeeTo = abi.decode(_barFeeTo, (address));
+        bento = abi.decode(_bento, (address));
         masterDeployer = _masterDeployer;
         unlocked = 1;
         if (_twapSupport) blockTimestampLast = 1;
@@ -80,19 +85,14 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint256 _totalSupply = totalSupply;
 
         _mintFee(_reserve0, _reserve1, _totalSupply);
-        // @dev These are safe from underflow - reserves `_update` after withdrawals and will be less than routed balances. 
-        unchecked {
-            uint256 amount0 = balance0 - _reserve0;
-            uint256 amount1 = balance1 - _reserve1;
-            emit Mint(msg.sender, amount0, amount1, recipient);
-        }
+
         uint256 computed = TridentMath.sqrt(balance0 * balance1);
         if (_totalSupply == 0) {
             _mint(address(0), MINIMUM_LIQUIDITY);
-            (, bytes memory _migrator) = masterDeployer.staticcall(abi.encodeWithSelector(0x7cd07e47)); // @dev migrator().
+            (, bytes memory _migrator) = masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.migrator.selector));
             address migrator = abi.decode(_migrator, (address));
             if (msg.sender == migrator) {
-                (, bytes memory _liquidity) = migrator.staticcall(abi.encodeWithSelector(0x40dc0e37)); // @dev desiredLiquidity().
+                (, bytes memory _liquidity) = migrator.staticcall(abi.encodeWithSelector(IMigrator.desiredLiquidity.selector));
                 liquidity = abi.decode(_liquidity, (uint256));
                 require(liquidity != 0 && liquidity != type(uint256).max, "BAD_DESIRED_LIQUIDITY");
             } else {
@@ -107,6 +107,12 @@ contract ConstantProductPool is IPool, TridentERC20 {
         _mint(recipient, liquidity);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         kLast = computed;
+        // @dev These are safe from underflow - reserves `_update` after withdrawals and will be less than routed balances. 
+        unchecked {
+            uint256 amount0 = balance0 - _reserve0;
+            uint256 amount1 = balance1 - _reserve1;
+            emit Mint(msg.sender, amount0, amount1, recipient);
+        }
     }
 
     /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
@@ -232,6 +238,12 @@ contract ConstantProductPool is IPool, TridentERC20 {
             }
         }
     }
+    
+    /// @dev Updates `barFee` for Trident protocol.
+    function updateBarFee() public {
+        (, bytes memory _barFee) = masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
+        barFee = abi.decode(_barFee, (uint256));
+    }
 
     function _getReserves()
         internal
@@ -297,8 +309,6 @@ contract ConstantProductPool is IPool, TridentERC20 {
             if (computed > _kLast) {
                 // @dev `barFee` % of increase in liquidity.
                 // It's going to be slightly less than `barFee` % in reality due to the math.
-                (, bytes memory _barFee) = masterDeployer.staticcall(abi.encodeWithSelector(0xc14ad802)); // @dev barFee().
-                uint256 barFee = abi.decode(_barFee, (uint256));
                 uint256 liquidity = (_totalSupply * (computed - _kLast) * barFee) / computed / MAX_FEE;
                 if (liquidity != 0) {
                     _mint(barFeeTo, liquidity);
