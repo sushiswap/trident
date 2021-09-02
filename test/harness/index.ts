@@ -8,6 +8,7 @@ import {
   getBigNumber,
   randBetween,
   sqrt,
+  printHumanReadable,
   ZERO,
   TWO,
   MAX_FEE,
@@ -270,7 +271,7 @@ export async function swap(
     const params = {
       tokenIn: tokenIn,
       amountIn: amountIn,
-      amountOutMinimum: 1, // TODO: Fix
+      amountOutMinimum: amountOutMinimum,
       path: path,
     };
     if (nativeIn) {
@@ -329,8 +330,8 @@ async function getSwapAmounts(hops, amountIn, poolBalances, reverse = false) {
       amountOuts.push(
         getAmountOut(
           amountIn,
-          poolBalances[poolIndex + 1],
-          poolBalances[poolIndex],
+          poolBalances[2 * poolIndex + 1],
+          poolBalances[2 * poolIndex],
           poolFees[poolIndex]
         )
       );
@@ -342,7 +343,12 @@ async function getSwapAmounts(hops, amountIn, poolBalances, reverse = false) {
 
   for (let i = 0; i < hops; i++) {
     amountOuts.push(
-      getAmountOut(amountIn, poolBalances[i], poolBalances[i + 1], poolFees[i])
+      getAmountOut(
+        amountIn,
+        poolBalances[2 * i],
+        poolBalances[2 * i + 1],
+        poolFees[i]
+      )
     );
     amountIn = amountOuts[i];
   }
@@ -432,11 +438,12 @@ function liquidityCalculations(
       .add(amount0.sub(fee0))
       .mul(initialBalances[2].add(amount1.sub(fee1)))
   );
+  printHumanReadable([feeMint, initialBalances[0]]);
   const computedLiquidity = preMintComputed.isZero()
     ? computed.sub(BigNumber.from(1000))
     : computed
         .sub(preMintComputed)
-        .mul(updatedTotalSupply)
+        .mul(initialBalances[0])
         .div(preMintComputed);
   const expectedIncreaseInTotalSupply = computedLiquidity
     .add(feeMint)
