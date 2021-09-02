@@ -31,7 +31,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
     address public immutable masterDeployer;
     address public immutable token0;
     address public immutable token1;
-    
+
     uint256 public barFee;
     uint256 public price0CumulativeLast;
     uint256 public price1CumulativeLast;
@@ -57,9 +57,9 @@ contract ConstantProductPool is IPool, TridentERC20 {
         require(_token0 != address(0), "ZERO_ADDRESS");
         require(_token0 != _token1, "IDENTICAL_ADDRESSES");
         require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
-        
+
         (, bytes memory _barFee) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
-        (, bytes memory _barFeeTo) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFeeTo.selector)); 
+        (, bytes memory _barFeeTo) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFeeTo.selector));
         (, bytes memory _bento) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.bento.selector));
 
         token0 = _token0;
@@ -85,7 +85,9 @@ contract ConstantProductPool is IPool, TridentERC20 {
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 _totalSupply = totalSupply;
 
-        _mintFee(_reserve0, _reserve1, _totalSupply);
+        unchecked {
+            _totalSupply += _mintFee(_reserve0, _reserve1, _totalSupply);
+        }
 
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
@@ -121,7 +123,9 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint256 _totalSupply = totalSupply;
         uint256 liquidity = balanceOf[address(this)];
 
-        _mintFee(_reserve0, _reserve1, _totalSupply);
+        unchecked {
+            _totalSupply += _mintFee(_reserve0, _reserve1, _totalSupply);
+        }
 
         uint256 amount0 = (liquidity * balance0) / _totalSupply;
         uint256 amount1 = (liquidity * balance1) / _totalSupply;
@@ -152,7 +156,9 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint256 _totalSupply = totalSupply;
         uint256 liquidity = balanceOf[address(this)];
 
-        _mintFee(_reserve0, _reserve1, _totalSupply);
+        unchecked {
+            _totalSupply += _mintFee(_reserve0, _reserve1, _totalSupply);
+        }
 
         uint256 amount0 = (liquidity * balance0) / _totalSupply;
         uint256 amount1 = (liquidity * balance1) / _totalSupply;
@@ -236,7 +242,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
             }
         }
     }
-    
+
     /// @dev Updates `barFee` for Trident protocol.
     function updateBarFee() public {
         (, bytes memory _barFee) = masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
@@ -300,14 +306,14 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint112 _reserve0,
         uint112 _reserve1,
         uint256 _totalSupply
-    ) internal returns (uint256 computed) {
+    ) internal returns (uint256 liquidity) {
         uint256 _kLast = kLast;
         if (_kLast != 0) {
-            computed = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
+            uint256 computed = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
             if (computed > _kLast) {
                 // @dev `barFee` % of increase in liquidity.
                 // It's going to be slightly less than `barFee` % in reality due to the math.
-                uint256 liquidity = (_totalSupply * (computed - _kLast) * barFee) / computed / MAX_FEE;
+                liquidity = (_totalSupply * (computed - _kLast) * barFee) / computed / MAX_FEE;
                 if (liquidity != 0) {
                     _mint(barFeeTo, liquidity);
                 }
@@ -340,7 +346,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
             require(success, "TRANSFER_FAILED");
         }
     }
-    
+
     /// @dev This fee is charged to cover for `swapFee` when users add unbalanced liquidity.
     function _nonOptimalMintFee(
         uint256 _amount0,
