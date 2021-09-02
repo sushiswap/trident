@@ -343,18 +343,14 @@ contract ConcentratedLiquidityPool is IPool {
             liquidity = uint128(cache.currentLiquidity);
         }
 
-        (uint256 amount0, uint256 amount1) = _balance();
+        _updateReserves(zeroForOne, uint128(inAmount), amountOut, cache.totalFeeAmount);
 
-        _updateReserves(zeroForOne, uint128(inAmount), amount0, amount1, amountOut, cache.totalFeeAmount);
+        _updateFees(zeroForOne, cache.feeGrowthGlobal, uint128(cache.protocolFee));
 
         if (zeroForOne) {
-            feeGrowthGlobal1 += cache.feeGrowthGlobal;
-            token1ProtocolFee += uint128(cache.protocolFee);
             _transfer(token1, amountOut, recipient, unwrapBento);
             emit Swap(recipient, token0, token1, inAmount, amountOut);
         } else {
-            feeGrowthGlobal0 += cache.feeGrowthGlobal;
-            token0ProtocolFee += uint128(cache.protocolFee);
             _transfer(token0, amountOut, recipient, unwrapBento);
             emit Swap(recipient, token1, token0, inAmount, amountOut);
         }
@@ -363,11 +359,11 @@ contract ConcentratedLiquidityPool is IPool {
     function _updateReserves(
         bool zeroForOne,
         uint128 inAmount,
-        uint256 amount0,
-        uint256 amount1,
         uint256 amountOut,
         uint256 totalFeeAmount
     ) internal {
+        (uint256 amount0, uint256 amount1) = _balance();
+
         if (zeroForOne) {
             uint128 newBalance = reserve0 + inAmount;
             require(uint256(newBalance) <= amount0, "TOKEN0_MISSING");
@@ -378,6 +374,20 @@ contract ConcentratedLiquidityPool is IPool {
             require(uint256(newBalance) <= amount1, "TOKEN1_MISSING");
             reserve1 = newBalance;
             reserve0 -= (uint128(amountOut) + uint128(totalFeeAmount));
+        }
+    }
+
+    function _updateFees(
+        bool zeroForOne,
+        uint256 feeGrowthGlobal,
+        uint128 protocolFee
+    ) internal {
+        if (zeroForOne) {
+            feeGrowthGlobal1 += feeGrowthGlobal;
+            token1ProtocolFee += protocolFee;
+        } else {
+            feeGrowthGlobal0 += feeGrowthGlobal;
+            token0ProtocolFee += protocolFee;
         }
     }
 
