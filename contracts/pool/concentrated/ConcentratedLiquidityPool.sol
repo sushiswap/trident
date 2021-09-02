@@ -345,24 +345,39 @@ contract ConcentratedLiquidityPool is IPool {
 
         (uint256 amount0, uint256 amount1) = _balance();
 
+        _updateReserves(zeroForOne, uint128(inAmount), amount0, amount1, amountOut, cache.totalFeeAmount);
+
         if (zeroForOne) {
             feeGrowthGlobal0 += cache.feeGrowthGlobal;
-            uint128 newBalance = reserve0 + uint128(inAmount);
-            require(uint256(newBalance) <= amount0, "TOKEN0_MISSING");
-            reserve0 = newBalance;
-            reserve1 -= (uint128(amountOut) + uint128(cache.totalFeeAmount));
             token1ProtocolFee += uint128(cache.protocolFee);
             _transfer(token1, amountOut, recipient, unwrapBento);
             emit Swap(recipient, token0, token1, inAmount, amountOut);
         } else {
             feeGrowthGlobal0 += cache.feeGrowthGlobal;
-            uint128 newBalance = reserve1 + uint128(inAmount);
-            require(uint256(newBalance) <= amount1, "TOKEN1_MISSING");
-            reserve1 = newBalance;
-            reserve0 -= (uint128(amountOut) + uint128(cache.totalFeeAmount));
             token0ProtocolFee += uint128(cache.protocolFee);
             _transfer(token0, amountOut, recipient, unwrapBento);
             emit Swap(recipient, token1, token0, inAmount, amountOut);
+        }
+    }
+
+    function _updateReserves(
+        bool zeroForOne,
+        uint128 inAmount,
+        uint256 amount0,
+        uint256 amount1,
+        uint256 amountOut,
+        uint256 totalFeeAmount
+    ) internal {
+        if (zeroForOne) {
+            uint128 newBalance = reserve0 + inAmount;
+            require(uint256(newBalance) <= amount0, "TOKEN0_MISSING");
+            reserve0 = newBalance;
+            reserve1 -= (uint128(amountOut) + uint128(totalFeeAmount));
+        } else {
+            uint128 newBalance = reserve1 + inAmount;
+            require(uint256(newBalance) <= amount1, "TOKEN1_MISSING");
+            reserve1 = newBalance;
+            reserve0 -= (uint128(amountOut) + uint128(totalFeeAmount));
         }
     }
 
