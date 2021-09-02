@@ -438,12 +438,11 @@ function liquidityCalculations(
       .add(amount0.sub(fee0))
       .mul(initialBalances[2].add(amount1.sub(fee1)))
   );
-  printHumanReadable([feeMint, initialBalances[0]]);
   const computedLiquidity = preMintComputed.isZero()
     ? computed.sub(BigNumber.from(1000))
     : computed
         .sub(preMintComputed)
-        .mul(initialBalances[0])
+        .mul(updatedTotalSupply)
         .div(preMintComputed);
   const expectedIncreaseInTotalSupply = computedLiquidity
     .add(feeMint)
