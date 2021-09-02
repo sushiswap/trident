@@ -348,7 +348,7 @@ contract ConcentratedLiquidityPool is IPool {
         _updateReserves(zeroForOne, uint128(inAmount), amount0, amount1, amountOut, cache.totalFeeAmount);
 
         if (zeroForOne) {
-            feeGrowthGlobal0 += cache.feeGrowthGlobal;
+            feeGrowthGlobal1 += cache.feeGrowthGlobal;
             token1ProtocolFee += uint128(cache.protocolFee);
             _transfer(token1, amountOut, recipient, unwrapBento);
             emit Swap(recipient, token0, token1, inAmount, amountOut);
