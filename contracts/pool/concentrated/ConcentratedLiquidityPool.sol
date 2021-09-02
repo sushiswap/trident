@@ -133,7 +133,19 @@ contract ConcentratedLiquidityPool is IPool {
         // @dev Fees should have been claimed before position updates.
         _updatePosition(msg.sender, lower, upper, int128(amount));
 
-        _insertInLinkedList(lowerOld, lower, upperOld, upper, amount, currentPrice);
+        (nearestTick) = Ticks.insert(
+            ticks,
+            nearestTick,
+            feeGrowthGlobal0,
+            feeGrowthGlobal1,
+            secondsPerLiquidity,
+            lowerOld,
+            lower,
+            upperOld,
+            upper,
+            amount,
+            currentPrice
+        );
 
         (uint128 amount0, uint128 amount1) = _getAmountsForLiquidity(
             uint256(priceLower),
@@ -203,8 +215,7 @@ contract ConcentratedLiquidityPool is IPool {
         _transfer(token0, amount0, recipient, unwrapBento);
         _transfer(token1, amount1, recipient, unwrapBento);
 
-        _removeFromLinkedList(lower, upper, amount);
-
+        (nearestTick) = Ticks.remove(ticks, nearestTick, lower, upper, amount);
         emit Burn(msg.sender, amount0, amount1, recipient);
     }
 
@@ -468,109 +479,6 @@ contract ConcentratedLiquidityPool is IPool {
 
         position.feeGrowthInside0Last = growth0current;
         position.feeGrowthInside1Last = growth1current;
-    }
-
-    function _insertInLinkedList(
-        int24 lowerOld,
-        int24 lower,
-        int24 upperOld,
-        int24 upper,
-        uint128 amount,
-        uint160 currentPrice
-    ) internal {
-        require(uint24(lower) % 2 == 0, "LOWER_EVEN");
-        require(uint24(upper) % 2 == 1, "UPPER_ODD");
-
-        require(lower < upper, "WRONG_ORDER");
-
-        require(TickMath.MIN_TICK <= lower && lower < TickMath.MAX_TICK, "LOWER_RANGE");
-        require(TickMath.MIN_TICK < upper && upper <= TickMath.MAX_TICK, "UPPER_RANGE");
-
-        int24 currentNearestTick = nearestTick;
-
-        if (ticks[lower].liquidity != 0 || lower == TickMath.MIN_TICK) {
-            // @dev We are adding liquidity to an existing tick.
-            ticks[lower].liquidity += amount;
-        } else {
-            // @dev Inserting a new tick.
-            Ticks.Tick storage old = ticks[lowerOld];
-
-            require((old.liquidity != 0 || lowerOld == TickMath.MIN_TICK) && lowerOld < lower && lower < old.nextTick, "LOWER_ORDER");
-
-            if (lower <= currentNearestTick) {
-                ticks[lower] = Ticks.Tick(lowerOld, old.nextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
-            } else {
-                ticks[lower] = Ticks.Tick(lowerOld, old.nextTick, amount, 0, 0, 0);
-            }
-
-            old.nextTick = lower;
-        }
-
-        if (ticks[upper].liquidity != 0 || upper == TickMath.MAX_TICK) {
-            // @dev We are adding liquidity to an existing tick.
-            ticks[upper].liquidity += amount;
-        } else {
-            // @dev Inserting a new tick.
-            Ticks.Tick storage old = ticks[upperOld];
-
-            require(old.liquidity != 0 && old.nextTick > upper && upperOld < upper, "UPPER_ORDER");
-
-            if (upper <= currentNearestTick) {
-                ticks[upper] = Ticks.Tick(upperOld, old.nextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
-            } else {
-                ticks[upper] = Ticks.Tick(upperOld, old.nextTick, amount, 0, 0, 0);
-            }
-
-            old.nextTick = upper;
-        }
-
-        int24 actualNearestTick = TickMath.getTickAtSqrtRatio(currentPrice);
-
-        if (currentNearestTick < lower && lower <= actualNearestTick) currentNearestTick = lower;
-
-        if (currentNearestTick < upper && upper <= actualNearestTick) currentNearestTick = upper;
-
-        nearestTick = currentNearestTick;
-    }
-
-    function _removeFromLinkedList(
-        int24 lower,
-        int24 upper,
-        uint128 amount
-    ) internal {
-        Ticks.Tick storage current = ticks[lower];
-
-        if (lower != TickMath.MIN_TICK && current.liquidity == amount) {
-            /// @dev Delete lower tick.
-            Ticks.Tick storage previous = ticks[current.previousTick];
-            Ticks.Tick storage next = ticks[current.nextTick];
-
-            previous.nextTick = current.nextTick;
-            next.previousTick = current.previousTick;
-
-            if (nearestTick == lower) nearestTick = current.previousTick;
-
-            delete ticks[lower];
-        } else {
-            current.liquidity -= amount;
-        }
-
-        current = ticks[upper];
-
-        if (upper != TickMath.MAX_TICK && current.liquidity == amount) {
-            // @dev Delete upper tick.
-            Ticks.Tick storage previous = ticks[current.previousTick];
-            Ticks.Tick storage next = ticks[current.nextTick];
-
-            previous.nextTick = current.nextTick;
-            next.previousTick = current.previousTick;
-
-            if (nearestTick == upper) nearestTick = current.previousTick;
-
-            delete ticks[upper];
-        } else {
-            current.liquidity -= amount;
-        }
     }
 
     // Generic formula for fee growth inside a range: (globalGrowth - growthBelow - growthAbove)
