@@ -474,7 +474,6 @@ describe("Router", function () {
       expect(expectedAmountOutSingleHop).gt(1);
       let params = {
         tokenIn: weth.address,
-        tokenOut: usdc.address,
         amountIn: amountIn,
         amountOutMinimum: 1,
         path: [
