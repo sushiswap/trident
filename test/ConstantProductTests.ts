@@ -1,6 +1,11 @@
 // @ts-nocheck
 
-import { initialize, addLiquidity, swap } from "./harness";
+import {
+  initialize,
+  addLiquidity,
+  swap,
+  burnLiquidity,
+} from "./harness/ConstantProduct";
 import { getBigNumber, randBetween, ZERO } from "./harness/helpers";
 
 describe("Constant Product Pool", function () {
@@ -10,7 +15,7 @@ describe("Constant Product Pool", function () {
 
   describe("Add liquidity", function () {
     it("Balanced liquidity to a balanced pool", async function () {
-      const amount = getBigNumber(randBetween(1, 100));
+      const amount = getBigNumber(randBetween(10, 100));
       await addLiquidity(0, amount, amount);
     });
     it("Add liquidity in 16 different ways before swap fees", async function () {
@@ -43,14 +48,29 @@ describe("Constant Product Pool", function () {
       }
     });
   });
+
+  describe("Burn Liquidity", function () {
+    it(`Remove liquidity in 12 different ways`, async function () {
+      for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 2; j++) {
+          // when fee is pending
+          await burnLiquidity(0, getBigNumber(randBetween(5, 10)), i, j == 0);
+          // when no fee is pending
+          await burnLiquidity(0, getBigNumber(randBetween(5, 10)), i, j == 0);
+          // generate fee
+          await swap(2, getBigNumber(randBetween(100, 200)));
+        }
+      }
+    });
+  });
 });
 
 async function addLiquidityInMultipleWays() {
   // The first loop selects the liquidity amounts to add - [0, x], [x, 0], [x, x], [x, y]
   for (let i = 0; i < 4; i++) {
-    const amount0 = i == 0 ? ZERO : getBigNumber(randBetween(1, 100));
+    const amount0 = i == 0 ? ZERO : getBigNumber(randBetween(10, 100));
     const amount1 =
-      i == 1 ? ZERO : i == 2 ? amount0 : getBigNumber(randBetween(1, 100));
+      i == 1 ? ZERO : i == 2 ? amount0 : getBigNumber(randBetween(10, 100));
 
     // We need to generate all permutations of [bool, bool]. This loop goes from 0 to 3 and then
     // we use the binary representation of `j` to get the actual values. 0 in binary = false, 1 = true.

@@ -127,15 +127,15 @@ export async function initialize() {
 }
 
 export async function addLiquidity(
-  poolNumber,
+  poolIndex,
   amount0,
   amount1,
   native0 = false,
   native1 = false
 ) {
-  const pool = pools[poolNumber];
-  const token0 = tokens[poolNumber];
-  const token1 = tokens[poolNumber + 1];
+  const pool = pools[poolIndex];
+  const token0 = tokens[poolIndex];
+  const token1 = tokens[poolIndex + 1];
 
   // [
   //   Total supply,
@@ -168,9 +168,9 @@ export async function addLiquidity(
   ];
 
   const [kLast, barFee, swapFee] = await Promise.all([
-    pools[poolNumber].kLast(),
+    pools[poolIndex].kLast(),
     masterDeployer.barFee(),
-    pools[poolNumber].swapFee(),
+    pools[poolIndex].swapFee(),
   ]);
 
   const [computedLiquidity, expectedIncreaseInTotalSupply] =
@@ -245,7 +245,6 @@ export async function swap(
   );
 
   const tokenIn = reverse ? tokens[hops].address : tokens[0].address;
-  const tokenOut = reverse ? tokens[0].address : tokens[hops].address;
 
   if (hops == 1) {
     const params = {
@@ -326,6 +325,123 @@ export async function swap(
     );
     expect(finalUserBalances[2]).eq(initialUserBalances[2]);
   }
+}
+
+export async function burnLiquidity(
+  poolIndex,
+  amount,
+  withdrawType,
+  unwrapBento
+) {
+  const pool = pools[poolIndex];
+  const token0 = tokens[poolIndex];
+  const token1 = tokens[poolIndex + 1];
+
+  await pool.approve(router.address, amount);
+
+  // [
+  //   Total supply,
+  //   Pool's token0 bento balance,
+  //   Pool's token1 bento balance,
+  //   Alice's token0 bento balance,
+  //   Alice's token1 bento balance,
+  //   Alice's token0 native balance,
+  //   Alice's token1 native balance,
+  //   Alice's LP balance
+  // ]
+  const initialBalances = await getBalances(
+    pool,
+    accounts[0].address,
+    token0,
+    token1
+  );
+
+  const [kLast, barFee, swapFee] = await Promise.all([
+    pools[poolIndex].kLast(),
+    masterDeployer.barFee(),
+    pools[poolIndex].swapFee(),
+  ]);
+
+  let [amount0, amount1, feeMint] = burnCalculations(
+    initialBalances,
+    amount,
+    kLast,
+    barFee
+  );
+
+  if (withdrawType == 0) {
+    // Withdraw in token0 only
+    amount0 = amount0.add(
+      getAmountOut(
+        amount1,
+        initialBalances[2].sub(amount1),
+        initialBalances[1].sub(amount0),
+        swapFee
+      )
+    );
+    amount1 = ZERO;
+    const burnData = utils.defaultAbiCoder.encode(
+      ["address", "address", "bool"],
+      [token0.address, accounts[0].address, unwrapBento]
+    );
+    await router.burnLiquiditySingle(pool.address, amount, burnData, amount0);
+  } else if (withdrawType == 1) {
+    // Withdraw in token1 only
+    amount1 = amount1.add(
+      getAmountOut(
+        amount0,
+        initialBalances[1].sub(amount0),
+        initialBalances[2].sub(amount1),
+        swapFee
+      )
+    );
+    amount0 = ZERO;
+    const burnData = utils.defaultAbiCoder.encode(
+      ["address", "address", "bool"],
+      [token1.address, accounts[0].address, unwrapBento]
+    );
+    await router.burnLiquiditySingle(pool.address, amount, burnData, amount1);
+  } else {
+    // Withdraw evenly
+    const minWithdrawals = [
+      {
+        token: token0.address,
+        amount: amount0,
+      },
+      {
+        token: token1.address,
+        amount: amount1,
+      },
+    ];
+    const burnData = utils.defaultAbiCoder.encode(
+      ["address", "bool"],
+      [accounts[0].address, unwrapBento]
+    );
+    await router.burnLiquidity(pool.address, amount, burnData, minWithdrawals);
+  }
+
+  const finalBalances = await getBalances(
+    pool,
+    accounts[0].address,
+    token0,
+    token1
+  );
+
+  // Total supply decreased
+  expect(finalBalances[0]).eq(initialBalances[0].sub(amount).add(feeMint));
+  // Pool balances decreased
+  expect(finalBalances[1]).eq(initialBalances[1].sub(amount0));
+  expect(finalBalances[2]).eq(initialBalances[2].sub(amount1));
+  // Users' token balances increased
+  if (unwrapBento) {
+    expect(finalBalances[3]).eq(initialBalances[3]);
+    expect(finalBalances[5]).eq(initialBalances[5].add(amount0));
+  } else {
+    expect(finalBalances[3]).eq(initialBalances[3].add(amount0));
+    expect(finalBalances[5]).eq(initialBalances[5]);
+  }
+  // Users' LP balance decreased
+  expect(finalBalances[7]).eq(initialBalances[7].sub(amount));
 }
 
 async function getBalances(pool, user, token0, token1) {
@@ -489,4 +605,18 @@ function liquidityCalculations(
     .add(feeMint)
     .add(preMintComputed.isZero() ? BigNumber.from(1000) : ZERO);
   return [computedLiquidity, expectedIncreaseInTotalSupply];
+}
+
+function burnCalculations(initialBalances, amount, kLast, barFee) {
+  const preMintComputed = sqrt(initialBalances[1].mul(initialBalances[2]));
+  const feeMint = preMintComputed.isZero()
+    ? ZERO
+    : initialBalances[0]
+        .mul(preMintComputed.sub(kLast).mul(barFee))
+        .div(preMintComputed.mul(MAX_FEE));
+  const updatedTotalSupply = feeMint.add(initialBalances[0]);
+
+  const amount0 = amount.mul(initialBalances[1]).div(updatedTotalSupply);
+  const amount1 = amount.mul(initialBalances[2]).div(updatedTotalSupply);
+  return [amount0, amount1, feeMint];
 }
