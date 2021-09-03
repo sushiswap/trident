@@ -3,7 +3,7 @@
 pragma solidity >=0.8.0;
 
 import "../interfaces/IMasterDeployer.sol";
-import "../workInProgress/IMigrator.sol";
+import "../interfaces/IMigrator.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/ITridentCallee.sol";
 import "../libraries/TridentMath.sol";
