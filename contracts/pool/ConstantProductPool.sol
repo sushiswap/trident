@@ -31,6 +31,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
     address public immutable masterDeployer;
     address public immutable token0;
     address public immutable token1;
+    bool public immutable useLock;
 
     uint256 public barFee;
     uint256 public price0CumulativeLast;
@@ -44,7 +45,19 @@ contract ConstantProductPool is IPool, TridentERC20 {
     bytes32 public constant override poolIdentifier = "Trident:ConstantProduct";
 
     uint256 internal unlocked;
-    modifier lock() {
+
+    modifier softLock() {
+        require(unlocked == 1, "LOCKED");
+        if (useLock) {
+            unlocked = 2;
+            _;
+            unlocked = 1;
+        } else {
+            _;
+        }
+    }
+
+    modifier hardLock() {
         require(unlocked == 1, "LOCKED");
         unlocked = 2;
         _;
@@ -52,7 +65,10 @@ contract ConstantProductPool is IPool, TridentERC20 {
     }
 
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (address _token0, address _token1, uint256 _swapFee, bool _twapSupport) = abi.decode(_deployData, (address, address, uint256, bool));
+        (address _token0, address _token1, uint256 _swapFee, bool _twapSupport, bool _useLock) = abi.decode(
+            _deployData,
+            (address, address, uint256, bool, bool)
+        );
 
         require(_token0 != address(0), "ZERO_ADDRESS");
         require(_token0 != _token1, "IDENTICAL_ADDRESSES");
@@ -74,12 +90,13 @@ contract ConstantProductPool is IPool, TridentERC20 {
         bento = abi.decode(_bento, (address));
         masterDeployer = _masterDeployer;
         unlocked = 1;
+        useLock = _useLock;
         if (_twapSupport) blockTimestampLast = 1;
     }
 
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
     /// The router must ensure that sufficient LP tokens are minted by using the return value.
-    function mint(bytes calldata data) public override lock returns (uint256 liquidity) {
+    function mint(bytes calldata data) public override softLock returns (uint256 liquidity) {
         address recipient = abi.decode(data, (address));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
@@ -116,7 +133,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
     }
 
     /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
-    function burn(bytes calldata data) public override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
+    function burn(bytes calldata data) public override softLock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
         (address recipient, bool unwrapBento) = abi.decode(data, (address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
@@ -149,7 +166,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
     /// @dev Burns LP tokens sent to this contract and swaps one of the output tokens for another
     /// - i.e., the user gets a single token out by burning LP tokens.
-    function burnSingle(bytes calldata data) public override lock returns (uint256 amountOut) {
+    function burnSingle(bytes calldata data) public override softLock returns (uint256 amountOut) {
         (address tokenOut, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
@@ -189,7 +206,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
     }
 
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
-    function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
+    function swap(bytes calldata data) public override softLock returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
@@ -215,7 +232,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
     }
 
     /// @dev Swaps one token for another. The router must support swap callbacks and ensure there isn't too much slippage.
-    function flashSwap(bytes calldata data) public override lock returns (uint256 amountOut) {
+    function flashSwap(bytes calldata data) public override hardLock returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento, uint256 amountIn, bytes memory context) = abi.decode(
             data,
             (address, address, bool, uint256, bytes)

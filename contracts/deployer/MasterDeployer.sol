@@ -3,24 +3,29 @@
 pragma solidity >=0.8.0;
 
 import "../interfaces/IPoolFactory.sol";
+import "../interfaces/IMasterDeployer.sol";
 import "../utils/TridentOwnable.sol";
 
 /// @notice Trident pool deployer contract with template factory whitelist.
 /// @author Mudit Gupta.
-contract MasterDeployer is TridentOwnable {
+contract MasterDeployer is IMasterDeployer, TridentOwnable {
     event DeployPool(address indexed _factory, address indexed pool);
 
-    uint256 public barFee;
-    address public migrator;
+    uint256 public override barFee;
+    address public override migrator;
 
-    address public immutable barFeeTo;
-    address public immutable bento;
+    address public immutable override barFeeTo;
+    address public immutable override bento;
 
-    uint256 internal constant MAX_FEE = 10000; // @dev 100%.
+    uint256 internal constant MAX_FEE = 10000; /// @dev 100%.
 
     address[] public pools;
 
-    mapping(address => bool) public whitelistedFactories;
+    mapping(address => bool) public override whitelistedFactories;
+
+    /// @notice A mapping of tokens that do not include any pre or post transfer hooks.
+    /// @dev Pools consisting only of "clean tokens" can use a less restrictive lock modifier
+    mapping(address => bool) public override cleanTokens;
 
     constructor(
         uint256 _barFee,
@@ -58,6 +63,12 @@ contract MasterDeployer is TridentOwnable {
 
     function setMigrator(address _migrator) external onlyOwner {
         migrator = _migrator;
+    }
+
+    function setCleanTokens(address[] calldata _tokens, bool[] calldata _values) external onlyOwner {
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            cleanTokens[_tokens[i]] = _values[i];
+        }
     }
 
     function poolsCount() external view returns (uint256 count) {

@@ -14,11 +14,11 @@ contract ConstantProductPoolFactory is PoolDeployer {
         (address tokenA, address tokenB, uint256 swapFee, bool twapSupport) = abi.decode(_deployData, (address, address, uint256, bool));
         if (tokenA > tokenB) {
             (tokenA, tokenB) = (tokenB, tokenA);
-            _deployData = abi.encode(tokenA, tokenB, swapFee, twapSupport);
         }
+        bool useLock = !IMasterDeployer(masterDeployer).cleanTokens(tokenA) || !IMasterDeployer(masterDeployer).cleanTokens(tokenB);
         address[] memory tokens = new address[](2);
         tokens[0] = tokenA;
         tokens[1] = tokenB;
-        pool = _deployPool(tokens, type(ConstantProductPool).creationCode, _deployData);
+        pool = _deployPool(tokens, type(ConstantProductPool).creationCode, abi.encode(tokenA, tokenB, swapFee, twapSupport, useLock));
     }
 }

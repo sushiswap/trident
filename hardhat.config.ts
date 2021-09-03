@@ -31,7 +31,6 @@ const config: HardhatUserConfig = {
     apiKey: process.env.ETHERSCAN_API_KEY,
   },
   gasReporter: {
-    coinmarketcap: process.env.COINMARKETCAP_API_KEY,
     currency: "USD",
     enabled: process.env.REPORT_GAS === "true",
     excludeContracts: ["BentoBoxV1", "ERC20Mock", "ERC20", "WETH9"],
