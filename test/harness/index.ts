@@ -232,7 +232,7 @@ export async function swap(
 ) {
   if (hops <= 0) return;
 
-  // [[pool0token0. pool0token1, pool1token0....], [userTokenInBento, userTokenOutBento, userTokenInNative, userTokenOutNative]]
+  // [[pool0token0. pool0token1, pool1token0....], [userToken0Bento, userToken0Native, userTokenNNative, userTokenNBento]]
   const [initialPoolBalances, initialUserBalances] = await getSwapBalances(
     hops,
     accounts[0].address
@@ -285,6 +285,47 @@ export async function swap(
     hops,
     accounts[0].address
   );
+
+  if (reverse) {
+    initialPoolBalances.reverse();
+    finalPoolBalances.reverse();
+    initialUserBalances.reverse();
+    finalUserBalances.reverse();
+    amountOuts.reverse();
+  }
+
+  // Ensure pool balances changed as expected
+  let poolAmountIn = amountIn;
+  for (let i = 0; i < hops; i++) {
+    // Pool in balance increased
+    expect(finalPoolBalances[2 * i]).eq(
+      initialPoolBalances[2 * i].add(poolAmountIn)
+    );
+    // pool out balance decreased
+    expect(finalPoolBalances[2 * i + 1]).eq(
+      initialPoolBalances[2 * i + 1].sub(amountOuts[i])
+    );
+    poolAmountIn = amountOuts[i];
+  }
+  // Ensure users' balances changed as expected
+  if (nativeIn) {
+    expect(finalUserBalances[0]).eq(initialUserBalances[0]);
+    expect(finalUserBalances[1]).eq(initialUserBalances[1].sub(amountIn));
+  } else {
+    expect(finalUserBalances[0]).eq(initialUserBalances[0].sub(amountIn));
+    expect(finalUserBalances[1]).eq(initialUserBalances[1]);
+  }
+  if (nativeOut) {
+    expect(finalUserBalances[3]).eq(initialUserBalances[3]);
+    expect(finalUserBalances[2]).eq(
+      initialUserBalances[2].add(amountOuts[amountOuts.length - 1])
+    );
+  } else {
+    expect(finalUserBalances[3]).eq(
+      initialUserBalances[3].add(amountOuts[amountOuts.length - 1])
+    );
+    expect(finalUserBalances[2]).eq(initialUserBalances[2]);
+  }
 }
 
 async function getBalances(pool, user, token0, token1) {
@@ -303,15 +344,15 @@ async function getBalances(pool, user, token0, token1) {
 async function getSwapBalances(hops, user) {
   let promises = [];
   for (let i = 0; i < hops; i++) {
-    promises.push(bento.balanceOf(tokens[i].address, pools[i].address)),
-      promises.push(bento.balanceOf(tokens[i + 1].address, pools[i].address));
+    promises.push(bento.balanceOf(tokens[i].address, pools[i].address));
+    promises.push(bento.balanceOf(tokens[i + 1].address, pools[i].address));
   }
   const poolBalances = await Promise.all(promises);
   const userBalances = await Promise.all([
-    bento.balanceOf(user, tokens[0].address),
-    bento.balanceOf(user, tokens[hops + 1].address),
+    bento.balanceOf(tokens[0].address, user),
     tokens[0].balanceOf(user),
-    tokens[hops + 1].balanceOf(user),
+    tokens[hops].balanceOf(user),
+    bento.balanceOf(tokens[hops].address, user),
   ]);
   return [poolBalances, userBalances];
 }
