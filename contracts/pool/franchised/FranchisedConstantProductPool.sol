@@ -8,6 +8,10 @@ import "../../libraries/TridentMath.sol";
 import "../TridentERC20.sol";
 import "../../workInProgress/IMigrator.sol";
 
+interface IWhiteListManager {
+    function whiteListedUsers(address operator, address user) external returns (bool);
+}
+
 /// @notice Trident exchange franchised pool template with constant product formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares.
 ///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
@@ -16,7 +20,7 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
     event Sync(uint256 reserve0, uint256 reserve1);
     event JoinWhitelist(uint256 indexed index, address indexed account);
-    event SetMerkleRoot(bytes32 merkleRoot); 
+    event SetMerkleRoot(bytes32 merkleRoot);
 
     uint256 internal constant MINIMUM_LIQUIDITY = 1000;
 
@@ -39,12 +43,9 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
     uint112 internal reserve0;
     uint112 internal reserve1;
     uint32 internal blockTimestampLast;
-    
-    address public operator;
-    bytes32 public merkleRoot;
-    /// @dev This is a packed array of booleans.
-    mapping(uint256 => uint256) internal whitelistedBitMap;
-    mapping(address => bool) internal whitelisted;
+
+    IWhiteListManager public immutable whiteListManager;
+    address public immutable operator;
 
     bytes32 public constant override poolIdentifier = "Trident:FranchisedCP";
 
@@ -58,9 +59,9 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
 
     /// @dev Only set immutable variables here - state changes made here will not be used.
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (address tokenA, address tokenB, uint256 _swapFee, bool _twapSupport, bytes32 _merkleRoot, address _operator) = abi.decode(
+        (address tokenA, address tokenB, uint256 _swapFee, bool _twapSupport, IPermissionManager _permissionManager, address _operator) = abi.decode(
             _deployData,
-            (address, address, uint256, bool, bytes32, address)
+            (address, address, uint256, bool, IPermissionManager, address)
         );
 
         require(tokenA != address(0), "ZERO_ADDRESS");
@@ -81,13 +82,13 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
         if (_twapSupport) {
             blockTimestampLast = 1;
         }
-        merkleRoot = _merkleRoot;
+        whiteListManager = _permissionManager;
         operator = _operator;
     }
-    
+
     function mint(bytes calldata data) public override lock returns (uint256 liquidity) {
         address to = abi.decode(data, (address));
-        require(whitelisted[to], "NOT_WHITELISTED");
+        require(whiteListManager.whiteListedUsers(operator, to), "NOT_WHITELISTED");
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 _totalSupply = totalSupply;
@@ -122,7 +123,7 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
 
     function burn(bytes calldata data) public override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
         (address to, bool unwrapBento) = abi.decode(data, (address, bool));
-        require(whitelisted[to], "NOT_WHITELISTED");
+        require(whiteListManager.whiteListedUsers(operator, to), "NOT_WHITELISTED");
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 _totalSupply = totalSupply;
@@ -153,7 +154,7 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
 
     function burnSingle(bytes calldata data) public override lock returns (uint256 amount) {
         (address tokenOut, address to, bool unwrapBento) = abi.decode(data, (address, address, bool));
-        require(whitelisted[to], "NOT_WHITELISTED");
+        require(whiteListManager.whiteListedUsers(operator, to), "NOT_WHITELISTED");
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 _totalSupply = totalSupply;
@@ -191,7 +192,7 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
 
     function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
-        require(whitelisted[recipient], "NOT_WHITELISTED");
+        require(whiteListManager.whiteListedUsers(operator, recipient), "NOT_WHITELISTED");
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 amountIn;
@@ -219,7 +220,7 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
             data,
             (address, address, bool, uint256, bytes)
         );
-        require(whitelisted[recipient], "NOT_WHITELISTED");
+        require(whiteListManager.whiteListedUsers(operator, recipient), "NOT_WHITELISTED");
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
 
         if (tokenIn == token0) {
@@ -370,45 +371,5 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
         )
     {
         return _getReserves();
-    }
-    
-    /// **** WHITELISTING 
-    // @dev Adapted from OpenZeppelin utilities and Uniswap merkle distributor.
-    function isWhitelisted(uint256 index) public view returns (bool success) {
-        uint256 whitelistedWordIndex = index / 256;
-        uint256 whitelistedBitIndex = index % 256;
-        uint256 claimedWord = whitelistedBitMap[whitelistedWordIndex];
-        uint256 mask = (1 << whitelistedBitIndex);
-        success = claimedWord & mask == mask;
-    }
-    
-    function joinWhitelist(uint256 index, address account, bytes32[] calldata merkleProof) public {
-        require(!isWhitelisted(index), "CLAIMED");
-        bytes32 node = keccak256(abi.encodePacked(index, account));
-        bytes32 computedHash = node;
-        for (uint256 i = 0; i < merkleProof.length; i++) {
-            bytes32 proofElement = merkleProof[i];
-            if (computedHash <= proofElement) {
-                // @dev Hash(current computed hash + current element of the proof).
-                computedHash = keccak256(abi.encodePacked(computedHash, proofElement));
-            } else {
-                // @dev Hash(current element of the proof + current computed hash).
-                computedHash = keccak256(abi.encodePacked(proofElement, computedHash));
-            }
-        }
-        // @dev Check if the computed hash (root) is equal to the provided root.
-        require(computedHash == merkleRoot, "NOT_ROOTED");
-        uint256 whitelistedWordIndex = index / 256;
-        uint256 whitelistedBitIndex = index % 256;
-        whitelistedBitMap[whitelistedWordIndex] = whitelistedBitMap[whitelistedWordIndex] | (1 << whitelistedBitIndex);
-        whitelisted[account] = true;
-        emit JoinWhitelist(index, account);
-    }
-
-    function setMerkleRoot(bytes32 _merkleRoot) public {
-        require(msg.sender == operator, "NOT_OPERATOR");
-        // @dev Set the new merkle root.
-        merkleRoot = _merkleRoot;
-        emit SetMerkleRoot(_merkleRoot);
     }
 }
