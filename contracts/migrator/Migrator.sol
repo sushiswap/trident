@@ -49,6 +49,12 @@ interface IOldPool {
 interface IConstantProductPool is IPool {
     /// @notice Returns the token supply in the pair pool per ERC-20.
     function totalSupply() external view returns (uint256);
+
+    /// @notice Returns the reserve of token 0
+    function reserve0() external view returns (uint112);
+
+    /// @notice Returns the reserve of token 0
+    function reserve1() external view returns (uint112);
 }
 
 interface IMasterChef {
@@ -116,9 +122,10 @@ contract Migrator {
         } else {
             address intermediaryToken = address(new IntermediaryToken(pool, masterChef, lpBalance));
 
-            (uint112 _reserve0, uint112 _reserve1, ) = oldPool.getReserves();
+            uint256 reserve0 = uint256(IConstantProductPool(pool).reserve0());
+            uint256 reserve1 = uint256(IConstantProductPool(pool).reserve1());
             uint256 oldPoolPrice = (1e18 * amount0) / amount1;
-            uint256 newPoolPrice = (uint256(_reserve0) * 1e18) / uint256(_reserve1);
+            uint256 newPoolPrice = (1e18 * reserve0) / reserve1;
             uint256 priceChange = (1e4 * oldPoolPrice) / newPoolPrice;
 
             require(priceChange < 10050 && priceChange > 9950, "Price difference too big"); // allow for 0.5% pool price difference
