@@ -6,6 +6,7 @@ interface ERC20 {
     function transfer(address, uint256);
 }
 
+/// @notice A pool that simply is an incentivized version of the index pool.
 contract IncentivizedPool is IndexPool {
 
     mapping (address => uint256) public rewardDebt;
