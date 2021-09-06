@@ -58,7 +58,7 @@ contract TridentERC20 {
     /// @param amount The token `amount` to move.
     /// @return (bool) Returns 'true' if succeeded.
     function transfer(address recipient, uint256 amount) external returns (bool) {
-        _beforeTokenTransfer(sender, address(0), amount);
+        _beforeTokenTransfer(msg.sender, address(0), amount);
 
         balanceOf[msg.sender] -= amount;
         // @dev This is safe from overflow - the sum of all user
