@@ -2,9 +2,9 @@
 
 pragma solidity >=0.8.0;
 
-/// @notice Trident exchange pool deployer for whitelisted pair template factories.
+/// @notice Trident pool deployer for whitelisted template factories.
 /// @author Mudit Gupta.
-abstract contract PoolDeployer {
+contract PoolDeployer {
     address public immutable masterDeployer;
 
     mapping(address => mapping(address => address[])) public pools;
@@ -34,10 +34,13 @@ abstract contract PoolDeployer {
         }
         // @dev Store the address of the deployed contract.
         configAddress[deployData] = pool;
-        for (uint256 i = 0; i < tokens.length - 1; i++) {
-            require(tokens[i] < tokens[i + 1], "INVALID_TOKEN_ORDER");
-            for (uint256 j = i + 1; j < tokens.length; j++) {
-                pools[tokens[i]][tokens[j]].push(pool);
+        // @dev This is safe from underflow - null token array would cause deployment to fail via gas limit.
+        unchecked {
+            for (uint256 i = 0; i < tokens.length - 1; i++) {
+                require(tokens[i] < tokens[i + 1], "INVALID_TOKEN_ORDER");
+                for (uint256 j = i + 1; j < tokens.length; j++) {
+                    pools[tokens[i]][tokens[j]].push(pool);
+                }
             }
         }
     }
