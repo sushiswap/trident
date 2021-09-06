@@ -19,6 +19,11 @@ contract IntermediaryToken is TridentERC20 {
         _mint(_recipient, _amount);
     }
 
+    function deposit(uint256 amount) public {
+        lpToken.transferFrom(msg.sender, address(this), amount);
+        _mint(msg.sender, amount);
+    }
+
     function redeem() public {
         uint256 availableLpTokens = lpToken.balanceOf(address(this));
         uint256 amountToBurn = balanceOf[msg.sender];
