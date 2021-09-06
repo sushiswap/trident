@@ -295,9 +295,9 @@ contract TridentRouter is ITridentRouter, TridentHelper {
     ) internal {
         if (token == wETH && address(this).balance != 0) {
             uint256 underlyingAmount = bento.toAmount(wETH, amount, true);
-            if (address(this).balance > underlyingAmount) {
+            if (address(this).balance >= underlyingAmount) {
                 // @dev Deposit ETH into `recipient` `bento` account.
-                bento.deposit{value: underlyingAmount}(address(0), address(this), recipient, 0, amount);
+                bento.deposit{value: underlyingAmount}(address(0), address(this), recipient, underlyingAmount, 0);
                 return;
             }
         }
@@ -313,9 +313,9 @@ contract TridentRouter is ITridentRouter, TridentHelper {
     ) internal {
         if (token == wETH && address(this).balance != 0) {
             uint256 underlyingAmount = bento.toAmount(wETH, amount, true);
-            if (address(this).balance > underlyingAmount) {
+            if (address(this).balance >= underlyingAmount) {
                 // @dev Deposit ETH into `recipient` `bento` account.
-                bento.deposit{value: underlyingAmount}(address(0), address(this), recipient, 0, amount);
+                bento.deposit{value: underlyingAmount}(address(0), address(this), recipient, underlyingAmount, 0);
                 return;
             }
         }
