@@ -16,29 +16,11 @@ const deployFunction: DeployFunction = async function ({
 
   const chainId = Number(await getChainId());
 
-  let bentoBoxV1Address;
-  let wethAddress;
-
-  if (chainId === 31337) {
-    const WETH9 = await ethers.getContractFactory("WETH9");
-    const weth9 = await WETH9.deploy();
-    const BentoBoxV1 = await ethers.getContractFactory("BentoBoxV1");
-    const bentoBoxV1 = await BentoBoxV1.deploy(weth9.address);
-    bentoBoxV1Address = bentoBoxV1.address;
-    wethAddress = weth9.address;
-  } else {
-    if (!(chainId in WNATIVE)) {
-      throw Error(`No WETH on chain #${chainId}!`);
-    } else if (!(chainId in BENTOBOX_ADDRESS)) {
-      throw Error(`No BENTOBOX on chain #${chainId}!`);
-    }
-    bentoBoxV1Address = BENTOBOX_ADDRESS[chainId as ChainId];
-    wethAddress = WNATIVE[chainId as ChainId].address;
-  }
+  const bentoBoxV1 = await ethers.getContract("BentoBoxV1");
 
   const { address } = await deploy("TridentRouter", {
     from: deployer,
-    args: [bentoBoxV1Address, wethAddress],
+    args: [bentoBoxV1.address, "0xd0a1e359811322d97991e03f863a0c30c2cf029c"],
     deterministicDeployment: false,
   });
 

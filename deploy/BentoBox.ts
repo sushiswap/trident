@@ -9,24 +9,20 @@ const deployFunction: DeployFunction = async function ({
   getNamedAccounts,
   getChainId,
 }: HardhatRuntimeEnvironment) {
-  console.log("Running MasterDeployer deploy script");
+  console.log("Running BentoBox deploy script");
   const { deploy } = deployments;
 
   const { deployer } = await getNamedAccounts();
 
-  const bentoBoxV1 = await ethers.getContract("BentoBoxV1");
-
-  const { address } = await deploy("MasterDeployer", {
+  const { address } = await deploy("BentoBoxV1", {
     from: deployer,
-    args: [17, deployer, bentoBoxV1.address],
+    args: ["0xd0a1e359811322d97991e03f863a0c30c2cf029c"],
     deterministicDeployment: false,
   });
 
-  console.log("MasterDeployer deployed at ", address);
+  console.log("BentoBoxV1 deployed at ", address);
 };
 
 export default deployFunction;
 
-deployFunction.tags = ["MasterDeployer"];
-
-deployFunction.dependencies = ["BentoBox"];
+deployFunction.tags = ["BentoBox"];

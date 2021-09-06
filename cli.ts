@@ -19,7 +19,7 @@ task("erc20:approve", "ERC20 approve")
   .addParam("spender", "Spender")
   .setAction(async function ({ token, spender }, { ethers }, runSuper) {
     const dev = await ethers.getNamedSigner("dev");
-    const erc20 = await ethers.getContractFactory("TridentERC20");
+    const erc20 = await ethers.getContractFactory("ERC20Mock");
 
     const slp = erc20.attach(token);
 
@@ -28,21 +28,21 @@ task("erc20:approve", "ERC20 approve")
 
 task("constant-product-pool:deploy", "Constant Product Pool deploy")
   .addOptionalParam(
-    "tokenA",
+    "tokena",
     "Token A",
-    "0xc778417E063141139Fce010982780140Aa0cD5Ab",
+    "0x4f96fe3b7a6cf9725f59d353f723c1bdb64ca6aa", // dai
     types.string
   )
   .addOptionalParam(
-    "tokenB",
+    "tokenb",
     "Token B",
-    "0xc2118d4d90b274016cB7a54c03EF52E6c537D957",
+    "0xd0A1E359811322d97991E03f863a0C30C2cF029C", // weth
     types.string
   )
   .addOptionalParam("fee", "Fee tier", 30, types.int)
-  .addOptionalParam("twap", "Twap enabled", true, types.boolean)
+  .addOptionalParam("twap", "Twap enabled", false, types.boolean)
   .setAction(async function (
-    { tokenA, tokenB, fee, twap },
+    { tokena, tokenb, fee, twap },
     { ethers },
     runSuper
   ) {
@@ -54,7 +54,7 @@ task("constant-product-pool:deploy", "Constant Product Pool deploy")
 
     const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint8", "bool"],
-      [...[tokenA, tokenB].sort(), fee, twap]
+      [...[tokena, tokenb].sort(), fee, twap]
     );
 
     const { events } = await (
@@ -71,17 +71,21 @@ task("whitelist", "Whitelist Router on BentoBox").setAction(async function (
   _,
   { ethers, getChainId }
 ) {
-  const dev = await ethers.getNamedSigner("dev");
+  const deployer = await ethers.getNamedSigner("deployer");
 
   const chainId = await getChainId();
 
   const router = await ethers.getContract("TridentRouter");
 
   const BentoBox = await ethers.getContractFactory("BentoBoxV1");
-  const bentoBox = BentoBox.attach(BENTOBOX_ADDRESS[chainId]);
+  const bentoBox = BentoBox.attach(
+    "0x2bf45480039C609e3a73A37eE09A1CB157c99c6C" || BENTOBOX_ADDRESS[chainId]
+  );
 
   await (
-    await bentoBox.connect(dev).whitelistMasterContract(router.address, true)
+    await bentoBox
+      .connect(deployer)
+      .whitelistMasterContract(router.address, true)
   ).wait();
 
   console.log("Router successfully whitelisted on BentoBox");
@@ -89,15 +93,27 @@ task("whitelist", "Whitelist Router on BentoBox").setAction(async function (
 
 task("router:add-liquidity", "Router add liquidity")
   .addOptionalParam(
-    "tokenA",
+    "tokena",
     "Token A",
-    "0xc778417E063141139Fce010982780140Aa0cD5Ab",
+    "0x4f96fe3b7a6cf9725f59d353f723c1bdb64ca6aa", // dai
     types.string
   )
   .addOptionalParam(
-    "tokenB",
+    "tokenb",
     "Token B",
-    "0xc2118d4d90b274016cB7a54c03EF52E6c537D957",
+    "0xd0A1E359811322d97991E03f863a0C30C2cF029C", // weth
+    types.string
+  )
+  .addOptionalParam(
+    "pool",
+    "Pool",
+    "0x00928AB3c14ECc1C794867d9Ead734328A19D97b", // dai/weth
+    types.string
+  )
+  .addOptionalParam(
+    "bento",
+    "BentoBox",
+    "0x2bf45480039C609e3a73A37eE09A1CB157c99c6C", // kovan
     types.string
   )
   .addParam(
@@ -116,42 +132,44 @@ task("router:add-liquidity", "Router add liquidity")
   // .addParam("tokenBMinimum", "Token B Minimum")
   // .addParam("to", "To")
   // .addOptionalParam("deadline", "Deadline", MaxUint256)
-  .setAction(async function (args, { ethers, run, getChainId }, runSuper) {
+  .setAction(async function (
+    { tokena, tokenb, pool, bento },
+    { ethers, run, getChainId },
+    runSuper
+  ) {
     const chainId = await getChainId();
 
     const router = await ethers.getContract("TridentRouter");
 
     const BentoBox = await ethers.getContractFactory("BentoBoxV1");
-    const bentoBox = BentoBox.attach(BENTOBOX_ADDRESS[chainId]);
+    const bentoBox = BentoBox.attach(bento || BENTOBOX_ADDRESS[chainId]);
 
     const dev = await ethers.getNamedSigner("dev");
-    const pool = "0x735C2c1564C0230041Ef8CA5A6F7e74bab8C3dcA"; // dai/weth
+
+    const erc20 = await ethers.getContractFactory("ERC20Mock");
+    const tokenA = await erc20.attach(tokena);
+    const tokenB = await erc20.attach(tokenb);
 
     let liquidityInput = [
       {
-        token: "0xc778417E063141139Fce010982780140Aa0cD5Ab", // weth
+        token: tokena,
         native: false,
-        amount: ethers.BigNumber.from(10).pow(17),
+        amount: (await tokenA.balanceOf(dev.address)).toString(),
       },
       {
-        token: "0xc2118d4d90b274016cB7a54c03EF52E6c537D957", // dai
+        token: tokenb,
         native: false,
-        amount: ethers.BigNumber.from(10).pow(17),
+        amount: (await tokenB.balanceOf(dev.address)).toString(),
       },
     ];
 
-    await (
-      await bentoBox.connect(dev).whitelistMasterContract(router.address, true)
-    ).wait();
-    console.log("Whitelisted master contract");
-
     await run("erc20:approve", {
-      token: liquidityInput[0].token,
+      token: tokena,
       spender: bentoBox.address,
     });
 
     await run("erc20:approve", {
-      token: liquidityInput[1].token,
+      token: tokenb,
       spender: bentoBox.address,
     });
 
@@ -164,7 +182,7 @@ task("router:add-liquidity", "Router add liquidity")
           liquidityInput[0].token,
           dev.address,
           dev.address,
-          BigNumber.from(10).pow(17),
+          liquidityInput[0].amount,
           0
         )
     ).wait();
@@ -175,7 +193,7 @@ task("router:add-liquidity", "Router add liquidity")
           liquidityInput[1].token,
           dev.address,
           dev.address,
-          BigNumber.from(10).pow(17),
+          liquidityInput[1].amount,
           0
         )
     ).wait();
