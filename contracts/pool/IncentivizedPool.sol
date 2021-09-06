@@ -38,7 +38,7 @@ contract IncentivizedPool is IndexPool {
         uint256 multiplier = getMultiplier(lastRewardBlock, block.number);
         uint256 reward = multiplier.mul(rewardPerBlock).mul(allocPoint).div(totalAllocPoint);
 
-        accSushiPerShare = accPerShare.add(reward.mul(1e12).div(totalSupply));
+        accPerShare = accPerShare.add(reward.mul(1e12).div(totalSupply));
 
         lastRewardBlock = block.number;
 
