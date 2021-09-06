@@ -20,8 +20,7 @@ contract TridentERC20 {
     mapping(address => mapping(address => uint256)) public allowance;
 
     /// @notice The EIP-712 typehash for the permit struct used by this contract.
-    bytes32 public constant PERMIT_TYPEHASH =
-        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+    bytes32 public constant PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
     /// @notice The EIP-712 typehash for this contract's domain.
     bytes32 public immutable DOMAIN_SEPARATOR;
     /// @notice owner -> nonce mapping used in {permit}.
@@ -58,6 +57,8 @@ contract TridentERC20 {
     /// @param amount The token `amount` to move.
     /// @return (bool) Returns 'true' if succeeded.
     function transfer(address recipient, uint256 amount) external returns (bool) {
+        _beforeTokenTransfer(msg.sender, recipient, amount);
+
         balanceOf[msg.sender] -= amount;
         // @dev This is safe from overflow - the sum of all user
         // balances can't exceed 'type(uint256).max'.
@@ -82,6 +83,9 @@ contract TridentERC20 {
             allowance[sender][msg.sender] -= amount;
         }
         balanceOf[sender] -= amount;
+
+        _beforeTokenTransfer(sender, recipient, amount);
+
         // @dev This is safe from overflow - the sum of all user
         // balances can't exceed 'type(uint256).max'.
         unchecked {
@@ -113,20 +117,17 @@ contract TridentERC20 {
         // beyond 'type(uint256).max' is exceedingly unlikely.
         unchecked {
             bytes32 digest = keccak256(
-                abi.encodePacked(
-                    "\x19\x01",
-                    DOMAIN_SEPARATOR,
-                    keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, amount, nonces[owner]++, deadline))
-                )
+                abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, amount, nonces[owner]++, deadline)))
             );
-        address recoveredAddress = ecrecover(digest, v, r, s);
-        require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_PERMIT_SIGNATURE");
-        allowance[recoveredAddress][spender] = amount;
+            address recoveredAddress = ecrecover(digest, v, r, s);
+            require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_PERMIT_SIGNATURE");
+            allowance[recoveredAddress][spender] = amount;
         }
         emit Approval(owner, spender, amount);
     }
 
     function _mint(address recipient, uint256 amount) internal {
+        _beforeTokenTransfer(address(0x0), recipient, amount);
         totalSupply += amount;
         // @dev This is safe from overflow - the sum of all user
         // balances can't exceed 'type(uint256).max'.
@@ -137,6 +138,7 @@ contract TridentERC20 {
     }
 
     function _burn(address sender, uint256 amount) internal {
+        _beforeTokenTransfer(sender, address(0x0), amount);
         balanceOf[sender] -= amount;
         // @dev This is safe from underflow - users won't ever
         // have a balance larger than `totalSupply`.
@@ -145,4 +147,10 @@ contract TridentERC20 {
         }
         emit Transfer(sender, address(0), amount);
     }
+
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
 }
