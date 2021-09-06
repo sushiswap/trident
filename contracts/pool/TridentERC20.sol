@@ -58,6 +58,8 @@ contract TridentERC20 {
     /// @param amount The token `amount` to move.
     /// @return (bool) Returns 'true' if succeeded.
     function transfer(address recipient, uint256 amount) external returns (bool) {
+        _beforeTokenTransfer(sender, address(0), amount);
+
         balanceOf[msg.sender] -= amount;
         // @dev This is safe from overflow - the sum of all user
         // balances can't exceed 'type(uint256).max'.
@@ -78,6 +80,7 @@ contract TridentERC20 {
         address recipient,
         uint256 amount
     ) external returns (bool) {
+        _beforeTokenTransfer(sender, address(0), amount);
         if (allowance[sender][msg.sender] != type(uint256).max) {
             allowance[sender][msg.sender] -= amount;
         }
@@ -127,6 +130,7 @@ contract TridentERC20 {
     }
 
     function _mint(address recipient, uint256 amount) internal {
+        _beforeTokenTransfer(sender, address(0), amount);
         totalSupply += amount;
         // @dev This is safe from overflow - the sum of all user
         // balances can't exceed 'type(uint256).max'.
@@ -137,6 +141,7 @@ contract TridentERC20 {
     }
 
     function _burn(address sender, uint256 amount) internal {
+        _beforeTokenTransfer(sender, address(0), amount);
         balanceOf[sender] -= amount;
         // @dev This is safe from underflow - users won't ever
         // have a balance larger than `totalSupply`.
@@ -145,4 +150,6 @@ contract TridentERC20 {
         }
         emit Transfer(sender, address(0), amount);
     }
+
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual {}
 }
