@@ -130,7 +130,7 @@ contract TridentERC20 {
     }
 
     function _mint(address recipient, uint256 amount) internal {
-        _beforeTokenTransfer(address(0), sender, amount);
+        _beforeTokenTransfer(address(0), recipient, amount);
         totalSupply += amount;
         // @dev This is safe from overflow - the sum of all user
         // balances can't exceed 'type(uint256).max'.
