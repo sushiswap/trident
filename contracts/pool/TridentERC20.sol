@@ -2,10 +2,12 @@
 
 pragma solidity >=0.8.0;
 
+import "../interfaces/IERC20.sol";
+
 /// @notice Trident pool ERC-20 with EIP-2612 extension.
 /// @author Adapted from RariCapital, https://github.com/Rari-Capital/solmate/blob/main/src/erc20/ERC20.sol,
 /// License-Identifier: AGPL-3.0-only.
-contract TridentERC20 {
+contract TridentERC20 is IERC20 {
     event Approval(address indexed owner, address indexed spender, uint256 amount);
     event Transfer(address indexed sender, address indexed recipient, uint256 amount);
 
@@ -13,15 +15,14 @@ contract TridentERC20 {
     string public constant symbol = "SLP";
     uint8 public constant decimals = 18;
 
-    uint256 public totalSupply;
+    uint256 public override totalSupply;
     /// @notice owner -> balance mapping.
-    mapping(address => uint256) public balanceOf;
+    mapping(address => uint256) public override balanceOf;
     /// @notice owner -> spender -> allowance mapping.
     mapping(address => mapping(address => uint256)) public allowance;
 
     /// @notice The EIP-712 typehash for the permit struct used by this contract.
-    bytes32 public constant PERMIT_TYPEHASH =
-        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+    bytes32 public constant PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
     /// @notice The EIP-712 typehash for this contract's domain.
     bytes32 public immutable DOMAIN_SEPARATOR;
     /// @notice owner -> nonce mapping used in {permit}.
@@ -47,7 +48,7 @@ contract TridentERC20 {
     /// @param spender Address of the party that can draw tokens from `msg.sender`'s account.
     /// @param amount The maximum collective `amount` that `spender` can draw.
     /// @return (bool) Returns 'true' if succeeded.
-    function approve(address spender, uint256 amount) external returns (bool) {
+    function approve(address spender, uint256 amount) external override returns (bool) {
         allowance[msg.sender][spender] = amount;
         emit Approval(msg.sender, spender, amount);
         return true;
@@ -57,7 +58,7 @@ contract TridentERC20 {
     /// @param recipient The address to move tokens to.
     /// @param amount The token `amount` to move.
     /// @return (bool) Returns 'true' if succeeded.
-    function transfer(address recipient, uint256 amount) external returns (bool) {
+    function transfer(address recipient, uint256 amount) external override returns (bool) {
         _beforeTokenTransfer(msg.sender, address(0), amount);
 
         balanceOf[msg.sender] -= amount;
@@ -79,7 +80,7 @@ contract TridentERC20 {
         address sender,
         address recipient,
         uint256 amount
-    ) external returns (bool) {
+    ) external override returns (bool) {
         _beforeTokenTransfer(sender, address(0), amount);
         if (allowance[sender][msg.sender] != type(uint256).max) {
             allowance[sender][msg.sender] -= amount;
@@ -116,15 +117,11 @@ contract TridentERC20 {
         // beyond 'type(uint256).max' is exceedingly unlikely.
         unchecked {
             bytes32 digest = keccak256(
-                abi.encodePacked(
-                    "\x19\x01",
-                    DOMAIN_SEPARATOR,
-                    keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, amount, nonces[owner]++, deadline))
-                )
+                abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, amount, nonces[owner]++, deadline)))
             );
-        address recoveredAddress = ecrecover(digest, v, r, s);
-        require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_PERMIT_SIGNATURE");
-        allowance[recoveredAddress][spender] = amount;
+            address recoveredAddress = ecrecover(digest, v, r, s);
+            require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_PERMIT_SIGNATURE");
+            allowance[recoveredAddress][spender] = amount;
         }
         emit Approval(owner, spender, amount);
     }
@@ -151,5 +148,9 @@ contract TridentERC20 {
         emit Transfer(sender, address(0), amount);
     }
 
-    function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual {}
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
 }

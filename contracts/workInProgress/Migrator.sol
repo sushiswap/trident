@@ -6,11 +6,8 @@ import "../pool/ConstantProductPool.sol";
 import "../pool/ConstantProductPoolFactory.sol";
 import "../deployer/MasterDeployer.sol";
 import "../interfaces/IPool.sol";
+import "../interfaces/IERC20.sol";
 import "../interfaces/IBentoBoxMinimal.sol";
-
-interface IERC20 {
-    function totalSupply() external returns (uint256);
-}
 
 contract Migrator {
     address public chef;
