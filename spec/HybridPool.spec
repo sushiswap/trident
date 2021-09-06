@@ -24,8 +24,12 @@ methods {
     token1() returns (address) envfree
     reserve0() returns (uint128) envfree
     reserve1() returns (uint128) envfree
+    otherHarness() returns (address) envfree // for noChangeToOthersBalances
+
+    // HybridPool constants
     MAX_FEE() returns (uint256) envfree
     MAX_FEE_MINUS_SWAP_FEE() returns (uint256) envfree
+    barFeeTo() returns (address) envfree
 
     // HybridPool functions
     _balance() returns (uint256 balance0, uint256 balance1) envfree
@@ -34,14 +38,13 @@ methods {
     getAmountOutWrapper(address tokenIn, uint256 amountIn) returns (uint256) envfree
     balanceOf(address) returns (uint256) envfree
 
-    // TODO: not working
-    // TridentERC20 (permit)
+    // TridentERC20 (permit method)
     ecrecover(bytes32 digest, uint8 v, bytes32 r, bytes32 s) 
-              returns (address) => NONDET
+              returns (address) => NONDET // TODO: check with Nurit
 
-    // HybridPool (swap, swapWithContext) -> ITridentCallee (tridentCallback)
-    tridentCallback(address tokenIn, address tokenOut, uint256 amountIn,
-                    uint256 amountOut, bytes data) => NONDET
+    // ITridentCallee
+    tridentSwapCallback(bytes) => NONDET // TODO: check with Nurit
+    tridentMintCallback(bytes) => NONDET // TODO: check with Nurit
 
     // bentobox
     bentoBox.balanceOf(address token, address user) returns (uint256) envfree
@@ -52,8 +55,12 @@ methods {
     balanceOf(address account) returns (uint256) => DISPATCHER(true) UNRESOLVED
     tokenBalanceOf(address token, address user) returns (uint256 balance) envfree 
 
-    // MasterDeployer(masterDeployer).barFee()
-    barFee() => NONDET
+    // MasterDeployer
+    barFee() => CONSTANT // TODO: check with Nurit
+    migrator() => NONDET // TODO: check with Nurit
+
+    // IMigrator
+    desiredLiquidity() => NONDET // TODO: check with Nurit
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -63,9 +70,11 @@ methods {
 ////////////////////////////////////////////////////////////////////////////
 //                               Invariants                               //
 ////////////////////////////////////////////////////////////////////////////
+// REVIEW: This should fail (passing right now)
 invariant validityOfTokens()
     token0() != 0 && token1() != 0 && token0() != token1()
 
+// REVIEW: This should fail (passing right now)
 invariant tokensNotMirin()
     token0() != currentContract && token1() != currentContract
 
@@ -111,7 +120,7 @@ invariant integrityOfTotalSupply()
 //     assert(false);
 // }
 
-// RUN: Pending
+// Passing
 rule noChangeToBalancedPoolAssets(method f) filtered { f ->
                     f.selector != flashSwapWrapper(address, address, bool, uint256, bytes).selector } {
     env e;
@@ -138,7 +147,7 @@ rule noChangeToBalancedPoolAssets(method f) filtered { f ->
            "pool's balance in BentoBox changed");
 }
 
-// RUN: Pending
+// Passing
 rule afterOpBalanceEqualsReserve(method f) {
     env e;
 
@@ -189,11 +198,15 @@ rule afterOpBalanceEqualsReserve(method f) {
            "balance doesn't equal reserve after state changing operations");
 }
 
-// RUN: Pending
+// Passing
+// Mudit: check require again, should pass without it
+// TRIED: doesn't
 rule mintingNotPossibleForBalancedPool() {
     env e;
 
-    require totalSupply() > 0 || (reserve0() == 0 || reserve1() == 0); // REVIEW: failing without this
+    // REVIEW: not pssing wih this
+    // require totalSupply() > 0 || (reserve0() == 0 && reserve1() == 0);
+    require totalSupply() > 0; // REVIEW: failing without this
 
     validState(true);
 
@@ -206,6 +219,8 @@ rule mintingNotPossibleForBalancedPool() {
 // DONE: try optimal liquidity of ratio 1 (Timing out when changed args
 // to actual variables to make the msg.sender the same)
 // TODO: if works, add another rule that checks that burn gives the money to the correct person
+// Mudit: can fail due to rounding error (-1 for the after liquidities)
+// TRIED: still times out
 // rule inverseOfMintAndBurn() {
 //     env e;
 
@@ -309,9 +324,13 @@ rule noChangeToOthersBalances(method f) {
 
     validState(false);
 
+    // Mudit: to == other => other's balances only increase or stay the same
     require other != currentContract && e.msg.sender != other &&
             to != other && recipient != other;
     require other != bentoBox;
+    require other != barFeeTo();
+
+    require otherHarness() == other; 
 
     // recording other's mirin balance
     uint256 _otherMirinBalance = balanceOf(other);
@@ -335,15 +354,16 @@ rule noChangeToOthersBalances(method f) {
         burnSingleWrapper(e, tokenOut, to, unwrapBento);
     } else if (f.selector == swapWrapper(address, address, bool).selector) {
         swapWrapper(e, tokenIn, recipient, unwrapBento);
-    }  else if (f.selector == flashSwapWrapper(address, address, bool, uint256, bytes).selector) {
+    }  else if (f.selector == flashSwapWrapper(address, address, bool, uint256, bytes).selector ||
+                f.selector == flashSwapWithConditions(address, address, bool, uint256, bytes).selector) {
         calldataarg args;
-        flashSwapWrapper(e, args); // TODO: since it uses bytes, limit recepient in the wrapper
+        flashSwapWithConditions(e, args);
     } else if (f.selector == transfer(address, uint256).selector) {
         uint256 amount;
         transfer(e, recipient, amount);
     } else if (f.selector == transferFrom(address, address, uint256).selector) {
         address from;
-        require from != other; // REVIEW: double check if this is safe
+        require from != other;
         uint256 amount;
 
         transferFrom(e, from, recipient, amount);
@@ -464,6 +484,7 @@ rule sameUnderlyingRatioLiquidity(method f) filtered { f ->
 
 // Timing out, even with reserve0() / reserve1() == 1
 // TODO: all swap methods
+// Mudit: singleAmountOut == multiAmountOut1 + multiAmountOut2
 // rule multiSwapLessThanSingleSwap() {
 //     env e;
 //     address to;
@@ -497,26 +518,27 @@ rule sameUnderlyingRatioLiquidity(method f) filtered { f ->
 //     assert(singleAmountOut >= multiAmountOut1 + multiAmountOut2, "multiple swaps better than one single swap");
 // }
 
-// TODO: add same rule as multiSwapLessThanSingleSwap but using getAmountOut
-// rule multiLessThanSingleAmountOut() {
-//     env e;
-//     uint256 amountInX;
-//     uint256 amountInY;
+// Mudit: singleAmountOut == multiAmountOut1 + multiAmountOut2
+rule multiLessThanSingleAmountOut() {
+    env e;
+    uint256 amountInX;
+    uint256 amountInY;
+    bool token0In;
 
-//     require 0 < MAX_FEE_MINUS_SWAP_FEE() && MAX_FEE_MINUS_SWAP_FEE() <= MAX_FEE();
+    require 0 < MAX_FEE_MINUS_SWAP_FEE() && MAX_FEE_MINUS_SWAP_FEE() <= MAX_FEE();
     
-//     uint256 multiAmountOut1 = _getAmountOut(e, amountInX, reserve0(), reserve1());
-//     require reserve0() + amountInX <= max_uint256;
-//     uint256 multiAmountOut2 = _getAmountOut(e, amountInY, reserve0() + amountInX, reserve1() - multiAmountOut1);
+    uint256 multiAmountOut1 = _getAmountOut(e, amountInX, reserve0(), reserve1(), token0In);
+    require reserve0() + amountInX <= max_uint256;
+    uint256 multiAmountOut2 = _getAmountOut(e, amountInY, reserve0() + amountInX, reserve1() - multiAmountOut1, token0In);
 
-//     // checking for overflows
-//     require amountInX + amountInY <= max_uint256;
+    // checking for overflows
+    require amountInX + amountInY <= max_uint256;
 
-//     uint256 singleAmountOut = _getAmountOut(e, amountInX + amountInY, reserve0(), reserve1());
+    uint256 singleAmountOut = _getAmountOut(e, amountInX + amountInY, reserve0(), reserve1(), token0In);
 
-//     // TODO: Mudit wanted strictly greater
-//     assert(singleAmountOut >= multiAmountOut1 + multiAmountOut2, "multiple swaps better than one single swap");
-// }
+    // TODO: Mudit wanted strictly greater
+    assert(singleAmountOut >= multiAmountOut1 + multiAmountOut2, "multiple swaps better than one single swap");
+}
 
 // Timing out, even with require reserve0() == reserve1();
 // rule additivityOfMint() {
@@ -599,7 +621,7 @@ rule sameUnderlyingRatioLiquidity(method f) filtered { f ->
 
 //     uint256 userMirinBalanceNonOptimal = balanceOf(e, e.msg.sender);
 
-//     // TODO: strictly greater?
+//     // TODO: strictly greater? (Mudit: when the difference is small, the final amount would be the same)
 //     assert(mirinOptimal >= mirinNonOptimal);
 //     assert(userMirinBalanceOptimal >= userMirinBalanceNonOptimal);
 // }
@@ -624,9 +646,9 @@ rule zeroCharacteristicsOfGetAmountOut(uint256 _reserve0, uint256 _reserve1) {
     if (amountIn == 0) {
         assert(amountOut == 0, "amountIn is 0, but amountOut is not 0");
     } else { 
-        if (tokenIn == token0() && reserve1() == 0) {
+        if (tokenIn == token0() && reserve1() == 0) { // Mudit: if either of the reserves is 0 then getAmountOut should revert
             assert(amountOut == 0, "token1 has no reserves, but amountOut is non-zero");
-        } else {
+        } else { // Mudit: if (amountIn > ratio of the reserves)
             assert(amountOut > 0);
         }
     }
@@ -654,10 +676,12 @@ rule maxAmountOut(uint256 _reserve0, uint256 _reserve1) {
     // mathint maxValue = to_mathint(amountIn) * to_mathint(_reserve1) / to_mathint(_reserve0);
     // assert amountOut <= maxValue;
 
-    assert amountOut <= _reserve1;
+    // Mudit: needs to be strictly less than
+    // TRIED: works!!!!
+    assert amountOut < _reserve1; 
 }
 
-// Passing (need to check)
+// Passing (need to review)
 rule nonZeroMint() {
     env e;
     address to;

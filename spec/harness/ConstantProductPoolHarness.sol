@@ -7,6 +7,7 @@ contract ConstantProductPoolHarness is ConstantProductPool {
     // state variables ///////////
     // mapping(uint256 => mapping(uint256 => mapping(uint256 => uint256))) public amountOutHarness;
     address public otherHarness;
+    address public tokenInHarness;
 
     // constructor ///////////////
     constructor(bytes memory _deployData, address _masterDeployer)
@@ -52,24 +53,8 @@ contract ConstantProductPoolHarness is ConstantProductPool {
     function flashSwapWrapper(address tokenIn, address recipient, bool unwrapBento,
                               uint256 amountIn, bytes memory context)
             public returns (uint256 amountOut) {
-        // TODO: would be applied for all rules
-        // require(recipient != address(this), "recepient is current contract");
-        // require(recipient != token0, "recepient is token0");
-        // require(recipient != token1, "recepient is token1");
-
-        // require(tokenIn == token0, "wrong token");
-        // require(tokenOut == token1, "wrong token");
-
-        bytes memory data = abi.encode(tokenIn, recipient,  unwrapBento, amountIn, context);
-
-        return super.flashSwap(data);
-    }
-
-    // for noChangeToOthersBalances
-    function flashSwapWithConditions(address tokenIn, address recipient, bool unwrapBento,
-                                     uint256 amountIn, bytes memory context)
-            public returns (uint256 amountOut) {
         require(otherHarness != recipient, "recepient is other");
+        require(tokenInHarness == tokenIn);
 
         bytes memory data = abi.encode(tokenIn, recipient,  unwrapBento, amountIn, context);
 
