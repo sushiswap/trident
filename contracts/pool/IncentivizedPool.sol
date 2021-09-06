@@ -25,7 +25,7 @@ contract IncentivizedPool is IndexPool {
 
     ERC20 public rewardToken;
 
-    constructor(bytes memory _deployData, address _masterDeployer) IncentivizedPool(_deployData, _masterDeployer) {}
+    constructor(bytes memory _deployData, address _masterDeployer) IndexPool(_deployData, _masterDeployer) {}
 
     function _beforeTokenTransfer(
         address from,
