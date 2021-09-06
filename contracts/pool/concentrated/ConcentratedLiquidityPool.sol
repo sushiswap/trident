@@ -560,7 +560,7 @@ contract ConcentratedLiquidityPool is IPool {
         assets[1] = token1;
     }
 
-    function collectProtocolFee() public {
+    function collectProtocolFee() external lock {
         _transfer(token0, token0ProtocolFee - 1, barFeeTo, false);
         _transfer(token1, token1ProtocolFee - 1, barFeeTo, false);
         token0ProtocolFee = 1;
