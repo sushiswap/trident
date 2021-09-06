@@ -24,7 +24,7 @@ contract IncentivizedPool is IndexPool {
 
     uint256 public constant BONUS_MULTIPLIER = 10;
 
-    ERC20 public reward;
+    ERC20 public rewardToken;
 
     function _beforeTokenTransfer(address from, address to, uint256 amount) internal {
         if (block.number <= lastRewardBlock) {
@@ -43,7 +43,7 @@ contract IncentivizedPool is IndexPool {
         lastRewardBlock = block.number;
 
         if (balances[from] > 0) {
-            reward.transfer(from, balances[from].mul(accPerShare).div(1e12).sub(rewardDebt));
+            rewardToken.transfer(from, balances[from].mul(accPerShare).div(1e12).sub(rewardDebt));
         }
     }
 
