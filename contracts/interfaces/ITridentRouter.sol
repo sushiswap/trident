@@ -19,7 +19,6 @@ interface ITridentRouter {
 
     struct ExactInputParams {
         address tokenIn;
-        address tokenOut;
         uint256 amountIn;
         uint256 amountOutMinimum;
         Path[] path;

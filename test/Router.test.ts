@@ -510,7 +510,6 @@ describe("Router", function () {
       expect(expectedAmountOutSingleHop).gt(1);
       let params = {
         tokenIn: weth.address,
-        tokenOut: sushi.address,
         amountIn: amountIn,
         amountOutMinimum: 1,
         path: [
