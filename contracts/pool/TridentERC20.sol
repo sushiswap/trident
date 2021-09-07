@@ -5,7 +5,7 @@ pragma solidity >=0.8.0;
 /// @notice Trident pool ERC-20 with EIP-2612 extension.
 /// @author Adapted from RariCapital, https://github.com/Rari-Capital/solmate/blob/main/src/erc20/ERC20.sol,
 /// License-Identifier: AGPL-3.0-only.
-contract TridentERC20 {
+abstract contract TridentERC20 {
     event Approval(address indexed owner, address indexed spender, uint256 amount);
     event Transfer(address indexed sender, address indexed recipient, uint256 amount);
 
@@ -19,7 +19,7 @@ contract TridentERC20 {
     /// @notice owner -> spender -> allowance mapping.
     mapping(address => mapping(address => uint256)) public allowance;
 
-    /// @notice The EIP-712 typehash for the permit struct used by this contract.
+    /// @notice The EIP-712 typehash for this contract's {permit} struct.
     bytes32 public constant PERMIT_TYPEHASH =
         keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
     /// @notice The EIP-712 typehash for this contract's domain.
@@ -44,8 +44,8 @@ contract TridentERC20 {
     }
 
     /// @notice Approves `amount` from `msg.sender` to be spent by `spender`.
-    /// @param spender Address of the party that can draw tokens from `msg.sender`'s account.
-    /// @param amount The maximum collective `amount` that `spender` can draw.
+    /// @param spender Address of the party that can pull tokens from `msg.sender`'s account.
+    /// @param amount The maximum collective `amount` that `spender` can pull.
     /// @return (bool) Returns 'true' if succeeded.
     function approve(address spender, uint256 amount) external returns (bool) {
         allowance[msg.sender][spender] = amount;
@@ -69,7 +69,7 @@ contract TridentERC20 {
     }
 
     /// @notice Transfers `amount` tokens from `sender` to `recipient`. Caller needs approval from `from`.
-    /// @param sender Address to draw tokens `from`.
+    /// @param sender Address to pull tokens `from`.
     /// @param recipient The address to move tokens to.
     /// @param amount The token `amount` to move.
     /// @return (bool) Returns 'true' if succeeded.
@@ -110,7 +110,7 @@ contract TridentERC20 {
     ) external {
         require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
         // @dev This is reasonably safe from overflow - incrementing
-        // beyond 'type(uint256).max' is exceedingly unlikely.
+        // beyond 'type(uint256).max' via approvals is exceedingly unlikely.
         unchecked {
             bytes32 digest = keccak256(
                 abi.encodePacked(
@@ -119,9 +119,9 @@ contract TridentERC20 {
                     keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, amount, nonces[owner]++, deadline))
                 )
             );
-        address recoveredAddress = ecrecover(digest, v, r, s);
-        require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_PERMIT_SIGNATURE");
-        allowance[recoveredAddress][spender] = amount;
+            address recoveredAddress = ecrecover(digest, v, r, s);
+            require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_PERMIT_SIGNATURE");
+            allowance[recoveredAddress][spender] = amount;
         }
         emit Approval(owner, spender, amount);
     }
