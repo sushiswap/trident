@@ -24,6 +24,12 @@ contract IncentivizedPool is IndexPool {
             return;
         }
 
-        rewards.claimRewardsFor(this, from);
+        if (from != address(0)) {
+            rewards.claimRewardsFor(this, from);
+        }
+
+        if (to != address(0)) {
+            rewards.claimRewardsFor(this, to);
+        }
     }
 }
