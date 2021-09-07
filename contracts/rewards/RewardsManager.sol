@@ -4,6 +4,11 @@ pragma solidity >=0.8.0;
 
 import "../interfaces/IPool.sol";
 import "../interfaces/IRewarder.sol";
+import "../interfaces/IMasterChef.sol";
+
+interface Sushi {
+    function safeTransfer(address, uint256) external returns (bool);
+}
 
 /// @notice Manages the rewards for various pools without requiring users to stake LP tokens.
 contract RewardsManager {
@@ -16,12 +21,11 @@ contract RewardsManager {
         uint64 allocPoint;
     }
 
-    /// `rewardDebt` The amount of SUSHI entitled to the user for a specific pool.
-    mapping(address => mapping(address => int256)) public rewardDebt;
+    /// @notice Address of MCV1 contract.
+    IMasterChef public immutable MASTER_CHEF;
 
-    mapping(address => PoolInfo) public poolInfo;
-
-    mapping(address => IRewarder) public rewarder;
+    /// @notice Address of SUSHI contract.
+    Sushi public immutable SUSHI;
 
     /// @dev Total allocation points. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint;
@@ -29,19 +33,27 @@ contract RewardsManager {
     uint256 private constant MASTERCHEF_SUSHI_PER_BLOCK = 1e20;
     uint256 private constant ACC_SUSHI_PRECISION = 1e12;
 
-    event Harvest(address indexed user, uint256 indexed pid, uint256 amount);
+    /// `rewardDebt` The amount of SUSHI entitled to the user for a specific pool.
+    mapping(address => mapping(address => int256)) public rewardDebt;
+
+    mapping(address => PoolInfo) public poolInfo;
+
+    mapping(address => IRewarder) public rewarder;
+
+    event Harvest(address indexed user, address indexed pid, uint256 amount);
+    event LogUpdatePool(address indexed pid, uint64 lastRewardBlock, uint256 lpSupply, uint256 accSushiPerShare);
 
     function claimRewardsFor(IPool pool, address account) external {
         PoolInfo memory info = updatePool(pool);
 
-        uint256 debt = rewardDebt[pool][account];
-        uint256 amount = pool.balanceOf(account);
+        int256 debt = rewardDebt[address(pool)][account];
+        uint256 amount = IERC20(address(pool)).balanceOf(account);
 
         int256 accumulatedSushi = int256((amount * info.accSushiPerShare) / ACC_SUSHI_PRECISION);
         uint256 _pendingSushi = uint256(accumulatedSushi - debt);
 
         // Effects
-        rewardDebt[pool][account] = accumulatedSushi;
+        rewardDebt[address(pool)][account] = accumulatedSushi;
 
         // Interactions
         if (_pendingSushi != 0) {
@@ -50,32 +62,27 @@ contract RewardsManager {
 
         IRewarder _rewarder = rewarder[address(pool)];
         if (address(_rewarder) != address(0)) {
-            _rewarder.onSushiReward(pid, account, account, _pendingSushi, amount);
+            _rewarder.onSushiReward(address(pool), account, account, _pendingSushi, amount);
         }
 
-        emit Harvest(account, pid, _pendingSushi);
+        emit Harvest(account, address(pool), _pendingSushi);
     }
 
     /// @notice Update reward variables of the given pool.
     /// @param pool The address of the pool. See `poolInfo`.
     /// @return info Returns the pool that was updated.
     function updatePool(IPool pool) public returns (PoolInfo memory info) {
-        info = poolInfo[pool];
+        info = poolInfo[address(pool)];
         if (block.number > info.lastRewardBlock) {
-            uint256 lpSupply = pool.totalSupply();
+            uint256 lpSupply = IERC20(address(pool)).totalSupply();
             if (lpSupply > 0) {
-                uint256 blocks = block.number.sub(info.lastRewardBlock);
-                uint256 sushiReward = blocks.mul(sushiPerBlock()).mul(info.allocPoint) / totalAllocPoint;
-                info.accSushiPerShare = info.accSushiPerShare.add((sushiReward.mul(ACC_SUSHI_PRECISION) / lpSupply).to128());
+                uint256 blocks = block.number - info.lastRewardBlock;
+                uint256 sushiReward = (blocks * MASTER_CHEF.sushiPerBlock() * info.allocPoint) / totalAllocPoint;
+                info.accSushiPerShare = info.accSushiPerShare + uint128((sushiReward * ACC_SUSHI_PRECISION) / lpSupply);
             }
-            info.lastRewardBlock = block.number.to64();
-            poolInfo[pool] = info;
-            emit LogUpdatePool(pool, info.lastRewardBlock, lpSupply, info.accSushiPerShare);
+            info.lastRewardBlock = uint64(block.number);
+            poolInfo[address(pool)] = info;
+            emit LogUpdatePool(address(pool), info.lastRewardBlock, lpSupply, info.accSushiPerShare);
         }
-    }
-
-    /// @notice Calculates and returns the `amount` of SUSHI per block.
-    function sushiPerBlock() public view returns (uint256 amount) {
-        amount = (uint256(MASTERCHEF_SUSHI_PER_BLOCK) * MASTER_CHEF.poolInfo(MASTER_PID).allocPoint) / MASTER_CHEF.totalAllocPoint();
     }
 }

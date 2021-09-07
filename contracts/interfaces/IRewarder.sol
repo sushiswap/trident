@@ -6,7 +6,7 @@ import "./IERC20.sol";
 
 interface IRewarder {
     function onSushiReward(
-        uint256 pid,
+        address pool,
         address user,
         address recipient,
         uint256 sushiAmount,
@@ -14,7 +14,7 @@ interface IRewarder {
     ) external;
 
     function pendingTokens(
-        uint256 pid,
+        address pool,
         address user,
         uint256 sushiAmount
     ) external view returns (IERC20[] memory, uint256[] memory);
