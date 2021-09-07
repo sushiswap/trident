@@ -78,6 +78,9 @@ contract RewardsManager is TridentOwnable {
         }
     }
 
+    /// @notice Harvest rewards for a specific account for a given pool.
+    /// @param pool The address of the pool. See `poolInfo`.
+    /// @param account The account to claim for.
     function claimRewardsFor(IPool pool, address account) external {
         PoolInfo memory info = updatePool(pool);
 
