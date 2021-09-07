@@ -3,6 +3,7 @@
 pragma solidity >=0.8.0;
 
 import "../interfaces/IPool.sol";
+import "../interfaces/IRewarder.sol";
 
 /// @notice Manages the rewards for various pools without requiring users to stake LP tokens.
 contract RewardsManager {
@@ -20,6 +21,8 @@ contract RewardsManager {
 
     mapping(address => PoolInfo) public poolInfo;
 
+    mapping(address => IRewarder) public rewarder;
+
     /// @dev Total allocation points. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint;
 
@@ -34,18 +37,18 @@ contract RewardsManager {
         uint256 debt = rewardDebt[pool][account];
         uint256 amount = pool.balanceOf(account);
 
-        int256 accumulatedSushi = int256(amount.mul(info.accSushiPerShare) / ACC_SUSHI_PRECISION);
-        uint256 _pendingSushi = accumulatedSushi.sub(debt).toUInt256();
+        int256 accumulatedSushi = int256((amount * info.accSushiPerShare) / ACC_SUSHI_PRECISION);
+        uint256 _pendingSushi = uint256(accumulatedSushi - debt);
 
         // Effects
         rewardDebt[pool][account] = accumulatedSushi;
 
         // Interactions
         if (_pendingSushi != 0) {
-            SUSHI.safeTransfer(to, _pendingSushi);
+            SUSHI.safeTransfer(account, _pendingSushi);
         }
 
-        IRewarder _rewarder = rewarder[pid];
+        IRewarder _rewarder = rewarder[address(pool)];
         if (address(_rewarder) != address(0)) {
             _rewarder.onSushiReward(pid, account, account, _pendingSushi, amount);
         }
@@ -69,5 +72,10 @@ contract RewardsManager {
             poolInfo[pool] = info;
             emit LogUpdatePool(pool, info.lastRewardBlock, lpSupply, info.accSushiPerShare);
         }
+    }
+
+    /// @notice Calculates and returns the `amount` of SUSHI per block.
+    function sushiPerBlock() public view returns (uint256 amount) {
+        amount = (uint256(MASTERCHEF_SUSHI_PER_BLOCK) * MASTER_CHEF.poolInfo(MASTER_PID).allocPoint) / MASTER_CHEF.totalAllocPoint();
     }
 }
