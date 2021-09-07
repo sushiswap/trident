@@ -13,6 +13,9 @@ contract IndexPoolFactory is PoolDeployer {
     function deployPool(bytes memory _deployData) external returns (address pool) {
         (address[] memory tokens, , ) = abi.decode(_deployData, (address[], uint256[], uint256));
 
-        pool = _deployPool(tokens, type(IndexPool).creationCode, _deployData);
+        // @dev Salt is not actually needed since `_deployData` is part of creationCode and already contains the salt.
+        bytes32 salt = keccak256(_deployData);
+        pool = address(new IndexPool{salt: salt}(_deployData, masterDeployer));
+        _registerPool(pool, tokens, salt);
     }
 }

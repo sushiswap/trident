@@ -19,6 +19,10 @@ contract ConstantProductPoolFactory is PoolDeployer {
         address[] memory tokens = new address[](2);
         tokens[0] = tokenA;
         tokens[1] = tokenB;
-        pool = _deployPool(tokens, type(ConstantProductPool).creationCode, _deployData);
+
+        // @dev Salt is not actually needed since `_deployData` is part of creationCode and already contains the salt.
+        bytes32 salt = keccak256(_deployData);
+        pool = address(new ConstantProductPool{salt: salt}(_deployData, masterDeployer));
+        _registerPool(pool, tokens, salt);
     }
 }
