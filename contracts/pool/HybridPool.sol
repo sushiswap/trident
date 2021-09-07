@@ -69,6 +69,8 @@ contract HybridPool is IPool, TridentERC20 {
         (, bytes memory _barFee) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
         (, bytes memory _barFeeTo) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFeeTo.selector));
         (, bytes memory _bento) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.bento.selector));
+        (, bytes memory _decimals0) = _token0.staticcall(abi.encodeWithSelector(0x313ce567)); // @dev 'decimals()'.
+        (, bytes memory _decimals1) = _token1.staticcall(abi.encodeWithSelector(0x313ce567)); // @dev 'decimals()'.
 
         token0 = _token0;
         token1 = _token1;
@@ -79,8 +81,8 @@ contract HybridPool is IPool, TridentERC20 {
         masterDeployer = _masterDeployer;
         A = a;
         N_A = 2 * a;
-        token0PrecisionMultiplier = uint256(10)**(decimals - TridentERC20(_token0).decimals());
-        token1PrecisionMultiplier = uint256(10)**(decimals - TridentERC20(_token1).decimals());
+        token0PrecisionMultiplier = 10**(decimals - abi.decode(_decimals0, (uint8)));
+        token1PrecisionMultiplier = 10**(decimals - abi.decode(_decimals1, (uint8)));
         unlocked = 1;
     }
     
@@ -124,11 +126,8 @@ contract HybridPool is IPool, TridentERC20 {
         _transfer(token0, amount0, recipient, unwrapBento);
         _transfer(token1, amount1, recipient, unwrapBento);
 
-        uint256 amount0inShares = _toShare(token0, amount0);
-        uint256 amount1inShares = _toShare(token1, amount1);
-
-        balance0 -= amount0inShares;
-        balance1 -= amount1inShares;
+        balance0 -= _toShare(token0, amount0);
+        balance1 -= _toShare(token1, amount1);
         
         _updateReserves();
 
@@ -159,8 +158,7 @@ contract HybridPool is IPool, TridentERC20 {
             uint256 fee = _handleFee(token0, amount0);
             amount1 += _getAmountOut(amount0 - fee, _reserve0 - amount0, _reserve1 - amount1, true);
             _transfer(token1, amount1, recipient, unwrapBento);
-            uint256 amount0inShares = _toShare(token0, amount0);
-            balance0 -= amount0inShares;
+            balance0 -= _toShare(token0, amount0);
             amountOut = amount1;
             amount0 = 0;
         } else {
@@ -169,8 +167,7 @@ contract HybridPool is IPool, TridentERC20 {
             uint256 fee = _handleFee(token1, amount1);
             amount0 += _getAmountOut(amount1 - fee, _reserve0 - amount0, _reserve1 - amount1, false);
             _transfer(token0, amount0, recipient, unwrapBento);
-            uint256 amount1inShares = _toShare(token1, amount1);
-            balance1 -= amount1inShares;
+            balance1 -= _toShare(token1, amount1);
             amountOut = amount0;
             amount1 = 0;
         }
@@ -185,7 +182,7 @@ contract HybridPool is IPool, TridentERC20 {
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 amountIn;
         address tokenOut;
-
+        
         if (tokenIn == token0) {
             tokenOut = token1;
             amountIn = balance0 - _reserve0;
@@ -212,7 +209,7 @@ contract HybridPool is IPool, TridentERC20 {
         (uint256 _reserve0, uint256 _reserve1) = _getReserves();
         address tokenOut;
         uint256 fee;
-
+        
         if (tokenIn == token0) {
             tokenOut = token1;
             amountIn = _toAmount(token0, amountIn);
@@ -298,9 +295,10 @@ contract HybridPool is IPool, TridentERC20 {
         uint256 _reserve0,
         uint256 _reserve1,
         bool token0In
-    ) internal view returns (uint256) {
+    ) internal view returns (uint256 dy) {
         uint256 xpIn;
         uint256 xpOut;
+        
         if (token0In) {
             xpIn = _reserve0 * token0PrecisionMultiplier;
             xpOut = _reserve1 * token1PrecisionMultiplier;
@@ -313,9 +311,8 @@ contract HybridPool is IPool, TridentERC20 {
         uint256 d = _computeLiquidityFromAdjustedBalances(xpIn, xpOut);
         uint256 x = xpIn + amountIn;
         uint256 y = _getY(x, d);
-        uint256 dy = xpOut - y - 1;
+        dy = xpOut - y - 1;
         dy /= (token0In ? token1PrecisionMultiplier : token0PrecisionMultiplier);
-        return dy;
     }
 
     function _transfer(
@@ -349,6 +346,7 @@ contract HybridPool is IPool, TridentERC20 {
 
     function _computeLiquidityFromAdjustedBalances(uint256 xp0, uint256 xp1) internal view returns (uint256 computed) {
         uint256 s = xp0 + xp1;
+        
         if (s == 0) {
             computed = 0;
         }
@@ -371,14 +369,13 @@ contract HybridPool is IPool, TridentERC20 {
     /// the user should receive on swap.
     /// @dev Originally https://github.com/saddle-finance/saddle-contract/blob/0b76f7fb519e34b878aa1d58cffc8d8dc0572c12/contracts/SwapUtils.sol#L432.
     /// @param x The new total amount of FROM token.
-    /// @return The amount of TO token that should remain in the pool.
-    function _getY(uint256 x, uint256 D) internal view returns (uint256) {
+    /// @return y The amount of TO token that should remain in the pool.
+    function _getY(uint256 x, uint256 D) internal view returns (uint256 y) {
         uint256 c = (D * D) / (x * 2);
         c = (c * D) / ((N_A * 2) / A_PRECISION);
         uint256 b = x + ((D * A_PRECISION) / N_A);
         uint256 yPrev;
-        uint256 y = D;
-
+        y = D;
         // @dev Iterative approximation.
         for (uint256 i = 0; i < MAX_LOOP_LIMIT; i++) {
             yPrev = y;
@@ -387,7 +384,6 @@ contract HybridPool is IPool, TridentERC20 {
                 break;
             }
         }
-        return y;
     }
 
     /// @notice Calculate the price of a token in the pool given
@@ -399,17 +395,18 @@ contract HybridPool is IPool, TridentERC20 {
     /// x_1**2 + b*x_1 = c
     /// x_1 = (x_1**2 + c) / (2*x_1 + b)
     /// @dev Originally https://github.com/saddle-finance/saddle-contract/blob/0b76f7fb519e34b878aa1d58cffc8d8dc0572c12/contracts/SwapUtils.sol#L276.
-    /// @return The price of the token, in the same precision as in xp.
+    /// @return y The price of the token, in the same precision as in xp.
     function _getYD(
         uint256 s, // @dev xpOut.
         uint256 d
-    ) internal view returns (uint256) {
+    ) internal view returns (uint256 y) {
         uint256 c = (d * d) / (s * 2);
         c = (c * d) / ((N_A * 2) / A_PRECISION);
 
         uint256 b = s + ((d * A_PRECISION) / N_A);
         uint256 yPrev;
-        uint256 y = d;
+        y = d;
+        
         for (uint256 i = 0; i < MAX_LOOP_LIMIT; i++) {
             yPrev = y;
             y = (y * y + c) / (y * 2 + b - d);
@@ -417,7 +414,6 @@ contract HybridPool is IPool, TridentERC20 {
                 break;
             }
         }
-        return y;
     }
     
     function _handleFee(address tokenIn, uint256 amountIn) internal returns (uint256 fee) {
@@ -435,6 +431,7 @@ contract HybridPool is IPool, TridentERC20 {
     ) internal view returns (uint256 token0Fee, uint256 token1Fee) {
         if (_reserve0 == 0 || _reserve1 == 0) return (0, 0);
         uint256 amount1Optimal = (_amount0 * _reserve1) / _reserve0;
+        
         if (amount1Optimal <= _amount1) {
             token1Fee = (swapFee * (_amount1 - amount1Optimal)) / (2 * MAX_FEE);
         } else {
@@ -454,6 +451,7 @@ contract HybridPool is IPool, TridentERC20 {
         (uint256 _reserve0, uint256 _reserve1) = _getReserves();
         amountIn = _toAmount(tokenIn, amountIn);
         amountIn -= (amountIn * swapFee) / MAX_FEE;
+        
         if (tokenIn == token0) {
             finalAmountOut = _getAmountOut(amountIn, _reserve0, _reserve1, true);
         } else {
@@ -469,6 +467,6 @@ contract HybridPool is IPool, TridentERC20 {
             uint256 _reserve1
         )
     {
-        return _getReserves();
+        (_reserve0, _reserve1) = _getReserves();
     }
 }
