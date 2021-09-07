@@ -18,7 +18,7 @@ contract MasterDeployer is TridentOwnable {
 
     uint256 internal constant MAX_FEE = 10000; // @dev 100%.
 
-    address[] public pools;
+    mapping(address => bool) public pools;
 
     mapping(address => bool) public whitelistedFactories;
 
@@ -39,7 +39,7 @@ contract MasterDeployer is TridentOwnable {
     function deployPool(address _factory, bytes calldata _deployData) external returns (address pool) {
         require(whitelistedFactories[_factory], "FACTORY_NOT_WHITELISTED");
         pool = IPoolFactory(_factory).deployPool(_deployData);
-        pools.push(pool);
+        pools[pool] = true;
         emit DeployPool(_factory, pool);
     }
 
@@ -58,9 +58,5 @@ contract MasterDeployer is TridentOwnable {
 
     function setMigrator(address _migrator) external onlyOwner {
         migrator = _migrator;
-    }
-
-    function poolsCount() external view returns (uint256 count) {
-        count = pools.length;
     }
 }

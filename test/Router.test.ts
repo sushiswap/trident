@@ -43,7 +43,11 @@ describe("Router", function () {
     bento = await Bento.deploy(weth.address);
     masterDeployer = await Deployer.deploy(17, alice.address, bento.address);
     tridentPoolFactory = await PoolFactory.deploy(masterDeployer.address);
-    router = await TridentRouter.deploy(bento.address, weth.address);
+    router = await TridentRouter.deploy(
+      bento.address,
+      masterDeployer.address,
+      weth.address
+    );
 
     // Whitelist pool factory in master deployer
     await masterDeployer.addToWhitelist(tridentPoolFactory.address);
@@ -251,9 +255,7 @@ describe("Router", function () {
           amount: BigNumber.from(10).pow(18),
         },
       ];
-      await router.addLiquidity(liquidityInput, pool.address, 1, aliceEncoded, {
-        value: BigNumber.from(10).pow(17),
-      });
+      await router.addLiquidity(liquidityInput, pool.address, 1, aliceEncoded);
 
       let finalTotalSupply = await pool.totalSupply();
       let finalPoolWethBalance = await bento.balanceOf(
