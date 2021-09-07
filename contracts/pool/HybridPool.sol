@@ -2,15 +2,15 @@
 
 pragma solidity >=0.8.0;
 
-import "../deployer/MasterDeployer.sol";
 import "../interfaces/IBentoBoxMinimal.sol";
+import "../interfaces/IMasterDeployer.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/ITridentCallee.sol";
 import "../libraries/MathUtils.sol";
 import "./TridentERC20.sol";
 
 /// @notice Trident exchange pool template with hybrid like-kind formula for swapping between an ERC-20 token pair.
-/// @dev The reserves are stored as bento shares. However, the stabeswap invariant is applied to the underlying amounts.
+/// @dev The reserves are stored as bento shares. However, the stableswap invariant is applied to the underlying amounts.
 ///      The API uses the underlying amounts.
 contract HybridPool is IPool, TridentERC20 {
     using MathUtils for uint256;
@@ -47,7 +47,7 @@ contract HybridPool is IPool, TridentERC20 {
     uint128 internal reserve0;
     uint128 internal reserve1;
 
-    bytes32 public constant override poolIdentifier = "Trident:HybridPair";
+    bytes32 public constant override poolIdentifier = "Trident:HybridPool";
 
     uint256 internal unlocked;
     modifier lock() {
@@ -121,11 +121,14 @@ contract HybridPool is IPool, TridentERC20 {
         uint256 amount1 = (liquidity * balance1) / _totalSupply;
 
         _burn(address(this), liquidity);
-        _transfer(token0, recipient, amount0, unwrapBento);
-        _transfer(token1, recipient, amount1, unwrapBento);
+        _transfer(token0, amount0, recipient, unwrapBento);
+        _transfer(token1, amount1, recipient, unwrapBento);
 
-        balance0 -= bento.toShare(token0, amount0, false);
-        balance1 -= bento.toShare(token1, amount1, false);
+        uint256 amount0inShares = _toShare(token0, amount0);
+        uint256 amount1inShares = _toShare(token1, amount1);
+
+        balance0 -= amount0inShares;
+        balance1 -= amount1inShares;
         
         _updateReserves();
 
@@ -155,17 +158,19 @@ contract HybridPool is IPool, TridentERC20 {
             // @dev Calculate `amountOut` as if the user first withdrew balanced liquidity and then swapped `token0` for `token1`.
             uint256 fee = _handleFee(token0, amount0);
             amount1 += _getAmountOut(amount0 - fee, _reserve0 - amount0, _reserve1 - amount1, true);
-            _transfer(token1, recipient, amount1, unwrapBento);
-            balance0 -= bento.toShare(token0, amount0, false);
+            _transfer(token1, amount1, recipient, unwrapBento);
+            uint256 amount0inShares = _toShare(token0, amount0);
+            balance0 -= amount0inShares;
             amountOut = amount1;
             amount0 = 0;
         } else {
             // @dev Swap `token1` for `token0`.
-            require(tokenOut == token0), "INVALID_OUTPUT_TOKEN");
+            require(tokenOut == token0, "INVALID_OUTPUT_TOKEN");
             uint256 fee = _handleFee(token1, amount1);
             amount0 += _getAmountOut(amount1 - fee, _reserve0 - amount0, _reserve1 - amount1, false);
-            _transfer(token0, recipient, amount0, unwrapBento);
-            balance1 -= bento.toShare(token1, amount1, false);
+            _transfer(token0, amount0, recipient, unwrapBento);
+            uint256 amount1inShares = _toShare(token1, amount1);
+            balance1 -= amount1inShares;
             amountOut = amount0;
             amount1 = 0;
         }
@@ -187,13 +192,13 @@ contract HybridPool is IPool, TridentERC20 {
             uint256 fee = _handleFee(tokenIn, amountIn);
             amountOut = _getAmountOut(amountIn - fee, _reserve0, _reserve1, true);
         } else {
-            require(tokenIn == token1), "INVALID_INPUT_TOKEN");
+            require(tokenIn == token1, "INVALID_INPUT_TOKEN");
             tokenOut = token0;
             amountIn = balance1 - _reserve1;
             uint256 fee = _handleFee(tokenIn, amountIn);
             amountOut = _getAmountOut(amountIn - fee, _reserve0, _reserve1, false);
         }
-        _transfer(tokenOut, recipient, finalAmountOut, unwrapBento);
+        _transfer(tokenOut, amountOut, recipient, unwrapBento);
         _updateReserves();
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
@@ -210,23 +215,23 @@ contract HybridPool is IPool, TridentERC20 {
 
         if (tokenIn == token0) {
             tokenOut = token1;
-            amountIn = bento.toAmount(token0, amountIn, false);
+            amountIn = _toAmount(token0, amountIn);
             fee = (amountIn * swapFee) / MAX_FEE;
             amountOut = _getAmountOut(amountIn - fee, _reserve0, _reserve1, true);
             _processSwap(token1, recipient, amountOut, context, unwrapBento);
-            uint256 balance0 = bento.toAmount(token0, bento.balanceOf(token0, address(this)), false);
+            uint256 balance0 = _toAmount(token0, __balance(token0));
             require(balance0 - _reserve0 >= amountIn, "INSUFFICIENT_AMOUNT_IN");
         } else {
-            require(tokenIn == token1), "INVALID_INPUT_TOKEN");
+            require(tokenIn == token1, "INVALID_INPUT_TOKEN");
             tokenOut = token0;
-            amountIn = bento.toAmount(token1, amountIn, false);
+            amountIn = _toAmount(token1, amountIn);
             fee = (amountIn * swapFee) / MAX_FEE;
             amountOut = _getAmountOut(amountIn - fee, _reserve0, _reserve1, false);
             _processSwap(token0, recipient, amountOut, context, unwrapBento);
-            uint256 balance1 = bento.toAmount(token1, bento.balanceOf(token0, address(this)), false);
+            uint256 balance1 = _toAmount(token1, __balance(token1));
             require(balance1 - _reserve1 >= amountIn, "INSUFFICIENT_AMOUNT_IN");
         }
-        _transfer(tokenIn, barFeeTo, fee, false);
+        _transfer(tokenIn, fee, barFeeTo, false);
         _updateReserves();
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
@@ -236,33 +241,7 @@ contract HybridPool is IPool, TridentERC20 {
         (, bytes memory _barFee) = masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
         barFee = abi.decode(_barFee, (uint256));
     }
-
-    function _transfer(
-        address token,
-        address to,
-        uint256 amount,
-        bool unwrapBento
-    ) internal {
-        if (unwrapBento) {
-            bento.withdraw(token, address(this), to, amount, 0);
-        } else {
-            bento.transfer(token, address(this), to, bento.toShare(token, amount, false));
-        }
-    }
-
-    function _transferShares(
-        address token,
-        address to,
-        uint256 shares,
-        bool unwrapBento
-    ) internal {
-        if (unwrapBento) {
-            bento.withdraw(token, address(this), to, 0, shares);
-        } else {
-            bento.transfer(token, address(this), to, shares);
-        }
-    }
-
+    
     function _processSwap(
         address tokenOut,
         address to,
@@ -270,76 +249,109 @@ contract HybridPool is IPool, TridentERC20 {
         bytes memory data,
         bool unwrapBento
     ) internal {
-        _transferAmount(tokenOut, to, amountOut, unwrapBento);
+        _transfer(tokenOut, amountOut, to, unwrapBento);
         if (data.length != 0) ITridentCallee(msg.sender).tridentSwapCallback(data);
     }
-
-    function _handleFee(address tokenIn, uint256 amountIn) internal returns (uint256 fee) {
-        fee = (amountIn * swapFee) / MAX_FEE;
-        uint256 barFee = (fee * masterDeployer.barFee()) / MAX_FEE;
-        _transferAmount(tokenIn, barFeeTo, barFee, false);
+    
+    function _getReserves() internal view returns (uint256 _reserve0, uint256 _reserve1) {
+        (_reserve0, _reserve1) = (reserve0, reserve1);
+        _reserve0 = _toAmount(token0, _reserve0);
+        _reserve1 = _toAmount(token1, _reserve1);
     }
-
+    
     function _updateReserves() internal {
-        uint256 _reserve0 = bento.balanceOf(token0, address(this));
-        uint256 _reserve1 = bento.balanceOf(token1, address(this));
-        require(_reserve0 < type(uint128).max && _reserve1 < type(uint128).max, "HybridPool: OVERFLOW");
+        (uint256 _reserve0, uint256 _reserve1) = _balance();
+        require(_reserve0 < type(uint128).max && _reserve1 < type(uint128).max, "OVERFLOW");
         reserve0 = uint128(_reserve0);
         reserve1 = uint128(_reserve1);
         emit Sync(_reserve0, _reserve1);
     }
-
+    
     function _balance() internal view returns (uint256 balance0, uint256 balance1) {
-        balance0 = bento.toAmount(token0, bento.balanceOf(token0, address(this)), false);
-        balance1 = bento.toAmount(token1, bento.balanceOf(token1, address(this)), false);
+        balance0 = _toAmount(token0, __balance(token0));
+        balance1 = _toAmount(token1, __balance(token1));
+    }
+    
+    function __balance(address token) internal view returns (uint256 balance) {
+        // @dev balanceOf(address,address).
+        (, bytes memory ___balance) = bento.staticcall(abi.encodeWithSelector(IBentoBoxMinimal.balanceOf.selector, 
+            token, address(this)));
+        balance = abi.decode(___balance, (uint256));
     }
 
-    function _getReserves() internal view returns (uint256 _reserve0, uint256 _reserve1) {
-        (_reserve0, _reserve1) = (reserve0, reserve1);
-        _reserve0 = bento.toAmount(token0, _reserve0, false);
-        _reserve1 = bento.toAmount(token1, _reserve1, false);
+    function _toAmount(address token, uint256 input) internal view returns (uint256 output) {
+        // @dev toAmount(address,uint256,bool).
+        (, bytes memory _output) = bento.staticcall(abi.encodeWithSelector(IBentoBoxMinimal.toAmount.selector,
+            token, input, false));
+        output = abi.decode(_output, (uint256));
     }
-
-    function getAmountOut(bytes calldata data) public view override returns (uint256 finalAmountOut) {
-        (address tokenIn, uint256 amountIn) = abi.decode(data, (address, uint256));
-        (uint256 _reserve0, uint256 _reserve1) = _reserve();
-        amountIn = bento.toAmount(tokenIn, amountIn, false);
-        amountIn -= (amountIn * swapFee) / MAX_FEE;
-        if (tokenIn == token0) {
-            finalAmountOut = _getAmountOut(amountIn, _reserve0, _reserve1, true);
+    
+    function _toShare(address token, uint256 input) internal view returns (uint256 output) {
+        // @dev toShare(address,uint256,bool).
+        (, bytes memory _output) = bento.staticcall(abi.encodeWithSelector(IBentoBoxMinimal.toShare.selector,
+            token, input, false));
+        output = abi.decode(_output, (uint256));
+    }
+ 
+    function _getAmountOut(
+        uint256 amountIn,
+        uint256 _reserve0,
+        uint256 _reserve1,
+        bool token0In
+    ) internal view returns (uint256) {
+        uint256 xpIn;
+        uint256 xpOut;
+        if (token0In) {
+            xpIn = _reserve0 * token0PrecisionMultiplier;
+            xpOut = _reserve1 * token1PrecisionMultiplier;
+            amountIn *= token0PrecisionMultiplier;
         } else {
-            finalAmountOut = _getAmountOut(amountIn, _reserve0, _reserve1, false);
+            xpIn = _reserve1 * token1PrecisionMultiplier;
+            xpOut = _reserve0 * token0PrecisionMultiplier;
+            amountIn *= token1PrecisionMultiplier;
+        }
+        uint256 d = _computeLiquidityFromAdjustedBalances(xpIn, xpOut);
+        uint256 x = xpIn + amountIn;
+        uint256 y = _getY(x, d);
+        uint256 dy = xpOut - y - 1;
+        dy /= (token0In ? token1PrecisionMultiplier : token0PrecisionMultiplier);
+        return dy;
+    }
+
+    function _transfer(
+        address token,
+        uint256 amount,
+        address to,
+        bool unwrapBento
+    ) internal {
+        if (unwrapBento) {
+            // @dev withdraw(address,address,address,uint256,uint256).
+            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.withdraw.selector, 
+            token, address(this), to, amount, 0));
+            require(success, "WITHDRAW_FAILED");
+        } else {
+            // @dev transfer(address,address,address,uint256).
+            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.transfer.selector, 
+                token, address(this), to, _toShare(token, amount)));
+            require(success, "TRANSFER_FAILED");
         }
     }
 
-    function getAssets() public view override returns (address[] memory assets) {
-        assets = new address[](2);
-        assets[0] = token0;
-        assets[1] = token1;
-    }
-
-    /**
-     * @notice Get D, the StableSwap invariant, based on a set of balances and a particular A.
-     * See the StableSwap paper for details
-     *
-     * @dev Originally https://github.com/saddle-finance/saddle-contract/blob/0b76f7fb519e34b878aa1d58cffc8d8dc0572c12/contracts/SwapUtils.sol#L319
-     *
-     * @return the invariant, at the precision of the pool
-     */
-    function _computeLiquidity(uint256 _reserve0, uint256 _reserve1) internal view returns (uint256) {
+    /// @notice Get D, the StableSwap invariant, based on a set of balances and a particular A.
+    /// See the StableSwap paper for details.
+    /// @dev Originally https://github.com/saddle-finance/saddle-contract/blob/0b76f7fb519e34b878aa1d58cffc8d8dc0572c12/contracts/SwapUtils.sol#L319.
+    /// @return liquidity The invariant, at the precision of the pool.
+    function _computeLiquidity(uint256 _reserve0, uint256 _reserve1) internal view returns (uint256 liquidity) {
         uint256 xp0 = _reserve0 * token0PrecisionMultiplier;
         uint256 xp1 = _reserve1 * token1PrecisionMultiplier;
-
-        return _computeLiquidityFromAdjustedBalances(xp0, xp1);
+        liquidity = _computeLiquidityFromAdjustedBalances(xp0, xp1);
     }
 
-    function _computeLiquidityFromAdjustedBalances(uint256 xp0, uint256 xp1) internal view returns (uint256) {
+    function _computeLiquidityFromAdjustedBalances(uint256 xp0, uint256 xp1) internal view returns (uint256 computed) {
         uint256 s = xp0 + xp1;
-
         if (s == 0) {
-            return 0;
+            computed = 0;
         }
-
         uint256 prevD;
         uint256 D = s;
         for (uint256 i = 0; i < MAX_LOOP_LIMIT; i++) {
@@ -350,57 +362,24 @@ contract HybridPool is IPool, TridentERC20 {
                 break;
             }
         }
-        return D;
+        computed = D;
     }
 
-    function _getAmountOut(
-        uint256 amountIn,
-        uint256 _reserve0,
-        uint256 _reserve1,
-        bool token0In
-    ) public view returns (uint256) {
-        uint256 xpIn;
-        uint256 xpOut;
-
-        if (token0In) {
-            xpIn = _reserve0 * token0PrecisionMultiplier;
-            xpOut = _reserve1 * token1PrecisionMultiplier;
-            amountIn *= token0PrecisionMultiplier;
-        } else {
-            xpIn = _reserve1 * token1PrecisionMultiplier;
-            xpOut = _reserve0 * token0PrecisionMultiplier;
-            amountIn *= token1PrecisionMultiplier;
-        }
-
-        uint256 d = _computeLiquidityFromAdjustedBalances(xpIn, xpOut);
-        uint256 x = xpIn + amountIn;
-        uint256 y = _getY(x, d);
-        uint256 dy = xpOut - y - 1;
-        //console.log("D, y", d, y);
-        //console.log("out", dy);
-        dy /= (token0In ? token1PrecisionMultiplier : token0PrecisionMultiplier);
-        return dy;
-    }
-
-    /**
-     * @notice Calculate the new balances of the tokens given the indexes of the token
-     * that is swapped from (FROM) and the token that is swapped to (TO).
-     * This function is used as a helper function to calculate how much TO token
-     * the user should receive on swap.
-     *
-     * @dev Originally https://github.com/saddle-finance/saddle-contract/blob/0b76f7fb519e34b878aa1d58cffc8d8dc0572c12/contracts/SwapUtils.sol#L432
-     *
-     * @param x the new total amount of FROM token
-     * @return the amount of TO token that should remain in the pool
-     */
-    function _getY(uint256 x, uint256 D) private view returns (uint256) {
+    /// @notice Calculate the new balances of the tokens given the indexes of the token
+    /// that is swapped from (FROM) and the token that is swapped to (TO).
+    /// This function is used as a helper function to calculate how much TO token
+    /// the user should receive on swap.
+    /// @dev Originally https://github.com/saddle-finance/saddle-contract/blob/0b76f7fb519e34b878aa1d58cffc8d8dc0572c12/contracts/SwapUtils.sol#L432.
+    /// @param x The new total amount of FROM token.
+    /// @return The amount of TO token that should remain in the pool.
+    function _getY(uint256 x, uint256 D) internal view returns (uint256) {
         uint256 c = (D * D) / (x * 2);
         c = (c * D) / ((N_A * 2) / A_PRECISION);
         uint256 b = x + ((D * A_PRECISION) / N_A);
         uint256 yPrev;
         uint256 y = D;
 
-        // iterative approximation
+        // @dev Iterative approximation.
         for (uint256 i = 0; i < MAX_LOOP_LIMIT; i++) {
             yPrev = y;
             y = (y * y + c) / (y * 2 + b - D);
@@ -411,24 +390,18 @@ contract HybridPool is IPool, TridentERC20 {
         return y;
     }
 
-    /**
-     * @notice Calculate the price of a token in the pool given
-     * precision-adjusted balances and a particular D and precision-adjusted
-     * array of balances.
-     *
-     * @dev This is accomplished via solving the quadratic equation iteratively.
-     * See the StableSwap paper and Curve.fi implementation for further details.
-     *
-     * x_1**2 + x1 * (sum' - (A*n**n - 1) * D / (A * n**n)) = D ** (n + 1) / (n ** (2 * n) * prod' * A)
-     * x_1**2 + b*x_1 = c
-     * x_1 = (x_1**2 + c) / (2*x_1 + b)
-     *
-     * @dev Originally https://github.com/saddle-finance/saddle-contract/blob/0b76f7fb519e34b878aa1d58cffc8d8dc0572c12/contracts/SwapUtils.sol#L276
-     *
-     * @return the price of the token, in the same precision as in xp
-     */
+    /// @notice Calculate the price of a token in the pool given
+    /// precision-adjusted balances and a particular D and precision-adjusted
+    /// array of balances.
+    /// @dev This is accomplished via solving the quadratic equation iteratively.
+    /// See the StableSwap paper and Curve.fi implementation for further details.
+    /// x_1**2 + x1 * (sum' - (A*n**n - 1) * D / (A * n**n)) = D ** (n + 1) / (n ** (2 * n) * prod' * A)
+    /// x_1**2 + b*x_1 = c
+    /// x_1 = (x_1**2 + c) / (2*x_1 + b)
+    /// @dev Originally https://github.com/saddle-finance/saddle-contract/blob/0b76f7fb519e34b878aa1d58cffc8d8dc0572c12/contracts/SwapUtils.sol#L276.
+    /// @return The price of the token, in the same precision as in xp.
     function _getYD(
-        uint256 s, //xpOut
+        uint256 s, // @dev xpOut.
         uint256 d
     ) internal view returns (uint256) {
         uint256 c = (d * d) / (s * 2);
@@ -446,8 +419,14 @@ contract HybridPool is IPool, TridentERC20 {
         }
         return y;
     }
-
-    // @dev this fee is charged to cover for swap fee when people add unbalanced liquidity.
+    
+    function _handleFee(address tokenIn, uint256 amountIn) internal returns (uint256 fee) {
+        fee = (amountIn * swapFee) / MAX_FEE;
+        uint256 _barFee = (fee * barFee) / MAX_FEE;
+        _transfer(tokenIn, _barFee, barFeeTo, false);
+    }
+    
+    /// @dev This fee is charged to cover for `swapFee` when users add unbalanced liquidity.
     function _nonOptimalMintFee(
         uint256 _amount0,
         uint256 _amount1,
@@ -455,7 +434,6 @@ contract HybridPool is IPool, TridentERC20 {
         uint256 _reserve1
     ) internal view returns (uint256 token0Fee, uint256 token1Fee) {
         if (_reserve0 == 0 || _reserve1 == 0) return (0, 0);
-
         uint256 amount1Optimal = (_amount0 * _reserve1) / _reserve0;
         if (amount1Optimal <= _amount1) {
             token1Fee = (swapFee * (_amount1 - amount1Optimal)) / (2 * MAX_FEE);
@@ -463,5 +441,34 @@ contract HybridPool is IPool, TridentERC20 {
             uint256 amount0Optimal = (_amount1 * _reserve0) / _reserve1;
             token0Fee = (swapFee * (_amount0 - amount0Optimal)) / (2 * MAX_FEE);
         }
+    }
+    
+    function getAssets() public view override returns (address[] memory assets) {
+        assets = new address[](2);
+        assets[0] = token0;
+        assets[1] = token1;
+    }
+    
+    function getAmountOut(bytes calldata data) public view override returns (uint256 finalAmountOut) {
+        (address tokenIn, uint256 amountIn) = abi.decode(data, (address, uint256));
+        (uint256 _reserve0, uint256 _reserve1) = _getReserves();
+        amountIn = _toAmount(tokenIn, amountIn);
+        amountIn -= (amountIn * swapFee) / MAX_FEE;
+        if (tokenIn == token0) {
+            finalAmountOut = _getAmountOut(amountIn, _reserve0, _reserve1, true);
+        } else {
+            finalAmountOut = _getAmountOut(amountIn, _reserve0, _reserve1, false);
+        }
+    }
+
+    function getReserves()
+        public
+        view
+        returns (
+            uint256 _reserve0,
+            uint256 _reserve1
+        )
+    {
+        return _getReserves();
     }
 }
