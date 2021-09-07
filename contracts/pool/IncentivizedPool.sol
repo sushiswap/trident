@@ -14,6 +14,6 @@ contract IncentivizedPool is IndexPool {
         address to,
         uint256 amount
     ) internal override {
-        rewards.claimRewards(from);
+        rewards.claimRewardsFor(this, from);
     }
 }

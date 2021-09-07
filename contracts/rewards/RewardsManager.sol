@@ -6,7 +6,7 @@ import "../interfaces/IPool.sol";
 
 /// @notice Manages the rewards for various pools without requiring users to stake LP tokens.
 contract RewardsManager {
-    /// @notice Info of each Incentivized pool.
+    /// @notice Info of each pool.
     /// `allocPoint` The amount of allocation points assigned to the pool.
     /// Also known as the amount of SUSHI to distribute per block.
     struct PoolInfo {
@@ -15,45 +15,59 @@ contract RewardsManager {
         uint64 allocPoint;
     }
 
-    /// @notice Info of each pool.
+    /// `rewardDebt` The amount of SUSHI entitled to the user for a specific pool.
+    mapping(address => mapping(address => int256)) public rewardDebt;
+
     mapping(address => PoolInfo) public poolInfo;
 
-    mapping(address => mapping(address => uint256)) public rewardDebt;
+    /// @dev Total allocation points. Must be the sum of all allocation points in all pools.
+    uint256 public totalAllocPoint;
 
-    // @TODO CHANGE SO ANYONE CAN CALL, BUT ALSO LET THE POOL CALL
-    function claimRewardsFor(address account) external {
-        IPool pool = IPool(msg.sender);
-        PoolInfo memory info = poolInfo[msg.sender];
+    uint256 private constant MASTERCHEF_SUSHI_PER_BLOCK = 1e20;
+    uint256 private constant ACC_SUSHI_PRECISION = 1e12;
 
-        if (block.number <= info.lastRewardBlock) {
-            return;
+    event Harvest(address indexed user, uint256 indexed pid, uint256 amount);
+
+    function claimRewardsFor(IPool pool, address account) external {
+        PoolInfo memory info = updatePool(pool);
+
+        uint256 debt = rewardDebt[pool][account];
+        uint256 amount = pool.balanceOf(account);
+
+        int256 accumulatedSushi = int256(amount.mul(info.accSushiPerShare) / ACC_SUSHI_PRECISION);
+        uint256 _pendingSushi = accumulatedSushi.sub(debt).toUInt256();
+
+        // Effects
+        rewardDebt[pool][account] = accumulatedSushi;
+
+        // Interactions
+        if (_pendingSushi != 0) {
+            SUSHI.safeTransfer(to, _pendingSushi);
         }
 
-        if (pool.totalSupply == 0) {
-            info.lastRewardBlock = block.number;
-            return;
+        IRewarder _rewarder = rewarder[pid];
+        if (address(_rewarder) != address(0)) {
+            _rewarder.onSushiReward(pid, account, account, _pendingSushi, amount);
         }
 
-        // @TODO UPDATE TO V2 MATH
-        uint256 multiplier = getMultiplier(info.lastRewardBlock, block.number);
-        uint256 reward = (multiplier * sushiPerBlock() * info.allocPoint) / info.totalAllocPoint;
-
-        info.accPerShare = info.accPerShare + ((reward * 1e12) / pool.totalSupply());
-
-        info.lastRewardBlock = block.number;
-
-        if (pool.balanceOf(account) > 0) {
-            rewardToken.transfer(account, unclaimedRewardsFor(account));
-        }
-
-        rewardDebt[msg.sender][account] = ((pool.balanceOf(account) * info.accPerShare) / 1e12);
+        emit Harvest(account, pid, _pendingSushi);
     }
 
-    function unclaimedRewardsFor(address account) public view returns (uint256) {
-        return ((balanceOf[account] * accPerShare) / 1e12) - rewardDebt[account];
-    }
-
-    function sushiPerBlock() public view returns (uint256 amount) {
-        amount = uint256(MASTERCHEF_SUSHI_PER_BLOCK).mul(MASTER_CHEF.poolInfo(MASTER_PID).allocPoint) / MASTER_CHEF.totalAllocPoint();
+    /// @notice Update reward variables of the given pool.
+    /// @param pool The address of the pool. See `poolInfo`.
+    /// @return info Returns the pool that was updated.
+    function updatePool(IPool pool) public returns (PoolInfo memory info) {
+        info = poolInfo[pool];
+        if (block.number > info.lastRewardBlock) {
+            uint256 lpSupply = pool.totalSupply();
+            if (lpSupply > 0) {
+                uint256 blocks = block.number.sub(info.lastRewardBlock);
+                uint256 sushiReward = blocks.mul(sushiPerBlock()).mul(info.allocPoint) / totalAllocPoint;
+                info.accSushiPerShare = info.accSushiPerShare.add((sushiReward.mul(ACC_SUSHI_PRECISION) / lpSupply).to128());
+            }
+            info.lastRewardBlock = block.number.to64();
+            poolInfo[pool] = info;
+            emit LogUpdatePool(pool, info.lastRewardBlock, lpSupply, info.accSushiPerShare);
+        }
     }
 }
