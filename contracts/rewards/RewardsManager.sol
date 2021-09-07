@@ -43,6 +43,11 @@ contract RewardsManager {
     event Harvest(address indexed user, address indexed pid, uint256 amount);
     event LogUpdatePool(address indexed pid, uint64 lastRewardBlock, uint256 lpSupply, uint256 accSushiPerShare);
 
+    constructor(IMasterChef _MASTER_CHEF, Sushi _SUSHI) {
+        MASTER_CHEF = _MASTER_CHEF;
+        SUSHI = _SUSHI;
+    }
+
     function claimRewardsFor(IPool pool, address account) external {
         PoolInfo memory info = updatePool(pool);
 
