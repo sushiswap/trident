@@ -19,7 +19,7 @@ task("erc20:approve", "ERC20 approve")
   .addParam("spender", "Spender")
   .setAction(async function ({ token, spender }, { ethers }, runSuper) {
     const dev = await ethers.getNamedSigner("dev");
-    const erc20 = await ethers.getContractFactory("TridentERC20");
+    const erc20 = await ethers.getContractFactory("ERC20Mock");
 
     const slp = erc20.attach(token);
 
@@ -145,7 +145,7 @@ task("router:add-liquidity", "Router add liquidity")
       {
         token: tokenB,
         native: false,
-        amount: ethers.BigNumber.from(10).pow(18),
+        amount: ethers.BigNumber.from(10).pow(17),
       },
     ];
 
