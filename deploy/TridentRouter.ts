@@ -32,9 +32,11 @@ const deployFunction: DeployFunction = async function ({
     wethAddress = WNATIVE[chainId as ChainId].address;
   }
 
+  const masterDeployer = await ethers.getContract("MasterDeployer");
+
   const { address } = await deploy("TridentRouter", {
     from: deployer,
-    args: [bentoBoxV1Address, wethAddress],
+    args: [bentoBoxV1Address, masterDeployer.address, wethAddress],
     deterministicDeployment: false,
   });
 

@@ -95,14 +95,10 @@ describe("MasterDeployer", function () {
         [...[this.weth.address, this.sushi.address].sort(), 30, true]
       );
 
-      await expect(await this.masterDeployer.poolsCount()).to.eq(0);
-
       await this.masterDeployer.deployPool(
         this.constantProductPoolFactory.address,
         deployData
       );
-
-      await expect(await this.masterDeployer.poolsCount()).to.eq(1);
     });
 
     // TODO: Fix this
