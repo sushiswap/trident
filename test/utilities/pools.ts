@@ -20,7 +20,7 @@ export async function createHybridPool(
   tridentPoolFactory: Contract,
   bento: Contract,
   alice: SignerWithAddress
-): Promise<[Contract, sdk.HybridPool]> {
+): Promise<[Contract, sdk.RHybridPool]> {
   const [reserve0, reserve0BN] = getIntegerRandomValueWithMin(
     reservesExponents[0],
     minLiquidity,
@@ -63,14 +63,14 @@ export async function createHybridPool(
     ethers.utils.defaultAbiCoder.encode(["address"], [alice.address])
   );
 
-  const hybridPoolInfo = new sdk.HybridPool({
+  const hybridPoolInfo = new sdk.RHybridPool({
     A,
     reserve0: reserve0BN,
     reserve1: reserve1BN,
     address: hybridPool.address,
     token0: { address: tokenA.address, name: tokenA.address },
     token1: { address: tokenB.address, name: tokenB.address },
-    fee: fee,
+    fee: swapFee,
   });
 
   return [hybridPool, hybridPoolInfo];
@@ -87,7 +87,7 @@ export async function createConstantProductPool(
   tridentPoolFactory: Contract,
   bento: Contract,
   alice: SignerWithAddress
-): Promise<[Contract, sdk.ConstantProductPool]> {
+): Promise<[Contract, sdk.RConstantProductPool]> {
   const [reserve0, reserve0BN] = getIntegerRandomValueWithMin(
     reservesExponents[0],
     minLiquidity,
@@ -130,13 +130,13 @@ export async function createConstantProductPool(
     ethers.utils.defaultAbiCoder.encode(["address"], [alice.address])
   );
 
-  const cpPoolInfo: sdk.ConstantProductPool = new sdk.ConstantProductPool({
+  const cpPoolInfo: sdk.RConstantProductPool = new sdk.RConstantProductPool({
     reserve0: reserve0BN,
     reserve1: reserve1BN,
     address: constantProductPool.address,
     token0: { address: tokenA.address, name: tokenA.address },
     token1: { address: tokenB.address, name: tokenB.address },
-    fee,
+    fee: swapFee,
   });
 
   return [constantProductPool, cpPoolInfo];
