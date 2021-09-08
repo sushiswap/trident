@@ -53,7 +53,7 @@ task("constant-product-pool:deploy", "Constant Product Pool deploy")
     );
 
     const deployData = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8", "bool"],
+      ["address", "address", "uint256", "bool"],
       [...[tokenA, tokenB].sort(), fee, twap]
     );
 
@@ -140,7 +140,7 @@ task("router:add-liquidity", "Router add liquidity")
       {
         token: tokenA,
         native: false,
-        amount: ethers.BigNumber.from(10).pow(18),
+        amount: ethers.BigNumber.from(10).pow(17),
       },
       {
         token: tokenB,
