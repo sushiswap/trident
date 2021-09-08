@@ -54,8 +54,11 @@ contract ConstantProductPool is IPool, TridentERC20 {
     constructor(bytes memory _deployData, address _masterDeployer) {
         (address _token0, address _token1, uint256 _swapFee, bool _twapSupport) = abi.decode(_deployData, (address, address, uint256, bool));
 
+        // NB Factory ensures that the tokens are sorted
         require(_token0 != address(0), "ZERO_ADDRESS");
         require(_token0 != _token1, "IDENTICAL_ADDRESSES");
+        require(_token0 != address(this), "INVALID_TOKEN");
+        require(_token1 != address(this), "INVALID_TOKEN");
         require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
 
         (, bytes memory _barFee) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
