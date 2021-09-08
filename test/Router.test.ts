@@ -92,7 +92,7 @@ describe("Router", function () {
     // Pool deploy data
     let addresses = [weth.address, sushi.address].sort();
     const deployData = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8", "bool"],
+      ["address", "address", "uint256", "bool"],
       [addresses[0], addresses[1], 30, false]
     );
     pool = await Pool.attach(
@@ -107,7 +107,7 @@ describe("Router", function () {
     );
     addresses = [dai.address, sushi.address].sort();
     const deployData2 = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8", "bool"],
+      ["address", "address", "uint256", "bool"],
       [addresses[0], addresses[1], 30, false]
     );
     daiSushiPool = await Pool.attach(
@@ -122,7 +122,7 @@ describe("Router", function () {
     );
     addresses = [dai.address, weth.address].sort();
     const deployData3 = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8", "bool"],
+      ["address", "address", "uint256", "bool"],
       [addresses[0], addresses[1], 30, false]
     );
     daiWethPool = await Pool.attach(

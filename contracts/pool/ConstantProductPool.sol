@@ -98,6 +98,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint256 computed = TridentMath.sqrt((balance0 - fee0) * (balance1 - fee1));
 
         if (_totalSupply == 0) {
+            require(amount0 > 0 && amount1 > 0, "INVALID_AMOUNTS");
             _mint(address(0), MINIMUM_LIQUIDITY);
             address migrator = IMasterDeployer(masterDeployer).migrator();
             if (msg.sender == migrator) {
@@ -212,6 +213,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
                 balance0 -= amountOut;
             }
         }
+        require(amountOut > 0, "INVALID_AMOUNT_OUT");
         _transfer(tokenOut, amountOut, recipient, unwrapBento);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
@@ -244,6 +246,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
                 emit Swap(recipient, tokenIn, token0, amountIn, amountOut);
             }
         }
+        require(amountOut > 0, "INVALID_AMOUNT_OUT");
     }
 
     /// @dev Updates `barFee` for Trident protocol.

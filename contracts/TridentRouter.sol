@@ -86,6 +86,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         }
         // @dev Resets the `cachedPool` to get a refund.
         // `1` is used as the default value to avoid the storage slot being released.
+        cachedMsgSender = address(1);
         cachedPool = address(1);
         require(amountOut >= amountOutMinimum, "TOO_LITTLE_RECEIVED");
     }
@@ -193,6 +194,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         cachedPool = pool;
         // @dev The pool must ensure that there's not too much slippage.
         IPool(pool).mint(data);
+        cachedMsgSender = address(1);
         cachedPool = address(1);
     }
 

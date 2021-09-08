@@ -73,7 +73,7 @@ describe("MasterDeployer", function () {
   describe("#deployPool", async function () {
     it("Reverts on non-whitelisted factory", async function () {
       const deployData = defaultAbiCoder.encode(
-        ["address", "address", "uint8"],
+        ["address", "address", "uint256"],
         [...[this.weth.address, this.sushi.address].sort(), 30]
       );
 
@@ -91,7 +91,7 @@ describe("MasterDeployer", function () {
       );
 
       const deployData = defaultAbiCoder.encode(
-        ["address", "address", "uint8", "bool"],
+        ["address", "address", "uint256", "bool"],
         [...[this.weth.address, this.sushi.address].sort(), 30, true]
       );
 
@@ -108,7 +108,7 @@ describe("MasterDeployer", function () {
       );
 
       const deployData = defaultAbiCoder.encode(
-        ["address", "address", "uint8", "bool"],
+        ["address", "address", "uint256", "bool"],
         [...[this.weth.address, this.sushi.address].sort(), 30, true]
       );
 

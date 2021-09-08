@@ -106,7 +106,7 @@ export async function initialize() {
       token1 = tokens[i];
     }
     const deployData = utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8", "bool"],
+      ["address", "address", "uint256", "bool"],
       [token0.address, token1.address, 30, false]
     );
     const salt = utils.keccak256(deployData);
