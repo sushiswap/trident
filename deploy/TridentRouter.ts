@@ -20,12 +20,8 @@ const deployFunction: DeployFunction = async function ({
   let wethAddress;
 
   if (chainId === 31337) {
-    const WETH9 = await ethers.getContractFactory("WETH9");
-    const weth9 = await WETH9.deploy();
-    const BentoBoxV1 = await ethers.getContractFactory("BentoBoxV1");
-    const bentoBoxV1 = await BentoBoxV1.deploy(weth9.address);
-    bentoBoxV1Address = bentoBoxV1.address;
-    wethAddress = weth9.address;
+    bentoBoxV1Address = (await ethers.getContract("BentoBoxV1")).address;
+    wethAddress = (await ethers.getContract("WETH9")).address;
   } else {
     if (!(chainId in WNATIVE)) {
       throw Error(`No WETH on chain #${chainId}!`);

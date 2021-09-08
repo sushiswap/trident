@@ -4,7 +4,7 @@ pragma solidity >=0.8.0;
 
 /// @notice Trident pool deployer for whitelisted template factories.
 /// @author Mudit Gupta.
-contract PoolDeployer {
+abstract contract PoolDeployer {
     address public immutable masterDeployer;
 
     mapping(address => mapping(address => address[])) public pools;

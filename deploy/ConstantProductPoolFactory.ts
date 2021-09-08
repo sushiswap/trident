@@ -10,6 +10,7 @@ const deployFunction: DeployFunction = async function ({
   const { deploy } = deployments;
 
   const { deployer } = await getNamedAccounts();
+
   const masterDeployer = await ethers.getContract("MasterDeployer");
 
   const { address } = await deploy("ConstantProductPoolFactory", {
