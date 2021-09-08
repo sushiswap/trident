@@ -121,6 +121,7 @@ export async function initialize() {
     );
     pools.push(Pool.attach(poolAddress));
     promises.push(masterDeployer.deployPool(poolFactory.address, deployData));
+    router.updatePoolWhitelisting(poolAddress);
   }
   await Promise.all(promises);
 
