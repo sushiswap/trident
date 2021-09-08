@@ -30,6 +30,7 @@ abstract contract PoolDeployer {
                 require(tokens[i] < tokens[i + 1], "INVALID_TOKEN_ORDER");
                 for (uint256 j = i + 1; j < tokens.length; j++) {
                     pools[tokens[i]][tokens[j]].push(pool);
+                    pools[tokens[j]][tokens[i]].push(pool);
                 }
             }
         }
