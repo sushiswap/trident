@@ -6,14 +6,7 @@ import { BigNumber, Contract, ContractFactory } from "ethers";
 import seedrandom from "seedrandom";
 import { calcOutByIn, calcInByOut } from "@sushiswap/sdk";
 import { getBigNumber } from "../utilities";
-import {
-  ConstantProductPool,
-  ERC20Mock,
-  BentoBoxV1,
-  MasterDeployer,
-  TridentRouter,
-  ConstantProductPoolFactory,
-} from "../../types";
+import { ConstantProductPool, ERC20Mock, BentoBoxV1, MasterDeployer, TridentRouter, ConstantProductPoolFactory } from "../../types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 
 interface PoolInfo {
@@ -65,10 +58,7 @@ function areCloseValues(v1, v2, threshold) {
 }
 
 function encodedSwapData(tokenIn: string, to: string, unwrapBento: boolean) {
-  return ethers.utils.defaultAbiCoder.encode(
-    ["address", "address", "bool"],
-    [tokenIn, to, unwrapBento]
-  );
+  return ethers.utils.defaultAbiCoder.encode(["address", "address", "bool"], [tokenIn, to, unwrapBento]);
 }
 
 describe("ConstantProductPool Typescript == Solidity check", function () {
@@ -83,39 +73,21 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
     router: TridentRouter,
     Pool: ContractFactory;
 
-  async function createConstantProductPool(
-    fee: Number,
-    res0exp: Number,
-    res1exp: Number
-  ): [PoolInfo, Contract] {
+  async function createConstantProductPool(fee: Number, res0exp: Number, res1exp: Number): [PoolInfo, Contract] {
     [alice, feeTo] = await ethers.getSigners();
 
     const ERC20 = await ethers.getContractFactory("ERC20Mock");
     const Bento = await ethers.getContractFactory("BentoBoxV1");
     const Deployer = await ethers.getContractFactory("MasterDeployer");
-    const PoolFactory = await ethers.getContractFactory(
-      "ConstantProductPoolFactory"
-    );
+    const PoolFactory = await ethers.getContractFactory("ConstantProductPoolFactory");
     const SwapRouter = await ethers.getContractFactory("TridentRouter");
     Pool = await ethers.getContractFactory("ConstantProductPool");
 
-    weth = await ERC20.deploy(
-      "WETH",
-      "WETH",
-      getBigNumber("1000000000000000000")
-    );
+    weth = await ERC20.deploy("WETH", "WETH", getBigNumber("1000000000000000000"));
     await weth.deployed();
-    usdt = await ERC20.deploy(
-      "USDT",
-      "USDT",
-      getBigNumber("1000000000000000000")
-    );
+    usdt = await ERC20.deploy("USDT", "USDT", getBigNumber("1000000000000000000"));
     await usdt.deployed();
-    usdc = await ERC20.deploy(
-      "USDC",
-      "USDC",
-      getBigNumber("1000000000000000000")
-    );
+    usdc = await ERC20.deploy("USDC", "USDC", getBigNumber("1000000000000000000"));
     await usdc.deployed();
 
     bento = await Bento.deploy(weth.address);
@@ -126,7 +98,7 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
 
     tridentPoolFactory = await PoolFactory.deploy(masterDeployer.address);
     await tridentPoolFactory.deployed();
-    router = await SwapRouter.deploy(bento.address, weth.address);
+    router = await SwapRouter.deploy(bento.address, masterDeployer.address, weth.address);
     await router.deployed();
 
     // Whitelist pool factory in master deployer
@@ -138,20 +110,8 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
     await usdc.approve(bento.address, getBigNumber("1000000000000000000"));
     await usdt.approve(bento.address, getBigNumber("1000000000000000000"));
     // Make BentoBox token deposits
-    await bento.deposit(
-      usdc.address,
-      alice.address,
-      alice.address,
-      getBigNumber("1000000000000000000"),
-      0
-    );
-    await bento.deposit(
-      usdt.address,
-      alice.address,
-      alice.address,
-      getBigNumber("1000000000000000000"),
-      0
-    );
+    await bento.deposit(usdc.address, alice.address, alice.address, getBigNumber("1000000000000000000"), 0);
+    await bento.deposit(usdt.address, alice.address, alice.address, getBigNumber("1000000000000000000"), 0);
     // Approve Router to spend 'alice' BentoBox tokens
     await bento.setMasterContractApproval(
       alice.address,
@@ -163,37 +123,22 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
     );
 
     const [address0, address1]: string[] =
-      usdt.address.toUpperCase() < usdc.address.toUpperCase()
-        ? [usdt.address, usdc.address]
-        : [usdc.address, usdt.address];
+      usdt.address.toUpperCase() < usdc.address.toUpperCase() ? [usdt.address, usdc.address] : [usdc.address, usdt.address];
     const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint256", "bool"],
       [address0, address1, Math.round(fee * 10_000), true]
     );
     const pool: ConstantProductPool = await Pool.attach(
       (
-        await (
-          await masterDeployer.deployPool(
-            tridentPoolFactory.address,
-            deployData
-          )
-        ).wait()
+        await (await masterDeployer.deployPool(tridentPoolFactory.address, deployData)).wait()
       ).events[0].args[1]
     );
 
-    const [jsVal0, bnVal0] = getIntegerRandomValueWithMin(
-      res0exp,
-      MINIMUM_LIQUIDITY
-    );
-    const [jsVal1, bnVal1] =
-      res1exp == undefined
-        ? [jsVal0, bnVal0]
-        : getIntegerRandomValueWithMin(res1exp, MINIMUM_LIQUIDITY);
+    const [jsVal0, bnVal0] = getIntegerRandomValueWithMin(res0exp, MINIMUM_LIQUIDITY);
+    const [jsVal1, bnVal1] = res1exp == undefined ? [jsVal0, bnVal0] : getIntegerRandomValueWithMin(res1exp, MINIMUM_LIQUIDITY);
     await bento.transfer(usdt.address, alice.address, pool.address, bnVal0);
     await bento.transfer(usdc.address, alice.address, pool.address, bnVal1);
-    await pool.mint(
-      ethers.utils.defaultAbiCoder.encode(["address"], [alice.address])
-    );
+    await pool.mint(ethers.utils.defaultAbiCoder.encode(["address"], [alice.address]));
 
     const poolInfo: PoolInfo = {
       type: "ConstantProduct",
@@ -206,11 +151,7 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
   }
 
   let swapDirection = true;
-  async function checkSwap(
-    pool: ConstantProductPool,
-    poolRouterInfo: PoolInfo,
-    swapAmountExp: Number
-  ) {
+  async function checkSwap(pool: ConstantProductPool, poolRouterInfo: PoolInfo, swapAmountExp: Number) {
     const [jsValue, bnValue] = getIntegerRandomValue(swapAmountExp);
     const [t0, t1] = swapDirection ? [usdt, usdc] : [usdc, usdt];
 
@@ -225,62 +166,38 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
     poolRouterInfo.reserve0 = await bento.balanceOf(usdt.address, pool.address);
     poolRouterInfo.reserve1 = await bento.balanceOf(usdc.address, pool.address);
 
-    let balOutBefore: BigNumber = await bento.balanceOf(
-      t1.address,
-      alice.address
-    );
+    let balOutBefore: BigNumber = await bento.balanceOf(t1.address, alice.address);
     await router.connect(alice).exactInputSingle(params);
-    let balOutAfter: BigNumber = await bento.balanceOf(
-      t1.address,
-      alice.address
-    );
+    let balOutAfter: BigNumber = await bento.balanceOf(t1.address, alice.address);
     const amountOutPool: BigNumber = balOutAfter.sub(balOutBefore);
 
-    const amountOutPrediction = calcOutByIn(
-      poolRouterInfo,
-      jsValue,
-      swapDirection
-    );
+    const amountOutPrediction = calcOutByIn(poolRouterInfo, jsValue, swapDirection);
 
     //console.log(Math.abs(amountOutPrediction/amountOutPool-1), amountOutPrediction, amountOutPool);
     expect(areCloseValues(amountOutPrediction, amountOutPool, 1e-12)).equals(
       true,
       "predicted amount out did not equal swapped amount result"
     );
-    const reserveOut = swapDirection
-      ? poolRouterInfo.reserve1
-      : poolRouterInfo.reserve0;
+    const reserveOut = swapDirection ? poolRouterInfo.reserve1 : poolRouterInfo.reserve0;
     if (reserveOut - amountOutPool < MINIMUM_LIQUIDITY) {
       swapDirection = !swapDirection;
       return;
     }
-    const amounInExpected = calcInByOut(
-      poolRouterInfo,
-      amountOutPrediction,
-      swapDirection
-    );
-    const amountOutPrediction2 = calcOutByIn(
-      poolRouterInfo,
-      amounInExpected,
-      swapDirection
-    );
+    const amounInExpected = calcInByOut(poolRouterInfo, amountOutPrediction, swapDirection);
+    const amountOutPrediction2 = calcOutByIn(poolRouterInfo, amounInExpected, swapDirection);
     // console.log(Math.abs(amounInExpected/jsValue-1), amounInExpected, jsValue);
     // console.log(Math.abs(amountOutPrediction/amountOutPrediction2-1), amountOutPrediction, amountOutPrediction2);
-    expect(
-      areCloseValues(amounInExpected, jsValue, 1e-12) ||
-        areCloseValues(amountOutPrediction, amountOutPrediction2, 1e-12)
-    ).equals(true, "values were not equal");
+    expect(areCloseValues(amounInExpected, jsValue, 1e-12) || areCloseValues(amountOutPrediction, amountOutPrediction2, 1e-12)).equals(
+      true,
+      "values were not equal"
+    );
     swapDirection = !swapDirection;
   }
 
   describe("Check regular liquidity values", function () {
     for (let mintNum = 0; mintNum < 3; ++mintNum) {
       it(`Test ${mintNum + 1}`, async function () {
-        const [poolRouterInfo, pool] = await createConstantProductPool(
-          0.003,
-          19,
-          19
-        );
+        const [poolRouterInfo, pool] = await createConstantProductPool(0.003, 19, 19);
 
         // test regular values
         for (let swapNum = 0; swapNum < 3; ++swapNum) {
@@ -301,11 +218,7 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
   describe("Check supersmall liquidity values", function () {
     for (let mintNum = 0; mintNum < 3; ++mintNum) {
       it(`Test ${mintNum + 1}`, async function () {
-        const [poolRouterInfo, pool] = await createConstantProductPool(
-          0.003,
-          4,
-          4
-        );
+        const [poolRouterInfo, pool] = await createConstantProductPool(0.003, 4, 4);
 
         // test regular values
         for (let swapNum = 0; swapNum < 3; ++swapNum) {
@@ -326,11 +239,7 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
   describe("Check superbig liquidity values", function () {
     for (let mintNum = 0; mintNum < 3; ++mintNum) {
       it(`Test ${mintNum + 1}`, async function () {
-        const [poolRouterInfo, pool] = await createConstantProductPool(
-          0.003,
-          33,
-          33
-        );
+        const [poolRouterInfo, pool] = await createConstantProductPool(0.003, 33, 33);
 
         // test regular values
         for (let swapNum = 0; swapNum < 3; ++swapNum) {
@@ -352,11 +261,7 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
     for (let mintNum = 0; mintNum < 3; ++mintNum) {
       const fee = (mintNum * 4 + 1) / 1000;
       it(`fee = ${fee}`, async function () {
-        const [poolRouterInfo, pool] = await createConstantProductPool(
-          fee,
-          19,
-          19
-        );
+        const [poolRouterInfo, pool] = await createConstantProductPool(fee, 19, 19);
 
         // test regular values
         for (let swapNum = 0; swapNum < 3; ++swapNum) {
