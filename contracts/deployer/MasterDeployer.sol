@@ -9,6 +9,10 @@ import "../utils/TridentOwnable.sol";
 /// @author Mudit Gupta.
 contract MasterDeployer is TridentOwnable {
     event DeployPool(address indexed _factory, address indexed pool);
+    event AddToWhitelist(address indexed _factory);
+    event RemoveFromWhitelist(address indexed _factory);
+    event SetBarFee(uint256 indexed _barFee);
+    event SetMigrator(address indexed _migrator);
 
     uint256 public barFee;
     address public migrator;
@@ -45,19 +49,23 @@ contract MasterDeployer is TridentOwnable {
 
     function addToWhitelist(address _factory) external onlyOwner {
         whitelistedFactories[_factory] = true;
+        emit AddToWhitelist(_factory);
     }
 
     function removeFromWhitelist(address _factory) external onlyOwner {
         whitelistedFactories[_factory] = false;
+        emit RemoveFromWhitelist(_factory);
     }
 
     function setBarFee(uint256 _barFee) external onlyOwner {
         require(_barFee <= MAX_FEE, "INVALID_BAR_FEE");
         barFee = _barFee;
+        emit SetBarFee(_barFee);
     }
 
     function setMigrator(address _migrator) external onlyOwner {
         migrator = _migrator;
+        emit SetMigrator(_migrator);
     }
 
     function poolsCount() external view returns (uint256 count) {
