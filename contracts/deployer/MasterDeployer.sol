@@ -11,8 +11,8 @@ contract MasterDeployer is TridentOwnable {
     event DeployPool(address indexed _factory, address indexed pool);
     event AddToWhitelist(address indexed _factory);
     event RemoveFromWhitelist(address indexed _factory);
-    event SetBarFee(uint256 indexed _barFee);
-    event SetMigrator(address indexed _migrator);
+    event BarFeeUpdated(uint256 indexed _barFee);
+    event MigratorUpdated(address indexed _migrator);
 
     uint256 public barFee;
     address public migrator;
@@ -60,11 +60,11 @@ contract MasterDeployer is TridentOwnable {
     function setBarFee(uint256 _barFee) external onlyOwner {
         require(_barFee <= MAX_FEE, "INVALID_BAR_FEE");
         barFee = _barFee;
-        emit SetBarFee(_barFee);
+        emit BarFeeUpdated(_barFee);
     }
 
     function setMigrator(address _migrator) external onlyOwner {
         migrator = _migrator;
-        emit SetMigrator(_migrator);
+        emit MigratorUpdated(_migrator);
     }
 }
