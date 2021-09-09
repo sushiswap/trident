@@ -40,8 +40,6 @@ contract TridentRouter is ITridentRouter, TridentHelper {
     /// minimum amount of token B after the swap and data required by the pool for the swap.
     /// @dev Ensure that the pool is trusted before calling this function. The pool can steal users' tokens.
     function exactInputSingle(ExactInputSingleParams calldata params) public payable returns (uint256 amountOut) {
-        // We don't necessarily need this check but saving users from themseleves.
-        isWhiteListed(params.pool);
         // @dev Prefund the pool with token A.
         bento.transfer(params.tokenIn, msg.sender, params.pool, params.amountIn);
         // @dev Trigger the swap in the pool.
@@ -100,8 +98,6 @@ contract TridentRouter is ITridentRouter, TridentHelper {
     /// minimum amount of token B after the swap and data required by the pool for the swap.
     /// @dev Ensure that the pool is trusted before calling this function. The pool can steal users' tokens.
     function exactInputSingleWithNativeToken(ExactInputSingleParams calldata params) public payable returns (uint256 amountOut) {
-        // We don't necessarily need this check but saving users from themseleves.
-        isWhiteListed(params.pool);
         // @dev Deposits the native ERC-20 token from the user into the pool's `bento`.
         _depositToBentoBox(params.tokenIn, params.pool, params.amountIn);
         // @dev Trigger the swap in the pool.
