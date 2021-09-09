@@ -36,7 +36,7 @@ contract Migrator {
 
         bytes memory deployData = abi.encode(token0, token1, 10, false);
 
-        IPool pair = IPool(factory.configAddress(deployData));
+        IPool pair = IPool(factory.configAddress(keccak256(deployData)));
 
         if (address(pair) == (address(0))) {
             pair = IPool(factory.deployPool(deployData));

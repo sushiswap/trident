@@ -52,7 +52,11 @@ export async function initialize() {
     accounts[1].address,
     bento.address
   );
-  router = await TridentRouter.deploy(bento.address, tokens[0].address);
+  router = await TridentRouter.deploy(
+    bento.address,
+    masterDeployer.address,
+    tokens[0].address
+  );
   const poolFactory = await PoolFactory.deploy(masterDeployer.address);
 
   await Promise.all([
