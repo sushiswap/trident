@@ -14,7 +14,6 @@ import "./TridentERC20.sol";
 contract IndexPool is IPool, TridentERC20 {
     event Mint(address indexed sender, address tokenIn, uint256 amountIn, address indexed recipient);
     event Burn(address indexed sender, address tokenOut, uint256 amountOut, address indexed recipient);
-    //event Sync(uint256 reserve0, uint256 reserve1);
 
     uint256 public immutable swapFee;
 
@@ -22,21 +21,21 @@ contract IndexPool is IPool, TridentERC20 {
     address public immutable bento;
     address public immutable masterDeployer;
 
-    uint136 internal constant BASE = 10**18;
-    uint136 internal constant MIN_TOKENS = 2;
-    uint136 internal constant MAX_TOKENS = 8;
-    uint136 internal constant MIN_FEE = BASE / 10**6;
-    uint136 internal constant MAX_FEE = BASE / 10;
-    uint136 internal constant MIN_WEIGHT = BASE;
-    uint136 internal constant MAX_WEIGHT = BASE * 50;
-    uint136 internal constant MAX_TOTAL_WEIGHT = BASE * 50;
-    uint136 internal constant MIN_BALANCE = BASE / 10**12;
-    uint136 internal constant INIT_POOL_SUPPLY = BASE * 100;
-    uint136 internal constant MIN_POW_BASE = 1;
-    uint136 internal constant MAX_POW_BASE = (2 * BASE) - 1;
-    uint136 internal constant POW_PRECISION = BASE / 10**10;
-    uint136 internal constant MAX_IN_RATIO = BASE / 2;
-    uint136 internal constant MAX_OUT_RATIO = (BASE / 3) + 1;
+    uint256 internal constant BASE = 10**18;
+    uint256 internal constant MIN_TOKENS = 2;
+    uint256 internal constant MAX_TOKENS = 8;
+    uint256 internal constant MIN_FEE = BASE / 10**6;
+    uint256 internal constant MAX_FEE = BASE / 10;
+    uint256 internal constant MIN_WEIGHT = BASE;
+    uint256 internal constant MAX_WEIGHT = BASE * 50;
+    uint256 internal constant MAX_TOTAL_WEIGHT = BASE * 50;
+    uint256 internal constant MIN_BALANCE = BASE / 10**12;
+    uint256 internal constant INIT_POOL_SUPPLY = BASE * 100;
+    uint256 internal constant MIN_POW_BASE = 1;
+    uint256 internal constant MAX_POW_BASE = (2 * BASE) - 1;
+    uint256 internal constant POW_PRECISION = BASE / 10**10;
+    uint256 internal constant MAX_IN_RATIO = BASE / 2;
+    uint256 internal constant MAX_OUT_RATIO = (BASE / 3) + 1;
     
     uint136 internal totalWeight;
     address[] internal tokens;
@@ -55,7 +54,7 @@ contract IndexPool is IPool, TridentERC20 {
 
     mapping(address => Record) public records;
     struct Record {
-        uint112 reserve;
+        uint120 reserve;
         uint136 weight;
     }
 
@@ -69,7 +68,7 @@ contract IndexPool is IPool, TridentERC20 {
         require(MIN_FEE <= _swapFee && _swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
         require(MIN_TOKENS <= _tokens.length && _tokens.length <= MAX_TOKENS, "INVALID_TOKENS_LENGTH");
 
-        for (uint8 i = 0; i < _tokens.length; i++) {
+        for (uint256 i = 0; i < _tokens.length; i++) {
             require(_tokens[i] != address(0), "ZERO_ADDRESS");
             require(MIN_WEIGHT <= _weights[i] && _weights[i] <= MAX_WEIGHT, "INVALID_WEIGHT");
             records[_tokens[i]] = Record({reserve: 0, weight: _weights[i]});
@@ -98,14 +97,14 @@ contract IndexPool is IPool, TridentERC20 {
     function mint(bytes calldata data) public override lock returns (uint256 liquidity) {
         (address recipient, uint256 toMint) = abi.decode(data, (address, uint256));
         
-        uint112 ratio = uint112(_div(toMint, totalSupply));
+        uint120 ratio = uint120(_div(toMint, totalSupply));
 
         for (uint256 i = 0; i < tokens.length; i++) {
             address tokenIn = tokens[i];
-            uint112 reserve = records[tokenIn].reserve;
+            uint120 reserve = records[tokenIn].reserve;
             // @dev If token balance is '0', initialize with `ratio`.
-            uint112 amountIn = reserve != 0 ? uint112(_mul(ratio, reserve)) : ratio;
-            require(amountIn >= MIN_BALANCE, "MIN_AMOUNT");
+            uint120 amountIn = reserve != 0 ? uint120(_mul(ratio, reserve)) : ratio;
+            require(amountIn >= MIN_BALANCE, "MIN_BALANCE");
             // @dev Check Trident router has sent `amountIn` for skim into pool.
             unchecked { // @dev This is safe from overflow - only logged amounts handled.
                 require(_balance(tokenIn) >= amountIn + reserve, "NOT_RECEIVED");
@@ -130,8 +129,8 @@ contract IndexPool is IPool, TridentERC20 {
         for (uint256 i = 0; i < tokens.length; i++) {
             address tokenOut = tokens[i];
             uint256 balance = records[tokenOut].reserve;
-            uint112 amountOut = uint112(_mul(ratio, balance));
-            require(amountOut != 0, "AMOUNT_NULL");
+            uint120 amountOut = uint120(_mul(ratio, balance));
+            require(amountOut != 0, "ZERO_OUT");
             // @dev This is safe from underflow - only logged amounts handled.
             unchecked {
                 records[tokenOut].reserve -= amountOut;
@@ -164,7 +163,7 @@ contract IndexPool is IPool, TridentERC20 {
         require(amountOut <= _mul(outRecord.reserve, MAX_OUT_RATIO), "MAX_OUT_RATIO");
         // @dev This is safe from underflow - only logged amounts handled.
         unchecked {
-            outRecord.reserve -= uint112(amountOut);
+            outRecord.reserve -= uint120(amountOut);
         }
         _burn(address(this), toBurn);
         _transfer(tokenOut, amountOut, recipient, unwrapBento);
@@ -187,8 +186,8 @@ contract IndexPool is IPool, TridentERC20 {
         // @dev Check Trident router has sent `amountIn` for skim into pool.
         unchecked { // @dev This is safe from under/overflow - only logged amounts handled.
             require(_balance(tokenIn) >= amountIn + inRecord.reserve, "NOT_RECEIVED");
-            inRecord.reserve += uint112(amountIn);
-            outRecord.reserve -= uint112(amountOut);
+            inRecord.reserve += uint120(amountIn);
+            outRecord.reserve -= uint120(amountOut);
         }
         _transfer(tokenOut, amountOut, recipient, unwrapBento);
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
@@ -216,8 +215,8 @@ contract IndexPool is IPool, TridentERC20 {
         // @dev Check Trident router has sent `amountIn` for skim into pool.
         unchecked { // @dev This is safe from under/overflow - only logged amounts handled.
             require(_balance(tokenIn) >= amountIn + inRecord.reserve, "NOT_RECEIVED");
-            inRecord.reserve += uint112(amountIn);
-            outRecord.reserve -= uint112(amountOut);
+            inRecord.reserve += uint120(amountIn);
+            outRecord.reserve -= uint120(amountOut);
         }
         _transfer(tokenOut, amountOut, recipient, unwrapBento);
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
@@ -231,7 +230,7 @@ contract IndexPool is IPool, TridentERC20 {
     
     function _balance(address token) internal view returns (uint256 balance) {
         (, bytes memory data) = bento.staticcall(abi.encodeWithSelector(IBentoBoxMinimal.balanceOf.selector, 
-        token, address(this)));
+            token, address(this)));
         balance = abi.decode(data, (uint256));
     }
 
@@ -345,11 +344,11 @@ contract IndexPool is IPool, TridentERC20 {
     ) internal {
         if (unwrapBento) {
             (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.withdraw.selector, 
-            token, address(this), to, 0, shares));
+                token, address(this), to, 0, shares));
             require(success, "WITHDRAW_FAILED");
         } else {
             (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.transfer.selector, 
-            token, address(this), to, shares));
+                token, address(this), to, shares));
             require(success, "TRANSFER_FAILED");
         }
     }
@@ -369,13 +368,15 @@ contract IndexPool is IPool, TridentERC20 {
         amountOut = _getAmountOut(tokenInAmount, tokenInBalance, tokenInWeight, tokenOutBalance, tokenOutWeight);
     }
     
-    function getReserves() public view returns (uint112[] memory reserves) {
+    function getReservesAndWeights() public view returns (uint256[] memory reserves, uint136[] memory weights) {
         uint256 length = tokens.length;
-        reserves = new uint112[](length);
+        reserves = new uint256[](length);
+        weights = new uint136[](length);
         // @dev This is safe from overflow - `tokens` `length` is bound to '8'.
         unchecked {
-            for (uint8 i = 0; i < length; i++) {
+            for (uint256 i = 0; i < length; i++) {
                 reserves[i] = records[tokens[i]].reserve;
+                weights[i] = records[tokens[i]].weight;
             }
         }
     }
