@@ -348,8 +348,4 @@ contract TridentRouter is ITridentRouter, TridentHelper {
             whitelistedPools[pool] = masterDeployer.pools(pool);
         }
     }
-
-    function updatePoolWhitelisting(address pool) external {
-        whitelistedPools[pool] = masterDeployer.pools(pool);
-    }
 }
