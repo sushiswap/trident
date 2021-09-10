@@ -37,18 +37,18 @@ const deployFunction: DeployFunction = async function ({ deployments, getNamedAc
 
   console.log("ConcentratedLiquidityPoolManager deployed at ", positionManager.address);
 
-  const factory = await deploy("ConstantProductPoolFactory", {
+  const factory = await deploy("ConcentratedLiquidityPoolFactory", {
     from: deployer,
     deterministicDeployment: false,
     args: [masterDeployer.address, positionManager.address],
   });
 
   if (!(await masterDeployer.whitelistedFactories(factory.address))) {
-    console.log("Add ConstantProductPoolFactory to MasterDeployer whitelist");
+    console.log("Add ConcentratedLiquidityPoolFactory to MasterDeployer whitelist");
     await (await masterDeployer.addToWhitelist(factory.address)).wait();
   }
 
-  console.log("ConstantProductPoolFactory deployed at ", factory.address);
+  console.log("ConcentratedLiquidityPoolFactory deployed at ", factory.address);
 };
 
 export default deployFunction;
