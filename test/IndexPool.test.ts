@@ -118,7 +118,7 @@ describe("IndexPool test", function () {
     );
 
     const tokens: string[] =
-      usdt.address.toUpperCase() > usdc.address.toUpperCase()
+      usdt.address.toUpperCase() < usdc.address.toUpperCase()
         ? [usdt.address, usdc.address]
         : [usdc.address, usdt.address];
 
