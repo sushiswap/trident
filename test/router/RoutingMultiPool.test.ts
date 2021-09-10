@@ -7,7 +7,7 @@ import {
   getIntegerRandomValue,
   HybridPoolParams,
   ConstantProductPoolParams,
-  Path,
+  getExactInputParamsFromMultiRoute,
   ExactInputParams,
 } from "../utilities";
 import {
@@ -16,6 +16,7 @@ import {
 } from "../utilities/pools";
 import * as sdk from "@sushiswap/sdk";
 import seedrandom from "seedrandom";
+import { expect } from "chai";
 
 const testSeed = "7";
 const rnd = seedrandom(testSeed);
@@ -200,52 +201,16 @@ describe("MultiPool Routing Tests", function () {
 
     // const poolRouterInfo = {...poolInfo };
     // poolRouterInfo.reserve0 = await bento.balanceOf(tokens[0].address, ????);
-    // poolrouterInfo.reserve1 = await bento.balanceOf(tokens[1].address, ????);
+    // poolrouterInfo.res`erve1 = await bento.balanceOf(tokens[1].address, ????);
 
-    let balanceBefore: BigNumber = await bento.balanceOf(
-      t1.address,
-      alice.address
-    );
+    const hybridT1Before = hybridPoolInfo.token1;
+    console.log("Before switch", hybridT1Before);
 
-    // constant product has USDT <> DAI
-    // Hybrid pool has      USDC <> USDT
-    //  -- ROUTER PARAMS --
-    let paths: Path[] = [
-      {
-        pool: hybridPool.address,
-        data: ethers.utils.defaultAbiCoder.encode(
-          ["address", "address", "bool"],
-          [usdc.address, alice.address, false]
-        ),
-      },
-      {
-        pool: cpPool.address,
-        data: ethers.utils.defaultAbiCoder.encode(
-          ["address", "address", "bool"],
-          [dai.address, alice.address, false]
-        ),
-      },
-    ];
+    hybridPoolInfo.token1 = cpPoolInfo.token0; //??
+    console.log("After switch", hybridPoolInfo.token1, "\n");
 
-    let inputParams: ExactInputParams = {
-      tokenIn: usdc.address,
-      tokenOut: dai.address,
-      amountIn: swapExpBN,
-      amountOutMinimum: getBigNumber(0),
-      path: paths,
-    };
-
-    // execute transaction
-    // const tx = await router.connect(alice).exactInput(inputParams);
-    // let balanceAfter: BigNumber = await bento.balanceOf(
-    //   t1.address,
-    //   alice.address
-    // );
-
-    // const amountOutPoolBN = balanceAfter.sub(balanceBefore);
-    hybridPoolInfo.token1 = cpPoolInfo.token0;
-    // ConstantProductPool has t0 = USDT <> t1 = DAI
     // HybridPool has          t0 = USDC <> t1 = USDT
+    // ConstantProductPool has t0 = USDT <> t1 = DAI
     const amountOutPrediction: sdk.MultiRoute | undefined =
       sdk.findMultiRouting(
         hybridPoolInfo.token0, // USDC
@@ -259,12 +224,78 @@ describe("MultiPool Routing Tests", function () {
 
     amountOutPrediction == undefined
       ? console.log("error calculating route")
-      : console.log(amountOutPrediction);
+      : console.log(amountOutPrediction, "\n");
 
-    // console.log(amountOutPrediction)
-    // cant do this yet cause findRouterMulti function net exposed by sdk yet?
-    // const amountOutPrediction = sdk. where is find router multi??
-    // expect(areCloseValues(amountOutPrediction, amountOutPoolBN)).to.equal(true, "predicted amount did not equal actual swapped amount");
+    const inputParams: ExactInputParams = getExactInputParamsFromMultiRoute(
+      amountOutPrediction,
+      alice.address
+    );
+
+    let balanceBefore: BigNumber = await bento.balanceOf(
+      usdc.address,
+      alice.address
+    );
+    let outputBalanceBefore: BigNumber = await bento.balanceOf(
+      dai.address,
+      alice.address
+    );
+    let usdtBalanceBefore: BigNumber = await bento.balanceOf(
+      usdt.address,
+      alice.address
+    );
+
+    await router.connect(alice).exactInput(inputParams);
+
+    let balanceAfter: BigNumber = await bento.balanceOf(
+      usdc.address,
+      alice.address
+    );
+    let outputBalanceAfter: BigNumber = await bento.balanceOf(
+      dai.address,
+      alice.address
+    );
+    let usdtBalanceAfter: BigNumber = await bento.balanceOf(
+      usdt.address,
+      alice.address
+    );
+
+    const amountOutPoolBN = outputBalanceAfter.sub(outputBalanceBefore);
+
+    console.log(
+      `Input Token(USDC) Balance before execution`,
+      balanceBefore.toString()
+    );
+    console.log(`USDT Balance before execution`, usdtBalanceBefore.toString());
+    console.log(
+      `Output Token(DAI) Balance before execution`,
+      outputBalanceBefore.toString(),
+      "\n"
+    );
+
+    console.log(
+      `Input Token(USDC) Balance after execution`,
+      balanceAfter.toString()
+    );
+    console.log(`USDT Balance after execution`, usdtBalanceAfter.toString());
+    console.log(
+      `Output Token(DAI) Balance after execution`,
+      outputBalanceAfter.toString(),
+      "\n"
+    );
+
+    console.log(
+      "Amount out prediction",
+      amountOutPrediction.totalAmountOut.toString()
+    );
+    console.log("Actual amount out", amountOutPoolBN.toString());
+
+    expect(
+      areCloseValues(
+        getBigNumber(amountOutPrediction.totalAmountOut.toString()),
+        amountOutPoolBN,
+        1e-17
+      )
+    ).to.equal(true, "predicted amount did not equal actual swapped amount");
 
     swapDirection = !swapDirection;
   }
