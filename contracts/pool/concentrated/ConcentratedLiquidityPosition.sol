@@ -8,7 +8,7 @@ import "../../interfaces/IMasterDeployer.sol";
 import "./TridentNFT.sol";
 
 /// @notice Trident Concentrated Liquidity Pool periphery contract that combines non-fungible position management and staking.
-contract ConcentratedLiquidityPosition is TridentNFT {
+abstract contract ConcentratedLiquidityPosition is TridentNFT {
     event Mint(address indexed pool, address indexed recipient, uint256 indexed positionId);
     event Burn(address indexed pool, address indexed owner, uint256 indexed positionId);
 
