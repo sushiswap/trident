@@ -50,6 +50,16 @@ export function getExactInputParamsFromMultiRoute(
 ): ExactInputParams {
   const routeLegs = multiRoute.legs.length;
 
+  // let paths: Path[] = [];
+
+  // for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
+  //   const path: Path = {
+  //     pool: multiRoute.legs[legIndex].address,
+  //     data: ethers.utils.defaultAbiCoder.encode(["address", "address", "bool"], [multiRoute.legs[legIndex].token.address , senderAddress, true])
+  //   }
+  //   paths.push(path);
+  // }
+
   let paths: Path[] = [
     {
       pool: multiRoute.legs[0].address,
