@@ -31,7 +31,11 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
     mapping(IConcentratedLiquidityPool => mapping(uint256 => Incentive)) public incentives;
     mapping(uint256 => mapping(uint256 => Stake)) public stakes;
 
-    constructor(address bento, address wETH) ConcentratedLiquidityPosition(bento, wETH) {}
+    constructor(
+        address bento,
+        address wETH,
+        address _masterDeployer
+    ) ConcentratedLiquidityPosition(bento, wETH, _masterDeployer) {}
 
     function addIncentive(IConcentratedLiquidityPool pool, Incentive memory incentive) public {
         uint32 current = uint32(block.timestamp);

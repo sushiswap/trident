@@ -3,6 +3,8 @@ pragma solidity >=0.8.0;
 
 import "../../interfaces/IPool.sol";
 import "../../interfaces/ITridentCallee.sol";
+import "../../interfaces/ITridentRouter.sol";
+import "../../interfaces/IMasterDeployer.sol";
 import "../../libraries/concentratedPool/TickMath.sol";
 import "../../libraries/concentratedPool/FullMath.sol";
 import "../../libraries/concentratedPool/UnsafeMath.sol";
@@ -11,13 +13,15 @@ import "../../libraries/concentratedPool/SwapLib.sol";
 import "../../libraries/concentratedPool/Ticks.sol";
 import "hardhat/console.sol";
 
-// TODO remove need for interface by calling the master deployer via low level calls
-interface IMasterDeployer {
-    function barFee() external view returns (uint256);
-
-    function barFeeTo() external view returns (address);
-
-    function bento() external view returns (address);
+interface IPositionManager {
+    function positionMintCallback(
+        address recipient,
+        int24 lower,
+        int24 upper,
+        uint128 amount /* ,
+        uint256 feeGrowthInside0,
+        uint256 feeGrowthInside1 */
+    ) external returns (uint256 positionId);
 }
 
 /// @notice Trident exchange pool template with concentrated liquidity and constant product formula for swapping between an ERC-20 token pair.
@@ -36,7 +40,8 @@ contract ConcentratedLiquidityPool is IPool {
 
     address public immutable barFeeTo;
     address public immutable bento;
-    IMasterDeployer public immutable masterDeployer;
+    address public immutable masterDeployer;
+    address public immutable poolManager;
     address public immutable token0;
     address public immutable token1;
 
@@ -78,6 +83,19 @@ contract ConcentratedLiquidityPool is IPool {
         int24 nextTickToCross;
     }
 
+    struct AddLiquidityParams {
+        int24 lowerOld;
+        int24 lower;
+        int24 upperOld;
+        int24 upper;
+        uint256 amount0Desired;
+        uint256 amount1Desired;
+        bool amount0native;
+        bool amount1native;
+        address positionOwner;
+        address recipient;
+    }
+
     /*
     univ3 1% -> 200 tickSpacing
     univ3 0.3% pool -> 60 tickSpacing -> 0.6% between ticks
@@ -96,7 +114,11 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     /// @dev Only set immutable variables here - state changes made here will not be used.
-    constructor(bytes memory _deployData, IMasterDeployer _masterDeployer) {
+    constructor(
+        bytes memory _deployData,
+        address _masterDeployer,
+        address _poolManager
+    ) {
         (address _token0, address _token1, uint24 _swapFee, uint160 _price) = abi.decode(_deployData, (address, address, uint24, uint160));
 
         require(_token0 != address(0), "ZERO_ADDRESS");
@@ -110,28 +132,30 @@ contract ConcentratedLiquidityPool is IPool {
         ticks[TickMath.MIN_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
         ticks[TickMath.MAX_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
         nearestTick = TickMath.MIN_TICK;
-        bento = _masterDeployer.bento();
-        barFeeTo = _masterDeployer.barFeeTo();
-        barFee = _masterDeployer.barFee();
+        bento = IMasterDeployer(_masterDeployer).bento();
+        barFeeTo = IMasterDeployer(_masterDeployer).barFeeTo();
+        barFee = IMasterDeployer(_masterDeployer).barFee();
         masterDeployer = _masterDeployer;
+        poolManager = _poolManager;
         unlocked = 1;
     }
 
-    function mint(bytes calldata data) external override lock returns (uint256 minted) {
-        (int24 lowerOld, int24 lower, int24 upperOld, int24 upper, uint128 amount, address recipient) = abi.decode(
-            data,
-            (int24, int24, int24, int24, uint128, address)
-        );
+    function mint(bytes calldata data) external override lock returns (uint256 _liquidity) {
+        AddLiquidityParams memory params = abi.decode(data, (AddLiquidityParams));
 
-        uint160 priceLower = TickMath.getSqrtRatioAtTick(lower);
-        uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper);
-        uint160 currentPrice = price;
+        uint256 priceLower = uint256(TickMath.getSqrtRatioAtTick(params.lower));
+        uint256 priceUpper = uint256(TickMath.getSqrtRatioAtTick(params.upper));
+        uint256 currentPrice = uint256(price);
+
+        _liquidity = DyDxMath.getLiquidityForAmounts(priceLower, priceUpper, currentPrice, params.amount1Desired, params.amount0Desired);
+
         // @dev This is safe because overflow is checked in position minter contract.
         unchecked {
-            if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += amount;
+            if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += uint128(_liquidity);
         }
-        // @dev Fees should have been claimed before position updates.
-        _updatePosition(msg.sender, lower, upper, int128(amount));
+
+        /// @dev Fees should have been claimed before position updates.
+        _updatePosition(params.positionOwner, params.lower, params.upper, int128(uint128(_liquidity)));
 
         (nearestTick) = Ticks.insert(
             ticks,
@@ -139,45 +163,51 @@ contract ConcentratedLiquidityPool is IPool {
             feeGrowthGlobal0,
             feeGrowthGlobal1,
             secondsPerLiquidity,
-            lowerOld,
-            lower,
-            upperOld,
-            upper,
-            amount,
-            currentPrice
+            params.lowerOld,
+            params.lower,
+            params.upperOld,
+            params.upper,
+            uint128(_liquidity),
+            uint160(currentPrice)
         );
 
-        (uint128 amount0, uint128 amount1) = _getAmountsForLiquidity(
-            uint256(priceLower),
-            uint256(priceUpper),
-            uint256(currentPrice),
-            uint256(amount)
-        );
-        // @dev This is safe because overflow is checked in {getAmountsForLiquidity}.
-        unchecked {
-            if (amount0 != 0) {
-                amount0 += reserve0;
-                // @dev balanceOf(address,address).
-                (, bytes memory _balance0) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token0, address(this)));
-                uint256 balance0 = abi.decode(_balance0, (uint256));
-                require(uint256(amount0) <= balance0, "TOKEN0_MISSING");
-                // @dev `reserve0 = bento.balanceOf(...)` doesn't help anyone and coins will be stuck.
-                reserve0 = amount0;
+        {
+            (uint128 amount0Actual, uint128 amount1Actual) = _getAmountsForLiquidity(priceLower, priceUpper, currentPrice, _liquidity);
+
+            ITridentCallee(msg.sender).tridentMintCallback(
+                abi.encode(
+                    [
+                        ITridentRouter.TokenInput(token0, params.amount0native, amount0Actual),
+                        ITridentRouter.TokenInput(token1, params.amount1native, amount1Actual)
+                    ]
+                )
+            );
+
+            // @dev This is safe because overflow is checked in {getAmountsForLiquidity}.
+            unchecked {
+                if (amount0Actual != 0) {
+                    /// @dev balanceOf(address,address).
+                    (, bytes memory _balance0) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token0, address(this)));
+                    uint256 balance0 = abi.decode(_balance0, (uint256));
+                    require(amount0Actual + reserve0 <= balance0, "TOKEN0_MISSING");
+                    reserve0 += amount0Actual;
+                }
+
+                if (amount1Actual != 0) {
+                    /// @dev balanceOf(address,address).
+                    (, bytes memory _balance1) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token1, address(this)));
+                    uint256 balance1 = abi.decode(_balance1, (uint256));
+                    require(amount1Actual + reserve0 <= balance1, "TOKEN1_MISSING");
+                    reserve1 += amount1Actual;
+                }
             }
 
-            if (amount1 != 0) {
-                amount1 += reserve1;
-                // @dev balanceOf(address,address).
-                (, bytes memory _balance1) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token1, address(this)));
-                uint256 balance1 = abi.decode(_balance1, (uint256));
-                require(uint256(amount1) <= balance1, "TOKEN1_MISSING");
-                reserve1 = amount1;
-            }
+            IPositionManager(poolManager).positionMintCallback(params.recipient, params.lower, params.upper, uint128(_liquidity));
+
+            emit Mint(msg.sender, amount0Actual, amount1Actual, params.recipient);
         }
 
-        minted = amount;
-
-        emit Mint(msg.sender, amount0, amount1, recipient);
+        return _liquidity;
     }
 
     function burn(bytes calldata data) external override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
@@ -568,7 +598,7 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     function updateBarFee() public {
-        barFee = masterDeployer.barFee();
+        barFee = IMasterDeployer(masterDeployer).barFee();
     }
 
     function getAmountOut(bytes calldata) public view override returns (uint256 finalAmountOut) {

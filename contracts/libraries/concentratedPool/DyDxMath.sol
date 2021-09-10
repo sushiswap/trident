@@ -37,4 +37,26 @@ library DyDxMath {
             }
         }
     }
+
+    function getLiquidityForAmounts(
+        uint256 priceLower,
+        uint256 priceUpper,
+        uint256 currentPrice,
+        uint256 dy,
+        uint256 dx
+    ) internal pure returns (uint256 liquidity) {
+        if (priceUpper <= currentPrice) {
+            liquidity = FullMath.mulDiv(dy, 0x1000000000000000000000000, priceUpper - priceLower);
+        } else if (currentPrice <= priceLower) {
+            liquidity = FullMath.mulDiv(dx, FullMath.mulDiv(priceLower, priceUpper, 0x1000000000000000000000000), priceUpper - priceLower);
+        } else {
+            uint256 liquidity0 = FullMath.mulDiv(
+                dx,
+                FullMath.mulDiv(priceLower, currentPrice, 0x1000000000000000000000000),
+                priceUpper - priceLower
+            );
+            uint256 liquidity1 = FullMath.mulDiv(dy, 0x1000000000000000000000000, priceUpper - currentPrice);
+            liquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
+        }
+    }
 }
