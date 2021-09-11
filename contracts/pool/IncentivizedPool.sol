@@ -18,7 +18,7 @@ contract IncentivizedPool is IndexPool {
     function _beforeTokenTransfer(
         address from,
         address to,
-        uint256 amount
+        uint256
     ) internal override {
         if (address(rewards) == address(0)) {
             return;
