@@ -97,7 +97,11 @@ describe("HybridPool Typescript == Solidity check", function () {
 
     tridentPoolFactory = await PoolFactory.deploy(masterDeployer.address);
     await tridentPoolFactory.deployed();
-    router = await SwapRouter.deploy(bento.address, weth.address);
+    router = await SwapRouter.deploy(
+      bento.address,
+      masterDeployer.address,
+      weth.address
+    );
     await router.deployed();
 
     // Whitelist pool factory in master deployer
