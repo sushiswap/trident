@@ -9,6 +9,8 @@ import {
   ConstantProductPoolParams,
   getExactInputParamsFromMultiRoute,
   ExactInputParams,
+  getComplexPathParamsFromMultiRoute,
+  ComplexPathParams,
 } from "../utilities";
 import {
   createConstantProductPool,
@@ -226,7 +228,7 @@ describe("MultiPool Routing Tests", function () {
       ? console.log("error calculating route")
       : console.log(amountOutPrediction, "\n");
 
-    const inputParams: ExactInputParams = getExactInputParamsFromMultiRoute(
+    const complexParams: ComplexPathParams = getComplexPathParamsFromMultiRoute(
       amountOutPrediction,
       alice.address
     );
@@ -244,7 +246,7 @@ describe("MultiPool Routing Tests", function () {
       alice.address
     );
 
-    await router.connect(alice).exactInput(inputParams);
+    await router.connect(alice).complexPath(complexParams);
 
     let balanceAfter: BigNumber = await bento.balanceOf(
       usdc.address,
