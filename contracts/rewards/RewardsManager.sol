@@ -12,6 +12,7 @@ interface Sushi {
 }
 
 /// @notice Manages the rewards for various pools without requiring users to stake LP tokens.
+///         Based on MasterChefV2.
 contract RewardsManager is TridentOwnable {
     /// @notice Info of each pool.
     /// `allocPoint` The amount of allocation points assigned to the pool.
