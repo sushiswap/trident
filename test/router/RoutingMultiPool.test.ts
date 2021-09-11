@@ -3,7 +3,6 @@ import { BigNumber, Contract } from "ethers";
 import { ethers } from "hardhat";
 import {
   areCloseValues,
-  getBigNumber,
   getIntegerRandomValue,
   HybridPoolParams,
   ConstantProductPoolParams,
@@ -19,11 +18,12 @@ import {
 import * as sdk from "@sushiswap/sdk";
 import seedrandom from "seedrandom";
 import { expect } from "chai";
+import { getBigNumber } from "@sushiswap/sdk";
 
 const testSeed = "7";
 const rnd = seedrandom(testSeed);
 
-const ERC20DeployAmount = getBigNumber("1000000000000000000");
+const ERC20DeployAmount = getBigNumber(undefined, Math.pow(10, 37));
 const gasPrice = 1 * 200 * 1e-9;
 
 describe("MultiPool Routing Tests", function () {
@@ -206,10 +206,8 @@ describe("MultiPool Routing Tests", function () {
     // poolrouterInfo.res`erve1 = await bento.balanceOf(tokens[1].address, ????);
 
     const hybridT1Before = hybridPoolInfo.token1;
-    console.log("Before switch", hybridT1Before);
 
     hybridPoolInfo.token1 = cpPoolInfo.token0; //??
-    console.log("After switch", hybridPoolInfo.token1, "\n");
 
     // HybridPool has          t0 = USDC <> t1 = USDT
     // ConstantProductPool has t0 = USDT <> t1 = DAI
@@ -223,10 +221,6 @@ describe("MultiPool Routing Tests", function () {
         gasPrice,
         100
       );
-
-    amountOutPrediction == undefined
-      ? console.log("error calculating route")
-      : console.log(amountOutPrediction, "\n");
 
     const complexParams: ComplexPathParams = getComplexPathParamsFromMultiRoute(
       amountOutPrediction,
@@ -263,39 +257,11 @@ describe("MultiPool Routing Tests", function () {
 
     const amountOutPoolBN = outputBalanceAfter.sub(outputBalanceBefore);
 
-    console.log(
-      `Input Token(USDC) Balance before execution`,
-      balanceBefore.toString()
-    );
-    console.log(`USDT Balance before execution`, usdtBalanceBefore.toString());
-    console.log(
-      `Output Token(DAI) Balance before execution`,
-      outputBalanceBefore.toString(),
-      "\n"
-    );
-
-    console.log(
-      `Input Token(USDC) Balance after execution`,
-      balanceAfter.toString()
-    );
-    console.log(`USDT Balance after execution`, usdtBalanceAfter.toString());
-    console.log(
-      `Output Token(DAI) Balance after execution`,
-      outputBalanceAfter.toString(),
-      "\n"
-    );
-
-    console.log(
-      "Amount out prediction",
-      amountOutPrediction.totalAmountOut.toString()
-    );
-    console.log("Actual amount out", amountOutPoolBN.toString());
-
     expect(
       areCloseValues(
-        getBigNumber(amountOutPrediction.totalAmountOut.toString()),
-        amountOutPoolBN,
-        1e-17
+        amountOutPrediction.amountOut,
+        parseInt(amountOutPoolBN.toString()),
+        1e-14
       )
     ).to.equal(true, "predicted amount did not equal actual swapped amount");
 
