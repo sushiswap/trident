@@ -66,6 +66,11 @@ contract RewardsManager is TridentOwnable {
         if (overwrite) {
             rewarder[_pool] = _rewarder;
         }
+
+        if (poolInfo[_pool].lastRewardBlock == 0) {
+            poolInfo[_pool].lastRewardBlock = block.number;
+        }
+
         emit LogSetPool(_pool, _allocPoint, overwrite ? _rewarder : rewarder[_pool], overwrite);
     }
 
