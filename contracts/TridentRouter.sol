@@ -187,13 +187,18 @@ contract TridentRouter is ITridentRouter, TridentHelper {
 
     /// @notice Add liquidity to a pool using callbacks - same as `addLiquidity`, but now with callbacks.
     /// @dev The input tokens are sent to the pool during the callback.
-    function addLiquidityLazy(address pool, bytes calldata data) public payable {
+    function addLiquidityLazy(
+        address pool,
+        uint256 minLiquidity,
+        bytes calldata data
+    ) public payable returns (uint256 liquidity) {
         require(masterDeployer.pools(pool), "INVALID_POOL");
         cachedMsgSender = msg.sender;
         cachedPool = pool;
         // @dev The pool must ensure that there's not too much slippage.
-        IPool(pool).mint(data);
+        liquidity = IPool(pool).mint(data);
         cachedPool = address(1);
+        require(liquidity >= minLiquidity, "NOT_ENOUGH_LIQUIDITY_MINTED");
     }
 
     /// @notice Burn liquidity tokens to get back `bento` tokens.
