@@ -196,6 +196,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
     function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
+        require(_reserve0 > 0, "POOL_UNINITIALIZED");
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 amountIn;
         address tokenOut;
@@ -213,7 +214,6 @@ contract ConstantProductPool is IPool, TridentERC20 {
                 balance0 -= amountOut;
             }
         }
-        require(amountOut > 0, "INVALID_AMOUNT_OUT");
         _transfer(tokenOut, amountOut, recipient, unwrapBento);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
@@ -226,6 +226,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
             (address, address, bool, uint256, bytes)
         );
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
+        require(_reserve0 > 0, "POOL_UNINITIALIZED");
         unchecked {
             if (tokenIn == token0) {
                 amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
@@ -246,7 +247,6 @@ contract ConstantProductPool is IPool, TridentERC20 {
                 emit Swap(recipient, tokenIn, token0, amountIn, amountOut);
             }
         }
-        require(amountOut > 0, "INVALID_AMOUNT_OUT");
     }
 
     /// @dev Updates `barFee` for Trident protocol.
