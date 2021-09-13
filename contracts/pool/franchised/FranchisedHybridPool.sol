@@ -10,7 +10,7 @@ import "../../interfaces/IWhiteListManager.sol";
 import "../../libraries/MathUtils.sol";
 import "../TridentERC20.sol";
 
-/// @notice Trident exchange franchised pool template with hybrid like-kind formula for swapping between an ERC-20 token pair.
+/// @notice Trident exchange franchised pool (level 1) template with hybrid like-kind formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares. However, the stableswap invariant is applied to the underlying amounts.
 ///      The API uses the underlying amounts.
 contract FranchisedHybridPool is IPool, TridentERC20 {
@@ -190,7 +190,6 @@ contract FranchisedHybridPool is IPool, TridentERC20 {
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
     function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
-        _checkWhiteList(recipient);
         (uint256 _reserve0, uint256 _reserve1) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 amountIn;
@@ -219,7 +218,6 @@ contract FranchisedHybridPool is IPool, TridentERC20 {
             data,
             (address, address, bool, uint256, bytes)
         );
-        _checkWhiteList(recipient);
         (uint256 _reserve0, uint256 _reserve1) = _getReserves();
         address tokenOut;
         uint256 fee;
