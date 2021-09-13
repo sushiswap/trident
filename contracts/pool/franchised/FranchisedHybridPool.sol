@@ -6,14 +6,13 @@ import "../../interfaces/IBentoBoxMinimal.sol";
 import "../../interfaces/IMasterDeployer.sol";
 import "../../interfaces/IPool.sol";
 import "../../interfaces/ITridentCallee.sol";
-import "../../interfaces/IWhiteListManager.sol";
 import "../../libraries/MathUtils.sol";
-import "../TridentERC20.sol";
+import "./TridentFranchisedERC20.sol";
 
 /// @notice Trident exchange franchised pool template with hybrid like-kind formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares. However, the stableswap invariant is applied to the underlying amounts.
 ///      The API uses the underlying amounts.
-contract FranchisedHybridPool is IPool, TridentERC20 {
+contract FranchisedHybridPool is IPool, TridentFranchisedERC20 {
     using MathUtils for uint256;
 
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
@@ -47,9 +46,6 @@ contract FranchisedHybridPool is IPool, TridentERC20 {
 
     uint128 internal reserve0;
     uint128 internal reserve1;
-    
-    address public immutable whiteListManager;
-    address public immutable operator;
 
     bytes32 public constant override poolIdentifier = "Trident:FranchisedHybrid";
 
@@ -62,9 +58,9 @@ contract FranchisedHybridPool is IPool, TridentERC20 {
     }
 
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (address _token0, address _token1, uint256 _swapFee, uint256 a, address _whiteListManager, address _operator) = abi.decode(
+        (address _token0, address _token1, uint256 _swapFee, uint256 a, address _whiteListManager, address _operator, bool _level2) = abi.decode(
             _deployData,
-            (address, address, uint256, uint256, address, address)
+            (address, address, uint256, uint256, address, address, bool)
         );
         
         // @dev Factory ensures that the tokens are sorted.
@@ -72,6 +68,8 @@ contract FranchisedHybridPool is IPool, TridentERC20 {
         require(_token0 != _token1, "IDENTICAL_ADDRESSES");
         require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
         require(a != 0, "ZERO_A");
+        
+        TridentFranchisedERC20.initialize(_whiteListManager, _operator, _level2);
         
         (, bytes memory _barFee) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
         (, bytes memory _barFeeTo) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFeeTo.selector));
@@ -90,8 +88,6 @@ contract FranchisedHybridPool is IPool, TridentERC20 {
         N_A = 2 * a;
         token0PrecisionMultiplier = 10**(decimals - abi.decode(_decimals0, (uint8)));
         token1PrecisionMultiplier = 10**(decimals - abi.decode(_decimals1, (uint8)));
-        whiteListManager = _whiteListManager;
-        operator = _operator;
         unlocked = 1;
     }
     
@@ -190,7 +186,7 @@ contract FranchisedHybridPool is IPool, TridentERC20 {
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
     function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
-        _checkWhiteList(recipient);
+        if (level2) _checkWhiteList(recipient);
         (uint256 _reserve0, uint256 _reserve1) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 amountIn;
@@ -219,7 +215,7 @@ contract FranchisedHybridPool is IPool, TridentERC20 {
             data,
             (address, address, bool, uint256, bytes)
         );
-        _checkWhiteList(recipient);
+        if (level2) _checkWhiteList(recipient);
         (uint256 _reserve0, uint256 _reserve1) = _getReserves();
         address tokenOut;
         uint256 fee;
@@ -453,15 +449,7 @@ contract FranchisedHybridPool is IPool, TridentERC20 {
             token0Fee = (swapFee * (_amount0 - amount0Optimal)) / (2 * MAX_FEE);
         }
     }
-    
-    /// @dev Checks `whiteListManager` for pool `operator` and given user `account`.
-    function _checkWhiteList(address account) internal view {
-        (, bytes memory _whitelisted) = whiteListManager.staticcall(abi.encodeWithSelector(IWhiteListManager.whitelistedAccounts.selector,
-            operator, account));
-        bool whitelisted = abi.decode(_whitelisted, (bool));
-        require(whitelisted, "NOT_WHITELISTED");
-    }
-    
+
     function getAssets() public view override returns (address[] memory assets) {
         assets = new address[](2);
         assets[0] = token0;

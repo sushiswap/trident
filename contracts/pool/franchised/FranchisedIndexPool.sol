@@ -6,13 +6,12 @@ import "../../interfaces/IBentoBoxMinimal.sol";
 import "../../interfaces/IMasterDeployer.sol";
 import "../../interfaces/IPool.sol";
 import "../../interfaces/ITridentCallee.sol";
-import "../../interfaces/IWhiteListManager.sol";
-import "../TridentERC20.sol";
+import "./TridentFranchisedERC20.sol";
 
 /// @notice Trident exchange franchised pool template with constant mean formula for swapping among an array of ERC-20 tokens.
 /// @dev The reserves are stored as bento shares.
 ///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
-contract FranchisedIndexPool is IPool, TridentERC20 {
+contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
     event Mint(address indexed sender, address tokenIn, uint256 amountIn, address indexed recipient);
     event Burn(address indexed sender, address tokenOut, uint256 amountOut, address indexed recipient);
 
@@ -42,10 +41,7 @@ contract FranchisedIndexPool is IPool, TridentERC20 {
     address[] internal tokens;
     
     uint256 public barFee;
-    
-    address public immutable whiteListManager;
-    address public immutable operator;
-    
+
     bytes32 public constant override poolIdentifier = "Trident:FranchisedIndex";
 
     uint256 internal unlocked;
@@ -63,14 +59,16 @@ contract FranchisedIndexPool is IPool, TridentERC20 {
     }
 
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (address[] memory _tokens, uint136[] memory _weights, uint256 _swapFee, address _whiteListManager, address _operator) = abi.decode(
+        (address[] memory _tokens, uint136[] memory _weights, uint256 _swapFee, address _whiteListManager, address _operator, bool _level2) = abi.decode(
             _deployData,
-            (address[], uint136[], uint256, address, address)
+            (address[], uint136[], uint256, address, address, bool)
         );
         // @dev Factory ensures that the tokens are sorted.
         require(_tokens.length == _weights.length, "INVALID_ARRAYS");
         require(MIN_FEE <= _swapFee && _swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
         require(MIN_TOKENS <= _tokens.length && _tokens.length <= MAX_TOKENS, "INVALID_TOKENS_LENGTH");
+        
+        TridentFranchisedERC20.initialize(_whiteListManager, _operator, _level2);
 
         for (uint256 i = 0; i < _tokens.length; i++) {
             require(_tokens[i] != address(0), "ZERO_ADDRESS");
@@ -93,8 +91,6 @@ contract FranchisedIndexPool is IPool, TridentERC20 {
         barFeeTo = abi.decode(_barFeeTo, (address));
         bento = abi.decode(_bento, (address));
         masterDeployer = _masterDeployer;
-        whiteListManager = _whiteListManager;
-        operator = _operator;
         unlocked = 1;
     }
     
@@ -182,7 +178,7 @@ contract FranchisedIndexPool is IPool, TridentERC20 {
             data,
             (address, address, address, bool, uint256)
         );
-        _checkWhiteList(recipient);
+        if (level2) _checkWhiteList(recipient);
         Record storage inRecord = records[tokenIn];
         Record storage outRecord = records[tokenOut];
 
@@ -209,7 +205,7 @@ contract FranchisedIndexPool is IPool, TridentERC20 {
             uint256 amountIn,
             bytes memory context
         ) = abi.decode(data, (address, address, address, bool, uint256, bytes));
-        _checkWhiteList(recipient);
+        if (level2) _checkWhiteList(recipient);
         Record storage inRecord = records[tokenIn];
         Record storage outRecord = records[tokenOut];
 
@@ -358,15 +354,7 @@ contract FranchisedIndexPool is IPool, TridentERC20 {
             require(success, "TRANSFER_FAILED");
         }
     }
-    
-    /// @dev Checks `whiteListManager` for pool `operator` and given user `account`.
-    function _checkWhiteList(address account) internal view {
-        (, bytes memory _whitelisted) = whiteListManager.staticcall(abi.encodeWithSelector(IWhiteListManager.whitelistedAccounts.selector,
-            operator, account));
-        bool whitelisted = abi.decode(_whitelisted, (bool));
-        require(whitelisted, "NOT_WHITELISTED");
-    }
-    
+
     function getAssets() public view override returns (address[] memory assets) {
         assets = tokens;
     }
