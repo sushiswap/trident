@@ -84,10 +84,10 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
         barFeeTo = abi.decode(_barFeeTo, (address));
         bento = abi.decode(_bento, (address));
         masterDeployer = _masterDeployer;
-        unlocked = 1;
-        if (_twapSupport) blockTimestampLast = 1;
         whiteListManager = _whiteListManager;
         operator = _operator;
+        unlocked = 1;
+        if (_twapSupport) blockTimestampLast = 1;
     }
 
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
