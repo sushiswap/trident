@@ -16,8 +16,6 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Sync(uint256 reserve0, uint256 reserve1);
-    event JoinWhitelist(uint256 indexed index, address indexed account);
-    event SetMerkleRoot(bytes32 merkleRoot);
 
     uint256 internal constant MINIMUM_LIQUIDITY = 1000;
 
