@@ -8,7 +8,6 @@ import "../interfaces/IMasterChef.sol";
 import "../utils/TridentOwnable.sol";
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../flat/BentoBoxV1Flat.sol";
 
 /// @notice Manages the rewards for various pools without requiring users to stake LP tokens.
 ///         Based on MasterChefV2.
@@ -125,7 +124,7 @@ contract RewardsManager is TridentOwnable {
 
         IRewarder _rewarder = rewarder[address(pool)];
         if (address(_rewarder) != address(0)) {
-            _rewarder.onSushiReward(address(pool), account, account, _pendingSushi, amount);
+            address(_rewarder).call(abi.encodePacked(_rewarder.onSushiReward.selector, address(pool), account, account, _pendingSushi, amount));
         }
 
         emit Harvest(account, address(pool), _pendingSushi);
