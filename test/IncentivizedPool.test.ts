@@ -26,6 +26,8 @@ const tokenWeights: BigNumber[] = [getBigNumber("10"), getBigNumber("10")];
 // pool swap fee
 const poolSwapFee: number | BigNumber = getBigNumber("1", 13);
 
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
 // -------------         -------------
 
 function encodeSwapData(
@@ -51,12 +53,15 @@ describe("IncentivizedPool test", function () {
     masterDeployer: Contract,
     tridentPoolFactory: Contract,
     router: Contract,
+    rewardToken: Contract,
+    rewardsManager: Contract,
     Pool: ContractFactory;
 
   async function deployPool(): Promise<Contract> {
     const ERC20 = await ethers.getContractFactory("ERC20Mock");
     const Bento = await ethers.getContractFactory("BentoBoxV1");
     const Deployer = await ethers.getContractFactory("MasterDeployer");
+    const RewardsManager = await ethers.getContractFactory("RewardsManager");
     const PoolFactory = await ethers.getContractFactory(
       "IncentivizedPoolFactory"
     );
@@ -70,6 +75,11 @@ describe("IncentivizedPool test", function () {
     await usdt.deployed();
     usdc = await ERC20.deploy("USDC", "USDC", ERCDeployAmount);
     await usdc.deployed();
+    rewardToken = await ERC20.deploy("SUSHI", "SUSHI", ERCDeployAmount);
+    await rewardToken.deployed();
+
+    rewardsManager = await RewardsManager.deploy(rewardToken.address);
+    await rewardsManager.deployed();
 
     bento = await Bento.deploy(weth.address);
     await bento.deployed();
@@ -127,13 +137,17 @@ describe("IncentivizedPool test", function () {
     // address[], uint256[], uint256
     const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address[]", "uint256[]", "uint256", "address"],
-      [tokens, tokenWeights, poolSwapFee, alice.address] // @TODO
+      [tokens, tokenWeights, poolSwapFee, rewardsManager.address]
     );
 
     let tx = await (
       await masterDeployer.deployPool(tridentPoolFactory.address, deployData)
     ).wait();
     const pool: Contract = await Pool.attach(tx.events[1].args.pool);
+
+    await rewardsManager.set(ZERO_ADDRESS, 10, ZERO_ADDRESS, true);
+    await rewardsManager.set(pool.address, 10, ZERO_ADDRESS, true);
+    await rewardToken.transfer(rewardsManager.address, ERCDeployAmount);
 
     await bento.transfer(
       usdt.address,
@@ -193,5 +207,21 @@ describe("IncentivizedPool test", function () {
     // await expect(tx).to.eventually.be.rejectedWith(
     //   "VM Exception while processing transaction: reverted with panic code 0x11 (Arithmetic operation underflowed or overflowed outside of an unchecked block)"
     // );
+  });
+
+  it("should pay out rewards", async () => {
+    const pool: Contract = await deployPool();
+
+    expect(
+      (
+        await rewardsManager.pendingSushi(pool.address, alice.address)
+      ).toString()
+    ).to.not.be.eq("0");
+    await pool.transfer(ZERO_ADDRESS, 0);
+    expect(
+      (
+        await rewardsManager.pendingSushi(pool.address, alice.address)
+      ).toNumber()
+    ).to.eq(0);
   });
 });

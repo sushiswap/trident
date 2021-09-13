@@ -23,15 +23,14 @@ contract RewardsManager is TridentOwnable {
         uint64 allocPoint;
     }
 
-    /// @notice Address of MCV1 contract.
-    IMasterChef public immutable MASTER_CHEF;
-
     /// @notice Address of SUSHI contract.
     Sushi public immutable SUSHI;
 
     /// @dev Total allocation points. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint;
 
+    address private constant MASTER_PID = address(0);
+    uint256 private constant MASTERCHEF_SUSHI_PER_BLOCK = 1e20;
     uint256 private constant ACC_SUSHI_PRECISION = 1e12;
 
     /// `rewardDebt` The amount of SUSHI entitled to the user for a specific pool.
@@ -45,9 +44,27 @@ contract RewardsManager is TridentOwnable {
     event LogUpdatePool(address indexed pid, uint64 lastRewardBlock, uint256 lpSupply, uint256 accSushiPerShare);
     event LogSetPool(address indexed pid, uint256 allocPoint, IRewarder indexed rewarder, bool overwrite);
 
-    constructor(IMasterChef _MASTER_CHEF, Sushi _SUSHI) {
-        MASTER_CHEF = _MASTER_CHEF;
+    constructor(Sushi _SUSHI) {
         SUSHI = _SUSHI;
+    }
+
+    /// @notice View function to see pending SUSHI on frontend.
+    /// @param _pid The address of the pool. See `poolInfo`.
+    /// @param _user Address of user.
+    /// @return pending SUSHI reward for a given user.
+    function pendingSushi(address _pid, address _user) external view returns (uint256 pending) {
+        PoolInfo memory pool = poolInfo[_pid];
+        uint256 accSushiPerShare = pool.accSushiPerShare;
+
+        uint256 lpSupply = IERC20(address(_pid)).totalSupply();
+        if (block.number > pool.lastRewardBlock && lpSupply != 0) {
+            uint256 blocks = block.number - pool.lastRewardBlock;
+            uint256 sushiReward = (blocks * sushiPerBlock() * pool.allocPoint) / totalAllocPoint;
+            accSushiPerShare = accSushiPerShare + ((sushiReward * ACC_SUSHI_PRECISION) / lpSupply);
+        }
+
+        uint256 amount = IERC20(address(_pid)).balanceOf(_user);
+        pending = uint256(int256((amount * (accSushiPerShare)) / ACC_SUSHI_PRECISION) - (rewardDebt[_pid][_user]));
     }
 
     /// @notice Update the given pool's SUSHI allocation point and `IRewarder` contract. Can only be called by the owner.
@@ -61,14 +78,18 @@ contract RewardsManager is TridentOwnable {
         IRewarder _rewarder,
         bool overwrite
     ) public onlyOwner {
-        totalAllocPoint = (totalAllocPoint - poolInfo[_pool].allocPoint) + _allocPoint;
-        poolInfo[_pool].allocPoint = uint64(_allocPoint);
-        if (overwrite) {
-            rewarder[_pool] = _rewarder;
+        PoolInfo memory info = poolInfo[_pool];
+        if (info.lastRewardBlock == 0 && info.allocPoint == 0) {
+            totalAllocPoint = totalAllocPoint + _allocPoint;
+            poolInfo[_pool].lastRewardBlock = uint64(block.number);
+        } else {
+            totalAllocPoint = (totalAllocPoint - poolInfo[_pool].allocPoint) + _allocPoint;
         }
 
-        if (poolInfo[_pool].lastRewardBlock == 0) {
-            poolInfo[_pool].lastRewardBlock = uint64(block.number);
+        poolInfo[_pool].allocPoint = uint64(_allocPoint);
+
+        if (overwrite) {
+            rewarder[_pool] = _rewarder;
         }
 
         emit LogSetPool(_pool, _allocPoint, overwrite ? _rewarder : rewarder[_pool], overwrite);
@@ -120,12 +141,17 @@ contract RewardsManager is TridentOwnable {
             uint256 lpSupply = IERC20(address(pool)).totalSupply();
             if (lpSupply > 0) {
                 uint256 blocks = block.number - info.lastRewardBlock;
-                uint256 sushiReward = (blocks * MASTER_CHEF.sushiPerBlock() * info.allocPoint) / totalAllocPoint;
+                uint256 sushiReward = (blocks * sushiPerBlock() * info.allocPoint) / totalAllocPoint;
                 info.accSushiPerShare = info.accSushiPerShare + uint128((sushiReward * ACC_SUSHI_PRECISION) / lpSupply);
             }
             info.lastRewardBlock = uint64(block.number);
             poolInfo[address(pool)] = info;
             emit LogUpdatePool(address(pool), info.lastRewardBlock, lpSupply, info.accSushiPerShare);
         }
+    }
+
+    /// @notice Calculates and returns the `amount` of SUSHI per block.
+    function sushiPerBlock() public view returns (uint256 amount) {
+        amount = uint256(MASTERCHEF_SUSHI_PER_BLOCK * poolInfo[MASTER_PID].allocPoint) / totalAllocPoint;
     }
 }
