@@ -375,7 +375,7 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
         }
     }
     
-    // @dev Checks `whiteListManager` for pool `operator` and given user `account`.
+    /// @dev Checks `whiteListManager` for pool `operator` and given user `account`.
     function _checkWhiteList(address account) internal view {
         (, bytes memory _whitelisted) = whiteListManager.staticcall(abi.encodeWithSelector(IWhiteListManager.whitelistedAccounts.selector,
             operator, account));
