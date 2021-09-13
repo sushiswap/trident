@@ -2,7 +2,7 @@
 
 pragma solidity >=0.8.0;
 
-import "../../../interfaces/IWhiteListManager.sol";
+import "../../interfaces/IWhiteListManager.sol";
 
 /// @notice Trident franchised pool (level 2) ERC-20 with EIP-2612 extension.
 /// @author Adapted from RariCapital, https://github.com/Rari-Capital/solmate/blob/main/src/erc20/ERC20.sol,
@@ -17,6 +17,7 @@ abstract contract TridentFranchisedERC20 {
     
     address public whiteListManager;
     address public operator;
+    bool public immutable level2;
 
     uint256 public totalSupply;
     /// @notice owner -> balance mapping.
@@ -45,9 +46,10 @@ abstract contract TridentFranchisedERC20 {
     }
     
     /// @dev Initializes whitelist settings from pool.
-    function initialize(address _whiteListManager, address _operator) internal {
+    function initialize(address _whiteListManager, address _operator, address _level2) internal {
         whiteListManager = _whiteListManager;
         operator = _operator;
+        if (_level2) level2 = true;
     }
 
     /// @notice Approves `amount` from `msg.sender` to be spent by `spender`.
@@ -65,7 +67,7 @@ abstract contract TridentFranchisedERC20 {
     /// @param amount The token `amount` to move.
     /// @return (bool) Returns 'true' if succeeded.
     function transfer(address recipient, uint256 amount) external returns (bool) {
-        _checkWhiteList(recipient);
+        if (level2) _checkWhiteList(recipient);
         balanceOf[msg.sender] -= amount;
         // @dev This is safe from overflow - the sum of all user
         // balances can't exceed 'type(uint256).max'.
@@ -86,7 +88,7 @@ abstract contract TridentFranchisedERC20 {
         address recipient,
         uint256 amount
     ) external returns (bool) {
-        _checkWhiteList(recipient);
+        if (level2) _checkWhiteList(recipient);
         if (allowance[sender][msg.sender] != type(uint256).max) {
             allowance[sender][msg.sender] -= amount;
         }
