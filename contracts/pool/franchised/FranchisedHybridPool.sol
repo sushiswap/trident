@@ -2,13 +2,13 @@
 
 pragma solidity >=0.8.0;
 
-import "../interfaces/IBentoBoxMinimal.sol";
-import "../interfaces/IMasterDeployer.sol";
-import "../interfaces/IPool.sol";
-import "../interfaces/ITridentCallee.sol";
-import "../interfaces/IWhiteListManager.sol";
-import "../libraries/MathUtils.sol";
-import "./TridentERC20.sol";
+import "../../interfaces/IBentoBoxMinimal.sol";
+import "../../interfaces/IMasterDeployer.sol";
+import "../../interfaces/IPool.sol";
+import "../../interfaces/ITridentCallee.sol";
+import "../../interfaces/IWhiteListManager.sol";
+import "../../libraries/MathUtils.sol";
+import "../TridentERC20.sol";
 
 /// @notice Trident exchange franchised pool template with hybrid like-kind formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares. However, the stableswap invariant is applied to the underlying amounts.
