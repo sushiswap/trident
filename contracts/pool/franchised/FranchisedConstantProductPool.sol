@@ -2,6 +2,7 @@
 
 pragma solidity >=0.8.0;
 
+import "../interfaces/IBentoBoxMinimal.sol";
 import "../interfaces/IMasterDeployer.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/ITridentCallee.sol";
@@ -346,12 +347,12 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
         bool unwrapBento
     ) internal {
         if (unwrapBento) {
-            // @dev withdraw(address,address,address,uint256,uint256).
-            (bool success, ) = bento.call(abi.encodeWithSelector(0x97da6d30, token, address(this), to, 0, shares));
+            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.withdraw.selector, 
+                token, address(this), to, 0, shares));
             require(success, "WITHDRAW_FAILED");
         } else {
-            // @dev transfer(address,address,address,uint256).
-            (bool success, ) = bento.call(abi.encodeWithSelector(0xf18d03cc, token, address(this), to, shares));
+            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.transfer.selector, 
+                token, address(this), to, shares));
             require(success, "TRANSFER_FAILED");
         }
     }
