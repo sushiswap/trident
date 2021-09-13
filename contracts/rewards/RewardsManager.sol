@@ -124,7 +124,7 @@ contract RewardsManager is TridentOwnable {
 
         IRewarder _rewarder = rewarder[address(pool)];
         if (address(_rewarder) != address(0)) {
-            address(_rewarder).call(abi.encodePacked(_rewarder.onSushiReward.selector, address(pool), account, account, _pendingSushi, amount));
+            _rewarder.onSushiReward(address(pool), account, account, _pendingSushi, amount);
         }
 
         emit Harvest(account, address(pool), _pendingSushi);
