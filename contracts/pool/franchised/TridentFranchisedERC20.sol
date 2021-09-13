@@ -4,7 +4,7 @@ pragma solidity >=0.8.0;
 
 import "../../interfaces/IWhiteListManager.sol";
 
-/// @notice Trident franchised pool (level 2) ERC-20 with EIP-2612 extension.
+/// @notice Trident franchised pool ERC-20 with EIP-2612 extension.
 /// @author Adapted from RariCapital, https://github.com/Rari-Capital/solmate/blob/main/src/erc20/ERC20.sol,
 /// License-Identifier: AGPL-3.0-only.
 abstract contract TridentFranchisedERC20 {
@@ -17,7 +17,7 @@ abstract contract TridentFranchisedERC20 {
     
     address public whiteListManager;
     address public operator;
-    bool public immutable level2;
+    bool public level2;
 
     uint256 public totalSupply;
     /// @notice owner -> balance mapping.
@@ -46,7 +46,7 @@ abstract contract TridentFranchisedERC20 {
     }
     
     /// @dev Initializes whitelist settings from pool.
-    function initialize(address _whiteListManager, address _operator, address _level2) internal {
+    function initialize(address _whiteListManager, address _operator, bool _level2) internal {
         whiteListManager = _whiteListManager;
         operator = _operator;
         if (_level2) level2 = true;
