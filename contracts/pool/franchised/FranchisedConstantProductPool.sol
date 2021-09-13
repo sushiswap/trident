@@ -380,7 +380,7 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
         (, bytes memory _whitelisted) = whiteListManager.staticcall(abi.encodeWithSelector(IWhiteListManager.whitelistedAccounts.selector,
             operator, account));
         bool whitelisted = abi.decode(_whitelisted, (bool));
-        require(whitelisted, "NOT_AUTHORIZED");
+        require(whitelisted, "NOT_WHITELISTED");
     }
 
     function getAssets() public view override returns (address[] memory assets) {
