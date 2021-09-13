@@ -6,14 +6,13 @@ import "../../interfaces/IBentoBoxMinimal.sol";
 import "../../interfaces/IMasterDeployer.sol";
 import "../../interfaces/IPool.sol";
 import "../../interfaces/ITridentCallee.sol";
-import "../../interfaces/IWhiteListManager.sol";
 import "../../libraries/TridentMath.sol";
-import "../TridentERC20.sol";
+import "./TridentFranchisedERC20.sol";
 
 /// @notice Trident exchange franchised pool template with constant product formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares.
 ///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
-contract FranchisedConstantProductPool is IPool, TridentERC20 {
+contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Sync(uint256 reserve0, uint256 reserve1);
@@ -42,9 +41,6 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
     uint112 internal reserve1;
     uint32 internal blockTimestampLast;
 
-    address public immutable whiteListManager;
-    address public immutable operator;
-
     bytes32 public constant override poolIdentifier = "Trident:FranchisedCP";
 
     uint256 internal unlocked;
@@ -56,17 +52,19 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
     }
 
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (address _token0, address _token1, uint256 _swapFee, bool _twapSupport, address _whiteListManager, address _operator) = abi.decode(
+        (address _token0, address _token1, uint256 _swapFee, bool _twapSupport, address _whiteListManager, address _operator, bool _level2) = abi.decode(
             _deployData,
-            (address, address, uint256, bool, address, address)
+            (address, address, uint256, bool, address, address, bool)
         );
-
+        
         // @dev Factory ensures that the tokens are sorted.
         require(_token0 != address(0), "ZERO_ADDRESS");
         require(_token0 != _token1, "IDENTICAL_ADDRESSES");
         require(_token0 != address(this), "INVALID_TOKEN");
         require(_token1 != address(this), "INVALID_TOKEN");
         require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
+        
+        TridentFranchisedERC20.initialize(_whiteListManager, _operator, _level2);
 
         (, bytes memory _barFee) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
         (, bytes memory _barFeeTo) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFeeTo.selector));
@@ -83,8 +81,6 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
         barFeeTo = abi.decode(_barFeeTo, (address));
         bento = abi.decode(_bento, (address));
         masterDeployer = _masterDeployer;
-        whiteListManager = _whiteListManager;
-        operator = _operator;
         unlocked = 1;
         if (_twapSupport) blockTimestampLast = 1;
     }
@@ -199,7 +195,7 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
     function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
-        _checkWhiteList(recipient);
+        if (level2) _checkWhiteList(recipient);
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 amountIn;
@@ -229,7 +225,7 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
             data,
             (address, address, bool, uint256, bytes)
         );
-        _checkWhiteList(recipient);
+        if (level2) _checkWhiteList(recipient);
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         unchecked {
             if (tokenIn == token0) {
@@ -347,10 +343,12 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
         bool unwrapBento
     ) internal {
         if (unwrapBento) {
-            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.withdraw.selector, token, address(this), to, 0, shares));
+            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.withdraw.selector, 
+                token, address(this), to, 0, shares));
             require(success, "WITHDRAW_FAILED");
         } else {
-            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.transfer.selector, token, address(this), to, shares));
+            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.transfer.selector, 
+                token, address(this), to, shares));
             require(success, "TRANSFER_FAILED");
         }
     }
@@ -370,13 +368,6 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
             uint256 amount0Optimal = (_amount1 * _reserve0) / _reserve1;
             token0Fee = (swapFee * (_amount0 - amount0Optimal)) / (2 * MAX_FEE);
         }
-    }
-
-    /// @dev Checks `whiteListManager` for pool `operator` and given user `account`.
-    function _checkWhiteList(address account) internal view {
-        (, bytes memory _whitelisted) = whiteListManager.staticcall(abi.encodeWithSelector(IWhiteListManager.whitelistedAccounts.selector, operator, account));
-        bool whitelisted = abi.decode(_whitelisted, (bool));
-        require(whitelisted, "NOT_WHITELISTED");
     }
 
     function getAssets() public view override returns (address[] memory assets) {
