@@ -121,6 +121,9 @@ perl -0777 -i -pe 's/function getAmountOut\(bytes calldata data\) public/functio
 perl -0777 -i -pe 's/uint256 internal constant MAX_FEE = 10000;/uint256 public constant MAX_FEE = 10000;/g' contracts/pool/ConstantProductPool.sol
 perl -0777 -i -pe 's/uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE/uint256 public immutable MAX_FEE_MINUS_SWAP_FEE/g' contracts/pool/ConstantProductPool.sol
 
+# internal -> public unlocked
+perl -0777 -i -pe 's/uint256 internal unlocked/uint256 public unlocked/g' contracts/pool/ConstantProductPool.sol
+
 ##################################################
 #                    HybridPool                  #
 ##################################################
@@ -142,3 +145,6 @@ perl -0777 -i -pe 's/function getAmountOut\(bytes calldata data\) public/functio
 
 # internal -> public fee constants
 perl -0777 -i -pe 's/uint256 internal constant MAX_FEE = 10000;/uint256 public constant MAX_FEE = 10000;/g' contracts/pool/HybridPool.sol
+
+# internal -> public unlocked
+perl -0777 -i -pe 's/uint256 private unlocked/uint256 public unlocked/g' contracts/pool/HybridPool.sol
