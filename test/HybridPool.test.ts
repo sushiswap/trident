@@ -94,7 +94,7 @@ describe("Router", function () {
     // Pool deploy data
     let addresses = [weth.address, usdc.address].sort();
     const deployData = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8", "uint256"],
+      ["address", "address", "uint256", "uint256"],
       [addresses[0], addresses[1], 30, 200000]
     );
 
@@ -111,7 +111,7 @@ describe("Router", function () {
 
     addresses = [dai.address, usdc.address].sort();
     const deployData2 = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8", "uint256"],
+      ["address", "address", "uint256", "uint256"],
       [addresses[0], addresses[1], 30, 200000]
     );
     daiUsdcPool = await Pool.attach(
