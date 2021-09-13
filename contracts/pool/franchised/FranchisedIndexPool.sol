@@ -9,7 +9,7 @@ import "../../interfaces/ITridentCallee.sol";
 import "../../interfaces/IWhiteListManager.sol";
 import "../TridentERC20.sol";
 
-/// @notice Trident exchange franchised pool template with constant mean formula for swapping among an array of ERC-20 tokens.
+/// @notice Trident exchange franchised pool (level 1) template with constant mean formula for swapping among an array of ERC-20 tokens.
 /// @dev The reserves are stored as bento shares.
 ///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
 contract FranchisedIndexPool is IPool, TridentERC20 {
@@ -182,7 +182,6 @@ contract FranchisedIndexPool is IPool, TridentERC20 {
             data,
             (address, address, address, bool, uint256)
         );
-        _checkWhiteList(recipient);
         Record storage inRecord = records[tokenIn];
         Record storage outRecord = records[tokenOut];
 
@@ -209,7 +208,6 @@ contract FranchisedIndexPool is IPool, TridentERC20 {
             uint256 amountIn,
             bytes memory context
         ) = abi.decode(data, (address, address, address, bool, uint256, bytes));
-        _checkWhiteList(recipient);
         Record storage inRecord = records[tokenIn];
         Record storage outRecord = records[tokenOut];
 
