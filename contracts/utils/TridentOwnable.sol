@@ -8,8 +8,8 @@ contract TridentOwnable {
     address public owner;
     address public pendingOwner;
 
-    event TransferOwner(address indexed from, address indexed recipient);
-    event TransferOwnerClaim(address indexed from, address indexed recipient);
+    event TransferOwner(address indexed sender, address indexed recipient);
+    event TransferOwnerClaim(address indexed sender, address indexed recipient);
 
     /// @notice Initialize and grant deployer account (`msg.sender`) `owner` access role.
     constructor() {
