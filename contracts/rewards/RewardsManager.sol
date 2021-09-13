@@ -7,9 +7,8 @@ import "../interfaces/IRewarder.sol";
 import "../interfaces/IMasterChef.sol";
 import "../utils/TridentOwnable.sol";
 
-interface Sushi {
-    function safeTransfer(address, uint256) external returns (bool);
-}
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "../flat/BentoBoxV1Flat.sol";
 
 /// @notice Manages the rewards for various pools without requiring users to stake LP tokens.
 ///         Based on MasterChefV2.
@@ -24,7 +23,7 @@ contract RewardsManager is TridentOwnable {
     }
 
     /// @notice Address of SUSHI contract.
-    Sushi public immutable SUSHI;
+    IERC20 public immutable SUSHI;
 
     /// @dev Total allocation points. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint;
@@ -44,7 +43,7 @@ contract RewardsManager is TridentOwnable {
     event LogUpdatePool(address indexed pid, uint64 lastRewardBlock, uint256 lpSupply, uint256 accSushiPerShare);
     event LogSetPool(address indexed pid, uint256 allocPoint, IRewarder indexed rewarder, bool overwrite);
 
-    constructor(Sushi _SUSHI) {
+    constructor(IERC20 _SUSHI) {
         SUSHI = _SUSHI;
     }
 
@@ -121,7 +120,7 @@ contract RewardsManager is TridentOwnable {
 
         // Interactions
         if (_pendingSushi != 0) {
-            SUSHI.safeTransfer(account, _pendingSushi);
+            SUSHI.transfer(account, _pendingSushi);
         }
 
         IRewarder _rewarder = rewarder[address(pool)];

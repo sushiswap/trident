@@ -12,9 +12,4 @@ contract ERC20Mock is ERC20 {
     ) ERC20(name, symbol) {
         _mint(msg.sender, supply);
     }
-
-    function safeTransfer(address recipient, uint256 amount) external returns (bool) {
-        _transfer(msg.sender, recipient, amount);
-        return true;
-    }
 }
