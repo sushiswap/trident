@@ -4,7 +4,6 @@ pragma solidity >=0.8.0;
 
 import "../interfaces/IPool.sol";
 import "../interfaces/IRewarder.sol";
-import "../interfaces/IMasterChef.sol";
 import "../utils/TridentOwnable.sol";
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
