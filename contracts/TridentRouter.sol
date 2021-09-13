@@ -8,6 +8,8 @@ import "./interfaces/ITridentRouter.sol";
 import "./utils/TridentHelper.sol";
 import "./deployer/MasterDeployer.sol";
 
+//import "hardhat/console.sol";
+
 /// @notice Router contract that helps in swapping across Trident pools.
 contract TridentRouter is ITridentRouter, TridentHelper {
     /// @notice BentoBox token vault.
@@ -144,7 +146,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         // @dev Do all the middle swaps. Input comes from previous pools - output goes to following pools.
         for (uint256 i; i < params.percentagePath.length; i++) {
             uint256 balanceShares = bento.balanceOf(params.percentagePath[i].tokenIn, address(this));
-            uint256 transferShares = (balanceShares * params.percentagePath[i].balancePercentage) / uint256(10)**6;
+            uint256 transferShares = (balanceShares * params.percentagePath[i].balancePercentage) / uint256(10)**8;
             bento.transfer(params.percentagePath[i].tokenIn, address(this), params.percentagePath[i].pool, transferShares);
             require(masterDeployer.pools(params.percentagePath[i].pool), "INVALID_POOL");
             IPool(params.percentagePath[i].pool).swap(params.percentagePath[i].data);
@@ -152,8 +154,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         // @dev Do all the final swaps. Input comes from previous pools - output goes to the user.
         for (uint256 i; i < params.output.length; i++) {
             uint256 balanceShares = bento.balanceOf(params.output[i].token, address(this));
-            uint256 balanceAmount = bento.toAmount(params.output[i].token, balanceShares, false);
-            require(balanceAmount >= params.output[i].minAmount, "TOO_LITTLE_RECEIVED");
+            require(balanceShares >= params.output[i].minAmount, "TOO_LITTLE_RECEIVED");
             if (params.output[i].unwrapBento) {
                 bento.withdraw(params.output[i].token, address(this), params.output[i].to, 0, balanceShares);
             } else {
