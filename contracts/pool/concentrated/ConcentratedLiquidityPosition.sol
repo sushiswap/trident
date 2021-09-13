@@ -58,7 +58,7 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         address recipient,
         bool unwrapBento
     ) external {
-        require(msg.sender == ownerOf[tokenId], "");
+        require(msg.sender == ownerOf[tokenId], "NOT_OWNER");
         Position memory position = positions[tokenId];
         bytes memory burnData = abi.encode(position.lower, position.upper, amount, recipient, unwrapBento);
         position.pool.burn(burnData);
@@ -66,7 +66,7 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
             position.liquidity -= amount;
         } else {
             delete positions[tokenId];
-            _burn(msg.sender, tokenId);
+            _burn(tokenId);
         }
         emit Burn(address(position.pool), msg.sender, tokenId);
     }
@@ -76,7 +76,7 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         address recipient,
         bool unwrapBento
     ) external returns (uint256 token0amount, uint256 token1amount) {
-        require(msg.sender == ownerOf[tokenId], "");
+        require(msg.sender == ownerOf[tokenId], "NOT_OWNER");
         Position storage position = positions[tokenId];
         bytes memory collectData = abi.encode(position.lower, position.upper, recipient, false);
         (uint256 feeGrowthInside0, uint256 feeGrowthInside1) = position.pool.rangeFeeGrowth(position.lower, position.upper);
