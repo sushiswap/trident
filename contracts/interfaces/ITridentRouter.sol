@@ -41,7 +41,7 @@ interface ITridentRouter {
     struct PercentagePath {
         address tokenIn;
         address pool;
-        uint64 balancePercentage; // @dev Multiplied by 10^6.
+        uint64 balancePercentage; // @dev Multiplied by 10^6. 100% = 100_000_000
         bytes data;
     }
 
