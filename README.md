@@ -8,11 +8,12 @@ TRIDENT 🔱 is a newly developed AMM and routing system from [SushiSwap](https:
 
 | Contract                   | Address                                    |
 | -------------------------- | ------------------------------------------ |
-| TridentRouter              | 0x760ef4F484EbF2668001B090291f84A3CDf2f3aa |
-| MasterDeployer             | 0x5ad6211CD3fdE39A9cECB5df6f380b8263d1e277 |
-| ConstantProductPoolFactory | 0x3c9f107Bf4f79674F6bA8F2bd40E3D2a92424d29 |
-| HybridPoolFactory          | 0x042c99C84b00f11A08a07AA9752E083261083A57 |
-| IndexPoolFactory           | 0x510039982C76eA66cDca696e995b5308FE932242 |
+| TridentRouter              | 0x9F48E9b7DF64191e374C1B134fC0B197C7f02CAb |
+| MasterDeployer             | 0xa2A7Aa74cb94f37221FD49F5BA6F3fF876092700 |
+| ConstantProductPoolFactory | 0x5e343eD1586e13d5e34A204667FAb0D81F85a2c2 |
+| HybridPoolFactory          | 0x0FaBb19C1362cbdd83a13D9b53F54934b05fC771 |
+| IndexPoolFactory           | 0x6c27a62230B46BF52084C8110b05FEd34e480489 |
+| WETH-DAI Cpp               | 0x6a658a7B8ed066397342e882987149bA230F9bE9 |
 
 ## Extensibility
 

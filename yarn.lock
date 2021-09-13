@@ -572,6 +572,7 @@
     fastq "^1.6.0"
 
 "@nomiclabs/hardhat-ethers@npm:hardhat-deploy-ethers@0.3.0-beta.10", hardhat-deploy-ethers@^0.3.0-beta.10:
+  name "@nomiclabs/hardhat-ethers"
   version "0.3.0-beta.10"
   resolved "https://registry.yarnpkg.com/hardhat-deploy-ethers/-/hardhat-deploy-ethers-0.3.0-beta.10.tgz#bccfcf635d380bbab3638960f6739fe4d396fc5f"
   integrity sha512-TeyriUshRZ7XVHOjMsDtTozIrdwLf3Bw+oZRYNhXdG/eut5HeDhjUFPfRlG7TI1lSLvkcB5dt7OxOtPYKDOxTg==
@@ -755,10 +756,10 @@
   resolved "https://registry.yarnpkg.com/@sushiswap/prettier-config/-/prettier-config-0.1.0.tgz#4fdddf1ba2590025f78adf6cb54ed016344958a4"
   integrity sha512-QD+xdR0VZbmqwSa1xMMkCh5KGCVQQLqN3VHS7VDh5rB4FtZKbUE8lNgKvtKwp38aG0zIlwZcbA+ASFBnWmbkJQ==
 
-"@sushiswap/sdk@5.0.0-canary.48":
-  version "5.0.0-canary.48"
-  resolved "https://registry.yarnpkg.com/@sushiswap/sdk/-/sdk-5.0.0-canary.48.tgz#ec858b9c2c3c50dd23c800841bcda22b80490d3f"
-  integrity sha512-15lv6znoK3AjdmOvDPwdFjC6vh0agO82KEwRKI5sC5+ZtZ0O1nVsAWthXzi/HpYrDleoRzd3y4Io0BSmXwzjZQ==
+"@sushiswap/sdk@5.0.0-canary.66":
+  version "5.0.0-canary.66"
+  resolved "https://registry.yarnpkg.com/@sushiswap/sdk/-/sdk-5.0.0-canary.66.tgz#e80cfa1205e8f4d31953bbdcccf8b1eb1cfa9311"
+  integrity sha512-/d2NDtBIM7H1fsJnGmWDGmqY5gsGyJ+Pj3c7RJPl+hVsDEz0NYcWzr7Yy991nS+FU56ny4RgKIpmPdmkGdJHwg==
   dependencies:
     big.js "^6.1.0"
     decimal.js-light "^2.5.0"
