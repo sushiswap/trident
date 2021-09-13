@@ -10,7 +10,7 @@ import "../../interfaces/IWhiteListManager.sol";
 import "../../libraries/TridentMath.sol";
 import "../TridentERC20.sol";
 
-/// @notice Trident exchange franchised pool template with constant product formula for swapping between an ERC-20 token pair.
+/// @notice Trident exchange franchised pool (level 1) template with constant product formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares.
 ///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
 contract FranchisedConstantProductPool is IPool, TridentERC20 {
@@ -199,7 +199,6 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
     function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
-        _checkWhiteList(recipient);
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 amountIn;
@@ -229,7 +228,6 @@ contract FranchisedConstantProductPool is IPool, TridentERC20 {
             data,
             (address, address, bool, uint256, bytes)
         );
-        _checkWhiteList(recipient);
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         unchecked {
             if (tokenIn == token0) {
