@@ -25,11 +25,14 @@ methods {
     reserve0() returns (uint128) envfree
     reserve1() returns (uint128) envfree
     otherHarness() returns (address) envfree // for noChangeToOthersBalances
+    tokenInHarness() returns (address) envfree // for callFunction
+    unlocked() returns (uint256) envfree
 
     // HybridPool constants
     MAX_FEE() returns (uint256) envfree
     MAX_FEE_MINUS_SWAP_FEE() returns (uint256) envfree
     barFeeTo() returns (address) envfree
+    swapFee() returns (uint256) envfree
 
     // HybridPool functions
     _balance() returns (uint256 balance0, uint256 balance1) envfree
@@ -43,8 +46,15 @@ methods {
               returns (address) => NONDET // TODO: check with Nurit
 
     // ITridentCallee
-    tridentSwapCallback(bytes) => NONDET // TODO: check with Nurit
-    tridentMintCallback(bytes) => NONDET // TODO: check with Nurit
+    tridentSwapCallback(bytes) => DISPATCHER(true) // TODO: check with Nurit
+    tridentMintCallback(bytes) => DISPATCHER(true) // TODO: check with Nurit
+
+    // Hard math functions
+    // _getAmountOut simplified in the harness
+    _computeLiquidityFromAdjustedBalances(uint256, uint256) => NONDET
+    // not needed since it is only used in _getAmountOut and we already simplified it
+    // _getY(uint256, uint256) => NONDET
+    // _computeLiquidity(uint256, uint256) => NONDET
 
     // bentobox
     bentoBox.balanceOf(address token, address user) returns (uint256) envfree
@@ -58,6 +68,8 @@ methods {
     // MasterDeployer
     barFee() => CONSTANT // TODO: check with Nurit
     migrator() => NONDET // TODO: check with Nurit
+    barFeeTo() => NONDET
+    bento() => NONDET
 
     // IMigrator
     desiredLiquidity() => NONDET // TODO: check with Nurit
@@ -70,11 +82,11 @@ methods {
 ////////////////////////////////////////////////////////////////////////////
 //                               Invariants                               //
 ////////////////////////////////////////////////////////////////////////////
-// REVIEW: This should fail (passing right now)
+// TODO: This should fail (passing right now)
 invariant validityOfTokens()
     token0() != 0 && token1() != 0 && token0() != token1()
 
-// REVIEW: This should fail (passing right now)
+// TODO: This should fail (passing right now)
 invariant tokensNotMirin()
     token0() != currentContract && token1() != currentContract
 
@@ -87,6 +99,7 @@ invariant reserveLessThanEqualToBalance()
 		}
 	}
 
+// Mudit: bidirectional implication
 invariant integrityOfTotalSupply()
     totalSupply() == 0 => (reserve0() == 0 && reserve1() == 0) {
         preserved burnWrapper(address to, bool b) with (env e) {
@@ -107,18 +120,41 @@ invariant integrityOfTotalSupply()
             require tokenIn == token0();
             require amountIn > 0 => getAmountOutWrapper(token0(), amountIn) > 0;
         }
+
+        // preserved flashSwapWrapper(address tokenIn, address recipient, bool unwrapBento, uint256 amountIn, bytes context) with (env e) {
+        //     requireInvariant reserveLessThanEqualToBalance;
+        //     uint256 amountIn2 = reserve0() - bentoBox.balanceOf(token0(), currentContract);
+        //     require tokenIn == token0();
+        //     require amountIn2 > 0 => getAmountOutWrapper(token0(), amountIn2) > 0;
+        // }
     }
     
 ////////////////////////////////////////////////////////////////////////////
 //                                 Rules                                  //
 ////////////////////////////////////////////////////////////////////////////
-// rule sanity(method f) {
-//     env e;
-//     calldataarg args;
-//     f(e, args);
+rule sanity(method f) {
+    env e;
+    calldataarg args;
+    f(e, args);
 
-//     assert(false);
-// }
+    assert(false);
+}
+
+rule pathSanityForToken0(method f) {
+    address token0;
+
+    callFunction(f, token0);
+
+    assert(false);
+}
+
+rule pathSanityForToken1(method f) {
+    address token1;
+
+    callFunction(f, token1);
+
+    assert(false);
+}
 
 // Passing
 rule noChangeToBalancedPoolAssets(method f) filtered { f ->
@@ -204,9 +240,9 @@ rule afterOpBalanceEqualsReserve(method f) {
 rule mintingNotPossibleForBalancedPool() {
     env e;
 
-    // REVIEW: not pssing wih this
+    // TODO: not passing wih this:
     // require totalSupply() > 0 || (reserve0() == 0 && reserve1() == 0);
-    require totalSupply() > 0; // REVIEW: failing without this
+    require totalSupply() > 0; // TODO: failing without this
 
     validState(true);
 
@@ -330,8 +366,6 @@ rule noChangeToOthersBalances(method f) {
     require other != bentoBox;
     require other != barFeeTo();
 
-    require otherHarness() == other; 
-
     // recording other's mirin balance
     uint256 _otherMirinBalance = balanceOf(other);
 
@@ -354,10 +388,10 @@ rule noChangeToOthersBalances(method f) {
         burnSingleWrapper(e, tokenOut, to, unwrapBento);
     } else if (f.selector == swapWrapper(address, address, bool).selector) {
         swapWrapper(e, tokenIn, recipient, unwrapBento);
-    }  else if (f.selector == flashSwapWrapper(address, address, bool, uint256, bytes).selector ||
-                f.selector == flashSwapWithConditions(address, address, bool, uint256, bytes).selector) {
+    }  else if (f.selector == flashSwapWrapper(address, address, bool, uint256, bytes).selector) {
+        require otherHarness() == other;
         calldataarg args;
-        flashSwapWithConditions(e, args);
+        flashSwapWrapper(e, args);
     } else if (f.selector == transfer(address, uint256).selector) {
         uint256 amount;
         transfer(e, recipient, amount);
@@ -395,7 +429,7 @@ rule burnTokenAdditivity() {
 
     validState(true);
     // require to != currentContract;
-    // REVIEW: require balanceOf(e, currentContract) == 0; (Needed ?)
+    // TODO: require balanceOf(e, currentContract) == 0; (Needed ?)
 
     // need to replicate the exact state later on
     storage initState = lastStorage;
@@ -440,7 +474,7 @@ rule sameUnderlyingRatioLiquidity(method f) filtered { f ->
     // setting the environment constraints
     require e1.block.timestamp < e2.block.timestamp && 
             e2.block.timestamp < e3.block.timestamp;
-    // REVIEW: swap is done by someother person (maybe incorrect)
+    // TODO: swap is done by someother person (safe asumption??)
     require e1.msg.sender == e3.msg.sender && e2.msg.sender != e1.msg.sender;
 
     validState(true);
@@ -461,7 +495,7 @@ rule sameUnderlyingRatioLiquidity(method f) filtered { f ->
     }
 
     calldataarg args;
-    f(e2, args); // TODO: run with all swaps
+    f(e2, args);
 
     uint256 liquidity0_;
     uint256 liquidity1_;
@@ -476,8 +510,7 @@ rule sameUnderlyingRatioLiquidity(method f) filtered { f ->
         liquidity1_ = 0;
     }
     
-    // since swap is taking place, liquidities should be strictly greater
-    // TODO: && totalSupply() != 0 not working, counter example when liquidities are 0
+    // TODO: since swap is taking place, liquidities should be strictly greater??
     assert((reserve0() / reserve1() == 2) => (_liquidity0 <= liquidity0_ &&
            _liquidity1 <= liquidity1_), "with time liquidities decreased");
 }
@@ -518,14 +551,14 @@ rule sameUnderlyingRatioLiquidity(method f) filtered { f ->
 //     assert(singleAmountOut >= multiAmountOut1 + multiAmountOut2, "multiple swaps better than one single swap");
 // }
 
-// Mudit: singleAmountOut == multiAmountOut1 + multiAmountOut2
+// TODO: rename the rule to be equal since swapFee is zero
 rule multiLessThanSingleAmountOut() {
     env e;
     uint256 amountInX;
     uint256 amountInY;
     bool token0In;
 
-    require 0 < MAX_FEE_MINUS_SWAP_FEE() && MAX_FEE_MINUS_SWAP_FEE() <= MAX_FEE();
+    require swapFee() == 0;
     
     uint256 multiAmountOut1 = _getAmountOut(e, amountInX, reserve0(), reserve1(), token0In);
     require reserve0() + amountInX <= max_uint256;
@@ -536,9 +569,54 @@ rule multiLessThanSingleAmountOut() {
 
     uint256 singleAmountOut = _getAmountOut(e, amountInX + amountInY, reserve0(), reserve1(), token0In);
 
-    // TODO: Mudit wanted strictly greater
-    assert(singleAmountOut >= multiAmountOut1 + multiAmountOut2, "multiple swaps better than one single swap");
+    assert(singleAmountOut == multiAmountOut1 + multiAmountOut2, "multiple swaps not equal to one single swap");
 }
+
+// Before: reserve0(), reserve1()
+// After: reserve0() + amountInX, reserve1() - multiAmountOut1
+// filtered { f -> f.selector == swapWrapper(address, address, bool).selector
+//                 f.selector == flashSwapWrapper(address, address, bool, uint256, bytes).selector }
+rule increasingConstantProductCurve() {
+    env e;
+    uint256 amountIn;
+    bool token0In;
+
+    require 0 <= MAX_FEE_MINUS_SWAP_FEE() && MAX_FEE_MINUS_SWAP_FEE() <= MAX_FEE();
+
+    uint256 _reserve0 = reserve0();
+    uint256 _reserve1 = reserve1();
+
+    // tokenIn is token0
+    uint256 amountOut = _getAmountOut(e, amountIn, _reserve0, _reserve1, token0In);
+
+    require _reserve0 + amountIn <= max_uint256;
+
+    uint256 reserve0_ = _reserve0 + amountIn;
+    uint256 reserve1_ = _reserve1 - amountOut;
+
+    assert(_reserve0 * _reserve1 <= reserve0_ * reserve1_);
+}
+
+// rule increasingConstantProductCurve(uint256 reserve0_, uint256 reserve1_) {
+//     env e;
+//     address tokenIn;
+//     address recipient;
+//     bool unwrapBento;
+
+//     require tokenIn == token0();
+
+//     validState(false);
+
+//     uint256 _reserve0 = reserve0();
+//     uint256 _reserve1 = reserve1();
+
+//     swapWrapper(e, tokenIn, recipient, unwrapBento);
+
+//     require reserve0_ == reserve0();
+//     require reserve1_ == reserve1();
+
+//     assert(_reserve0 * _reserve1 <= reserve0_ * reserve1_);
+// }
 
 // Timing out, even with require reserve0() == reserve1();
 // rule additivityOfMint() {
@@ -626,35 +704,39 @@ rule multiLessThanSingleAmountOut() {
 //     assert(userMirinBalanceOptimal >= userMirinBalanceNonOptimal);
 // }
 
-// Failing, expected (Sushi needs to fix)
 rule zeroCharacteristicsOfGetAmountOut(uint256 _reserve0, uint256 _reserve1) {
     env e;
     uint256 amountIn;
     address tokenIn;
+    address tokenOut;
 
     validState(false);
 
     // assume token0 to token1
-    require tokenIn == token0(); 
+    require tokenIn == token0() || tokenIn == token1(); 
+
     require _reserve0 == reserve0();
-    require _reserve0 == reserve1();
-    require _reserve0 * _reserve1 >= 1000;
-    require MAX_FEE_MINUS_SWAP_FEE() <= MAX_FEE();
+    require _reserve1 == reserve1();
+
+    require 0 <= MAX_FEE_MINUS_SWAP_FEE() && MAX_FEE_MINUS_SWAP_FEE() <= MAX_FEE();
+
+    uint256 amountInWithFee = amountIn * MAX_FEE_MINUS_SWAP_FEE();
 
     uint256 amountOut = getAmountOutWrapper(tokenIn, amountIn);
 
     if (amountIn == 0) {
         assert(amountOut == 0, "amountIn is 0, but amountOut is not 0");
-    } else { 
-        if (tokenIn == token0() && reserve1() == 0) { // Mudit: if either of the reserves is 0 then getAmountOut should revert
-            assert(amountOut == 0, "token1 has no reserves, but amountOut is non-zero");
-        } else { // Mudit: if (amountIn > ratio of the reserves)
-            assert(amountOut > 0);
-        }
+    } else if (tokenIn == token0() && reserve1() == 0) {
+        assert(amountOut == 0, "token1 has no reserves, but amountOut is non-zero");
+    } else if (tokenIn == token1() && reserve0() == 0) {
+        assert(amountOut == 0, "token0 has no reserves, but amountOut is non-zero");
+    } else if (tokenIn == token0() && amountInWithFee * _reserve1 < (_reserve0 * MAX_FEE()) + amountInWithFee) { // TODO: review
+        assert(amountOut == 0, "numerator > denominator");
+    } else if (tokenIn == token1() && amountInWithFee * _reserve0 < (_reserve1 * MAX_FEE()) + amountInWithFee) { // TODO: review
+        assert(amountOut == 0, "numerator > denominator");
+    } else {
+        assert(amountOut > 0, "amountOut not greater than zero");
     }
-    /* else if (tokenIn == token1() && reserve0() == 0) {
-            assert(amountOut == 0, "token0 has no reserves, but amountOut is non-zero");
-        } */ 
 }
 
 // Passing
@@ -681,7 +763,7 @@ rule maxAmountOut(uint256 _reserve0, uint256 _reserve1) {
     assert amountOut < _reserve1; 
 }
 
-// Passing (need to review)
+// Passing
 rule nonZeroMint() {
     env e;
     address to;
@@ -696,6 +778,51 @@ rule nonZeroMint() {
     assert liquidity > 0;
 }
 
+// rule constantFormulaIsCorrect() {
+    // value returned by getAmountOut matches the value using the ConstantProductFormula
+    // for the same input.
+// }
+
+// 2. prove that you can't not call back the ConstantProductPool
+//      TODO: Assume unlock is true (means 2???), call any ConstantProductPool function with revert, and assert lastReverted
+// want f to only be public functions
+rule reentrancy(method f) {
+    require unlocked() == 2;
+
+    env e;
+    calldataarg args;
+    f@withrevert(e, args);
+
+    assert(lastReverted, "reentrancy possible");
+
+}
+
+// If the bentoBox balance of one token decreases then the 
+// other token’s BentoBox increases or the totalSupply decreases
+// (strictly increase and strictly decrease)
+rule integrityOfBentoBoxTokenBalances(method f) {
+    validState(false);
+
+    uint256 _token0Balance = bentoBox.balanceOf(token0(), currentContract);
+    uint256 _token1Balance = bentoBox.balanceOf(token1(), currentContract);
+    uint256 _totalSupply = totalSupply();
+
+    env e;
+    calldataarg args;
+    f(e, args);
+
+    uint256 token0Balance_ = bentoBox.balanceOf(token0(), currentContract);
+    uint256 token1Balance_ = bentoBox.balanceOf(token1(), currentContract);
+    uint256 totalSupply_ = totalSupply();
+
+    assert((token0Balance_ - _token0Balance < 0) => 
+           ((token1Balance_ - _token1Balance > 0) || (totalSupply_ - _totalSupply < 0)),
+           "token0's balance decreased; conditions not met");
+    assert((token1Balance_ - _token1Balance < 0) => 
+           ((token0Balance_ - _token0Balance > 0) || (totalSupply_ - _totalSupply < 0)),
+           "token1's balance decreased; conditions not met");
+}
+
 ////////////////////////////////////////////////////////////////////////////
 //                             Helper Methods                             //
 ////////////////////////////////////////////////////////////////////////////
@@ -708,5 +835,35 @@ function validState(bool isBalanced) {
                 reserve1() == bentoBox.balanceOf(token1(), currentContract);
     } else {
         requireInvariant reserveLessThanEqualToBalance();
+    }
+}
+
+// designed for sanity of the tokens
+// WARNING: be careful when using, especially with the parameter constraints
+function callFunction(method f, address token) {
+    env e;
+    address to;
+    address recipient;
+    bool unwrapBento;
+
+    if (f.selector == burnSingleWrapper(address, address, bool).selector) {
+        // tokenOut, to, unwrapBento
+        burnSingleWrapper(e, token, to, unwrapBento);
+    } else if (f.selector == swapWrapper(address, address, bool).selector) {
+        // tokenIn, recipient, unwrapBento
+        swapWrapper(e, token, recipient, unwrapBento);
+    } else if (f.selector == flashSwapWrapper(address, address, bool,
+                              uint256, bytes).selector) {
+        // tokenIn, recipient, unwrapBento, amountIn, context
+        calldataarg args;
+        require token == tokenInHarness();
+        flashSwapWrapper(e, args);
+    } else if (f.selector == getAmountOutWrapper(address, uint256).selector) {
+        // tokenIn, amountIn
+        uint256 amountIn;
+        getAmountOutWrapper(token, amountIn);
+    } else {
+        calldataarg args;
+        f(e, args);
     }
 }
