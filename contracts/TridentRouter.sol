@@ -8,6 +8,8 @@ import "./interfaces/ITridentRouter.sol";
 import "./utils/TridentHelper.sol";
 import "./deployer/MasterDeployer.sol";
 
+//import "hardhat/console.sol";
+
 /// @notice Router contract that helps in swapping across Trident pools.
 contract TridentRouter is ITridentRouter, TridentHelper {
     /// @notice BentoBox token vault.
@@ -88,6 +90,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         }
         // @dev Resets the `cachedPool` to get a refund.
         // `1` is used as the default value to avoid the storage slot being released.
+        cachedMsgSender = address(1);
         cachedPool = address(1);
         require(amountOut >= amountOutMinimum, "TOO_LITTLE_RECEIVED");
     }
@@ -145,7 +148,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         // @dev Do all the middle swaps. Input comes from previous pools - output goes to following pools.
         for (uint256 i; i < params.percentagePath.length; i++) {
             uint256 balanceShares = bento.balanceOf(params.percentagePath[i].tokenIn, address(this));
-            uint256 transferShares = (balanceShares * params.percentagePath[i].balancePercentage) / uint256(10)**6;
+            uint256 transferShares = (balanceShares * params.percentagePath[i].balancePercentage) / uint256(10)**8;
             bento.transfer(params.percentagePath[i].tokenIn, address(this), params.percentagePath[i].pool, transferShares);
             isWhiteListed(params.percentagePath[i].pool);
             IPool(params.percentagePath[i].pool).swap(params.percentagePath[i].data);
@@ -153,8 +156,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         // @dev Do all the final swaps. Input comes from previous pools - output goes to the user.
         for (uint256 i; i < params.output.length; i++) {
             uint256 balanceShares = bento.balanceOf(params.output[i].token, address(this));
-            uint256 balanceAmount = bento.toAmount(params.output[i].token, balanceShares, false);
-            require(balanceAmount >= params.output[i].minAmount, "TOO_LITTLE_RECEIVED");
+            require(balanceShares >= params.output[i].minAmount, "TOO_LITTLE_RECEIVED");
             if (params.output[i].unwrapBento) {
                 bento.withdraw(params.output[i].token, address(this), params.output[i].to, 0, balanceShares);
             } else {
@@ -189,13 +191,19 @@ contract TridentRouter is ITridentRouter, TridentHelper {
 
     /// @notice Add liquidity to a pool using callbacks - same as `addLiquidity`, but now with callbacks.
     /// @dev The input tokens are sent to the pool during the callback.
-    function addLiquidityLazy(address pool, bytes calldata data) public payable {
+    function addLiquidityLazy(
+        address pool,
+        uint256 minLiquidity,
+        bytes calldata data
+    ) public payable returns (uint256 liquidity) {
         isWhiteListed(pool);
         cachedMsgSender = msg.sender;
         cachedPool = pool;
         // @dev The pool must ensure that there's not too much slippage.
-        IPool(pool).mint(data);
+        liquidity = IPool(pool).mint(data);
+        cachedMsgSender = address(1);
         cachedPool = address(1);
+        require(liquidity >= minLiquidity, "NOT_ENOUGH_LIQUIDITY_MINTED");
     }
 
     /// @notice Burn liquidity tokens to get back `bento` tokens.
@@ -345,7 +353,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
     function isWhiteListed(address pool) internal {
         if (!whitelistedPools[pool]) {
             require(masterDeployer.pools(pool), "INVALID POOL");
-            whitelistedPools[pool] = masterDeployer.pools(pool);
+            whitelistedPools[pool] = true;
         }
     }
 }
