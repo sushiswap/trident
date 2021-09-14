@@ -21,7 +21,7 @@ jobs:
         destination_repo: 'sushiswap/trident-dev-deployments'
         destination_folder: 'artifacts'
         user_email: 'gasper@sushi.com'
-        user_name: 'gasperbr'
+        user_name: 'sushiswap'
     - name: Pushes deployments folder
       uses: crykn/copy_folder_to_another_repo_action@v1.0.6
       env:
@@ -31,4 +31,4 @@ jobs:
         destination_repo: 'sushiswap/trident-dev-deployments'
         destination_folder: 'deployments'
         user_email: 'gasper@sushi.com'
-        user_name: 'gasperbr'
+        user_name: 'sushiswap'
