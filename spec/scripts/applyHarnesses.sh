@@ -64,11 +64,19 @@ perl -0777 -i -pe 's/address public immutable barFeeTo;/address public immutable
 # perl -0777 -i -pe 's/contract ConstantProductPool is IPool, TridentERC20/contract ConstantProductPool is IPool, TridentERC20, Simplifications/g' contracts/pool/ConstantProductPool.sol
 perl -0777 -i -pe 's/TridentMath.sqrt\(/simplified.sqrt\(/g' contracts/pool/ConstantProductPool.sol
 
+# removing the "immutable" keyword since it is not supported for constructors at the moment
+perl -0777 -i -pe 's/address public immutable token0;/address public token0;/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/address public immutable token1;/address public token1;/g' contracts/pool/ConstantProductPool.sol
+
 # BentoBox and MasterDeployer object
 ## address -> IBentoBoxMinimal
 ## address -> MasterDeployer
 perl -0777 -i -pe 's/address public immutable bento;/IBentoBoxMinimal public immutable bento;/g' contracts/pool/ConstantProductPool.sol
 perl -0777 -i -pe 's/address public immutable masterDeployer;/MasterDeployer public immutable masterDeployer;/g' contracts/pool/ConstantProductPool.sol
+
+# adding a require that token1 != address(0) in the constructor. This is a safe
+# assumption because the ConstantProductPoolFactory makes sure that token1 != address(0)
+perl -0777 -i -pe 's/require\(_token0 != address\(0\), \"ZERO_ADDRESS\"\);/require\(_token0 != address\(0\), \"ZERO_ADDRESS\"\);\n        require\(_token1 != address\(0\), \"ZERO_ADDRESS\"\);/g' contracts/pool/ConstantProductPool.sol
 
 ## commenting out staticcalls in constructor
 perl -0777 -i -pe 's/\(, bytes memory _barFee\)/\/\/ \(, bytes memory _barFee\)/g' contracts/pool/ConstantProductPool.sol # also used to comment out in updateBarFee

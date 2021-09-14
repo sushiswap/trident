@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract HybridPoolHarness is HybridPool {
     // state variables ///////////
     uint256 public MAX_FEE_MINUS_SWAP_FEE;
-    // mapping(uint256 => mapping(uint256 => mapping(uint256 => uint256))) public amountOutHarness;
+    mapping(uint256 => mapping(uint256 => mapping(uint256 => mapping(bool => uint256)))) public amountOutHarness;
     address public otherHarness;
     address public tokenInHarness;
 
@@ -107,4 +107,14 @@ contract HybridPoolHarness is HybridPool {
 
     //     return amountOutHarness[amountIn][reserveIn][reserveOut];
     // }
+
+    function _getAmountOut(
+        uint256 amountIn,
+        uint256 _reserve0,
+        uint256 _reserve1,
+        bool token0In
+    ) public view override returns (uint256) {
+        // TODO: add assumptions as per the properties of _getAmountOut
+        return amountOutHarness[amountIn][_reserve0][_reserve1][token0In];
+    }
 }

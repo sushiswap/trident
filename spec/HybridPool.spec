@@ -49,6 +49,13 @@ methods {
     tridentSwapCallback(bytes) => DISPATCHER(true) // TODO: check with Nurit
     tridentMintCallback(bytes) => DISPATCHER(true) // TODO: check with Nurit
 
+    // Hard math functions
+    // _getAmountOut simplified in the harness
+    _computeLiquidityFromAdjustedBalances(uint256, uint256) => NONDET
+    // not needed since it is only used in _getAmountOut and we already simplified it
+    // _getY(uint256, uint256) => NONDET
+    // _computeLiquidity(uint256, uint256) => NONDET
+
     // bentobox
     bentoBox.balanceOf(address token, address user) returns (uint256) envfree
     bentoBox.transfer(address token, address from, address to, uint256 share)
@@ -125,13 +132,13 @@ invariant integrityOfTotalSupply()
 ////////////////////////////////////////////////////////////////////////////
 //                                 Rules                                  //
 ////////////////////////////////////////////////////////////////////////////
-// rule sanity(method f) {
-//     env e;
-//     calldataarg args;
-//     f(e, args);
+rule sanity(method f) {
+    env e;
+    calldataarg args;
+    f(e, args);
 
-//     assert(false);
-// }
+    assert(false);
+}
 
 rule pathSanityForToken0(method f) {
     address token0;

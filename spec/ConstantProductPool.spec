@@ -79,6 +79,9 @@ methods {
 //                               Invariants                               //
 ////////////////////////////////////////////////////////////////////////////
 // TODO: This should fail (passing right now)
+// A harnessed require is added to the constructor of ConstantProductPool
+// to make this rule pass. It is a safe assumption since ConstantProductPoolFactory
+// makes sure that token1 != address(0)
 invariant validityOfTokens()
     token0() != 0 && token1() != 0 && token0() != token1()
 
@@ -128,13 +131,13 @@ invariant integrityOfTotalSupply()
 ////////////////////////////////////////////////////////////////////////////
 //                                 Rules                                  //
 ////////////////////////////////////////////////////////////////////////////
-// rule sanity(method f) {
-//     env e;
-//     calldataarg args;
-//     f(e, args);
+rule sanity(method f) {
+    env e;
+    calldataarg args;
+    f(e, args);
 
-//     assert(false);
-// }
+    assert(false);
+}
 
 rule pathSanityForToken0(method f) {
     address token0;
@@ -798,6 +801,13 @@ rule reentrancy(method f) {
 rule integrityOfBentoBoxTokenBalances(method f) {
     validState(false);
 
+    // TODO: trying out various things
+    require totalSupply() == 0 <=> (reserve0() == 0 && reserve1() == 0);
+    
+    // if (totalSupply() > 0) {
+    //     require reserve0() > 0 && reserve1() > 0;
+    // }
+
     uint256 _token0Balance = bentoBox.balanceOf(token0(), currentContract);
     uint256 _token1Balance = bentoBox.balanceOf(token1(), currentContract);
     uint256 _totalSupply = totalSupply();
@@ -810,9 +820,13 @@ rule integrityOfBentoBoxTokenBalances(method f) {
     uint256 token1Balance_ = bentoBox.balanceOf(token1(), currentContract);
     uint256 totalSupply_ = totalSupply();
 
+    // if token0's balance decreases, token1's balance should increase or 
+    // totalSupply (Mirin) should decrease
     assert((token0Balance_ - _token0Balance < 0) => 
            ((token1Balance_ - _token1Balance > 0) || (totalSupply_ - _totalSupply < 0)),
            "token0's balance decreased; conditions not met");
+    // if token1's balance decreases, token0's balance should increase or 
+    // totalSupply (Mirin) should decrease
     assert((token1Balance_ - _token1Balance < 0) => 
            ((token0Balance_ - _token0Balance > 0) || (totalSupply_ - _totalSupply < 0)),
            "token1's balance decreased; conditions not met");
