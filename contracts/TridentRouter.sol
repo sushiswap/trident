@@ -7,6 +7,7 @@ import "./interfaces/IPool.sol";
 import "./interfaces/ITridentRouter.sol";
 import "./utils/TridentHelper.sol";
 import "./deployer/MasterDeployer.sol";
+
 //import "hardhat/console.sol";
 
 /// @notice Router contract that helps in swapping across Trident pools.
@@ -19,6 +20,8 @@ contract TridentRouter is ITridentRouter, TridentHelper {
     /// These are set when someone calls a flash swap and reset afterwards.
     address internal cachedMsgSender;
     address internal cachedPool;
+
+    mapping(address => bool) internal whitelistedPools;
 
     constructor(
         IBentoBoxMinimal _bento,
@@ -61,7 +64,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         // a batch call should be made to `unwrapWETH`.
         for (uint256 i; i < params.path.length; i++) {
             // We don't necessarily need this check but saving users from themseleves.
-            require(masterDeployer.pools(params.path[i].pool), "INVALID_POOL");
+            isWhiteListed(params.path[i].pool);
             amountOut = IPool(params.path[i].pool).swap(params.path[i].data);
         }
         // @dev Ensure that the slippage wasn't too much. This assumes that the pool is honest.
@@ -78,7 +81,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         // Pool `N` should transfer its output tokens to pool `N+1` directly.
         // The last pool should transfer its output tokens to the user.
         for (uint256 i; i < path.length; i++) {
-            require(masterDeployer.pools(path[i].pool), "INVALID_POOL");
+            isWhiteListed(path[i].pool);
             // @dev The cached `msg.sender` is used as the funder when the callback happens.
             cachedMsgSender = msg.sender;
             // @dev The cached pool must be the address that calls the callback.
@@ -118,7 +121,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         // Pool `N` should transfer its output tokens to pool `N+1` directly.
         // The last pool should transfer its output tokens to the user.
         for (uint256 i; i < params.path.length; i++) {
-            require(masterDeployer.pools(params.path[i].pool), "INVALID_POOL");
+            isWhiteListed(params.path[i].pool);
             amountOut = IPool(params.path[i].pool).swap(params.path[i].data);
         }
         // @dev Ensure that the slippage wasn't too much. This assumes that the pool is honest.
@@ -139,7 +142,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
             } else {
                 bento.transfer(params.initialPath[i].tokenIn, msg.sender, params.initialPath[i].pool, params.initialPath[i].amount);
             }
-            require(masterDeployer.pools(params.initialPath[i].pool), "INVALID_POOL");
+            isWhiteListed(params.initialPath[i].pool);
             IPool(params.initialPath[i].pool).swap(params.initialPath[i].data);
         }
         // @dev Do all the middle swaps. Input comes from previous pools - output goes to following pools.
@@ -147,7 +150,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
             uint256 balanceShares = bento.balanceOf(params.percentagePath[i].tokenIn, address(this));
             uint256 transferShares = (balanceShares * params.percentagePath[i].balancePercentage) / uint256(10)**8;
             bento.transfer(params.percentagePath[i].tokenIn, address(this), params.percentagePath[i].pool, transferShares);
-            require(masterDeployer.pools(params.percentagePath[i].pool), "INVALID_POOL");
+            isWhiteListed(params.percentagePath[i].pool);
             IPool(params.percentagePath[i].pool).swap(params.percentagePath[i].data);
         }
         // @dev Do all the final swaps. Input comes from previous pools - output goes to the user.
@@ -173,7 +176,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         uint256 minLiquidity,
         bytes calldata data
     ) public payable returns (uint256 liquidity) {
-        require(masterDeployer.pools(pool), "INVALID_POOL");
+        isWhiteListed(pool);
         // @dev Send all input tokens to the pool.
         for (uint256 i; i < tokenInput.length; i++) {
             if (tokenInput[i].native) {
@@ -193,7 +196,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         uint256 minLiquidity,
         bytes calldata data
     ) public payable returns (uint256 liquidity) {
-        require(masterDeployer.pools(pool), "INVALID_POOL");
+        isWhiteListed(pool);
         cachedMsgSender = msg.sender;
         cachedPool = pool;
         // @dev The pool must ensure that there's not too much slippage.
@@ -214,7 +217,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         bytes calldata data,
         IPool.TokenAmount[] memory minWithdrawals
     ) public {
-        require(masterDeployer.pools(pool), "INVALID_POOL");
+        isWhiteListed(pool);
         safeTransferFrom(pool, msg.sender, pool, liquidity);
         IPool.TokenAmount[] memory withdrawnLiquidity = IPool(pool).burn(data);
         for (uint256 i; i < minWithdrawals.length; i++) {
@@ -242,7 +245,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         bytes calldata data,
         uint256 minWithdrawal
     ) public {
-        require(masterDeployer.pools(pool), "INVALID_POOL");
+        isWhiteListed(pool);
         // @dev Use 'liquidity = 0' for prefunding.
         safeTransferFrom(pool, msg.sender, pool, liquidity);
         uint256 withdrawn = IPool(pool).burnSingle(data);
@@ -345,5 +348,12 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         }
         // @dev Deposit ERC-20 token into `recipient` `bento` account.
         bento.deposit(token, sender, recipient, 0, amount);
+    }
+
+    function isWhiteListed(address pool) internal {
+        if (!whitelistedPools[pool]) {
+            require(masterDeployer.pools(pool), "INVALID POOL");
+            whitelistedPools[pool] = true;
+        }
     }
 }
