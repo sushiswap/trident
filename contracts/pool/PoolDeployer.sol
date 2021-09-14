@@ -10,6 +10,11 @@ abstract contract PoolDeployer {
     mapping(address => mapping(address => address[])) public pools;
     mapping(bytes32 => address) public configAddress;
 
+    modifier onlyMaster() {
+        require(msg.sender == masterDeployer, "UNAUTHORIZED_DEPLOYER");
+        _;
+    }
+
     constructor(address _masterDeployer) {
         require(_masterDeployer != address(0), "ZERO_ADDRESS");
         masterDeployer = _masterDeployer;
@@ -19,7 +24,7 @@ abstract contract PoolDeployer {
         address pool,
         address[] memory tokens,
         bytes32 salt
-    ) internal {
+    ) internal onlyMaster {
         require(configAddress[salt] == address(0), "POOL_ALREADY_DEPLOYED");
         // @dev Store the address of the deployed contract.
         configAddress[salt] = pool;

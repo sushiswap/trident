@@ -108,16 +108,12 @@ abstract contract TridentERC20 {
         bytes32 s
     ) external {
         require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
-        // @dev This is reasonably safe from overflow - incrementing
-        // beyond 'type(uint256).max' via approvals is exceedingly unlikely.
-        unchecked {
-            bytes32 digest = keccak256(
-                abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, amount, nonces[owner]++, deadline)))
-            );
-            address recoveredAddress = ecrecover(digest, v, r, s);
-            require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_PERMIT_SIGNATURE");
-            allowance[recoveredAddress][spender] = amount;
-        }
+        bytes32 digest = keccak256(
+            abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, amount, nonces[owner]++, deadline)))
+        );
+        address recoveredAddress = ecrecover(digest, v, r, s);
+        require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_PERMIT_SIGNATURE");
+        allowance[recoveredAddress][spender] = amount;
         emit Approval(owner, spender, amount);
     }
 
