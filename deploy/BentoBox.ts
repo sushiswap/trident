@@ -36,7 +36,7 @@ deployFunction.skip = ({ getChainId }) =>
     try {
       const chainId = await getChainId();
       console.log("CHAINID", chainId);
-      resolve(chainId !== "31337");
+      resolve(chainId !== "31337" && chainId !== "42");
     } catch (error) {
       reject(error);
     }

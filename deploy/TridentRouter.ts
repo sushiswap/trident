@@ -19,7 +19,7 @@ const deployFunction: DeployFunction = async function ({
   let bentoBoxV1Address;
   let wethAddress;
 
-  if (chainId === 31337) {
+  if (chainId === 31337 || chainId === 42) {
     bentoBoxV1Address = (await ethers.getContract("BentoBoxV1")).address;
     wethAddress = (await ethers.getContract("WETH9")).address;
   } else {
@@ -31,6 +31,7 @@ const deployFunction: DeployFunction = async function ({
     bentoBoxV1Address = BENTOBOX_ADDRESS[chainId as ChainId];
     wethAddress = WNATIVE[chainId as ChainId].address;
   }
+  console.log(wethAddress);
 
   const masterDeployer = await ethers.getContract("MasterDeployer");
 
