@@ -74,12 +74,11 @@ abstract contract TridentERC20 {
         address recipient,
         uint256 amount
     ) external returns (bool) {
+        _beforeTokenTransfer(sender, recipient, amount);
         if (allowance[sender][msg.sender] != type(uint256).max) {
             allowance[sender][msg.sender] -= amount;
         }
         balanceOf[sender] -= amount;
-
-        _beforeTokenTransfer(sender, recipient, amount);
 
         // @dev This is safe from overflow - the sum of all user
         // balances can't exceed 'type(uint256).max'.
