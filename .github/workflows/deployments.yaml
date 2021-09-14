@@ -1,0 +1,34 @@
+# script to save deployment artifacts to temporary repository
+# this can be removed after Trident is deployed
+
+name: Push File
+
+on: push
+
+jobs:
+  copy-file:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Pushes test folder
+      uses: crykn/copy_folder_to_another_repo_action@v1.0.6
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source_folder: 'artifacts'
+        destination_repo: 'gasperbr/actions-output'
+        destination_folder: 'artifacts'
+        user_email: 'gasper@sushi.com'
+        user_name: 'gasperbr'
+    - name: Pushes deployments folder
+      uses: crykn/copy_folder_to_another_repo_action@v1.0.6
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      with:
+        source_folder: 'deployments'
+        destination_repo: 'gasperbr/actions-output'
+        destination_folder: 'deployments'
+        user_email: 'gasper@sushi.com'
+        user_name: 'gasperbr'
