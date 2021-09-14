@@ -73,8 +73,8 @@ describe("MasterDeployer", function () {
   describe("#deployPool", async function () {
     it("Reverts on non-whitelisted factory", async function () {
       const deployData = defaultAbiCoder.encode(
-        ["address", "address", "uint256"],
-        [...[this.weth.address, this.sushi.address].sort(), 30]
+        ["address", "address", "uint256", "bool"],
+        [...[this.weth.address, this.sushi.address].sort(), 30, true]
       );
 
       await expect(
@@ -99,6 +99,17 @@ describe("MasterDeployer", function () {
         this.constantProductPoolFactory.address,
         deployData
       );
+    });
+
+    it("Reverts on direct deployment via factory", async function () {
+      const deployData = defaultAbiCoder.encode(
+        ["address", "address", "uint256", "bool"],
+        [...[this.weth.address, this.sushi.address].sort(), 30, true]
+      );
+
+      await expect(
+        this.constantProductPoolFactory.deployPool(deployData)
+      ).to.be.revertedWith("UNAUTHORIZED_DEPLOYER");
     });
 
     // TODO: Fix this
