@@ -6,7 +6,7 @@ name: Push File
 on: push
 
 jobs:
-  copy-file:
+  copy-deployment-artifacts:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -18,7 +18,7 @@ jobs:
         API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
       with:
         source_folder: 'artifacts'
-        destination_repo: 'gasperbr/actions-output'
+        destination_repo: 'sushiswap/trident-dev-deployments'
         destination_folder: 'artifacts'
         user_email: 'gasper@sushi.com'
         user_name: 'gasperbr'
@@ -28,7 +28,7 @@ jobs:
         API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
       with:
         source_folder: 'deployments'
-        destination_repo: 'gasperbr/actions-output'
+        destination_repo: 'sushiswap/trident-dev-deployments'
         destination_folder: 'deployments'
         user_email: 'gasper@sushi.com'
         user_name: 'gasperbr'
