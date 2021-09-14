@@ -3,7 +3,8 @@ node_modules/
 
 # Hardhat
 cache/
-artifacts/
+artifacts/*
+!*artifacts/contracts
 
 # Typechain
 types/
