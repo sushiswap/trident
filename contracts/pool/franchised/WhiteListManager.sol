@@ -6,7 +6,7 @@ contract WhiteListManager {
     event WhiteListAccount(address indexed operator, address indexed account, bool approved);
     event SetMerkleRoot(address operator, bytes32 merkleRoot);
     event JoinWithMerkle(address operator, uint256 indexed index, address indexed account);
-    
+
     /// @notice EIP-712 related variables and functions.
     string private constant EIP191_PREFIX_FOR_EIP712_STRUCTURED_DATA = "\x19\x01";
     bytes32 private constant APPROVAL_SIGNATURE_HASH = keccak256("SetWhitelisting(address account,bool approved,uint256 deadline)");
@@ -79,7 +79,7 @@ contract WhiteListManager {
 
         address recoveredAddress = ecrecover(digest, v, r, s);
         require(recoveredAddress == operator, "INVALID_SIGNATURE");
-        
+
         _whitelistAccount(operator, account, approved);
     }
 

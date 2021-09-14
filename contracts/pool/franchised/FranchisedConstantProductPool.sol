@@ -56,14 +56,14 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
             _deployData,
             (address, address, uint256, bool, address, address, bool)
         );
-        
+
         // @dev Factory ensures that the tokens are sorted.
         require(_token0 != address(0), "ZERO_ADDRESS");
         require(_token0 != _token1, "IDENTICAL_ADDRESSES");
         require(_token0 != address(this), "INVALID_TOKEN");
         require(_token1 != address(this), "INVALID_TOKEN");
         require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
-        
+
         TridentFranchisedERC20.initialize(_whiteListManager, _operator, _level2);
 
         (, bytes memory _barFee) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
@@ -343,12 +343,10 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
         bool unwrapBento
     ) internal {
         if (unwrapBento) {
-            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.withdraw.selector, 
-                token, address(this), to, 0, shares));
+            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.withdraw.selector, token, address(this), to, 0, shares));
             require(success, "WITHDRAW_FAILED");
         } else {
-            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.transfer.selector, 
-                token, address(this), to, shares));
+            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.transfer.selector, token, address(this), to, shares));
             require(success, "TRANSFER_FAILED");
         }
     }

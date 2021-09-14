@@ -36,10 +36,10 @@ contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
     uint256 internal constant POW_PRECISION = BASE / 10**10;
     uint256 internal constant MAX_IN_RATIO = BASE / 2;
     uint256 internal constant MAX_OUT_RATIO = (BASE / 3) + 1;
-    
+
     uint136 internal totalWeight;
     address[] internal tokens;
-    
+
     uint256 public barFee;
 
     bytes32 public constant override poolIdentifier = "Trident:FranchisedIndex";
@@ -67,7 +67,7 @@ contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
         require(_tokens.length == _weights.length, "INVALID_ARRAYS");
         require(MIN_FEE <= _swapFee && _swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
         require(MIN_TOKENS <= _tokens.length && _tokens.length <= MAX_TOKENS, "INVALID_TOKENS_LENGTH");
-        
+
         TridentFranchisedERC20.initialize(_whiteListManager, _operator, _level2);
 
         for (uint256 i = 0; i < _tokens.length; i++) {
@@ -77,15 +77,15 @@ contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
             tokens.push(_tokens[i]);
             totalWeight += _weights[i];
         }
-        
+
         require(totalWeight <= MAX_TOTAL_WEIGHT, "MAX_TOTAL_WEIGHT");
         // @dev This burns initial LP supply.
-        _mint(address(0), INIT_POOL_SUPPLY); 
+        _mint(address(0), INIT_POOL_SUPPLY);
 
         (, bytes memory _barFee) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
         (, bytes memory _barFeeTo) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFeeTo.selector));
         (, bytes memory _bento) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.bento.selector));
-        
+
         swapFee = _swapFee;
         barFee = abi.decode(_barFee, (uint256));
         barFeeTo = abi.decode(_barFeeTo, (address));
@@ -93,7 +93,7 @@ contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
         masterDeployer = _masterDeployer;
         unlocked = 1;
     }
-    
+
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
     /// The router must ensure that sufficient LP tokens are minted by using the return value.
     function mint(bytes calldata data) public override lock returns (uint256 liquidity) {
@@ -108,7 +108,8 @@ contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
             uint120 amountIn = reserve != 0 ? uint120(_mul(ratio, reserve)) : ratio;
             require(amountIn >= MIN_BALANCE, "MIN_BALANCE");
             // @dev Check Trident router has sent `amountIn` for skim into pool.
-            unchecked { // @dev This is safe from overflow - only logged amounts handled.
+            unchecked {
+                // @dev This is safe from overflow - only logged amounts handled.
                 require(_balance(tokenIn) >= amountIn + reserve, "NOT_RECEIVED");
                 records[tokenIn].reserve += amountIn;
             }
@@ -117,15 +118,15 @@ contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
         _mint(recipient, toMint);
         liquidity = toMint;
     }
-    
+
     /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
     function burn(bytes calldata data) public override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
         (address recipient, bool unwrapBento, uint256 toBurn) = abi.decode(data, (address, bool, uint256));
         _checkWhiteList(recipient);
         uint256 ratio = _div(toBurn, totalSupply);
-        
+
         withdrawnAmounts = new TokenAmount[](tokens.length);
-        
+
         _burn(address(this), toBurn);
 
         for (uint256 i = 0; i < tokens.length; i++) {
@@ -142,25 +143,15 @@ contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
             emit Burn(msg.sender, tokenOut, amountOut, recipient);
         }
     }
-    
+
     /// @dev Burns LP tokens sent to this contract and swaps one of the output tokens for another
     /// - i.e., the user gets a single token out by burning LP tokens.
     function burnSingle(bytes calldata data) public override lock returns (uint256 amountOut) {
-        (address tokenOut, address recipient, bool unwrapBento, uint256 toBurn) = abi.decode(
-            data,
-            (address, address, bool, uint256)
-        );
+        (address tokenOut, address recipient, bool unwrapBento, uint256 toBurn) = abi.decode(data, (address, address, bool, uint256));
         _checkWhiteList(recipient);
         Record storage outRecord = records[tokenOut];
 
-        amountOut = _computeSingleOutGivenPoolIn(
-            outRecord.reserve,
-            outRecord.weight,
-            totalSupply,
-            totalWeight,
-            toBurn,
-            swapFee
-        );
+        amountOut = _computeSingleOutGivenPoolIn(outRecord.reserve, outRecord.weight, totalSupply, totalWeight, toBurn, swapFee);
 
         require(amountOut <= _mul(outRecord.reserve, MAX_OUT_RATIO), "MAX_OUT_RATIO");
         // @dev This is safe from underflow - only logged amounts handled.
@@ -171,7 +162,7 @@ contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
         _transfer(tokenOut, amountOut, recipient, unwrapBento);
         emit Burn(msg.sender, tokenOut, amountOut, recipient);
     }
-    
+
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
     function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenIn, address tokenOut, address recipient, bool unwrapBento, uint256 amountIn) = abi.decode(
@@ -186,7 +177,8 @@ contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
 
         amountOut = _getAmountOut(amountIn, inRecord.reserve, inRecord.weight, outRecord.reserve, outRecord.weight);
         // @dev Check Trident router has sent `amountIn` for skim into pool.
-        unchecked { // @dev This is safe from under/overflow - only logged amounts handled.
+        unchecked {
+            // @dev This is safe from under/overflow - only logged amounts handled.
             require(_balance(tokenIn) >= amountIn + inRecord.reserve, "NOT_RECEIVED");
             inRecord.reserve += uint120(amountIn);
             outRecord.reserve -= uint120(amountOut);
@@ -194,17 +186,13 @@ contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
         _transfer(tokenOut, amountOut, recipient, unwrapBento);
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
-    
+
     /// @dev Swaps one token for another. The router must support swap callbacks and ensure there isn't too much slippage.
     function flashSwap(bytes calldata data) public override lock returns (uint256 amountOut) {
-        (
-            address tokenIn,
-            address tokenOut,
-            address recipient,
-            bool unwrapBento,
-            uint256 amountIn,
-            bytes memory context
-        ) = abi.decode(data, (address, address, address, bool, uint256, bytes));
+        (address tokenIn, address tokenOut, address recipient, bool unwrapBento, uint256 amountIn, bytes memory context) = abi.decode(
+            data,
+            (address, address, address, bool, uint256, bytes)
+        );
         if (level2) _checkWhiteList(recipient);
         Record storage inRecord = records[tokenIn];
         Record storage outRecord = records[tokenOut];
@@ -215,7 +203,8 @@ contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
 
         ITridentCallee(msg.sender).tridentSwapCallback(context);
         // @dev Check Trident router has sent `amountIn` for skim into pool.
-        unchecked { // @dev This is safe from under/overflow - only logged amounts handled.
+        unchecked {
+            // @dev This is safe from under/overflow - only logged amounts handled.
             require(_balance(tokenIn) >= amountIn + inRecord.reserve, "NOT_RECEIVED");
             inRecord.reserve += uint120(amountIn);
             outRecord.reserve -= uint120(amountOut);
@@ -223,16 +212,15 @@ contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
         _transfer(tokenOut, amountOut, recipient, unwrapBento);
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
-    
+
     /// @dev Updates `barFee` for Trident protocol.
     function updateBarFee() public {
         (, bytes memory _barFee) = masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
         barFee = abi.decode(_barFee, (uint256));
     }
-    
+
     function _balance(address token) internal view returns (uint256 balance) {
-        (, bytes memory data) = bento.staticcall(abi.encodeWithSelector(IBentoBoxMinimal.balanceOf.selector, 
-            token, address(this)));
+        (, bytes memory data) = bento.staticcall(abi.encodeWithSelector(IBentoBoxMinimal.balanceOf.selector, token, address(this)));
         balance = abi.decode(data, (uint256));
     }
 
@@ -256,13 +244,13 @@ contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
 
     function _compute(uint256 base, uint256 exp) internal pure returns (uint256 output) {
         require(MIN_POW_BASE <= base && base <= MAX_POW_BASE, "INVALID_BASE");
-        
-        uint256 whole = (exp / BASE) * BASE;   
+
+        uint256 whole = (exp / BASE) * BASE;
         uint256 remain = exp - whole;
         uint256 wholePow = _pow(base, whole / BASE);
-        
+
         if (remain == 0) output = wholePow;
-        
+
         uint256 partialResult = _powApprox(base, remain, POW_PRECISION);
         output = _mul(wholePow, partialResult);
     }
@@ -284,15 +272,18 @@ contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
         uint256 zaz = (BASE - normalizedWeight) * _swapFee;
         amountOut = _mul(tokenAmountOutBeforeSwapFee, (BASE - zaz));
     }
-    
+
     function _pow(uint256 a, uint256 n) internal pure returns (uint256 output) {
         output = n % 2 != 0 ? a : BASE;
-        for (n /= 2; n != 0; n /= 2) 
-            a = a * a;
-            if (n % 2 != 0) output = output * a;
+        for (n /= 2; n != 0; n /= 2) a = a * a;
+        if (n % 2 != 0) output = output * a;
     }
-    
-    function _powApprox(uint256 base, uint256 exp, uint256 precision) internal pure returns (uint256 sum) {
+
+    function _powApprox(
+        uint256 base,
+        uint256 exp,
+        uint256 precision
+    ) internal pure returns (uint256 sum) {
         uint256 a = exp;
         (uint256 x, bool xneg) = _subFlag(base, BASE);
         uint256 term = BASE;
@@ -314,9 +305,9 @@ contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
             }
         }
     }
-    
+
     function _subFlag(uint256 a, uint256 b) internal pure returns (uint256 difference, bool flag) {
-        // @dev This is safe from underflow - if/else flow performs checks. 
+        // @dev This is safe from underflow - if/else flow performs checks.
         unchecked {
             if (a >= b) {
                 (difference, flag) = (a - b, false);
@@ -325,19 +316,19 @@ contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
             }
         }
     }
-    
+
     function _mul(uint256 a, uint256 b) internal pure returns (uint256 c2) {
         uint256 c0 = a * b;
         uint256 c1 = c0 + (BASE / 2);
         c2 = c1 / BASE;
     }
-    
+
     function _div(uint256 a, uint256 b) internal pure returns (uint256 c2) {
         uint256 c0 = a * BASE;
         uint256 c1 = c0 + (b / 2);
         c2 = c1 / b;
     }
-    
+
     function _transfer(
         address token,
         uint256 shares,
@@ -345,12 +336,10 @@ contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
         bool unwrapBento
     ) internal {
         if (unwrapBento) {
-            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.withdraw.selector, 
-                token, address(this), to, 0, shares));
+            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.withdraw.selector, token, address(this), to, 0, shares));
             require(success, "WITHDRAW_FAILED");
         } else {
-            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.transfer.selector, 
-                token, address(this), to, shares));
+            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.transfer.selector, token, address(this), to, shares));
             require(success, "TRANSFER_FAILED");
         }
     }
@@ -358,18 +347,15 @@ contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
     function getAssets() public view override returns (address[] memory assets) {
         assets = tokens;
     }
-    
+
     function getAmountOut(bytes calldata data) public view override returns (uint256 amountOut) {
-        (
-            uint256 tokenInAmount,
-            uint256 tokenInBalance,
-            uint256 tokenInWeight,
-            uint256 tokenOutBalance,
-            uint256 tokenOutWeight
-        ) = abi.decode(data, (uint256, uint256, uint256, uint256, uint256));
+        (uint256 tokenInAmount, uint256 tokenInBalance, uint256 tokenInWeight, uint256 tokenOutBalance, uint256 tokenOutWeight) = abi.decode(
+            data,
+            (uint256, uint256, uint256, uint256, uint256)
+        );
         amountOut = _getAmountOut(tokenInAmount, tokenInBalance, tokenInWeight, tokenOutBalance, tokenOutWeight);
     }
-    
+
     function getReservesAndWeights() public view returns (uint256[] memory reserves, uint136[] memory weights) {
         uint256 length = tokens.length;
         reserves = new uint256[](length);
