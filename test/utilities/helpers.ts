@@ -24,9 +24,9 @@ function getTopoplogy(tokens: Contract[], poolCount: number): Topology {
 
     //TODO: Get random pool type and create
     const poolType = Math.floor(Math.random() * 10);
-    let pool = poolType === 0 ? createConstantProductPool() : createHybridPool;
+    //let pool = poolType === 0 ? createConstantProductPool() : createHybridPool;
 
-    topology.pools.push(pool);
+    //topology.pools.push(pool);
   }
 
   return topology;

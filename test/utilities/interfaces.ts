@@ -1,4 +1,6 @@
 import { BigNumber } from "ethers";
+import { Pool } from "@sushiswap/sdk";
+import { Contract } from "ethers";
 
 export interface Path {
   pool: string;
@@ -54,4 +56,10 @@ export interface ComplexPathParams {
   initialPath: InitialPath[];
   percentagePath: PercentagePath[];
   output: Output[];
+}
+
+export interface Topology {
+  tokens: Map<string, Contract>;
+  prices: Map<string, number>;
+  pools: Pool[];
 }
