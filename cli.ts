@@ -19,7 +19,7 @@ task("erc20:approve", "ERC20 approve")
   .addParam("spender", "Spender")
   .setAction(async function ({ token, spender }, { ethers }, runSuper) {
     const dev = await ethers.getNamedSigner("dev");
-    const erc20 = await ethers.getContractFactory("TridentERC20");
+    const erc20 = await ethers.getContractFactory("ERC20Mock");
 
     const slp = erc20.attach(token);
 
@@ -30,13 +30,13 @@ task("constant-product-pool:deploy", "Constant Product Pool deploy")
   .addOptionalParam(
     "tokenA",
     "Token A",
-    "0xc778417E063141139Fce010982780140Aa0cD5Ab",
+    "0xd0A1E359811322d97991E03f863a0C30C2cF029C", // kovan weth
     types.string
   )
   .addOptionalParam(
     "tokenB",
     "Token B",
-    "0xc2118d4d90b274016cB7a54c03EF52E6c537D957",
+    "0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa", // kovan dai
     types.string
   )
   .addOptionalParam("fee", "Fee tier", 30, types.int)
@@ -53,7 +53,7 @@ task("constant-product-pool:deploy", "Constant Product Pool deploy")
     );
 
     const deployData = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8", "bool"],
+      ["address", "address", "uint256", "bool"],
       [...[tokenA, tokenB].sort(), fee, twap]
     );
 
@@ -91,13 +91,19 @@ task("router:add-liquidity", "Router add liquidity")
   .addOptionalParam(
     "tokenA",
     "Token A",
-    "0xc778417E063141139Fce010982780140Aa0cD5Ab",
+    "0xd0A1E359811322d97991E03f863a0C30C2cF029C", // kovan weth
     types.string
   )
   .addOptionalParam(
     "tokenB",
     "Token B",
-    "0xc2118d4d90b274016cB7a54c03EF52E6c537D957",
+    "0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa", // kovan dai
+    types.string
+  )
+  .addOptionalParam(
+    "pool",
+    "Pool",
+    "0xD9d63e8f9ab4ad74632e75dB09D2F23869c450B7", // dai/weth
     types.string
   )
   .addParam(
@@ -116,7 +122,11 @@ task("router:add-liquidity", "Router add liquidity")
   // .addParam("tokenBMinimum", "Token B Minimum")
   // .addParam("to", "To")
   // .addOptionalParam("deadline", "Deadline", MaxUint256)
-  .setAction(async function (args, { ethers, run, getChainId }, runSuper) {
+  .setAction(async function (
+    { tokenA, tokenB, pool },
+    { ethers, run, getChainId },
+    runSuper
+  ) {
     const chainId = await getChainId();
 
     const router = await ethers.getContract("TridentRouter");
@@ -125,16 +135,15 @@ task("router:add-liquidity", "Router add liquidity")
     const bentoBox = BentoBox.attach(BENTOBOX_ADDRESS[chainId]);
 
     const dev = await ethers.getNamedSigner("dev");
-    const pool = "0x735C2c1564C0230041Ef8CA5A6F7e74bab8C3dcA"; // dai/weth
 
     let liquidityInput = [
       {
-        token: "0xc778417E063141139Fce010982780140Aa0cD5Ab", // weth
+        token: tokenA,
         native: false,
         amount: ethers.BigNumber.from(10).pow(17),
       },
       {
-        token: "0xc2118d4d90b274016cB7a54c03EF52E6c537D957", // dai
+        token: tokenB,
         native: false,
         amount: ethers.BigNumber.from(10).pow(17),
       },
@@ -164,7 +173,7 @@ task("router:add-liquidity", "Router add liquidity")
           liquidityInput[0].token,
           dev.address,
           dev.address,
-          BigNumber.from(10).pow(17),
+          liquidityInput[0].amount,
           0
         )
     ).wait();
@@ -175,7 +184,7 @@ task("router:add-liquidity", "Router add liquidity")
           liquidityInput[1].token,
           dev.address,
           dev.address,
-          BigNumber.from(10).pow(17),
+          liquidityInput[1].amount,
           0
         )
     ).wait();

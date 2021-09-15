@@ -52,7 +52,11 @@ export async function initialize() {
     accounts[1].address,
     bento.address
   );
-  router = await TridentRouter.deploy(bento.address, tokens[0].address);
+  router = await TridentRouter.deploy(
+    bento.address,
+    masterDeployer.address,
+    tokens[0].address
+  );
   const poolFactory = await PoolFactory.deploy(masterDeployer.address);
 
   await Promise.all([
@@ -102,7 +106,7 @@ export async function initialize() {
       token1 = tokens[i];
     }
     const deployData = utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8", "bool"],
+      ["address", "address", "uint256", "bool"],
       [token0.address, token1.address, 30, false]
     );
     const salt = utils.keccak256(deployData);
