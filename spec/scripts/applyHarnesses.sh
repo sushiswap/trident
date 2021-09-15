@@ -61,22 +61,21 @@ perl -0777 -i -pe 's/import \".\/TridentERC20.sol\";/import \".\/TridentERC20.so
 perl -0777 -i -pe 's/address public immutable barFeeTo;/address public immutable barFeeTo;\n    Simplifications public simplified;/g' contracts/pool/ConstantProductPool.sol
 
 # simplifying sqrt TridentMath.sqrt(balance0 * balance1) in ConstantProductPool
-# perl -0777 -i -pe 's/contract ConstantProductPool is IPool, TridentERC20/contract ConstantProductPool is IPool, TridentERC20, Simplifications/g' contracts/pool/ConstantProductPool.sol
 perl -0777 -i -pe 's/TridentMath.sqrt\(/simplified.sqrt\(/g' contracts/pool/ConstantProductPool.sol
 
 # removing the "immutable" keyword since it is not supported for constructors at the moment
 perl -0777 -i -pe 's/address public immutable token0;/address public token0;/g' contracts/pool/ConstantProductPool.sol
 perl -0777 -i -pe 's/address public immutable token1;/address public token1;/g' contracts/pool/ConstantProductPool.sol
 
+# adding a require that token1 != address(0) in the constructor. This is a safe
+# assumption because the ConstantProductPoolFactory makes sure that token1 != address(0)
+perl -0777 -i -pe 's/require\(_token0 != address\(0\), \"ZERO_ADDRESS\"\);/require\(_token0 != address\(0\), \"ZERO_ADDRESS\"\);\n        require\(_token1 != address\(0\), \"ZERO_ADDRESS\"\);/g' contracts/pool/ConstantProductPool.sol
+
 # BentoBox and MasterDeployer object
 ## address -> IBentoBoxMinimal
 ## address -> MasterDeployer
 perl -0777 -i -pe 's/address public immutable bento;/IBentoBoxMinimal public immutable bento;/g' contracts/pool/ConstantProductPool.sol
 perl -0777 -i -pe 's/address public immutable masterDeployer;/MasterDeployer public immutable masterDeployer;/g' contracts/pool/ConstantProductPool.sol
-
-# adding a require that token1 != address(0) in the constructor. This is a safe
-# assumption because the ConstantProductPoolFactory makes sure that token1 != address(0)
-perl -0777 -i -pe 's/require\(_token0 != address\(0\), \"ZERO_ADDRESS\"\);/require\(_token0 != address\(0\), \"ZERO_ADDRESS\"\);\n        require\(_token1 != address\(0\), \"ZERO_ADDRESS\"\);/g' contracts/pool/ConstantProductPool.sol
 
 ## commenting out staticcalls in constructor
 perl -0777 -i -pe 's/\(, bytes memory _barFee\)/\/\/ \(, bytes memory _barFee\)/g' contracts/pool/ConstantProductPool.sol # also used to comment out in updateBarFee
@@ -95,7 +94,7 @@ perl -0777 -i -pe 's/masterDeployer = _masterDeployer;/masterDeployer = MasterDe
 perl -0777 -i -pe 's/address migrator = IMasterDeployer\(masterDeployer\).migrator\(\);/address migrator = masterDeployer.migrator\(\);/g' contracts/pool/ConstantProductPool.sol
 
 ## fixing barFee in updateBarFee
-perl -0777 -i -pe 's/barFee = abi.decode\(_barFee, \(uint256\)\);/barFee = MasterDeployer\(masterDeployer\).barFee\(\);/g' contracts/pool/ConstantProductPool.sol
+perl -0777 -i -pe 's/barFee = abi.decode\(_barFee, \(uint256\)\);/barFee = masterDeployer.barFee\(\);/g' contracts/pool/ConstantProductPool.sol
 
 ## fixing _balance
 perl -0777 -i -pe 's/\(, bytes memory _balance0\)/\/\/ \(, bytes memory _balance0\)/g' contracts/pool/ConstantProductPool.sol
@@ -135,6 +134,68 @@ perl -0777 -i -pe 's/uint256 internal unlocked/uint256 public unlocked/g' contra
 ##################################################
 #                    HybridPool                  #
 ##################################################
+# add import for MasterDeployer
+perl -0777 -i -pe 's/import \".\/TridentERC20.sol\";/import \".\/TridentERC20.sol\";\nimport \"..\/deployer\/MasterDeployer.sol\";\nimport \"..\/..\/spec\/harness\/DummyERC20A.sol\";\nimport \"..\/..\/spec\/harness\/DummyERC20B.sol\";/g' contracts/pool/HybridPool.sol
+
+# removing the "immutable" keyword since it is not supported for constructors at the moment
+perl -0777 -i -pe 's/address public immutable token0;/address public token0;/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/address public immutable token1;/address public token1;/g' contracts/pool/HybridPool.sol
+
+# BentoBox and MasterDeployer object
+## address -> IBentoBoxMinimal
+## address -> MasterDeployer
+perl -0777 -i -pe 's/address public immutable bento;/IBentoBoxMinimal public immutable bento;/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/address public immutable masterDeployer;/MasterDeployer public immutable masterDeployer;/g' contracts/pool/HybridPool.sol
+
+## commenting out staticcalls in constructor
+perl -0777 -i -pe 's/\(, bytes memory _barFee\)/\/\/ \(, bytes memory _barFee\)/g' contracts/pool/HybridPool.sol # also used to comment out in updateBarFee
+perl -0777 -i -pe 's/\(, bytes memory _barFeeTo\)/\/\/ \(, bytes memory _barFeeTo\)/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/\(, bytes memory _bento\)/\/\/ \(, bytes memory _bento\)/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/\(, bytes memory _decimals0\)/\/\/\ (, bytes memory _decimals0\)/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/\(, bytes memory _decimals1\)/\/\/\ (, bytes memory _decimals1\)/g' contracts/pool/HybridPool.sol
+
+## fixing the initialization in the constructors
+perl -0777 -i -pe 's/swapFee = _swapFee;
+        barFee = abi.decode\(_barFee, \(uint256\)\);/swapFee = _swapFee;
+        barFee = MasterDeployer\(_masterDeployer\).barFee\(\);/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/barFeeTo = abi.decode\(_barFeeTo, \(address\)\);/barFeeTo = MasterDeployer\(_masterDeployer\).barFeeTo\(\);/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/bento = abi.decode\(_bento, \(address\)\);/bento = IBentoBoxMinimal\(MasterDeployer\(_masterDeployer\).bento\(\)\);/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/masterDeployer = _masterDeployer;/masterDeployer = MasterDeployer\(_masterDeployer\);/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/token0PrecisionMultiplier = 10\*\*\(decimals - abi.decode\(_decimals0, \(uint8\)\)\);/token0PrecisionMultiplier = 10\*\*\(decimals - DummyERC20A\(_token0\).decimals\(\)\);/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/token1PrecisionMultiplier = 10\*\*\(decimals - abi.decode\(_decimals1, \(uint8\)\)\);/token1PrecisionMultiplier = 10\*\*\(decimals - DummyERC20B\(_token1\).decimals\(\)\);/g' contracts/pool/HybridPool.sol
+
+## fixing barFee in updateBarFee
+perl -0777 -i -pe 's/barFee = abi.decode\(_barFee, \(uint256\)\);/barFee = masterDeployer.barFee\(\);/g' contracts/pool/HybridPool.sol
+
+## fixing __balance
+perl -0777 -i -pe 's/\(, bytes memory ___balance\) = bento.staticcall\(abi.encodeWithSelector\(IBentoBoxMinimal.balanceOf.selector, 
+            token, address\(this\)\)\);/\/\/ \(, bytes memory ___balance\) = bento.staticcall\(abi.encodeWithSelector\(IBentoBoxMinimal.balanceOf.selector, 
+            \/\/ token, address\(this\)\)\);/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/balance = abi.decode\(___balance, \(uint256\)\);/balance = bento.balanceOf\(token, address\(this\)\);/g' contracts/pool/HybridPool.sol
+
+## fixing _toAmount
+perl -0777 -i -pe 's/\(, bytes memory _output\) = bento.staticcall\(abi.encodeWithSelector\(IBentoBoxMinimal.toAmount.selector,
+            token, input, false\)\);/\/\/ \(, bytes memory _output\) = bento.staticcall\(abi.encodeWithSelector\(IBentoBoxMinimal.toAmount.selector,
+            \/\/ token, input, false\)\);/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/output = abi.decode\(_output, \(uint256\)\);/output = bento.toAmount\(token, input, false\);/' contracts/pool/HybridPool.sol
+
+## fixing _toShare
+perl -0777 -i -pe 's/\(, bytes memory _output\) = bento.staticcall\(abi.encodeWithSelector\(IBentoBoxMinimal.toShare.selector,
+            token, input, false\)\);/\/\/ \(, bytes memory _output\) = bento.staticcall\(abi.encodeWithSelector\(IBentoBoxMinimal.toShare.selector,
+            \/\/ token, input, false\)\);/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/output = abi.decode\(_output, \(uint256\)\);/output = bento.toShare\(token, input, false\);/g' contracts/pool/HybridPool.sol
+
+## fixing _transfer
+perl -0777 -i -pe 's/\(bool success, \) = bento.call\(abi.encodeWithSelector\(IBentoBoxMinimal.withdraw.selector, 
+            token, address\(this\), to, amount, 0\)\);/\/\/ \(bool success, \) = bento.call\(abi.encodeWithSelector\(IBentoBoxMinimal.withdraw.selector, 
+            \/\/ token, address\(this\), to, amount, 0\)\);/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/require\(success, \"WITHDRAW_FAILED\"\);/\/\/ require\(success, \"WITHDRAW_FAILED\"\);\n            bento.withdraw\(token, address\(this\), to, amount, 0\);/g' contracts/pool/HybridPool.sol
+
+perl -0777 -i -pe 's/\(bool success, \) = bento.call\(abi.encodeWithSelector\(IBentoBoxMinimal.transfer.selector, 
+                token, address\(this\), to, _toShare\(token, amount\)\)\);/\/\/ \(bool success, \) = bento.call\(abi.encodeWithSelector\(IBentoBoxMinimal.transfer.selector, 
+                \/\/ token, address\(this\), to, _toShare\(token, amount\)\)\);/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/require\(success, \"TRANSFER_FAILED\"\);/\/\/ require\(success, \"TRANSFER_FAILED\"\);\n            bento.transfer\(token, address\(this\), to, _toShare\(token, amount\)\);/g' contracts/pool/HybridPool.sol
+
 # _balance: internal -> public
 perl -0777 -i -pe 's/_balance\(\) internal view/_balance\(\) public view/g' contracts/pool/HybridPool.sol
 
@@ -148,11 +209,11 @@ perl -0777 -i -pe 's/function burn\(bytes calldata data\) public/function burn\(
 perl -0777 -i -pe 's/function burnSingle\(bytes calldata data\) public/function burnSingle\(bytes memory data\) public virtual/g' contracts/pool/HybridPool.sol
 perl -0777 -i -pe 's/function swap\(bytes calldata data\) public/function swap\(bytes memory data\) public virtual/g' contracts/pool/HybridPool.sol
 perl -0777 -i -pe 's/function flashSwap\(bytes calldata data\) public/function flashSwap\(bytes memory data\) public virtual/g' contracts/pool/HybridPool.sol
-perl -0777 -i -pe 's/public view returns \(uint256\)/public virtual view returns \(uint256\)/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/internal view returns \(uint256 dy\)/public virtual view returns \(uint256 dy\)/g' contracts/pool/HybridPool.sol
 perl -0777 -i -pe 's/function getAmountOut\(bytes calldata data\) public/function getAmountOut\(bytes memory data\) public virtual/g' contracts/pool/HybridPool.sol
 
 # internal -> public fee constants
 perl -0777 -i -pe 's/uint256 internal constant MAX_FEE = 10000;/uint256 public constant MAX_FEE = 10000;/g' contracts/pool/HybridPool.sol
 
 # internal -> public unlocked
-perl -0777 -i -pe 's/uint256 private unlocked/uint256 public unlocked/g' contracts/pool/HybridPool.sol
+perl -0777 -i -pe 's/uint256 internal unlocked/uint256 public unlocked/g' contracts/pool/HybridPool.sol
