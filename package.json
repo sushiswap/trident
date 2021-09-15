@@ -1,5 +1,13 @@
 {
   "name": "@sushiswap/trident",
+  "version": "1.0.0-canary.0",
+  "files": [
+    "artifacts",
+    "contracts",
+    "deployments",
+    "exports",
+    "types"
+  ],
   "scripts": {
     "build": "hardhat compile",
     "console": "hardhat console",
