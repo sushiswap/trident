@@ -120,7 +120,7 @@ contract TridentRouterHarness is TridentRouter {
 
     function callAddLiquidity(address tokenIn1, uint256 amount1, bool native1,
                         address tokenIn2, uint256 amount2, bool native2, 
-                        address pool,  address to, uint256 minliquidity) public returns (uint256) {
+                        address pool,  address to, uint256 minliquidity) public payable returns (uint256) {
         TokenInput[] memory tokenInput = new TokenInput[](2);
         tokenInput[0] = TokenInput({token: tokenIn1, native : native1 , amount : amount1 });
         tokenInput[1] = TokenInput({token: tokenIn2, native : native2 , amount : amount2 });
@@ -133,7 +133,7 @@ contract TridentRouterHarness is TridentRouter {
         address pool,
         uint256 minLiquidity,
         bytes calldata data
-    ) public  override returns (uint256 liquidity)  { }
+    ) public  payable override returns (uint256 liquidity)  { }
 
     //todo - add call
 

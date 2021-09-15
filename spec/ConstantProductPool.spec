@@ -102,32 +102,40 @@ invariant reserveLessThanEqualToBalance()
 
 // Mudit: bidirectional implication
 invariant integrityOfTotalSupply()
-    totalSupply() == 0 => (reserve0() == 0 && reserve1() == 0) {
+        (totalSupply() == 0 <=> reserve0() == 0 ) && 
+        (totalSupply() == 0 <=> reserve1() == 0 )  {
+        // (reserve0() == 0 => totalSupply() == 0)  && ( reserve1() == 0 => totalSupply() == 0 )  {
+        preserved {
+			requireInvariant validityOfTokens();
+            requireInvariant reserveLessThanEqualToBalance();
+		}
         preserved burnWrapper(address to, bool b) with (env e) {
-            require e.msg.sender != currentContract;
-            require to != currentContract;
-            require totalSupply() == 0 || balanceOf(e.msg.sender) < totalSupply() + 1000;
+            //require to != currentContract;
+            require balanceOf(0) == 1000;
+            require e.msg.sender != 0;
+            require totalSupply() == 0 || balanceOf(currentContract) + balanceOf(0) <= totalSupply() ;
         }
 
         preserved burnSingleWrapper(address tokenOut, address to, bool b) with (env e) {
-            require e.msg.sender != currentContract;
-            require to != currentContract;
-            require totalSupply() == 0 || balanceOf(e.msg.sender) < totalSupply() + 1000;
+            //require to != currentContract;
+            require balanceOf(0) == 1000;
+            require e.msg.sender != 0;
+            require totalSupply() == 0 || balanceOf(currentContract) + balanceOf(0) <= totalSupply() ;
         }
 
         preserved swapWrapper(address tokenIn, address recipient, bool unwrapBento) with (env e) {
-            requireInvariant reserveLessThanEqualToBalance;
-            uint256 amountIn = reserve0() - bentoBox.balanceOf(token0(), currentContract);
-            require tokenIn == token0();
-            require amountIn > 0 => getAmountOutWrapper(token0(), amountIn) > 0;
+            require e.msg.sender != currentContract;
+            require e.msg.sender != 0;
         }
 
-        // preserved flashSwapWrapper(address tokenIn, address recipient, bool unwrapBento, uint256 amountIn, bytes context) with (env e) {
-        //     requireInvariant reserveLessThanEqualToBalance;
-        //     uint256 amountIn2 = reserve0() - bentoBox.balanceOf(token0(), currentContract);
-        //     require tokenIn == token0();
-        //     require amountIn2 > 0 => getAmountOutWrapper(token0(), amountIn2) > 0;
-        // }
+    /*
+        preserved flashSwapWrapper(address tokenIn, address recipient1, bool unwrapBento, uint256 amountIn, bytes context) with (env e) {
+            require recipient1 != currentContract;
+            require e.msg.sender != currentContract;
+            require e.msg.sender != 0;
+        
+        } */
+         
     }
     
 ////////////////////////////////////////////////////////////////////////////
@@ -151,7 +159,7 @@ rule pathSanityForToken0(method f) {
 
 rule pathSanityForToken1(method f) {
     address token1;
-
+    
     callFunction(f, token1);
 
     assert(false);
