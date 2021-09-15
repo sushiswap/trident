@@ -57,9 +57,3 @@ export interface ComplexPathParams {
   percentagePath: PercentagePath[];
   output: Output[];
 }
-
-export interface Topology {
-  tokens: Map<string, Contract>;
-  prices: Map<string, number>;
-  pools: Pool[];
-}
