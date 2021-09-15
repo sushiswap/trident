@@ -8,7 +8,7 @@
 */
 
 using SimpleBentoBox as bentoBox
-
+using SymbolicTridentCallee as symbolicTridentCallee
 ////////////////////////////////////////////////////////////////////////////
 //                                Methods                                 //
 ////////////////////////////////////////////////////////////////////////////
@@ -46,6 +46,8 @@ methods {
               returns (address) => NONDET // TODO: check with Nurit
 
     // ITridentCallee
+    symbolicTridentCallee.tridentCalleeRecipient() returns (address) envfree // for noChangeToOthersBalances
+    symbolicTridentCallee.tridentCalleeFrom() returns (address) envfree // for noChangeToOthersBalances
     tridentSwapCallback(bytes) => DISPATCHER(true) // TODO: check with Nurit
     tridentMintCallback(bytes) => DISPATCHER(true) // TODO: check with Nurit
 
@@ -350,28 +352,26 @@ rule mintingNotPossibleForBalancedPool() {
 //            "user's total balances changed");
 // }
 
-rule noChangeToOthersBalances(method f) {
+rule noChangeToOthersBalances(method f) filtered { f -> 
+        f.selector == swapWrapper(address, address, bool).selector } {
     env e;
-
     address other;
-    address to;
     address recipient;
 
     validState(false);
 
-    // Mudit: to == other => other's balances only increase or stay the same
-    require other != currentContract && e.msg.sender != other &&
-            to != other && recipient != other;
-    require other != bentoBox;
-    require other != barFeeTo();
+    require other != currentContract && other != e.msg.sender &&
+            other != bentoBox && other != barFeeTo() &&
+            other != symbolicTridentCallee.tridentCalleeFrom();
 
     // recording other's mirin balance
     uint256 _otherMirinBalance = balanceOf(other);
 
     // recording other's tokens balance
-    uint256 _totalOthertoken0 = tokenBalanceOf(token0(), other) + 
+    // using mathint to prevent overflows
+    mathint _totalOthertoken0 = tokenBalanceOf(token0(), other) + 
                                bentoBox.balanceOf(token0(), other);
-    uint256 _totalOthertoken1 = tokenBalanceOf(token1(), other) + 
+    mathint _totalOthertoken1 = tokenBalanceOf(token1(), other) + 
                                bentoBox.balanceOf(token1(), other);
 
     bool unwrapBento;
@@ -379,12 +379,12 @@ rule noChangeToOthersBalances(method f) {
     address tokenOut;
 
     if (f.selector == mintWrapper(address).selector) {
-        require other != 0;
-        mintWrapper(e, to);
+        require other != 0; // mint transfers 1000 mirin to the zero address
+        mintWrapper(e, recipient);
     } else if (f.selector == burnWrapper(address, bool).selector) {
-        burnWrapper(e, to, unwrapBento);
+        burnWrapper(e, recipient, unwrapBento);
     } else if (f.selector == burnSingleWrapper(address, address, bool).selector) {
-        burnSingleWrapper(e, tokenOut, to, unwrapBento);
+        burnSingleWrapper(e, tokenOut, recipient, unwrapBento);
     } else if (f.selector == swapWrapper(address, address, bool).selector) {
         swapWrapper(e, tokenIn, recipient, unwrapBento);
     }  else if (f.selector == flashSwapWrapper(address, address, bool, uint256, bytes).selector) {
@@ -409,14 +409,21 @@ rule noChangeToOthersBalances(method f) {
     uint256 otherMirinBalance_ = balanceOf(other);
     
     // recording other's tokens balance
-    uint256 totalOthertoken0_ = tokenBalanceOf(token0(), other) + 
+    // using mathint to prevent overflows
+    mathint totalOthertoken0_ = tokenBalanceOf(token0(), other) + 
                                bentoBox.balanceOf(token0(), other);
-    uint256 totalOthertoken1_ = tokenBalanceOf(token1(), other) + 
+    mathint totalOthertoken1_ = tokenBalanceOf(token1(), other) + 
                                bentoBox.balanceOf(token1(), other);
 
-    assert(_otherMirinBalance == otherMirinBalance_, "other's Mirin balance changed");
-    assert(_totalOthertoken0 == totalOthertoken0_, "other's token0 balance changed");
-    assert(_totalOthertoken1 == totalOthertoken1_, "other's token1 balance changed");
+    if (other == recipient || other == symbolicTridentCallee.tridentCalleeRecipient()) {
+        assert(_otherMirinBalance <= otherMirinBalance_, "other's Mirin balance decreased");
+        assert(_totalOthertoken0 <= totalOthertoken0_, "other's token0 balance decreased");
+        assert(_totalOthertoken1 <= totalOthertoken1_, "other's token1 balance decreased");
+    } else {
+        assert(_otherMirinBalance == otherMirinBalance_, "other's Mirin balance changed");
+        assert(_totalOthertoken0 == totalOthertoken0_, "other's token0 balance changed");
+        assert(_totalOthertoken1 == totalOthertoken1_, "other's token1 balance changed");
+    }
 }
 
 // Problem with burnSingle, can only burn token1
@@ -463,12 +470,17 @@ rule burnTokenAdditivity() {
     // assert(_totalUsertoken1 == totalUsertoken1_, "user's token1 changed");
 }
 
+// TODO: Doesn't make sense because you cannot do only one swap and maintain the
+// ratio of the tokens
 rule sameUnderlyingRatioLiquidity(method f) filtered { f -> 
         f.selector == swapWrapper(address, address, bool).selector ||
         f.selector == flashSwapWrapper(address, address, bool, uint256, bytes).selector } {
     env e1;
     env e2;
     env e3;
+
+    // TODO: safe assumption, checked in the constructor (not the reason for counter example)
+    require swapFee() <= MAX_FEE();
 
     // setting the environment constraints
     require e1.block.timestamp < e2.block.timestamp && 
@@ -493,8 +505,10 @@ rule sameUnderlyingRatioLiquidity(method f) filtered { f ->
         _liquidity1 = 0;
     }
 
-    calldataarg args;
-    f(e2, args);
+    calldataarg args1;
+    f(e2, args1);
+    calldataarg args2;
+    f(e2, args2);
 
     uint256 liquidity0_;
     uint256 liquidity1_;
@@ -509,9 +523,17 @@ rule sameUnderlyingRatioLiquidity(method f) filtered { f ->
         liquidity1_ = 0;
     }
     
-    // TODO: since swap is taking place, liquidities should be strictly greater??
-    assert((reserve0() / reserve1() == 2) => (_liquidity0 <= liquidity0_ &&
-           _liquidity1 <= liquidity1_), "with time liquidities decreased");
+    // TODO: my guess is that same problem we need the integrityOfTotalSupply()
+    // and small numbers
+    if (swapFee() > 0 && totalSupply() != 0) {
+        // user's liquidities should strictly increase because of swapFee
+        assert((reserve0() / reserve1() == 2) => (_liquidity0 < liquidity0_ &&
+                _liquidity1 < liquidity1_), "with time liquidities didn't increase");
+    } else {
+        // since swapFee was zero, the liquidities should stay unchanged
+        assert((reserve0() / reserve1() == 2) => (_liquidity0 == liquidity0_ &&
+                _liquidity1 == liquidity1_), "with time liquidities decreased"); 
+    }
 }
 
 // Timing out, even with reserve0() / reserve1() == 1
