@@ -360,8 +360,7 @@ rule mintingNotPossibleForBalancedPool() {
 //            "user's total balances changed");
 // }
 
-rule noChangeToOthersBalances(method f) filtered { f -> 
-        f.selector == swapWrapper(address, address, bool).selector } {
+rule noChangeToOthersBalances(method f) {
     env e;
     address other;
     address recipient;
@@ -371,6 +370,10 @@ rule noChangeToOthersBalances(method f) filtered { f ->
     require other != currentContract && other != e.msg.sender &&
             other != bentoBox && other != barFeeTo() &&
             other != symbolicTridentCallee.tridentCalleeFrom();
+
+    // to prevent overflows in TridentERC20 (same assumption)
+    require balanceOf(other) + balanceOf(e.msg.sender) + balanceOf(currentContract) <= totalSupply();
+    require e.msg.sender != currentContract; // REVIEW
 
     // recording other's mirin balance
     uint256 _otherMirinBalance = balanceOf(other);
