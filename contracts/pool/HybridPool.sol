@@ -27,9 +27,9 @@ contract HybridPool is IPool, TridentERC20 {
     uint256 internal constant MAX_FEE = 10000; // @dev 100%.
     uint256 public immutable swapFee;
 
+    IBentoBoxMinimal public immutable bento;
+    IMasterDeployer public immutable masterDeployer;
     address public immutable barFeeTo;
-    address public immutable bento;
-    address public immutable masterDeployer;
     address public immutable token0;
     address public immutable token1;
     uint256 public immutable A;
@@ -67,23 +67,17 @@ contract HybridPool is IPool, TridentERC20 {
         require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
         require(a != 0, "ZERO_A");
 
-        (, bytes memory _barFee) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
-        (, bytes memory _barFeeTo) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFeeTo.selector));
-        (, bytes memory _bento) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.bento.selector));
-        (, bytes memory _decimals0) = _token0.staticcall(abi.encodeWithSelector(0x313ce567)); // @dev 'decimals()'.
-        (, bytes memory _decimals1) = _token1.staticcall(abi.encodeWithSelector(0x313ce567)); // @dev 'decimals()'.
-
         token0 = _token0;
         token1 = _token1;
         swapFee = _swapFee;
-        barFee = abi.decode(_barFee, (uint256));
-        barFeeTo = abi.decode(_barFeeTo, (address));
-        bento = abi.decode(_bento, (address));
-        masterDeployer = _masterDeployer;
+        barFee = IMasterDeployer(_masterDeployer).barFee();
+        barFeeTo = IMasterDeployer(_masterDeployer).barFeeTo();
+        bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
+        masterDeployer = IMasterDeployer(_masterDeployer);
         A = a;
         N_A = 2 * a;
-        token0PrecisionMultiplier = 10**(decimals - abi.decode(_decimals0, (uint8)));
-        token1PrecisionMultiplier = 10**(decimals - abi.decode(_decimals1, (uint8)));
+        token0PrecisionMultiplier = uint256(10)**(decimals - TridentERC20(_token0).decimals());
+        token1PrecisionMultiplier = uint256(10)**(decimals - TridentERC20(_token1).decimals());
         unlocked = 1;
     }
 
@@ -178,7 +172,6 @@ contract HybridPool is IPool, TridentERC20 {
             require(tokenOut == token0, "INVALID_OUTPUT_TOKEN");
             amount0 += _getAmountOut(amount1, balance0 - amount0, balance1 - amount1, false);
             _transfer(token0, amount0, recipient, unwrapBento);
-            balance1 -= _toShare(token1, amount1);
             amountOut = amount0;
             amount1 = 0;
             dLast = _computeLiquidity(balance0 - amountOut, balance1);
@@ -221,18 +214,18 @@ contract HybridPool is IPool, TridentERC20 {
 
         if (tokenIn == token0) {
             tokenOut = token1;
-            amountIn = _toAmount(token0, amountIn);
+            amountIn = bento.toAmount(token0, amountIn, false);
             amountOut = _getAmountOut(amountIn, _reserve0, _reserve1, true);
             _processSwap(token1, recipient, amountOut, context, unwrapBento);
-            uint256 balance0 = _toAmount(token0, __balance(token0));
+            uint256 balance0 = bento.toAmount(token0, bento.balanceOf(token0, address(this)), false);
             require(balance0 - _reserve0 >= amountIn, "INSUFFICIENT_AMOUNT_IN");
         } else {
             require(tokenIn == token1, "INVALID_INPUT_TOKEN");
             tokenOut = token0;
-            amountIn = _toAmount(token1, amountIn);
+            amountIn = bento.toAmount(token1, amountIn, false);
             amountOut = _getAmountOut(amountIn, _reserve0, _reserve1, false);
             _processSwap(token0, recipient, amountOut, context, unwrapBento);
-            uint256 balance1 = _toAmount(token1, __balance(token1));
+            uint256 balance1 = bento.toAmount(token1, bento.balanceOf(token1, address(this)), false);
             require(balance1 - _reserve1 >= amountIn, "INSUFFICIENT_AMOUNT_IN");
         }
         _updateReserves();
@@ -241,8 +234,7 @@ contract HybridPool is IPool, TridentERC20 {
 
     /// @dev Updates `barFee` for Trident protocol.
     function updateBarFee() public {
-        (, bytes memory _barFee) = masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
-        barFee = abi.decode(_barFee, (uint256));
+        barFee = masterDeployer.barFee();
     }
 
     function _processSwap(
@@ -258,8 +250,8 @@ contract HybridPool is IPool, TridentERC20 {
 
     function _getReserves() internal view returns (uint256 _reserve0, uint256 _reserve1) {
         (_reserve0, _reserve1) = (reserve0, reserve1);
-        _reserve0 = _toAmount(token0, _reserve0);
-        _reserve1 = _toAmount(token1, _reserve1);
+        _reserve0 = bento.toAmount(token0, _reserve0, false);
+        _reserve1 = bento.toAmount(token1, _reserve1, false);
     }
 
     function _updateReserves() internal {
@@ -271,26 +263,8 @@ contract HybridPool is IPool, TridentERC20 {
     }
 
     function _balance() internal view returns (uint256 balance0, uint256 balance1) {
-        balance0 = _toAmount(token0, __balance(token0));
-        balance1 = _toAmount(token1, __balance(token1));
-    }
-
-    function __balance(address token) internal view returns (uint256 balance) {
-        // @dev balanceOf(address,address).
-        (, bytes memory ___balance) = bento.staticcall(abi.encodeWithSelector(IBentoBoxMinimal.balanceOf.selector, token, address(this)));
-        balance = abi.decode(___balance, (uint256));
-    }
-
-    function _toAmount(address token, uint256 input) internal view returns (uint256 output) {
-        // @dev toAmount(address,uint256,bool).
-        (, bytes memory _output) = bento.staticcall(abi.encodeWithSelector(IBentoBoxMinimal.toAmount.selector, token, input, false));
-        output = abi.decode(_output, (uint256));
-    }
-
-    function _toShare(address token, uint256 input) internal view returns (uint256 output) {
-        // @dev toShare(address,uint256,bool).
-        (, bytes memory _output) = bento.staticcall(abi.encodeWithSelector(IBentoBoxMinimal.toShare.selector, token, input, false));
-        output = abi.decode(_output, (uint256));
+        balance0 = bento.toAmount(token0, IBentoBoxMinimal(bento).balanceOf(token0, address(this)), false);
+        balance1 = bento.toAmount(token1, IBentoBoxMinimal(bento).balanceOf(token1, address(this)), false);
     }
 
     function _getAmountOut(
@@ -326,13 +300,9 @@ contract HybridPool is IPool, TridentERC20 {
         bool unwrapBento
     ) internal {
         if (unwrapBento) {
-            // @dev withdraw(address,address,address,uint256,uint256).
-            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.withdraw.selector, token, address(this), to, amount, 0));
-            require(success, "WITHDRAW_FAILED");
+            bento.withdraw(token, address(this), to, amount, 0);
         } else {
-            // @dev transfer(address,address,address,uint256).
-            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.transfer.selector, token, address(this), to, _toShare(token, amount)));
-            require(success, "TRANSFER_FAILED");
+            bento.transfer(token, address(this), to, bento.toShare(token, amount, false));
         }
     }
 
@@ -435,16 +405,22 @@ contract HybridPool is IPool, TridentERC20 {
     function getAmountOut(bytes calldata data) public view override returns (uint256 finalAmountOut) {
         (address tokenIn, uint256 amountIn) = abi.decode(data, (address, uint256));
         (uint256 _reserve0, uint256 _reserve1) = _getReserves();
-        amountIn = _toAmount(tokenIn, amountIn);
+        amountIn = bento.toAmount(tokenIn, amountIn, false);
 
         if (tokenIn == token0) {
-            finalAmountOut = _toShare(token1, _getAmountOut(amountIn, _reserve0, _reserve1, true));
+            finalAmountOut = bento.toShare(token1, _getAmountOut(amountIn, _reserve0, _reserve1, true), false);
         } else {
-            finalAmountOut = _toShare(token0, _getAmountOut(amountIn, _reserve0, _reserve1, false));
+            finalAmountOut = bento.toShare(token0, _getAmountOut(amountIn, _reserve0, _reserve1, false), false);
         }
     }
 
     function getReserves() public view returns (uint256 _reserve0, uint256 _reserve1) {
         (_reserve0, _reserve1) = _getReserves();
+    }
+
+    function getVirtualPrice() public view returns (uint256 virtualPrice) {
+        (uint256 _reserve0, uint256 _reserve1) = _getReserves();
+        uint256 d = _computeLiquidity(_reserve0, _reserve1);
+        virtualPrice = (d * (uint256(10)**decimals)) / totalSupply;
     }
 }
