@@ -1,0 +1,12 @@
+export const STABLE_TOKEN_PRICE = 1;
+export const MIN_TOKEN_PRICE = 1e-6;
+export const MAX_TOKEN_PRICE = 1e6;
+export const MIN_POOL_RESERVE = 1e9;
+export const MAX_POOL_RESERVE = 1e31;
+export const MIN_POOL_IMBALANCE = 1 / (1 + 1e-3);
+export const MAX_POOL_IMBALANCE = 1 + 1e-3;
+export const MIN_LIQUIDITY = 1000;
+export const MAX_LIQUIDITY = Math.pow(2, 110);
+export const MIN_HYBRID_A = 200;
+export const MAX_HYBRID_A = 300000;
+export const GAS_PRICE = 1 * 200 * 1e-9;

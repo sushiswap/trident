@@ -1,168 +1,144 @@
-import { Contract, ContractFactory } from "ethers";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
+import { Contract } from "ethers";
 import seedrandom from "seedrandom";
 import { ethers } from "hardhat";
-import { RHybridPool, RConstantProductPool } from "@sushiswap/sdk";
+import { RHybridPool, RConstantProductPool, getBigNumber, RToken } from "@sushiswap/sdk";
 
-import { Topology, HPoolParams, CPoolParams } from "./helperInterfaces"; 
-import { getIntegerRandomValueWithMin } from "../utilities";
+import { PoolDeploymentContracts } from "./helperInterfaces"; 
+import { MAX_HYBRID_A, MAX_LIQUIDITY, MAX_POOL_IMBALANCE, MAX_POOL_RESERVE, MIN_HYBRID_A, MIN_LIQUIDITY, MIN_POOL_IMBALANCE, MIN_POOL_RESERVE, STABLE_TOKEN_PRICE } from "./constants";
+import { choice, getRandom } from "./randomHelper";
 
 const testSeed = "7";
-const rnd = seedrandom(testSeed);
+const rnd = seedrandom(testSeed); 
 
-/**
- * This function will generate paramas needed to create pools
- * @param tokens Input tokens to be used to create pool generation params
- * @returns
- */
-export function generatePoolParams(tokens: Contract[]): [HPoolParams[], CPoolParams[]] {
-  let hPoolParamsList: HPoolParams[] = [];
-  let cPoolParamsList: CPoolParams[] = [];
-  const poolCount = tokens.length - 1;
-
-  for (let poolIndex = 0; poolIndex < poolCount; poolIndex++) {
-    const tokenA = tokens[poolIndex];
-    const tokenB = tokens[poolIndex + 1];
-
-    if (poolIndex % 2 == 0) {
-      const hybridParams: HPoolParams = {
-        A: 6000,
-        fee: 0.003,
-        reserveAExponent: 19,
-        reserveBExponent: 19,
-        minLiquidity: 1000,
-        TokenA: tokenA,
-        TokenB: tokenB,
-      };
-
-      hPoolParamsList.push(hybridParams);
-    } else {
-      const cpParams: CPoolParams = {
-        fee: 0.003,
-        reserveAExponent: 33,
-        reserveBExponent: 33,
-        minLiquidity: 1000,
-        TokenA: tokenA,
-        TokenB: tokenB,
-      };
-
-      cPoolParamsList.push(cpParams);
-    }
-  }
-
-  return [hPoolParamsList, cPoolParamsList];
+export function getRandomPool(rnd: () => number, t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts) {
+  if (price !== STABLE_TOKEN_PRICE) return getCPPool(rnd, t0, t1, price, deploymentContracts)
+  if (rnd() < 0.5) getCPPool(rnd, t0, t1, price, deploymentContracts)
+  return getHybridPool(rnd, t0, t1, deploymentContracts)
 }
 
-/**
- * This method will generate & deploy hybrid pools using the params specified
- * @param hPoolParams 
- * @param HybridPoolFactory 
- * @param hybridPoolContract 
- * @param masterDeployerContract 
- * @param bentoContract 
- * @param account 
- * @returns 
- */
-export async function generateHybridPoolsFromParams(
-  hPoolParams: HPoolParams[],
-  HybridPoolFactory: ContractFactory,
-  hybridPoolContract: Contract,
-  masterDeployerContract: Contract,
-  bentoContract: Contract,
-  account: SignerWithAddress
-): Promise<RHybridPool[]> {
-  let hybridPoolList: RHybridPool[] = [];
-
-  for (let index = 0; index < hPoolParams.length; index++) {
-    const params = hPoolParams[index];
-    const A = params.A;
-
-    const [, reserveABN] = getIntegerRandomValueWithMin(params.reserveAExponent, params.minLiquidity, rnd);
-    const [, reserveBBN] = getIntegerRandomValueWithMin(params.reserveBExponent, params.minLiquidity, rnd);
-
-    const fee = Math.round(params.fee * 10_000);
-
-    const deployData = ethers.utils.defaultAbiCoder.encode(["address", "address", "uint256", "uint256"], [params.TokenA.address, params.TokenB.address, fee, params.A]);
-
-    const hybridPool: Contract = await HybridPoolFactory.attach(
-      (
-        await (await masterDeployerContract.deployPool(hybridPoolContract.address, deployData)).wait()
-      ).events[0].args[1]
-    );
-
-    await bentoContract.transfer(params.TokenA.address, account.address, hybridPool.address, reserveABN );
-    await bentoContract.transfer(params.TokenB.address, account.address, hybridPool.address, reserveBBN);
-
-    await hybridPool.mint(ethers.utils.defaultAbiCoder.encode(["address"], [account.address]));
-
-    const hybridPoolInfo = new RHybridPool({
-      A,
-      reserve0: reserveABN,
-      reserve1: reserveBBN,
-      address: hybridPool.address,
-      token0: { address: params.TokenA.address, name: params.TokenA.address },
-      token1: { address: params.TokenB.address, name: params.TokenB.address },
-      fee: fee,
-    });
-
-    hybridPoolList.push(hybridPoolInfo);
-  }
-
-  return hybridPoolList;
+function getPoolReserve(rnd: () => number) {
+  return getRandom(rnd, MIN_POOL_RESERVE, MAX_POOL_RESERVE)
 }
 
-/**
- * This function will generate and deploy collection of constant product pools using the params specified
- * @param cPoolParams 
- * @param constPoolFactory 
- * @param constantPoolContract 
- * @param masterDeployerContract 
- * @param bentoContract 
- * @param account 
- * @returns 
- */
-export async function generateConstantPoolsFromParams(
-    cPoolParams: CPoolParams[], 
-    constPoolFactory: ContractFactory, 
-    constantPoolContract: Contract, 
-    masterDeployerContract: Contract, 
-    bentoContract: Contract, 
-    account: SignerWithAddress): Promise<RConstantProductPool[]> {
+function getPoolFee(rnd: () => number) {
+  const fees = [0.003, 0.001, 0.0005]
+  const cmd = choice(rnd, {
+    0: 1,
+    1: 1,
+    2: 1
+  })
+  return fees[parseInt(cmd)]
+}
 
-    let constantPoolList: RConstantProductPool[] = [];
+function getPoolImbalance(rnd: () => number) {
+  return getRandom(rnd, MIN_POOL_IMBALANCE, MAX_POOL_IMBALANCE)
+}
 
-    for (let index = 0; index < cPoolParams.length; index++) {
-        const params = cPoolParams[index];
+function getPoolA(rnd: () => number) {
+  return Math.floor(getRandom(rnd, MIN_HYBRID_A, MAX_HYBRID_A))
+}
 
-        const [, reserveABN] = getIntegerRandomValueWithMin(params.reserveAExponent, params.minLiquidity, rnd);
-        const [, reserveBBN] = getIntegerRandomValueWithMin(params.reserveBExponent, params.minLiquidity, rnd);
-        
-        const fee = Math.round(params.fee * 10_000);
+async function getCPPool(rnd: () => number, t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts) {
+  if (rnd() < 0.5) {
+    const t = t0
+    t0 = t1
+    t1 = t
+    price = 1 / price
+  }
 
-        const deployData = ethers.utils.defaultAbiCoder.encode(["address", "address", "uint256", "bool"], [params.TokenA.address, params.TokenB.address, fee, true]);
+  const fee = getPoolFee(rnd) * 10_000;
+  const imbalance = getPoolImbalance(rnd)
 
-        const constantProductPool: Contract = await constPoolFactory.attach(
-        (
-          await (await masterDeployerContract.deployPool(constantPoolContract.address, deployData)).wait()
-        ).events[0].args[1]); 
-        
-        await bentoContract.transfer(params.TokenA.address, account.address, constantProductPool.address, reserveABN);
-        await bentoContract.transfer(params.TokenB.address, account.address, constantProductPool.address, reserveBBN);
-        
-        await constantProductPool.mint(ethers.utils.defaultAbiCoder.encode(["address"], [account.address]));
-        
-        const cpPoolInfo: RConstantProductPool = new RConstantProductPool({
-            reserve0: reserveABN,
-            reserve1: reserveBBN,
-            address: constantProductPool.address,
-            token0: { address: params.TokenA.address, name: params.TokenA.address },
-            token1: { address: params.TokenB.address, name: params.TokenB.address },
-            fee: fee,
-        });
+  let reserve0 = getPoolReserve(rnd)
+  let reserve1 = reserve0 * price * imbalance
+  const maxReserve = Math.max(reserve0, reserve1)
+  if (maxReserve > MAX_LIQUIDITY) {
+    const reduceRate = (maxReserve / MAX_LIQUIDITY) * 1.00000001
+    reserve0 /= reduceRate
+    reserve1 /= reduceRate
+  }
+  const minReserve = Math.min(reserve0, reserve1)
+  if (minReserve < MIN_LIQUIDITY) {
+    const raseRate = (MIN_LIQUIDITY / minReserve) * 1.00000001
+    reserve0 *= raseRate
+    reserve1 *= raseRate
+  }
+  console.assert(reserve0 >= MIN_LIQUIDITY && reserve0 <= MAX_LIQUIDITY, 'Error reserve0 clculation')
+  console.assert(reserve1 >= MIN_LIQUIDITY && reserve1 <= MAX_LIQUIDITY, 'Error reserve1 clculation ' + reserve1)
 
-        constantPoolList.push(cpPoolInfo);
-        
-    }
+  const deployData = ethers.utils.defaultAbiCoder.encode(
+      ["address", "address", "uint256", "bool"], 
+      [t0.address, t1.address, fee, true]);
 
-    return constantPoolList;
+  const constantProductPool: Contract = await deploymentContracts.constPoolFactory.attach(
+  (
+    await (await deploymentContracts.masterDeployerContract.deployPool(deploymentContracts.constantPoolContract.address, deployData)).wait()
+  ).events[0].args[1]); 
+  
+  await deploymentContracts.bentoContract.transfer(t0.address, deploymentContracts.account.address, constantProductPool.address, getBigNumber(undefined, reserve0));
+  await deploymentContracts.bentoContract.transfer(t1.address, deploymentContracts.account.address, constantProductPool.address, getBigNumber(undefined, reserve1));
+  
+  await constantProductPool.mint(ethers.utils.defaultAbiCoder.encode(["address"], [deploymentContracts.account.address]));
+       
+  return new RConstantProductPool({
+    token0: t0,
+    token1: t1,
+    address: `pool cp ${t0.name} ${t1.name} ${reserve0} ${price} ${fee}`,
+    reserve0: getBigNumber(undefined, reserve0),
+    reserve1: getBigNumber(undefined, reserve1),
+    fee
+  })
+}
+
+async function getHybridPool(
+  rnd: () => number, 
+  t0: RToken, 
+  t1: RToken, 
+  deploymentContracts: PoolDeploymentContracts) {
+  const fee = getPoolFee(rnd) * 10_000;
+  const imbalance = getPoolImbalance(rnd)
+  const A = getPoolA(rnd)
+
+  let reserve0 = getPoolReserve(rnd)
+  let reserve1 = reserve0 * STABLE_TOKEN_PRICE * imbalance
+  const maxReserve = Math.max(reserve0, reserve1)
+  if (maxReserve > MAX_LIQUIDITY) {
+    const reduceRate = (maxReserve / MAX_LIQUIDITY) * 1.00000001
+    reserve0 /= reduceRate
+    reserve1 /= reduceRate
+  }
+  const minReserve = Math.min(reserve0, reserve1)
+  if (minReserve < MIN_LIQUIDITY) {
+    const raseRate = (MIN_LIQUIDITY / minReserve) * 1.00000001
+    reserve0 *= raseRate
+    reserve1 *= raseRate
+  }
+  console.assert(reserve0 >= MIN_LIQUIDITY && reserve0 <= MAX_LIQUIDITY, 'Error reserve0 clculation')
+  console.assert(reserve1 >= MIN_LIQUIDITY && reserve1 <= MAX_LIQUIDITY, 'Error reserve1 clculation ' + reserve1)
+
+
+  const deployData = ethers.utils.defaultAbiCoder.encode(
+    ["address", "address", "uint256", "uint256"], 
+    [t0.address, t1.address, fee, A]);
+
+  const hybridPool: Contract = await deploymentContracts.hybridPoolFactory.attach(
+    (
+      await (await deploymentContracts.masterDeployerContract.deployPool(deploymentContracts.hybridPoolContract.address, deployData)).wait()
+    ).events[0].args[1]
+  );
+
+    await deploymentContracts.bentoContract.transfer(t0.address, deploymentContracts.account.address, hybridPool.address, getBigNumber(undefined, reserve0));
+    await deploymentContracts.bentoContract.transfer(t1.address, deploymentContracts.account.address, hybridPool.address, getBigNumber(undefined, reserve1));
+
+    await hybridPool.mint(ethers.utils.defaultAbiCoder.encode(["address"], [deploymentContracts.account.address]));
+  
+  return new RHybridPool({
+    token0: t0,
+    token1: t1,
+    address: `pool hb ${t0.name} ${t1.name} ${reserve0} ${1} ${fee}`,
+    reserve0: getBigNumber(undefined, reserve0),
+    reserve1: getBigNumber(undefined, reserve1),
+    fee,
+    A
+  })
 }

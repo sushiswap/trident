@@ -1,12 +1,12 @@
-import { Pool } from "@sushiswap/sdk";
-import { Contract } from "ethers";
-import { RHybridPool, RConstantProductPool } from "@sushiswap/sdk";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
+import { Pool, RToken } from "@sushiswap/sdk";
+import { BigNumber, Contract, ContractFactory } from "ethers";
 
 export interface Topology {
-  tokens: Map<string, Contract>;
-  prices: TokenPrice[];
-  hybridPools: RHybridPool[];
-  constantPools: RConstantProductPool[];
+  tokens: RToken[];
+  prices: number[];
+  pools: Pool[];
+  tokenContracts: Contract[];
 }
 
 export interface HPoolParams {
@@ -32,4 +32,47 @@ export interface TokenPrice {
   name: string;
   address: string;
   price: number;
+}
+
+export interface Variants {
+  [key: string]: number
+}
+
+export interface PoolDeploymentContracts {
+  hybridPoolFactory: ContractFactory,
+  hybridPoolContract: Contract,
+  constPoolFactory: ContractFactory, 
+  constantPoolContract: Contract, 
+  masterDeployerContract: Contract,
+  bentoContract: Contract,
+  account: SignerWithAddress
+}
+
+// Complex path types
+export interface InitialPath {
+  tokenIn: string;
+  pool: string;
+  native: boolean;
+  amount: BigNumber;
+  data: string;
+}
+
+export interface PercentagePath {
+  tokenIn: string;
+  pool: string;
+  balancePercentage: number; // @dev Multiplied by 10^6.
+  data: string;
+}
+
+export interface Output {
+  token: string;
+  to: string;
+  unwrapBento: boolean;
+  minAmount: BigNumber;
+}
+
+export interface ComplexPathParams {
+  initialPath: InitialPath[];
+  percentagePath: PercentagePath[];
+  output: Output[];
 }

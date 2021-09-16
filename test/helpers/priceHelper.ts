@@ -1,5 +1,9 @@
 import { Pool } from "@sushiswap/sdk";
 import { TokenPrice } from "./helperInterfaces";
+import { getRandom } from "./randomHelper";
+
+const MIN_TOKEN_PRICE = 1e-6
+const MAX_TOKEN_PRICE = 1e6
 
 /**
  * This function will calculate the prices of tokens in the specified pools
@@ -19,4 +23,10 @@ export function getTokenPricesFromPool(pool: Pool) : TokenPrice[] {
     prices.push({ name: pool.token1.name, address: pool.token1.address, price: TokenBPrice});
 
     return prices;
-} 
+}
+
+
+export function getTokenPrice(rnd: () => number) {
+    const price = getRandom(rnd, MIN_TOKEN_PRICE, MAX_TOKEN_PRICE)
+    return price
+}

@@ -1,18 +1,20 @@
 import { ethers } from "hardhat";
-import { getBigNumber } from "@sushiswap/sdk";
+import { getBigNumber, RToken, MultiRoute, findMultiRouting } from "@sushiswap/sdk";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { Contract, ContractFactory } from "ethers";
+import seedrandom from 'seedrandom'
 
-import { Topology, HPoolParams, CPoolParams } from "./helperInterfaces";
-import { generatePoolParams, generateHybridPoolsFromParams, generateConstantPoolsFromParams } from "./poolHelpers";
-import { getTokenPricesFromPool } from "./priceHelper";
-import { ConstantProductPoolFactory } from "../../types";
+import { Topology, PoolDeploymentContracts, InitialPath, PercentagePath, Output, ComplexPathParams } from "./helperInterfaces";
+import { getRandomPool } from "./poolHelpers";
+import { getTokenPrice } from "./priceHelper";
+import { STABLE_TOKEN_PRICE } from "./constants";
+
+const testSeed = '2'; // Change it to change random generator values
+const rnd: () => number = seedrandom(testSeed); // random [0, 1)
+
 
 let alice: SignerWithAddress,
-  feeTo: SignerWithAddress,
-  usdt: Contract,
-  usdc: Contract,
-  dai: Contract,
+  feeTo: SignerWithAddress, 
   weth: Contract,
   bento: Contract,
   masterDeployer: Contract,
@@ -22,20 +24,14 @@ let alice: SignerWithAddress,
   HybridPoolFactory: ContractFactory,
   ConstPoolFactory: ContractFactory,
   HybridPoolContractFactory: ContractFactory,
-  ConstantPoolContractFactory: ContractFactory
+  ConstantPoolContractFactory: ContractFactory,
+  ERC20Factory: ContractFactory;
 
 const tokenSupply = getBigNumber(undefined, Math.pow(10, 37));
   
-export async function init(): Promise<Contract[]> {
-  let testTokens: Contract[]
-
+export async function init() {
   await createAccounts();
-  await deployContracts()
-  await fundAccount();
-  
-  testTokens = [weth, usdt, usdc, dai]
-
-  return testTokens; 
+  await deployContracts();
 }
 
 async function createAccounts() {
@@ -43,7 +39,7 @@ async function createAccounts() {
 }
 
 async function deployContracts() {
-  const ERC20Factory = await ethers.getContractFactory("ERC20Mock");
+  ERC20Factory = await ethers.getContractFactory("ERC20Mock");
   const BentoFactory = await ethers.getContractFactory("BentoBoxV1");
   const MasterDeployerFactory = await ethers.getContractFactory(
     "MasterDeployer"
@@ -58,9 +54,9 @@ async function deployContracts() {
   ConstantPoolContractFactory = await ethers.getContractFactory(
     "ConstantProductPool"
   );
-
-  //Deploy test tokens
-  await deployTokens(ERC20Factory);
+  
+  weth = await ERC20Factory.deploy("WETH", "WETH", tokenSupply);
+  await weth.deployed();
 
   // deploy bento
   bento = await BentoFactory.deploy(weth.address);
@@ -91,48 +87,6 @@ async function deployContracts() {
 
   // whitelist router to bento
   await bento.whitelistMasterContract(router.address, true);
-}
-
-async function deployTokens(erc20ContractFactory: ContractFactory) {
-  weth = await erc20ContractFactory.deploy("WETH", "WETH", tokenSupply);
-  await weth.deployed();
-
-  usdt = await erc20ContractFactory.deploy("USDT", "USDT", tokenSupply);
-  await usdt.deployed();
-
-  usdc = await erc20ContractFactory.deploy("USDC", "USDC", tokenSupply);
-  await usdc.deployed();
-
-  dai = await erc20ContractFactory.deploy("DAI", "DAI", tokenSupply);
-  await dai.deployed();
-}
-
-async function fundAccount() {
-  await usdc.approve(bento.address, tokenSupply);
-  await usdt.approve(bento.address, tokenSupply);
-  await dai.approve(bento.address, tokenSupply);
-
-  await bento.deposit(
-    usdc.address,
-    alice.address,
-    alice.address,
-    tokenSupply,
-    0
-  );
-  await bento.deposit(
-    usdt.address,
-    alice.address,
-    alice.address,
-    tokenSupply,
-    0
-  );
-  await bento.deposit(
-    dai.address,
-    alice.address,
-    alice.address,
-    tokenSupply,
-    0
-  );
 
   await bento.setMasterContractApproval(
     alice.address,
@@ -144,45 +98,132 @@ async function fundAccount() {
   );
 } 
 
+async function approveAndFund(contracts: Contract[]){
+  for (let index = 0; index < contracts.length; index++) {
+    const tokenContract = contracts[index];
+
+    await tokenContract.approve(bento.address, tokenSupply);
+    await bento.deposit(tokenContract.address, alice.address, alice.address, tokenSupply, 0); 
+  }
+} 
+
 /**
  * Generates topology using specified tokens. 
  * @param tokens Token to be included in the topology. Must be more than one token
  * @returns 
  */
-export async function getTopoplogy(tokens: Contract[]): Promise<Topology> {
-  // getXXTopology (this, that, ...) => topology: list of tokens + prices + pools with reserves
+export async function getTopoplogy(rnd: () => number, tokenNumber: number): Promise<Topology> {
+  
   let topology: Topology = {
-    tokens: new Map<string, Contract>(), 
+    tokens: [], 
     prices: [],
-    hybridPools: [],
-    constantPools: []
+    pools: [],
+    tokenContracts: []
   };
 
-  if (tokens.length <= 1)
-    throw new Error(
-      "Input token count needs to be greater than 1 to generate topology"
-    );
- 
-  //Generate pool params
-  const [hPoolParams, cPoolParams] = generatePoolParams(tokens);
+  const poolDeployment: PoolDeploymentContracts = {
+    hybridPoolFactory: HybridPoolContractFactory,
+    hybridPoolContract: hybridPool,
+    constPoolFactory: ConstantPoolContractFactory, 
+    constantPoolContract: constantProductPool, 
+    masterDeployerContract: masterDeployer,
+    bentoContract: bento,
+    account: alice
+  };
 
-  //Generate hybrid pools
-  topology.hybridPools = await generateHybridPoolsFromParams(hPoolParams, HybridPoolContractFactory, hybridPool, masterDeployer, bento, alice);
-
-  for (let index = 0; index < topology.hybridPools.length; index++) {
-    const poolPrices = getTokenPricesFromPool(topology.hybridPools[0]);
-    topology.prices.concat(poolPrices);
+  //Create tokens
+  for (var i = 0; i < tokenNumber; ++i) {
+    topology.tokens.push({ name: 'Token' + i, address: '' + i })
+    if (i <= tokenNumber * 0.3) topology.prices.push(STABLE_TOKEN_PRICE)
+    else topology.prices.push(getTokenPrice(rnd))
   }
 
-  //Generate constant pools
-  topology.constantPools = await generateConstantPoolsFromParams(cPoolParams, ConstantPoolContractFactory, constantProductPool, masterDeployer, bento, alice);
-
-  for (let index = 0; index < topology.constantPools.length; index++) {
-    const poolPrices = getTokenPricesFromPool(topology.constantPools[0]);
-    topology.prices.concat(poolPrices);
+  //Deploy tokens 
+  for (let i = 0; i < topology.tokens.length; i++) {
+    const tokenContract = await ERC20Factory.deploy(topology.tokens[0].name, topology.tokens[0].name , tokenSupply);
+    await tokenContract.deployed();
+    topology.tokenContracts.push(tokenContract);
+    topology.tokens[i].address = tokenContract.address;
   }
+
+  await approveAndFund(topology.tokenContracts);
+
+  //Create pools
+  for (i = 0; i <= tokenNumber; ++i) {
+    for (var j = i + 1; j < tokenNumber; ++j) {
+      topology.pools.push(await getRandomPool(rnd, topology.tokens[i], topology.tokens[j], topology.prices[i] / topology.prices[j], poolDeployment))
+    }
+  } 
 
   return topology;
+}
+
+
+export function getRouteFromTopology(fromToken: RToken, toToken: RToken, baseToken: RToken, topology: Topology, amountIn: number, gasPrice: number): MultiRoute {
+  
+  topology.pools[0].token1 = topology.pools[1].token0;
+  
+  const route = findMultiRouting(fromToken, toToken, amountIn, topology.pools, baseToken, gasPrice);
+
+  return route;
+}
+
+export function getComplexPathParamsFromMultiRoute(multiRoute: MultiRoute, senderAddress: string) {
+
+  // let testPaths: Path[] = [];
+
+  // for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
+  //   const path: Path = {
+  //     pool: multiRoute.legs[legIndex].address,
+  //     data: ethers.utils.defaultAbiCoder.encode(
+  //       ["address", "address", "bool"],
+  //       [multiRoute.legs[legIndex].token.address, senderAddress, true]
+  //     ),
+  //   };
+  //   testPaths.push(path);
+  // }
+
+  let initialPaths: InitialPath[] = [
+    {
+      tokenIn: multiRoute.legs[0].token.address,
+      pool: multiRoute.legs[0].address,
+      amount: getBigNumber(undefined, multiRoute.amountIn),
+      native: false,
+      data: ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [multiRoute.legs[0].token.address, multiRoute.legs[1].address, false] //to address
+      ),
+    },
+  ];
+
+  let percentagePaths: PercentagePath[] = [
+    {
+      tokenIn: multiRoute.legs[1].token.address,
+      pool: multiRoute.legs[1].address,
+      balancePercentage: multiRoute.legs[1].swapPortion * 1_000_000,
+      data: ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [multiRoute.legs[1].token.address, senderAddress, false]
+      ),
+    },
+  ];
+
+  let outputs: Output[] = [
+    {
+      token: multiRoute.legs[1].token.address,
+      to: senderAddress,
+      unwrapBento: false,
+      minAmount: getBigNumber(undefined, 0),
+    },
+  ];
+
+  const complexParams: ComplexPathParams = {
+    initialPath: initialPaths,
+    percentagePath: percentagePaths,
+    output: outputs,
+  };
+
+  return complexParams;
 }
 
 
