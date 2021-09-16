@@ -124,8 +124,8 @@ contract TridentHelper {
     /// @notice Provides low-level `wETH` {withdraw}.
     /// @param amount Token amount to unwrap into ETH.
     function withdrawFromWETH(uint256 amount) internal {
-        (bool success, bytes memory data) = wETH.call(abi.encodeWithSelector(0x2e1a7d4d, amount)); // @dev withdraw(uint256).
-        require(success && data.length >= 32, "WITHDRAW_FROM_WETH_FAILED");
+        (bool success, ) = wETH.call(abi.encodeWithSelector(0x2e1a7d4d, amount)); // @dev withdraw(uint256).
+        require(success, "WITHDRAW_FROM_WETH_FAILED");
     }
 
     /// @notice Provides 'safe' ETH transfer.
