@@ -16,7 +16,7 @@ describe("MultiPool Routing Tests", function () {
   it("Should Test Normal Values", async function () {
     await init();
 
-    const topology = await getABCTopoplogy(["USDC", "USDT", "DAI"], rnd);
+    const topology = await getABCTopoplogy();
 
     const fromToken = topology.tokens[0];
     const toToken = topology.tokens[2];
@@ -42,6 +42,7 @@ describe("MultiPool Routing Tests", function () {
       toToken.address,
       signer.address
     );
+    console.log("Output balance before", outputBalanceBefore.toString());
 
     await tridentRouter.connect(signer).complexPath(routerParams);
 
@@ -49,8 +50,12 @@ describe("MultiPool Routing Tests", function () {
       toToken.address,
       signer.address
     );
+    console.log("Output balance after", outputBalanceAfter.toString());
 
     const amountOutPoolBN = outputBalanceAfter.sub(outputBalanceBefore);
+
+    console.log("Expected amount out", route.amountOut.toString());
+    console.log("Actual amount out", amountOutPoolBN.toString());
 
     expect(
       areCloseValues(

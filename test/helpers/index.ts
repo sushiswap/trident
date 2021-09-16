@@ -12,7 +12,6 @@ import { STABLE_TOKEN_PRICE } from "./constants";
 const testSeed = '2'; // Change it to change random generator values
 const rnd: () => number = seedrandom(testSeed); // random [0, 1)
 
-
 let alice: SignerWithAddress,
   feeTo: SignerWithAddress, 
   weth: Contract,
@@ -112,8 +111,10 @@ async function approveAndFund(contracts: Contract[]){
  * @param tokens Token to be included in the topology. Must be more than one token
  * @returns 
  */
-export async function getABCTopoplogy(tokenNames: string[], rnd: () => number): Promise<Topology> {
+export async function getABCTopoplogy(): Promise<Topology> {
   
+  const tokenNames = ["USDC", "USDT", "DAI"];
+
   let topology: Topology = {
     tokens: [], 
     prices: [],
