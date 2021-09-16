@@ -256,12 +256,12 @@ export function convertRoute(multiRoute: MultiRoute, senderAddress: string) {
 export async function executeContractRouter(routerParams: ComplexPathParams, toTokenAddress: string) {
    
   let outputBalanceBefore: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
-  console.log("Output balance before", outputBalanceBefore.toString());
+  // console.log("Output balance before", outputBalanceBefore.toString());
 
   await (await router.connect(alice).complexPath(routerParams)).wait();
 
   let outputBalanceAfter: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
-  console.log("Output balance after", outputBalanceAfter.toString());
+  // console.log("Output balance after", outputBalanceAfter.toString());
 
   return outputBalanceAfter.sub(outputBalanceBefore);
 }
