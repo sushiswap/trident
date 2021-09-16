@@ -18,8 +18,8 @@ contract IndexPool is IPool, TridentERC20 {
     uint256 public immutable swapFee;
 
     address public immutable barFeeTo;
-    address public immutable bento;
-    address public immutable masterDeployer;
+    IBentoBoxMinimal public immutable bento;
+    IMasterDeployer public immutable masterDeployer;
 
     uint256 internal constant BASE = 10**18;
     uint256 internal constant MIN_TOKENS = 2;
@@ -80,15 +80,11 @@ contract IndexPool is IPool, TridentERC20 {
         // @dev This burns initial LP supply.
         _mint(address(0), INIT_POOL_SUPPLY); 
 
-        (, bytes memory _barFee) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
-        (, bytes memory _barFeeTo) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFeeTo.selector));
-        (, bytes memory _bento) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.bento.selector));
-        
         swapFee = _swapFee;
-        barFee = abi.decode(_barFee, (uint256));
-        barFeeTo = abi.decode(_barFeeTo, (address));
-        bento = abi.decode(_bento, (address));
-        masterDeployer = _masterDeployer;
+        barFee = IMasterDeployer(_masterDeployer).barFee();
+        barFeeTo = IMasterDeployer(_masterDeployer).barFeeTo();
+        bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
+        masterDeployer = IMasterDeployer(_masterDeployer);
         unlocked = 1;
     }
     
@@ -224,14 +220,11 @@ contract IndexPool is IPool, TridentERC20 {
     
     /// @dev Updates `barFee` for Trident protocol.
     function updateBarFee() public {
-        (, bytes memory _barFee) = masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
-        barFee = abi.decode(_barFee, (uint256));
+        barFee = IMasterDeployer(masterDeployer).barFee();
     }
     
     function _balance(address token) internal view returns (uint256 balance) {
-        (, bytes memory data) = bento.staticcall(abi.encodeWithSelector(IBentoBoxMinimal.balanceOf.selector, 
-            token, address(this)));
-        balance = abi.decode(data, (uint256));
+        balance = bento.balanceOf(token, address(this));
     }
 
     function _getAmountOut(
@@ -343,13 +336,9 @@ contract IndexPool is IPool, TridentERC20 {
         bool unwrapBento
     ) internal {
         if (unwrapBento) {
-            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.withdraw.selector, 
-                token, address(this), to, 0, shares));
-            require(success, "WITHDRAW_FAILED");
+            bento.withdraw(token, address(this), to, 0, shares);
         } else {
-            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.transfer.selector, 
-                token, address(this), to, shares));
-            require(success, "TRANSFER_FAILED");
+            bento.transfer(token, address(this), to, shares);
         }
     }
     
