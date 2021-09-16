@@ -206,11 +206,20 @@ export function getComplexPathParamsFromMultiRoute(multiRoute: MultiRoute, sende
         [multiRoute.legs[1].token.address, senderAddress, false]
       ),
     },
+    {
+      tokenIn: multiRoute.legs[2].token.address,
+      pool: multiRoute.legs[2].address,
+      balancePercentage: multiRoute.legs[2].swapPortion * 1_000_000,
+      data: ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [multiRoute.legs[2].token.address, senderAddress, false]
+      ),
+    },
   ];
 
   let outputs: Output[] = [
     {
-      token: multiRoute.legs[1].token.address,
+      token: multiRoute.legs[2].token.address,
       to: senderAddress,
       unwrapBento: false,
       minAmount: getBigNumber(undefined, 0),
