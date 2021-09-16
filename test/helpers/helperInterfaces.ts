@@ -7,6 +7,9 @@ export interface Topology {
   prices: number[];
   pools: Pool[];
   tokenContracts: Contract[];
+  signer: SignerWithAddress;
+  bento: Contract,
+  tridentRouter: Contract
 }
 
 export interface HPoolParams {

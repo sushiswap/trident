@@ -3,12 +3,12 @@ import seedrandom from "seedrandom";
 import { ethers } from "hardhat";
 import { RHybridPool, RConstantProductPool, getBigNumber, RToken } from "@sushiswap/sdk";
 
-import { PoolDeploymentContracts } from "./helperInterfaces"; 
+import { PoolDeploymentContracts } from "./helperInterfaces";
 import { MAX_HYBRID_A, MAX_LIQUIDITY, MAX_POOL_IMBALANCE, MAX_POOL_RESERVE, MIN_HYBRID_A, MIN_LIQUIDITY, MIN_POOL_IMBALANCE, MIN_POOL_RESERVE, STABLE_TOKEN_PRICE } from "./constants";
 import { choice, getRandom } from "./randomHelper";
 
 const testSeed = "7";
-const rnd = seedrandom(testSeed); 
+const rnd = seedrandom(testSeed);
 
 export function getRandomPool(rnd: () => number, t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts) {
   if (price !== STABLE_TOKEN_PRICE) return getCPPool(rnd, t0, t1, price, deploymentContracts)
@@ -39,12 +39,12 @@ function getPoolA(rnd: () => number) {
 }
 
 async function getCPPool(rnd: () => number, t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts) {
-  if (rnd() < 0.5) {
-    const t = t0
-    t0 = t1
-    t1 = t
-    price = 1 / price
-  }
+  // if (rnd() < 0.5) {
+  //   const t = t0
+  //   t0 = t1
+  //   t1 = t
+  //   price = 1 / price
+  // }
 
   const fee = getPoolFee(rnd) * 10_000;
   const imbalance = getPoolImbalance(rnd)
@@ -67,33 +67,33 @@ async function getCPPool(rnd: () => number, t0: RToken, t1: RToken, price: numbe
   console.assert(reserve1 >= MIN_LIQUIDITY && reserve1 <= MAX_LIQUIDITY, 'Error reserve1 clculation ' + reserve1)
 
   const deployData = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint256", "bool"], 
+      ["address", "address", "uint256", "bool"],
       [t0.address, t1.address, fee, true]);
 
   const constantProductPool: Contract = await deploymentContracts.constPoolFactory.attach(
   (
     await (await deploymentContracts.masterDeployerContract.deployPool(deploymentContracts.constantPoolContract.address, deployData)).wait()
-  ).events[0].args[1]); 
-  
+  ).events[0].args[1]);
+
   await deploymentContracts.bentoContract.transfer(t0.address, deploymentContracts.account.address, constantProductPool.address, getBigNumber(undefined, reserve0));
   await deploymentContracts.bentoContract.transfer(t1.address, deploymentContracts.account.address, constantProductPool.address, getBigNumber(undefined, reserve1));
-  
+
   await constantProductPool.mint(ethers.utils.defaultAbiCoder.encode(["address"], [deploymentContracts.account.address]));
-       
+
   return new RConstantProductPool({
     token0: t0,
     token1: t1,
-    address: `pool cp ${t0.name} ${t1.name} ${reserve0} ${price} ${fee}`,
+    address: constantProductPool.address,
     reserve0: getBigNumber(undefined, reserve0),
     reserve1: getBigNumber(undefined, reserve1),
-    fee
+    fee: fee / 10_000
   })
 }
 
 async function getHybridPool(
-  rnd: () => number, 
-  t0: RToken, 
-  t1: RToken, 
+  rnd: () => number,
+  t0: RToken,
+  t1: RToken,
   deploymentContracts: PoolDeploymentContracts) {
   const fee = getPoolFee(rnd) * 10_000;
   const imbalance = getPoolImbalance(rnd)
@@ -118,7 +118,7 @@ async function getHybridPool(
 
 
   const deployData = ethers.utils.defaultAbiCoder.encode(
-    ["address", "address", "uint256", "uint256"], 
+    ["address", "address", "uint256", "uint256"],
     [t0.address, t1.address, fee, A]);
 
   const hybridPool: Contract = await deploymentContracts.hybridPoolFactory.attach(
@@ -131,14 +131,14 @@ async function getHybridPool(
     await deploymentContracts.bentoContract.transfer(t1.address, deploymentContracts.account.address, hybridPool.address, getBigNumber(undefined, reserve1));
 
     await hybridPool.mint(ethers.utils.defaultAbiCoder.encode(["address"], [deploymentContracts.account.address]));
-  
+
   return new RHybridPool({
     token0: t0,
     token1: t1,
-    address: `pool hb ${t0.name} ${t1.name} ${reserve0} ${1} ${fee}`,
+    address: hybridPool.address,
     reserve0: getBigNumber(undefined, reserve0),
     reserve1: getBigNumber(undefined, reserve1),
-    fee,
-    A
+    fee: fee / 10_000,
+    A: A
   })
 }
