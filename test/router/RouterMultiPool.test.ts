@@ -1,7 +1,7 @@
 import seedrandom from "seedrandom";
 
 import {
-  getComplexPathParamsFromMultiRoute,
+  convertRoute,
   getRouteFromTopology,
   getTopoplogy,
   init,

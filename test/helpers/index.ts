@@ -168,7 +168,7 @@ export function getRouteFromTopology(fromToken: RToken, toToken: RToken, baseTok
   return route;
 }
 
-export function getComplexPathParamsFromMultiRoute(multiRoute: MultiRoute, senderAddress: string) {
+export function convertRoute(multiRoute: MultiRoute, senderAddress: string) {
 
   // let testPaths: Path[] = [];
 
