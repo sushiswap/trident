@@ -1,10 +1,10 @@
 import { ethers } from "hardhat";
 import { getBigNumber, RToken, MultiRoute, findMultiRouting } from "@sushiswap/sdk";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
-import { Contract, ContractFactory } from "ethers";
+import { BigNumber, Contract, ContractFactory } from "ethers";
 import seedrandom from 'seedrandom'
 
-import { Topology, PoolDeploymentContracts, InitialPath, PercentagePath, Output, ComplexPathParams } from "./helperInterfaces";
+import { Topology, PoolDeploymentContracts, InitialPath, PercentagePath, Output, ComplexPathParams, TestContracts } from "./helperInterfaces";
 import { getRandomPool } from "./poolHelpers";
 import { getTokenPrice } from "./priceHelper";
 import { STABLE_TOKEN_PRICE } from "./constants";
@@ -28,9 +28,11 @@ let alice: SignerWithAddress,
 
 const tokenSupply = getBigNumber(undefined, Math.pow(10, 37));
   
-export async function init() {
+export async function init() : Promise<SignerWithAddress> {
   await createAccounts();
   await deployContracts();
+
+  return alice;
 }
 
 async function createAccounts() {
@@ -114,15 +116,12 @@ async function approveAndFund(contracts: Contract[]){
 export async function getABCTopoplogy(): Promise<Topology> {
   
   const tokenNames = ["USDC", "USDT", "DAI"];
+  const tokenContracts: Contract[] = [];
 
   let topology: Topology = {
     tokens: [], 
     prices: [],
-    pools: [],
-    tokenContracts: [],
-    signer: alice,
-    bento: bento,
-    tridentRouter: router
+    pools: []
   };
 
   const poolDeployment: PoolDeploymentContracts = {
@@ -148,11 +147,11 @@ export async function getABCTopoplogy(): Promise<Topology> {
   for (let i = 0; i < topology.tokens.length; i++) {
     const tokenContract = await ERC20Factory.deploy(topology.tokens[0].name, topology.tokens[0].name , tokenSupply);
     await tokenContract.deployed();
-    topology.tokenContracts.push(tokenContract);
+    tokenContracts.push(tokenContract);
     topology.tokens[i].address = tokenContract.address;
   }
 
-  await approveAndFund(topology.tokenContracts);
+  await approveAndFund(tokenContracts);
 
   //Create pools
   for (i = 0; i < poolCount; i++) {
@@ -252,6 +251,19 @@ export function convertRoute(multiRoute: MultiRoute, senderAddress: string) {
   };
 
   return complexParams;
+}
+
+export async function executeContractRouter(routerParams: ComplexPathParams, toTokenAddress: string) {
+   
+  let outputBalanceBefore: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
+  console.log("Output balance before", outputBalanceBefore.toString());
+
+  await (await router.connect(alice).complexPath(routerParams)).wait();
+
+  let outputBalanceAfter: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
+  console.log("Output balance after", outputBalanceAfter.toString());
+
+  return outputBalanceAfter.sub(outputBalanceBefore);
 }
 
 
