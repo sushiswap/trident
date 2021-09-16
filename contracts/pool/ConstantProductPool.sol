@@ -2,6 +2,7 @@
 
 pragma solidity >=0.8.0;
 
+import "../interfaces/IBentoBoxMinimal.sol";
 import "../interfaces/IMasterDeployer.sol";
 import "../workInProgress/IMigrator.sol";
 import "../interfaces/IPool.sol";
@@ -27,8 +28,8 @@ contract ConstantProductPool is IPool, TridentERC20 {
     uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
 
     address public immutable barFeeTo;
-    address public immutable bento;
-    address public immutable masterDeployer;
+    IBentoBoxMinimal public immutable bento;
+    IMasterDeployer public immutable masterDeployer;
     address public immutable token0;
     address public immutable token1;
 
@@ -54,16 +55,12 @@ contract ConstantProductPool is IPool, TridentERC20 {
     constructor(bytes memory _deployData, address _masterDeployer) {
         (address _token0, address _token1, uint256 _swapFee, bool _twapSupport) = abi.decode(_deployData, (address, address, uint256, bool));
 
-        // NB Factory ensures that the tokens are sorted
+        // @dev Factory ensures that the tokens are sorted.
         require(_token0 != address(0), "ZERO_ADDRESS");
         require(_token0 != _token1, "IDENTICAL_ADDRESSES");
         require(_token0 != address(this), "INVALID_TOKEN");
         require(_token1 != address(this), "INVALID_TOKEN");
         require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
-
-        (, bytes memory _barFee) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
-        (, bytes memory _barFeeTo) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFeeTo.selector));
-        (, bytes memory _bento) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.bento.selector));
 
         token0 = _token0;
         token1 = _token1;
@@ -72,10 +69,10 @@ contract ConstantProductPool is IPool, TridentERC20 {
         unchecked {
             MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
         }
-        barFee = abi.decode(_barFee, (uint256));
-        barFeeTo = abi.decode(_barFeeTo, (address));
-        bento = abi.decode(_bento, (address));
-        masterDeployer = _masterDeployer;
+        barFee = IMasterDeployer(_masterDeployer).barFee();
+        barFeeTo = IMasterDeployer(_masterDeployer).barFeeTo();
+        bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
+        masterDeployer = IMasterDeployer(_masterDeployer);
         unlocked = 1;
         if (_twapSupport) blockTimestampLast = 1;
     }
@@ -251,8 +248,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
     /// @dev Updates `barFee` for Trident protocol.
     function updateBarFee() public {
-        (, bytes memory _barFee) = masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
-        barFee = abi.decode(_barFee, (uint256));
+        barFee = IMasterDeployer(masterDeployer).barFee();
     }
 
     function _getReserves()
@@ -270,12 +266,8 @@ contract ConstantProductPool is IPool, TridentERC20 {
     }
 
     function _balance() internal view returns (uint256 balance0, uint256 balance1) {
-        // @dev balanceOf(address,address).
-        (, bytes memory _balance0) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token0, address(this)));
-        balance0 = abi.decode(_balance0, (uint256));
-        // @dev balanceOf(address,address).
-        (, bytes memory _balance1) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token1, address(this)));
-        balance1 = abi.decode(_balance1, (uint256));
+        balance0 = bento.balanceOf(token0, address(this));
+        balance1 = bento.balanceOf(token1, address(this));
     }
 
     function _update(
@@ -343,13 +335,9 @@ contract ConstantProductPool is IPool, TridentERC20 {
         bool unwrapBento
     ) internal {
         if (unwrapBento) {
-            // @dev withdraw(address,address,address,uint256,uint256).
-            (bool success, ) = bento.call(abi.encodeWithSelector(0x97da6d30, token, address(this), to, 0, shares));
-            require(success, "WITHDRAW_FAILED");
+            bento.withdraw(token, address(this), to, 0, shares);
         } else {
-            // @dev transfer(address,address,address,uint256).
-            (bool success, ) = bento.call(abi.encodeWithSelector(0xf18d03cc, token, address(this), to, shares));
-            require(success, "TRANSFER_FAILED");
+            bento.transfer(token, address(this), to, shares);
         }
     }
 

@@ -446,6 +446,8 @@ describe("Router", function () {
         encodedTokenAmount(usdc, amountIn)
       );
       expect(expectedAmountOut).lt(BigNumber.from(10).pow(18));
+      expect(expectedAmountOut).gt(1);
+
       params = swapParams(
         usdc.address,
         amountIn,
@@ -465,7 +467,7 @@ describe("Router", function () {
       expect(await bento.balanceOf(weth.address, pool.address)).gt(
         oldPoolWethBalance
       );
-      expect(await bento.balanceOf(usdc.address, pool.address)).lt(
+      expect(await bento.balanceOf(usdc.address, pool.address)).eq(
         oldPoolUsdcBalance
       );
     });
