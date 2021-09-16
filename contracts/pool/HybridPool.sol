@@ -8,12 +8,14 @@ import "../interfaces/IPool.sol";
 import "../interfaces/ITridentCallee.sol";
 import "../libraries/MathUtils.sol";
 import "./TridentERC20.sol";
+import "../libraries/RebaseLibrary.sol";
 
 /// @notice Trident exchange pool template with hybrid like-kind formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares. However, the stableswap invariant is applied to the underlying amounts.
 ///      The API uses the underlying amounts.
 contract HybridPool is IPool, TridentERC20 {
     using MathUtils for uint256;
+    using RebaseLibrary for Rebase;
 
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
@@ -183,19 +185,22 @@ contract HybridPool is IPool, TridentERC20 {
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
     function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
-        (uint256 _reserve0, uint256 _reserve1) = _getReserves();
-        (uint256 balance0, uint256 balance1) = _balance();
+        (uint256 _reserve0, uint256 _reserve1, uint256 balance0, uint256 balance1) = _getReservesAndBalances();
         uint256 amountIn;
         address tokenOut;
 
         if (tokenIn == token0) {
             tokenOut = token1;
-            amountIn = balance0 - _reserve0;
+            unchecked {
+                amountIn = balance0 - _reserve0;
+            }
             amountOut = _getAmountOut(amountIn, _reserve0, _reserve1, true);
         } else {
             require(tokenIn == token1, "INVALID_INPUT_TOKEN");
             tokenOut = token0;
-            amountIn = balance1 - _reserve1;
+            unchecked {
+                amountIn = balance1 - _reserve1;
+            }
             amountOut = _getAmountOut(amountIn, _reserve0, _reserve1, false);
         }
         _transfer(tokenOut, amountOut, recipient, unwrapBento);
@@ -254,6 +259,28 @@ contract HybridPool is IPool, TridentERC20 {
         _reserve1 = bento.toAmount(token1, _reserve1, false);
     }
 
+    function _getReservesAndBalances()
+        internal
+        view
+        returns (
+            uint256 _reserve0,
+            uint256 _reserve1,
+            uint256 balance0,
+            uint256 balance1
+        )
+    {
+        (_reserve0, _reserve1) = (reserve0, reserve1);
+        balance0 = bento.balanceOf(token0, address(this));
+        balance1 = bento.balanceOf(token1, address(this));
+        Rebase memory total0 = bento.totals(token0);
+        Rebase memory total1 = bento.totals(token1);
+
+        _reserve0 = total0.toElastic(_reserve0);
+        _reserve1 = total1.toElastic(_reserve1);
+        balance0 = total0.toElastic(balance0);
+        balance1 = total1.toElastic(balance1);
+    }
+
     function _updateReserves() internal {
         (uint256 _reserve0, uint256 _reserve1) = _balance();
         require(_reserve0 < type(uint128).max && _reserve1 < type(uint128).max, "OVERFLOW");
@@ -263,8 +290,8 @@ contract HybridPool is IPool, TridentERC20 {
     }
 
     function _balance() internal view returns (uint256 balance0, uint256 balance1) {
-        balance0 = bento.toAmount(token0, IBentoBoxMinimal(bento).balanceOf(token0, address(this)), false);
-        balance1 = bento.toAmount(token1, IBentoBoxMinimal(bento).balanceOf(token1, address(this)), false);
+        balance0 = bento.toAmount(token0, bento.balanceOf(token0, address(this)), false);
+        balance1 = bento.toAmount(token1, bento.balanceOf(token1, address(this)), false);
     }
 
     function _getAmountOut(
@@ -311,10 +338,11 @@ contract HybridPool is IPool, TridentERC20 {
     /// @dev Originally https://github.com/saddle-finance/saddle-contract/blob/0b76f7fb519e34b878aa1d58cffc8d8dc0572c12/contracts/SwapUtils.sol#L319.
     /// @return liquidity The invariant, at the precision of the pool.
     function _computeLiquidity(uint256 _reserve0, uint256 _reserve1) internal view returns (uint256 liquidity) {
-        uint256 adjustedReserve0 = _reserve0 * token0PrecisionMultiplier;
-        uint256 adjustedReserve1 = _reserve1 * token1PrecisionMultiplier;
-
-        liquidity = _computeLiquidityFromAdjustedBalances(adjustedReserve0, adjustedReserve1);
+        unchecked {
+            uint256 adjustedReserve0 = _reserve0 * token0PrecisionMultiplier;
+            uint256 adjustedReserve1 = _reserve1 * token1PrecisionMultiplier;
+            liquidity = _computeLiquidityFromAdjustedBalances(adjustedReserve0, adjustedReserve1);
+        }
     }
 
     function _computeLiquidityFromAdjustedBalances(uint256 xp0, uint256 xp1) internal view returns (uint256 computed) {
