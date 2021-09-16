@@ -8,12 +8,13 @@ TRIDENT 🔱 is a newly developed AMM and routing system from [SushiSwap](https:
 
 | Contract                   | Address                                    |
 | -------------------------- | ------------------------------------------ |
-| TridentRouter              | 0x9F48E9b7DF64191e374C1B134fC0B197C7f02CAb |
-| MasterDeployer             | 0xa2A7Aa74cb94f37221FD49F5BA6F3fF876092700 |
-| ConstantProductPoolFactory | 0x5e343eD1586e13d5e34A204667FAb0D81F85a2c2 |
-| HybridPoolFactory          | 0x0FaBb19C1362cbdd83a13D9b53F54934b05fC771 |
-| IndexPoolFactory           | 0x6c27a62230B46BF52084C8110b05FEd34e480489 |
-| WETH-DAI Cpp               | 0x6a658a7B8ed066397342e882987149bA230F9bE9 |
+| BentoBox                   | 0xc381a85ed7C7448Da073b7d6C9d4cBf1Cbf576f0 |
+| TridentRouter              | 0xD3b6D5aad58d7f427D54F3F6b903E374a503cE34 |
+| MasterDeployer             | 0xB8ef8579EEBDCCCf69305418E49a3A545301b393 |
+| ConstantProductPoolFactory | 0xd3846505fF88236593c2Dfe045e484174365f4F9 |
+| HybridPoolFactory          | 0x877bebEF2594f10a12c3222D0020D482b440708d |
+| IndexPoolFactory           | 0x0aBF10711A3Ed810d8D1312D223C735B35D985e6 |
+| WETH-DAI Cpp               | 0x9066719B1d10cB535e01674ffF056A7e2f7f0A8B |
 
 ## Extensibility
 
