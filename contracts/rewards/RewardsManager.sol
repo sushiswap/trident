@@ -20,6 +20,12 @@ contract RewardsManager is TridentOwnable {
         uint64 allocPoint;
     }
 
+    /// @notice Info of rewards that failed to be claimed from IRewarder.
+    struct RewardAmount {
+        uint256 pendingSushi;
+        uint256 amount;
+    }
+
     /// @notice Address of SUSHI contract.
     IERC20 public immutable SUSHI;
 
@@ -32,6 +38,9 @@ contract RewardsManager is TridentOwnable {
 
     /// `rewardDebt` The amount of SUSHI entitled to the user for a specific pool.
     mapping(address => mapping(address => int256)) public rewardDebt;
+
+    /// `unclaimedRewards` The amount of rewards that failed to be claimed from `IRewarder`s
+    mapping(address => mapping(address => RewardAmount)) public unclaimedRewards;
 
     mapping(address => PoolInfo) public poolInfo;
 
@@ -123,10 +132,25 @@ contract RewardsManager is TridentOwnable {
 
         IRewarder _rewarder = rewarder[address(pool)];
         if (address(_rewarder) != address(0)) {
-            _rewarder.onSushiReward(address(pool), account, account, _pendingSushi, amount);
+            RewardAmount memory reward = unclaimedRewards[address(pool)][account];
+            try _rewarder.onSushiReward(address(pool), account, account, _pendingSushi + reward.pendingSushi, amount + reward.amount) {
+                unclaimedRewards[address(pool)][account] = RewardAmount({pendingSushi: 0, amount: 0});
+            } catch {
+                unclaimedRewards[address(pool)][account] = RewardAmount({pendingSushi: reward.pendingSushi + _pendingSushi, amount: reward.amount + amount});
+            }
         }
 
         emit Harvest(account, address(pool), _pendingSushi);
+    }
+
+    function claimFailedRewarderRewards(IPool pool, address account) external {
+        IRewarder _rewarder = rewarder[address(pool)];
+        if (address(_rewarder) != address(0)) {
+            return;
+        }
+
+        RewardAmount memory reward = unclaimedRewards[address(pool)][account];
+        _rewarder.onSushiReward(address(pool), account, account, reward.pendingSushi, reward.amount);
     }
 
     /// @notice Update reward variables of the given pool.
