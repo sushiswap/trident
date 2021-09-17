@@ -1,5 +1,4 @@
 import { expect } from "chai";
-import { BigNumber } from "ethers";
 import seedrandom from "seedrandom";
 
 import {
@@ -21,7 +20,7 @@ describe("MultiPool Routing Tests", function () {
     for (let i = 0; i < 1; ++i) {
       const signer = await init();
 
-      const topology = await getABCTopoplogy();
+      const topology = await getABCTopoplogy(rnd);
 
       const fromToken = topology.tokens[0];
       const toToken = topology.tokens[2];

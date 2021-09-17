@@ -2,15 +2,11 @@ import { ethers } from "hardhat";
 import { getBigNumber, RToken, MultiRoute, findMultiRouting } from "@sushiswap/sdk";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { BigNumber, Contract, ContractFactory } from "ethers";
-import seedrandom from 'seedrandom'
 
 import { Topology, PoolDeploymentContracts, InitialPath, PercentagePath, Output, ComplexPathParams, TestContracts } from "./helperInterfaces";
 import { getRandomPool } from "./poolHelpers";
 import { getTokenPrice } from "./priceHelper";
 import { STABLE_TOKEN_PRICE } from "./constants";
-
-const testSeed = '2'; // Change it to change random generator values
-const rnd: () => number = seedrandom(testSeed); // random [0, 1)
 
 let alice: SignerWithAddress,
   feeTo: SignerWithAddress, 
@@ -113,7 +109,7 @@ async function approveAndFund(contracts: Contract[]){
  * @param tokens Token to be included in the topology. Must be more than one token
  * @returns 
  */
-export async function getABCTopoplogy(): Promise<Topology> {
+export async function getABCTopoplogy(rnd: () => number): Promise<Topology> {
   
   const tokenNames = ["USDC", "USDT", "DAI"];
   const tokenContracts: Contract[] = [];

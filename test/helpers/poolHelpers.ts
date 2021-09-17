@@ -1,5 +1,4 @@
 import { Contract } from "ethers";
-import seedrandom from "seedrandom";
 import { ethers } from "hardhat";
 import { RHybridPool, RConstantProductPool, getBigNumber, RToken } from "@sushiswap/sdk";
 
@@ -7,13 +6,13 @@ import { PoolDeploymentContracts } from "./helperInterfaces";
 import { MAX_HYBRID_A, MAX_LIQUIDITY, MAX_POOL_IMBALANCE, MAX_POOL_RESERVE, MIN_HYBRID_A, MIN_LIQUIDITY, MIN_POOL_IMBALANCE, MIN_POOL_RESERVE, STABLE_TOKEN_PRICE } from "./constants";
 import { choice, getRandom } from "./randomHelper";
 
-const testSeed = "7";
-const rnd = seedrandom(testSeed);
-
 export function getRandomPool(rnd: () => number, t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts) {
-  if (price !== STABLE_TOKEN_PRICE) return getCPPool(rnd, t0, t1, price, deploymentContracts)
-  if (rnd() < 0.5) getCPPool(rnd, t0, t1, price, deploymentContracts)
-  return getHybridPool(rnd, t0, t1, deploymentContracts)
+    if (Math.random() < 0.5) {
+      return getCPPool(rnd, t0, t1, price, deploymentContracts)
+    }
+    else {
+      return getHybridPool(rnd, t0, t1, deploymentContracts)
+    }
 }
 
 function getPoolReserve(rnd: () => number) {
@@ -39,12 +38,6 @@ function getPoolA(rnd: () => number) {
 }
 
 async function getCPPool(rnd: () => number, t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts) {
-  // if (rnd() < 0.5) {
-  //   const t = t0
-  //   t0 = t1
-  //   t1 = t
-  //   price = 1 / price
-  // }
 
   const fee = getPoolFee(rnd) * 10_000;
   const imbalance = getPoolImbalance(rnd)
