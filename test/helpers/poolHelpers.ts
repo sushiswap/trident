@@ -3,61 +3,14 @@ import { ethers } from "hardhat";
 import { RHybridPool, RConstantProductPool, getBigNumber, RToken } from "@sushiswap/sdk";
 
 import { PoolDeploymentContracts } from "./helperInterfaces";
-import { MAX_HYBRID_A, MAX_LIQUIDITY, MAX_POOL_IMBALANCE, MAX_POOL_RESERVE, MIN_HYBRID_A, MIN_LIQUIDITY, MIN_POOL_IMBALANCE, MIN_POOL_RESERVE, STABLE_TOKEN_PRICE } from "./constants";
-import { choice, getRandom } from "./randomHelper";
+ 
+ 
 
-export function getRandomPool(rnd: () => number, t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts) {
-    if (Math.random() < 0.5) {
-      return getCPPool(rnd, t0, t1, price, deploymentContracts)
-    }
-    else {
-      return getHybridPool(rnd, t0, t1, deploymentContracts)
-    }
-}
+export async function getCPPool(t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts) {
 
-function getPoolReserve(rnd: () => number) {
-  return getRandom(rnd, MIN_POOL_RESERVE, MAX_POOL_RESERVE)
-}
-
-function getPoolFee(rnd: () => number) {
-  const fees = [0.003, 0.001, 0.0005]
-  const cmd = choice(rnd, {
-    0: 1,
-    1: 1,
-    2: 1
-  })
-  return fees[parseInt(cmd)]
-}
-
-function getPoolImbalance(rnd: () => number) {
-  return getRandom(rnd, MIN_POOL_IMBALANCE, MAX_POOL_IMBALANCE)
-}
-
-function getPoolA(rnd: () => number) {
-  return Math.floor(getRandom(rnd, MIN_HYBRID_A, MAX_HYBRID_A))
-}
-
-async function getCPPool(rnd: () => number, t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts) {
-
-  const fee = getPoolFee(rnd) * 10_000;
-  const imbalance = getPoolImbalance(rnd)
-
-  let reserve0 = getPoolReserve(rnd)
-  let reserve1 = reserve0 * price * imbalance
-  const maxReserve = Math.max(reserve0, reserve1)
-  if (maxReserve > MAX_LIQUIDITY) {
-    const reduceRate = (maxReserve / MAX_LIQUIDITY) * 1.00000001
-    reserve0 /= reduceRate
-    reserve1 /= reduceRate
-  }
-  const minReserve = Math.min(reserve0, reserve1)
-  if (minReserve < MIN_LIQUIDITY) {
-    const raseRate = (MIN_LIQUIDITY / minReserve) * 1.00000001
-    reserve0 *= raseRate
-    reserve1 *= raseRate
-  }
-  console.assert(reserve0 >= MIN_LIQUIDITY && reserve0 <= MAX_LIQUIDITY, 'Error reserve0 clculation')
-  console.assert(reserve1 >= MIN_LIQUIDITY && reserve1 <= MAX_LIQUIDITY, 'Error reserve1 clculation ' + reserve1)
+  const fee = 0.003 * 10_000;  
+  const reserve1 = 1e19;
+  const reserve0 = 1e19 * price; 
 
   const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint256", "bool"],
@@ -83,33 +36,13 @@ async function getCPPool(rnd: () => number, t0: RToken, t1: RToken, price: numbe
   })
 }
 
-async function getHybridPool(
-  rnd: () => number,
-  t0: RToken,
-  t1: RToken,
-  deploymentContracts: PoolDeploymentContracts) {
-  const fee = getPoolFee(rnd) * 10_000;
-  const imbalance = getPoolImbalance(rnd)
-  const A = getPoolA(rnd)
+export async function getHybridPool(t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts) {
 
-  let reserve0 = getPoolReserve(rnd)
-  let reserve1 = reserve0 * STABLE_TOKEN_PRICE * imbalance
-  const maxReserve = Math.max(reserve0, reserve1)
-  if (maxReserve > MAX_LIQUIDITY) {
-    const reduceRate = (maxReserve / MAX_LIQUIDITY) * 1.00000001
-    reserve0 /= reduceRate
-    reserve1 /= reduceRate
-  }
-  const minReserve = Math.min(reserve0, reserve1)
-  if (minReserve < MIN_LIQUIDITY) {
-    const raseRate = (MIN_LIQUIDITY / minReserve) * 1.00000001
-    reserve0 *= raseRate
-    reserve1 *= raseRate
-  }
-  console.assert(reserve0 >= MIN_LIQUIDITY && reserve0 <= MAX_LIQUIDITY, 'Error reserve0 clculation')
-  console.assert(reserve1 >= MIN_LIQUIDITY && reserve1 <= MAX_LIQUIDITY, 'Error reserve1 clculation ' + reserve1)
-
-
+  const fee = 0.003 * 10_000;
+  const A = 7000;  
+  const reserve1 = 1e19;
+  const reserve0 = 1e19 * price; 
+ 
   const deployData = ethers.utils.defaultAbiCoder.encode(
     ["address", "address", "uint256", "uint256"],
     [t0.address, t1.address, fee, A]);

@@ -4,9 +4,8 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { BigNumber, Contract, ContractFactory } from "ethers";
 
 import { Topology, PoolDeploymentContracts, InitialPath, PercentagePath, Output, ComplexPathParams, TestContracts } from "./helperInterfaces";
-import { getRandomPool } from "./poolHelpers";
-import { getTokenPrice } from "./priceHelper";
-import { STABLE_TOKEN_PRICE } from "./constants";
+import { getCPPool, getHybridPool } from "./poolHelpers";
+import { getTokenPrice } from "./priceHelper"; 
 
 let alice: SignerWithAddress,
   feeTo: SignerWithAddress, 
@@ -29,6 +28,216 @@ export async function init() : Promise<SignerWithAddress> {
   await deployContracts();
 
   return alice;
+}
+
+export async function getABCTopoplogy(rnd: () => number): Promise<Topology> {
+  return await getTopoplogy(3, 1, rnd);
+}
+
+export async function getABCDTopoplogy(rnd: () => number): Promise<Topology> {
+  return await getTopoplogy(4, 1, rnd);
+}
+
+export async function getAB2VariantTopoplogy(rnd: () => number): Promise<Topology> {
+  return await getTopoplogy(2, 2, rnd);
+}
+
+export async function getAB3VariantTopoplogy(rnd: () => number): Promise<Topology> {
+  return await getTopoplogy(2, 3, rnd);
+}
+
+export function createRoute(fromToken: RToken, toToken: RToken, baseToken: RToken, topology: Topology, amountIn: number, gasPrice: number): MultiRoute {
+  const route = findMultiRouting(fromToken, toToken, amountIn, topology.pools, baseToken, gasPrice, 100);
+  return route;
+}
+
+export function convertRoute(multiRoute: MultiRoute, senderAddress: string, toToken: string) {
+
+  let initialPaths: InitialPath[] = [];
+  let percentagePaths: PercentagePath[] = [];
+  let outputs: Output[] = [];
+
+  const routeLegs = multiRoute.legs.length;
+
+  if(routeLegs === 1){
+
+    const initialPath: InitialPath = 
+    {
+      tokenIn: multiRoute.legs[0].token.address,
+      pool: multiRoute.legs[0].address,
+      amount: getBigNumber(undefined, multiRoute.amountIn),
+      native: false,
+      data: ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [multiRoute.legs[0].token.address, multiRoute.legs[0].address, false] //to address
+      ),
+    };
+    initialPaths.push(initialPath);
+
+    const output: Output =  
+      {
+        token: multiRoute.legs[0].token.address,
+        to: senderAddress,
+        unwrapBento: false,
+        minAmount: getBigNumber(undefined, 0),
+      };
+      outputs.push(output);
+
+      const complexParams: ComplexPathParams = {
+        initialPath: initialPaths,
+        percentagePath: percentagePaths,
+        output: outputs,
+      };
+    
+      return complexParams;
+
+  }
+
+  for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
+    
+    if(legIndex === 0) {
+      const initialPath: InitialPath = 
+      {
+        tokenIn: multiRoute.legs[legIndex].token.address,
+        pool: multiRoute.legs[legIndex].address,
+        amount: getBigNumber(undefined, multiRoute.amountIn),
+        native: false,
+        data: ethers.utils.defaultAbiCoder.encode(
+          ["address", "address", "bool"],
+          [multiRoute.legs[legIndex].token.address, multiRoute.legs[legIndex + 1].address, false] //to address
+        ),
+      };
+
+      initialPaths.push(initialPath);
+      continue;
+    }
+
+    if(legIndex === routeLegs-1){
+
+      //Create percent path for the final leg
+      const percentagePath: PercentagePath = 
+      {
+        tokenIn: multiRoute.legs[legIndex].token.address,
+        pool: multiRoute.legs[legIndex].address,
+        balancePercentage: multiRoute.legs[legIndex].swapPortion * 1_000_000,
+        data: ethers.utils.defaultAbiCoder.encode(
+          ["address", "address", "bool"],
+          [multiRoute.legs[legIndex].token.address, senderAddress, false]
+        ),
+      }
+      percentagePaths.push(percentagePath);
+
+
+      //Create output for the final leg
+      const output: Output =  
+      {
+        token: multiRoute.legs[legIndex].token.address,
+        to: senderAddress,
+        unwrapBento: false,
+        minAmount: getBigNumber(undefined, 0),
+      };
+      outputs.push(output);
+      continue;
+    }
+
+    //Create percent path for normal leg
+    const percentagePath: PercentagePath = 
+      {
+        tokenIn: multiRoute.legs[legIndex].token.address,
+        pool: multiRoute.legs[legIndex].address,
+        balancePercentage: multiRoute.legs[legIndex].swapPortion * 1_000_000,
+        data: ethers.utils.defaultAbiCoder.encode(
+          ["address", "address", "bool"],
+          [multiRoute.legs[legIndex].token.address, multiRoute.legs[legIndex + 1].address, false]
+        ),
+      }
+      percentagePaths.push(percentagePath); 
+  } 
+
+  const complexParams: ComplexPathParams = {
+    initialPath: initialPaths,
+    percentagePath: percentagePaths,
+    output: outputs,
+  };
+
+  return complexParams;
+}
+
+export async function executeContractRouter(routerParams: ComplexPathParams, toTokenAddress: string) {
+   
+  let outputBalanceBefore: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
+  console.log("Output balance before", outputBalanceBefore.toString());
+
+  await (await router.connect(alice).complexPath(routerParams)).wait();
+
+  let outputBalanceAfter: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
+  console.log("Output balance after", outputBalanceAfter.toString());
+
+  return outputBalanceAfter.sub(outputBalanceBefore);
+}
+
+async function getTopoplogy(tokenCount: number, poolVariants: number, rnd: () => number): Promise<Topology> {
+   
+  const tokenContracts: Contract[] = [];
+
+  let topology: Topology = {
+    tokens: [], 
+    prices: [],
+    pools: []
+  };
+
+  const poolDeployment: PoolDeploymentContracts = {
+    hybridPoolFactory: HybridPoolContractFactory,
+    hybridPoolContract: hybridPool,
+    constPoolFactory: ConstantPoolContractFactory, 
+    constantPoolContract: constantProductPool, 
+    masterDeployerContract: masterDeployer,
+    bentoContract: bento,
+    account: alice
+  };
+
+  const poolCount = tokenCount - 1;
+
+  //Create tokens
+  for (var i = 0; i < tokenCount; ++i) {
+    topology.tokens.push({ name: `Token${i}`, address: '' + i })
+    topology.prices.push(getTokenPrice(rnd)); 
+  }
+
+  //Deploy tokens 
+  for (let i = 0; i < topology.tokens.length; i++) {
+    const tokenContract = await ERC20Factory.deploy(topology.tokens[0].name, topology.tokens[0].name , tokenSupply);
+    await tokenContract.deployed();
+    tokenContracts.push(tokenContract);
+    topology.tokens[i].address = tokenContract.address;
+  }
+
+  await approveAndFund(tokenContracts);
+
+  //Create pools 
+  let poolType = 0;
+  for (i = 0; i < poolCount; i++) {
+    for (let index = 0; index < poolVariants; index++) {
+      const j = i + 1;
+      
+      const token0 = topology.tokens[i];
+      const token1 = topology.tokens[j];
+
+      const price0 = topology.prices[i];
+      const price1 = topology.prices[j];
+
+      if(poolType % 2 == 0){
+        topology.pools.push(await getHybridPool(token0, token1, price0 / price1, poolDeployment))
+      }
+      else{
+        topology.pools.push(await getCPPool(token0, token1, price0 / price1, poolDeployment))
+      }
+
+      poolType ++; 
+    }
+  } 
+
+  return topology;
 }
 
 async function createAccounts() {
@@ -103,163 +312,5 @@ async function approveAndFund(contracts: Contract[]){
     await bento.deposit(tokenContract.address, alice.address, alice.address, tokenSupply, 0); 
   }
 } 
-
-/**
- * Generates topology using specified tokens. 
- * @param tokens Token to be included in the topology. Must be more than one token
- * @returns 
- */
-export async function getABCTopoplogy(rnd: () => number): Promise<Topology> {
-  
-  const tokenNames = ["USDC", "USDT", "DAI"];
-  const tokenContracts: Contract[] = [];
-
-  let topology: Topology = {
-    tokens: [], 
-    prices: [],
-    pools: []
-  };
-
-  const poolDeployment: PoolDeploymentContracts = {
-    hybridPoolFactory: HybridPoolContractFactory,
-    hybridPoolContract: hybridPool,
-    constPoolFactory: ConstantPoolContractFactory, 
-    constantPoolContract: constantProductPool, 
-    masterDeployerContract: masterDeployer,
-    bentoContract: bento,
-    account: alice
-  };
-
-  const poolCount = tokenNames.length - 1;
-
-  //Create tokens
-  for (var i = 0; i < tokenNames.length; ++i) {
-    topology.tokens.push({ name: tokenNames[i], address: '' + i })
-    if (i <= tokenNames.length * 0.3) topology.prices.push(STABLE_TOKEN_PRICE)
-    else topology.prices.push(getTokenPrice(rnd))
-  }
-
-  //Deploy tokens 
-  for (let i = 0; i < topology.tokens.length; i++) {
-    const tokenContract = await ERC20Factory.deploy(topology.tokens[0].name, topology.tokens[0].name , tokenSupply);
-    await tokenContract.deployed();
-    tokenContracts.push(tokenContract);
-    topology.tokens[i].address = tokenContract.address;
-  }
-
-  await approveAndFund(tokenContracts);
-
-  //Create pools
-  for (i = 0; i < poolCount; i++) {
-    const j = i + 1;
-     
-    const token0 = topology.tokens[i];
-    const token1 = topology.tokens[j];
-
-    const price0 = topology.prices[i];
-    const price1 = topology.prices[j];
-
-    topology.pools.push(await getRandomPool(rnd, token0, token1, price0 / price1, poolDeployment))
-  } 
-
-  return topology;
-}
-
-
-export function createRoute(fromToken: RToken, toToken: RToken, baseToken: RToken, topology: Topology, amountIn: number, gasPrice: number): MultiRoute {
-  const route = findMultiRouting(fromToken, toToken, amountIn, topology.pools, baseToken, gasPrice, 100);
-  return route;
-}
-
-export function convertRoute(multiRoute: MultiRoute, senderAddress: string) {
-
-  let initialPaths: InitialPath[] = [];
-  let percentagePaths: PercentagePath[] = [];
-  let outputs: Output[] = [];
-
-  const routeLegs = multiRoute.legs.length;
-
-  for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
-
-    if(legIndex === 0) {
-      const initialPath: InitialPath = 
-      {
-        tokenIn: multiRoute.legs[legIndex].token.address,
-        pool: multiRoute.legs[legIndex].address,
-        amount: getBigNumber(undefined, multiRoute.amountIn),
-        native: false,
-        data: ethers.utils.defaultAbiCoder.encode(
-          ["address", "address", "bool"],
-          [multiRoute.legs[legIndex].token.address, multiRoute.legs[legIndex + 1].address, false] //to address
-        ),
-      };
-
-      initialPaths.push(initialPath);
-      continue;
-    }
-
-    if(legIndex === routeLegs-1){
-
-      //Create percent path for the final leg
-      const percentagePath: PercentagePath = 
-      {
-        tokenIn: multiRoute.legs[legIndex].token.address,
-        pool: multiRoute.legs[legIndex].address,
-        balancePercentage: multiRoute.legs[legIndex].swapPortion * 1_000_000,
-        data: ethers.utils.defaultAbiCoder.encode(
-          ["address", "address", "bool"],
-          [multiRoute.legs[legIndex].token.address, senderAddress, false]
-        ),
-      }
-      percentagePaths.push(percentagePath);
-
-
-      //Create output for the final leg
-      const output: Output =  
-      {
-        token: multiRoute.legs[legIndex].token.address,
-        to: senderAddress,
-        unwrapBento: false,
-        minAmount: getBigNumber(undefined, 0),
-      };
-      outputs.push(output);
-      continue;
-    }
-
-    //Create percent path for normal leg
-    const percentagePath: PercentagePath = 
-      {
-        tokenIn: multiRoute.legs[legIndex].token.address,
-        pool: multiRoute.legs[legIndex].address,
-        balancePercentage: multiRoute.legs[legIndex].swapPortion * 1_000_000,
-        data: ethers.utils.defaultAbiCoder.encode(
-          ["address", "address", "bool"],
-          [multiRoute.legs[legIndex].token.address, multiRoute.legs[legIndex + 1].address, false]
-        ),
-      }
-      percentagePaths.push(percentagePath); 
-  } 
-
-  const complexParams: ComplexPathParams = {
-    initialPath: initialPaths,
-    percentagePath: percentagePaths,
-    output: outputs,
-  };
-
-  return complexParams;
-}
-
-export async function executeContractRouter(routerParams: ComplexPathParams, toTokenAddress: string) {
-   
-  let outputBalanceBefore: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
-  // console.log("Output balance before", outputBalanceBefore.toString());
-
-  await (await router.connect(alice).complexPath(routerParams)).wait();
-
-  let outputBalanceAfter: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
-  // console.log("Output balance after", outputBalanceAfter.toString());
-
-  return outputBalanceAfter.sub(outputBalanceBefore);
-}
 
 

@@ -32,13 +32,7 @@ export interface CPoolParams {
   TokenA: Contract;
   TokenB: Contract;
 }
-
-export interface TokenPrice {
-  name: string;
-  address: string;
-  price: number;
-}
-
+  
 export interface Variants {
   [key: string]: number
 }
