@@ -10,13 +10,17 @@ import {
 } from "./interfaces";
 import { ethers } from "hardhat";
 import { OutgoingHttpHeaders } from "http2";
-import { getBigNumber } from "@sushiswap/sdk";
 export * from "./interfaces";
 
 export const BASE_TEN = 10;
 export const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000";
 
 export const MAX_FEE = 10000;
+
+//Defaults to e18 using amount * 10^18
+export function getBigNumber(amount: BigNumberish, decimals = 18): BigNumber {
+  return BigNumber.from(amount).mul(BigNumber.from(BASE_TEN).pow(decimals));
+}
 
 export function getIntegerRandomValue(
   exp: number,
@@ -57,7 +61,7 @@ export function getComplexPathParamsFromMultiRoute(
     {
       tokenIn: multiRoute.legs[0].token.address,
       pool: multiRoute.legs[0].address,
-      amount: getBigNumber(undefined, multiRoute.amountIn),
+      amount: sdk.getBigNumber(undefined, multiRoute.amountIn),
       native: false,
       data: ethers.utils.defaultAbiCoder.encode(
         ["address", "address", "bool"],
@@ -83,7 +87,7 @@ export function getComplexPathParamsFromMultiRoute(
       token: multiRoute.legs[1].token.address,
       to: senderAddress,
       unwrapBento: false,
-      minAmount: getBigNumber(undefined, 0),
+      minAmount: sdk.getBigNumber(undefined, 0),
     },
   ];
 
@@ -133,10 +137,10 @@ export function getExactInputParamsFromMultiRoute(
   ];
 
   let inputParams: ExactInputParams = {
-    amountIn: getBigNumber(undefined, multiRoute.amountIn),
+    amountIn: sdk.getBigNumber(undefined, multiRoute.amountIn),
     tokenIn: multiRoute.legs[0].token.address,
     tokenOut: multiRoute.legs[1].token.address,
-    amountOutMinimum: getBigNumber(undefined, 0),
+    amountOutMinimum: sdk.getBigNumber(undefined, 0),
     path: paths,
   };
 
