@@ -2,12 +2,14 @@ import { expect } from "chai";
 import seedrandom from "seedrandom";
 
 import {
-  convertRoute,
+  getComplexPathParams,
   createRoute,
-  executeContractRouter,
+  executeComplexPath,
   getAB2VariantTopoplogy,
   getABCTopoplogy,
   init,
+  getExactInputParams,
+  executeExactInput,
 } from "../helpers";
 import { areCloseValues, getIntegerRandomValue } from "../utilities";
 
@@ -21,7 +23,6 @@ describe("MultiPool Routing Tests", function () {
       const signer = await init();
 
       const topology = await getAB2VariantTopoplogy(rnd);
-      console.log("topology", topology);
 
       const fromToken = topology.tokens[0];
       const toToken = topology.tokens[1];
@@ -36,17 +37,20 @@ describe("MultiPool Routing Tests", function () {
         amountIn,
         gasPrice
       );
-      console.log("route", route);
 
-      const routerParams = convertRoute(route, signer.address, toToken.address);
+      const routerParams = getExactInputParams(
+        route,
+        signer.address,
+        toToken.address
+      );
 
-      const amountOutPoolBN = await executeContractRouter(
+      const amountOutPoolBN = await executeExactInput(
         routerParams,
         toToken.address
       );
 
-      console.log("Expected amount out", route.amountOut.toString());
-      console.log("Actual amount out  ", amountOutPoolBN.toString());
+      // console.log("Expected amount out", route.amountOut.toString());
+      // console.log("Actual amount out  ", amountOutPoolBN.toString());
 
       expect(
         areCloseValues(
@@ -64,7 +68,6 @@ describe("MultiPool Routing Tests", function () {
       const signer = await init();
 
       const topology = await getABCTopoplogy(rnd);
-      console.log("topology", topology);
 
       const fromToken = topology.tokens[0];
       const toToken = topology.tokens[2];
@@ -79,17 +82,16 @@ describe("MultiPool Routing Tests", function () {
         amountIn,
         gasPrice
       );
-      console.log("Route", route);
 
-      const routerParams = convertRoute(route, signer.address, toToken.address);
+      const routerParams = getComplexPathParams(route, signer.address);
 
-      const amountOutPoolBN = await executeContractRouter(
+      const amountOutPoolBN = await executeComplexPath(
         routerParams,
         toToken.address
       );
 
-      console.log("Expected amount out", route.amountOut.toString());
-      console.log("Actual amount out  ", amountOutPoolBN.toString());
+      // console.log("Expected amount out", route.amountOut.toString());
+      // console.log("Actual amount out  ", amountOutPoolBN.toString());
 
       expect(
         areCloseValues(

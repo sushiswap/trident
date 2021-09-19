@@ -4,8 +4,6 @@ import { RHybridPool, RConstantProductPool, getBigNumber, RToken } from "@sushis
 
 import { PoolDeploymentContracts } from "./helperInterfaces";
  
- 
-
 export async function getCPPool(t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts) {
 
   const fee = 0.003 * 10_000;  

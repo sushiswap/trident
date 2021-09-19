@@ -3,9 +3,10 @@ import { getBigNumber, RToken, MultiRoute, findMultiRouting } from "@sushiswap/s
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { BigNumber, Contract, ContractFactory } from "ethers";
 
-import { Topology, PoolDeploymentContracts, InitialPath, PercentagePath, Output, ComplexPathParams, TestContracts } from "./helperInterfaces";
+import { Topology, PoolDeploymentContracts, InitialPath, PercentagePath, Output, ComplexPathParams } from "./helperInterfaces";
 import { getCPPool, getHybridPool } from "./poolHelpers";
 import { getTokenPrice } from "./priceHelper"; 
+import { ExactInputParams, Path } from "../utilities";
 
 let alice: SignerWithAddress,
   feeTo: SignerWithAddress, 
@@ -49,49 +50,42 @@ export async function getAB3VariantTopoplogy(rnd: () => number): Promise<Topolog
 export function createRoute(fromToken: RToken, toToken: RToken, baseToken: RToken, topology: Topology, amountIn: number, gasPrice: number): MultiRoute {
   const route = findMultiRouting(fromToken, toToken, amountIn, topology.pools, baseToken, gasPrice, 100);
   return route;
+} 
+
+export function getExactInputParams(
+  multiRoute: MultiRoute,
+  senderAddress: string,
+  toToken: string
+): ExactInputParams {
+  
+  let paths: Path[] = [
+    {
+      pool: multiRoute.legs[0].address,
+      data: ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [multiRoute.legs[0].token.address, senderAddress, false]
+      ),
+    }
+  ];
+
+  let inputParams: ExactInputParams = {
+    amountIn: getBigNumber(undefined, multiRoute.amountIn),
+    tokenIn: multiRoute.legs[0].token.address,
+    tokenOut: toToken,
+    amountOutMinimum: getBigNumber(undefined, 0),
+    path: paths,
+  };
+
+  return inputParams;
 }
 
-export function convertRoute(multiRoute: MultiRoute, senderAddress: string, toToken: string) {
+export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: string) {
 
   let initialPaths: InitialPath[] = [];
   let percentagePaths: PercentagePath[] = [];
   let outputs: Output[] = [];
 
-  const routeLegs = multiRoute.legs.length;
-
-  if(routeLegs === 1){
-
-    const initialPath: InitialPath = 
-    {
-      tokenIn: multiRoute.legs[0].token.address,
-      pool: multiRoute.legs[0].address,
-      amount: getBigNumber(undefined, multiRoute.amountIn),
-      native: false,
-      data: ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "bool"],
-        [multiRoute.legs[0].token.address, multiRoute.legs[0].address, false] //to address
-      ),
-    };
-    initialPaths.push(initialPath);
-
-    const output: Output =  
-      {
-        token: multiRoute.legs[0].token.address,
-        to: senderAddress,
-        unwrapBento: false,
-        minAmount: getBigNumber(undefined, 0),
-      };
-      outputs.push(output);
-
-      const complexParams: ComplexPathParams = {
-        initialPath: initialPaths,
-        percentagePath: percentagePaths,
-        output: outputs,
-      };
-    
-      return complexParams;
-
-  }
+  const routeLegs = multiRoute.legs.length; 
 
   for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
     
@@ -163,19 +157,32 @@ export function convertRoute(multiRoute: MultiRoute, senderAddress: string, toTo
   return complexParams;
 }
 
-export async function executeContractRouter(routerParams: ComplexPathParams, toTokenAddress: string) {
+export async function executeComplexPath(routerParams: ComplexPathParams, toTokenAddress: string) {
    
   let outputBalanceBefore: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
-  console.log("Output balance before", outputBalanceBefore.toString());
+  //console.log("Output balance before", outputBalanceBefore.toString());
 
   await (await router.connect(alice).complexPath(routerParams)).wait();
 
   let outputBalanceAfter: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
-  console.log("Output balance after", outputBalanceAfter.toString());
+  //console.log("Output balance after", outputBalanceAfter.toString());
 
   return outputBalanceAfter.sub(outputBalanceBefore);
 }
 
+export async function executeExactInput(routerParams: ExactInputParams, toTokenAddress: string) {
+   
+  let outputBalanceBefore: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
+  //console.log("Output balance before", outputBalanceBefore.toString());
+
+  await (await router.connect(alice).exactInput(routerParams)).wait();
+
+  let outputBalanceAfter: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
+  //console.log("Output balance after", outputBalanceAfter.toString());
+
+  return outputBalanceAfter.sub(outputBalanceBefore);
+}
+  
 async function getTopoplogy(tokenCount: number, poolVariants: number, rnd: () => number): Promise<Topology> {
    
   const tokenContracts: Contract[] = [];
