@@ -9,7 +9,9 @@ import { ConcentratedLiquidityPoolFactory } from "../typechain/ConcentratedLiqui
 import { ConcentratedLiquidityPoolHelper } from "../typechain/ConcentratedLiquidityPoolHelper";
 import { BigNumber } from "ethers";
 
-describe.only("Concentrated liquidity pool", function () {
+// wip - will be refactored away
+
+describe.skip("Concentrated liquidity pool", function () {
   let alice: ethers.Signer,
     feeTo: ethers.Signer,
     weth: ERC20Mock,
