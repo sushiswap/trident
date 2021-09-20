@@ -98,15 +98,8 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
         if (_totalSupply == 0) {
             require(amount0 > 0 && amount1 > 0, "INVALID_AMOUNTS");
+            liquidity = computed - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
-            address migrator = IMasterDeployer(masterDeployer).migrator();
-            if (msg.sender == migrator) {
-                liquidity = IMigrator(migrator).desiredLiquidity();
-                require(liquidity != 0 && liquidity != type(uint256).max, "BAD_DESIRED_LIQUIDITY");
-            } else {
-                require(migrator == address(0), "ONLY_MIGRATOR");
-                liquidity = computed - MINIMUM_LIQUIDITY;
-            }
         } else {
             uint256 k = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
             uint256 kIncrease;
@@ -171,6 +164,9 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint256 amount1 = (liquidity * balance1) / _totalSupply;
 
         _burn(address(this), liquidity);
+        kLast = TridentMath.sqrt((uint256(_reserve0) - amount0) * (uint256(_reserve1) - amount1));
+
+        // Swap one token for another
         unchecked {
             if (tokenOut == token1) {
                 // @dev Swap `token0` for `token1`
@@ -191,7 +187,6 @@ contract ConstantProductPool is IPool, TridentERC20 {
             }
         }
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        kLast = TridentMath.sqrt(balance0 * balance1);
         emit Burn(msg.sender, amount0, amount1, recipient);
     }
 

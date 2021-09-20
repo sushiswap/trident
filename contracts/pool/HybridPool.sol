@@ -91,16 +91,20 @@ contract HybridPool is IPool, TridentERC20 {
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 _totalSupply = totalSupply;
 
+        uint256 amount0 = balance0 - _reserve0;
+        uint256 amount1 = balance1 - _reserve1;
+        (uint256 fee0, uint256 fee1) = _nonOptimalMintFee(amount0, amount1, _reserve0, _reserve1);
+        _reserve0 += uint112(fee0);
+        _reserve1 += uint112(fee1);
+
         unchecked {
             _totalSupply += _mintFee(_reserve0, _reserve1, _totalSupply);
         }
 
-        uint256 amount0 = balance0 - _reserve0;
-        uint256 amount1 = balance1 - _reserve1;
-        (uint256 fee0, uint256 fee1) = _nonOptimalMintFee(amount0, amount1, _reserve0, _reserve1);
-        uint256 newLiq = _computeLiquidity(balance0 - fee0, balance1 - fee1);
+        uint256 newLiq = _computeLiquidity(balance0, balance1);
 
         if (_totalSupply == 0) {
+            require(amount0 > 0 && amount1 > 0, "INVALID_AMOUNTS");
             liquidity = newLiq - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
@@ -160,7 +164,9 @@ contract HybridPool is IPool, TridentERC20 {
         uint256 amount1 = (liquidity * balance1) / _totalSupply;
 
         _burn(address(this), liquidity);
+        dLast = _computeLiquidity(balance0 - amount0, balance1 - amount1);
 
+        // Swap tokens
         if (tokenOut == token1) {
             // @dev Swap `token0` for `token1`.
             // @dev Calculate `amountOut` as if the user first withdrew balanced liquidity and then swapped `token0` for `token1`.
@@ -168,7 +174,6 @@ contract HybridPool is IPool, TridentERC20 {
             _transfer(token1, amount1, recipient, unwrapBento);
             amountOut = amount1;
             amount0 = 0;
-            dLast = _computeLiquidity(balance0, balance1 - amountOut);
         } else {
             // @dev Swap `token1` for `token0`.
             require(tokenOut == token0, "INVALID_OUTPUT_TOKEN");
@@ -176,7 +181,6 @@ contract HybridPool is IPool, TridentERC20 {
             _transfer(token0, amount0, recipient, unwrapBento);
             amountOut = amount0;
             amount1 = 0;
-            dLast = _computeLiquidity(balance0 - amountOut, balance1);
         }
         _updateReserves();
         emit Burn(msg.sender, amount0, amount1, recipient);
