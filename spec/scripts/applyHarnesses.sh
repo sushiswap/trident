@@ -23,26 +23,28 @@ perl -0777 -i -pe 's/\) public allowed\(from\) returns/\) public virtual allowed
 ##################################################
 #                  TridentHelper                 #
 ##################################################
-# virtualizing batch function
+# internal to public
+perl -0777 -i -pe 's/address internal immutable wETH;/address public immutable wETH;/g' contracts/utils/TridentHelper.sol
+
+# virtualizing batch function and others
 perl -0777 -i -pe 's/function batch\(bytes\[\] calldata data\) external/function batch\(bytes\[\] calldata data\) external virtual/g' contracts/utils/TridentHelper.sol
+# ) external { -> ) public virtual {
+perl -0777 -i -pe 's/\) external \{/\) public virtual \{/g' contracts/utils/TridentHelper.sol
+# ) public { -> ) public virtual {
+perl -0777 -i -pe 's/\) public \{/\) public virtual \{/g' contracts/utils/TridentHelper.sol
+# ) internal { -> ) internal virtual {
+perl -0777 -i -pe 's/\) internal \{/\) internal virtual \{/g' contracts/utils/TridentHelper.sol
 
 ##################################################
 #                   TridentRouter                #
 ##################################################
-# remove hardhat console
-perl -0777 -i -pe 's/import \"hardhat/\/\/ import \"hardhat/g' contracts/TridentRouter.sol
-
 # virtualizing receive
 perl -0777 -i -pe 's/receive\(\) external payable \{/receive\(\) external virtual payable \{/g' contracts/TridentRouter.sol
 
 # virtualize functions for TridentRouter
 perl -0777 -i -pe 's/external payable /public virtual payable /g' contracts/TridentRouter.sol
+perl -0777 -i -pe 's/public payable/public virtual payable/g' contracts/TridentRouter.sol
 perl -0777 -i -pe 's/        external\n        payable/        public\n        virtual\n        payable/g' contracts/TridentRouter.sol # for ExactSingleInput and others ...
-
-# external checkDeadline -> public virtual checkDeadline
-perl -0777 -i -pe 's/external checkDeadline/public virtual checkDeadline/g' contracts/TridentRouter.sol
-
-# virtualize 
 # ) external { -> ) public virtual {
 perl -0777 -i -pe 's/\) external \{/\) public virtual \{/g' contracts/TridentRouter.sol
 # ) public { -> ) public virtual {

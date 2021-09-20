@@ -11,32 +11,29 @@ using SimpleBentoBox as bento
 using DummyERC20A as tokenA
 using DummyERC20B as tokenB
 using DummyWeth as tokenWeth
-//using ConstantProductPool as pool
+// using ConstantProductPool as pool
 using SymbolicPool as pool
 
 ////////////////////////////////////////////////////////////////////////////
 //                                Methods                                 //
 ////////////////////////////////////////////////////////////////////////////
 /*
-    Declaration of methods that are used in the rules.
-    envfree indicate that the method is not dependent on the environment (msg.value, msg.sender).
+    Declaration of methods that are used in the rules. envfree indicate that
+    the method is not dependent on the environment (msg.value, msg.sender).
     Methods that are not declared here are assumed to be dependent on env.
 */
-
 methods {
-  
-    // bentobox
-    bento.transfer(address token, address from, address to, uint256 shares)  
+    // BentoBox
+    bento.transfer(address token, address from, address to, uint256 shares)
     bento.deposit(address, address, address, uint256, uint256) returns (uint256 amountOut, uint256 shareOut) 
-    bento.balanceOf(address token, address user) returns (uint256) envfree 
+    bento.balanceOf(address token, address user) returns (uint256) envfree
 
     // for solidity calls 
-    toAmount(address token, uint256 share, bool roundUp) returns (uint256)  => DISPATCHER(true)
-    toShare(address token, uint256 amount, bool roundUp) returns (uint256)  => DISPATCHER(true)
-    transfer(address token, address from, address to, uint256 shares)  => DISPATCHER(true) 
+    toAmount(address token, uint256 share, bool roundUp) returns (uint256) => DISPATCHER(true)
+    toShare(address token, uint256 amount, bool roundUp) returns (uint256) => DISPATCHER(true)
+    transfer(address token, address from, address to, uint256 shares) => DISPATCHER(true) 
     deposit(address, address, address, uint256, uint256) returns (uint256 amountOut, uint256 shareOut) => DISPATCHER(true) 
     balanceOf(address token, address user) returns (uint256) => DISPATCHER(true)
-
     registerProtocol() => NONDET
 
     // ERC20
@@ -46,20 +43,19 @@ methods {
     totalSupply() => DISPATCHER(true)
     balanceOf(address) returns (uint256) => DISPATCHER(true)
     permit(address holder, address spender, uint256 nonce, uint256 expiry, bool allowed, 
-                    uint8 v, bytes32 r, bytes32 s) => NONDET
+           uint8 v, bytes32 r, bytes32 s) => NONDET
 
     // WETH
     withdraw(uint256) => DISPATCHER(true)
 
     // IPool
+    // TODO: IPool or SymbolicPool?
     swap(bytes) returns (uint256) => DISPATCHER(true)
     flashSwap(bytes) returns (uint256) => DISPATCHER(true)
-    getOptimalLiquidityInAmounts((address,bool,uint256,uint256)[] liquidityInputs) returns((address,uint256)[]) => DISPATCHER(true)
     mint(bytes) returns (uint256) => DISPATCHER(true)
-    burn(bytes) => DISPATCHER(true)
-    burnSingle(bytes data) returns (uint256)  => DISPATCHER(true)
+    burn(bytes) => DISPATCHER(true) // TODO: missing return value??
+    burnSingle(bytes data) returns (uint256) => DISPATCHER(true)
     
-
     // Pool helper
     pool.balanceOf(address) returns (uint256) envfree 
     pool.token0() returns (address) envfree
@@ -70,58 +66,81 @@ methods {
     // receiver
     sendTo() => DISPATCHER(true)
     tokenBalanceOf(address, address) returns (uint256) envfree
-
 }
 
+////////////////////////////////////////////////////////////////////////////
+//                                 Rules                                  //
+////////////////////////////////////////////////////////////////////////////
+/*
+rule sanity(method f) {
+    env e;
 
+    calldataarg args;
+    f(e,args);
+
+    assert false;
+}
+*/
+
+// TridentRouter shouldn't hold any balance in any token.
 rule tridentRouterTokenBalanceShouldBeZero(method f) filtered { f -> !f.isView && !f.isFallback } {
     env e;
     calldataarg args;
 
-    address tokenIn; 
-    setupPoolAndMsgSender(e.msg.sender,tokenIn);
-
-    poolIsBalanced();
-    require tokenA.balanceOf(e, currentContract) == 0;
-    // require ethBalance(e,currentContract) == 0;
-    require bento.balanceOf(tokenA,currentContract) == 0;
-
+    address tokenIn;
     address tokenOut; 
     address recipient;
     bool unwrapBento;
     uint256 amount; 
     uint256 min;
 
+    // if tokenA can be anything its enough one. I think this rule breaks
+    // on the issue that the trident router does not check that one use the
+    // right token for the pool used
+    setupPoolAndMsgSender(e.msg.sender, tokenIn);
+    poolIsBalanced();
+    require tokenA.balanceOf(e, currentContract) == 0;
+    // require ethBalance(e, currentContract) == 0;
+    require bento.balanceOf(tokenA, currentContract) == 0;
+
     require recipient != currentContract && recipient != pool;
     callFunction(e.msg.sender, f, tokenIn, tokenOut, pool, recipient, unwrapBento, amount, min);
 
     assert tokenA.balanceOf(e, currentContract) == 0;
-    // assert ethBalance(e,currentContract) == 0;
-    assert bento.balanceOf(tokenA,currentContract) == 0;    
+    // assert ethBalance(e, currentContract) == 0;
+    assert bento.balanceOf(tokenA, currentContract) == 0;
 }
 
+// TODO: passing too quickly, need to check
+// TODO: passing with assert false (rule is vacuous)
 rule inverseOfSwapping(address tokenIn, address tokenOut, uint256 amountIn) {
     env e;
+
     address user = e.msg.sender;
-    
     address recipient;
     bool unwrapBento;
     uint256 deadline;
     uint256 amountOutMinimum;
     
-    setupPoolAndMsgSender(user,tokenIn);
-    require tokenIn == tokenA || tokenIn == tokenB || tokenIn == tokenWeth;
-    require tokenOut == tokenA || tokenOut == tokenB || tokenOut == tokenWeth;
+    setupPoolAndMsgSender(user, tokenIn);
+    require tokenIn == tokenA || tokenIn == tokenB || tokenIn == tokenWeth; // TODO: this one is unnecessary?
+
+    // setting up tokenOut
     require tokenOut != tokenIn;
+    require tokenOut == tokenA || tokenOut == tokenB || tokenOut == tokenWeth;
+
+    // ratio 1:1
     require(pool.reserve0() == pool.reserve1());
     // pool is at a stable state 
     poolIsBalanced();
     
-    uint256 amountInToOut = callExactInputSingle(e, tokenIn, tokenOut, pool, pool, unwrapBento, amountIn, amountOutMinimum);
-    uint256 amountOutToIn = callExactInputSingle(e, tokenOut, tokenIn, pool, recipient, unwrapBento, amountInToOut, amountOutMinimum);
+    // TODO: SymbolicPool has no fee, do we just want to check with fee? coverage?
+    // TODO: what about other methods?
+    uint256 amountInToOut = callExactInputSingle(e, tokenIn, pool, pool, unwrapBento, amountIn, amountOutMinimum);
+    uint256 amountOutToIn = callExactInputSingle(e, tokenOut, pool, recipient, unwrapBento, amountInToOut, amountOutMinimum);
     uint256 epsilon = 1;
 
-    assert amountOutToIn >= amountIn - epsilon && 
+    assert amountIn - epsilon <= amountOutToIn && 
            amountOutToIn <= amountIn + epsilon;
 }
 
@@ -138,11 +157,11 @@ rule integrityOfAddLiquidity(address token, uint256 x, uint256 amount) {
     // pool is at a stable state 
     poolIsBalanced();
    
-    require amount == x * 2 ; // just to avoid round by 1 
+    require amount == x * 2; // just to avoid round by 1 
 
     uint256 nativeBalance = tokenBalanceOf(token, user);
     uint256 bentoBalance = bento.balanceOf(token, user);
-    require (nativeBalance < max_uint64 && bentoBalance < max_uint64 );
+    require (nativeBalance < max_uint64 && bentoBalance < max_uint64);
     mathint userTokenBalanceBefore = tokenBalanceOf(token, user) + bento.balanceOf(token, user);
     uint256 poolTokenBalanceBefore = bento.balanceOf(token, pool);
     uint256 userLiquidityBalanceBefore = pool.balanceOf(user);
@@ -171,7 +190,7 @@ rule inverseOfMintAndBurnSingle(address token, uint256 amount) {
     uint256 zeroAmount = 0;
     bool isNative = true;
     
-    setupPoolAndMsgSender(user, token);   
+    setupPoolAndMsgSender(user, token);
     
     // pool is at a stable state 
     poolHasToken(token);
@@ -186,6 +205,7 @@ rule inverseOfMintAndBurnSingle(address token, uint256 amount) {
 
     assert( userTokenBalanceAfter == userTokenBalanceBefore);
 }
+
 /*
 rule inverseOfMintAndBurnDual(address token1, address token2, uint256 amount1, uint256 amount2) {
     env e;
@@ -223,7 +243,7 @@ rule noChangeToOther(method f, address token, address other) {
     require user != other && bento != other && other != pool && other != currentContract;
 
     uint256 native = tokenBalanceOf(token, other);
-    uint256 inBento  = bento.balanceOf(token, other);
+    uint256 inBento = bento.balanceOf(token, other);
     uint256 eth = ethBalance(e, other);
     uint256 liquidity = pool.balanceOf(other);
 
@@ -237,10 +257,10 @@ rule noChangeToOther(method f, address token, address other) {
     require recipient != other;
     callFunction(e.msg.sender, f, tokenIn, tokenOut, pool, recipient, unwrapBento, amount, min);
 
-    assert  tokenBalanceOf(token, other) == native &&
-            bento.balanceOf(token, other) == inBento &&
-            ethBalance(e, other) == eth  &&
-            pool.balanceOf(other) == liquidity ;
+    assert tokenBalanceOf(token, other) == native &&
+           bento.balanceOf(token, other) == inBento &&
+           ethBalance(e, other) == eth &&
+           pool.balanceOf(other) == liquidity;
 }
 
 rule validityOfUnwrapBento(address token, method f) {
@@ -265,18 +285,18 @@ rule validityOfUnwrapBento(address token, method f) {
 ////////////////////////////////////////////////////////////////////////////
 //                             Helper Methods                             //
 ////////////////////////////////////////////////////////////////////////////
-function callFunction(address msgSender, method f,
-            address tokenIn, address tokenOut, address _pool, address recipient, bool unwrapBento, uint256 amount, uint256 min) {
+// TODO: missing some functions???
+function callFunction(address msgSender, method f, address tokenIn, address tokenOut,
+                      address _pool, address recipient, bool unwrapBento, uint256 amount,
+                      uint256 min) {
     env e;
     require e.msg.sender == msgSender;
     
-    if (f.selector == callExactInputSingle(address,address,address,address,bool,uint256,uint256).selector ){
-        callExactInputSingle(e, tokenIn, tokenOut, _pool, recipient, unwrapBento, amount, min);
-    }
-    else if (f.selector == callExactInputSingleWithNativeToken(address,address,address,address,bool,uint256,uint256).selector) {
-        callExactInputSingleWithNativeToken(e, tokenIn, tokenOut, _pool, recipient, unwrapBento, amount, min);
-    }
-    else if (f.selector == callAddLiquidity(address,uint256,bool,address,uint256,bool,address,address,uint256).selector ) {
+    if (f.selector == callExactInputSingle(address,address,address,bool,uint256,uint256).selector) {
+        callExactInputSingle(e, tokenIn, _pool, recipient, unwrapBento, amount, min);
+    } else if (f.selector == callExactInputSingleWithNativeToken(address,address,address,bool,uint256,uint256).selector) {
+        callExactInputSingleWithNativeToken(e, tokenIn, _pool, recipient, unwrapBento, amount, min);
+    } else if (f.selector == callAddLiquidity(address,uint256,bool,address,uint256,bool,address,address,uint256).selector) {
         address zeroAddress = 0;
         uint256 zeroAmount = 0;
     
@@ -299,27 +319,26 @@ function callFunction(address msgSender, method f,
 }
 
 function poolHasToken(address token) {
-    require pool.token0() == token || pool.token1() == token ;
+    require pool.token0() == token || pool.token1() == token;
 }
 
 function poolIsBalanced() {
     require pool.reserve0() == bento.balanceOf(pool.token0(), currentContract) &&
-                pool.reserve1() == bento.balanceOf(pool.token1(), currentContract);
+            pool.reserve1() == bento.balanceOf(pool.token1(), currentContract);
 }
 
+// TODO: Do we need to setup multiple pools (for the multihop methods)???
 function setupPoolAndMsgSender(address sender, address token) {
+    // pool's token0 can be either ERC20 or wETH
     require pool.token0() == tokenA || pool.token0() == tokenWeth;
+    // pool's token1 can be either ERC20 or wETH
     require pool.token1() == tokenB || pool.token1() == tokenWeth;
-    require pool.token0() !=  pool.token1();
-    require sender != bento && sender != pool && sender != currentContract;
-    require token == pool.token0() || token == pool.token1();
-}
+    // pool's tokens can't be the same
+    require pool.token0() != pool.token1();
 
-/*
-rule sanity(method f) {
-    env e;
-    calldataarg args;
-    f(e,args);
-    assert false;
+    // token argument has to be one of the pool's tokens
+    require token == pool.token0() || token == pool.token1();
+
+    // limiting the caller for the TridentRouter functions
+    require sender != bento && sender != pool && sender != currentContract;
 }
-*/
