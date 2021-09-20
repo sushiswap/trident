@@ -2,6 +2,7 @@
 
 pragma solidity >=0.8.0;
 
+/// @notice Trident franchised pool whitelist manager.
 contract WhiteListManager {
     event WhiteListAccount(address indexed operator, address indexed account, bool approved);
     event SetMerkleRoot(address operator, bytes32 merkleRoot);
