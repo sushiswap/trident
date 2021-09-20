@@ -90,22 +90,20 @@ contract HybridPool is IPool, TridentERC20 {
         (uint256 _reserve0, uint256 _reserve1) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
 
+        uint256 newLiq = _computeLiquidity(balance0, balance1);
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
         (uint256 fee0, uint256 fee1) = _nonOptimalMintFee(amount0, amount1, _reserve0, _reserve1);
         _reserve0 += uint112(fee0);
         _reserve1 += uint112(fee1);
 
-        uint256 _totalSupply = _mintFee(_reserve0, _reserve1);
-
-        uint256 newLiq = _computeLiquidity(balance0, balance1);
+        (uint256 _totalSupply, uint256 oldLiq) = _mintFee(_reserve0, _reserve1);
 
         if (_totalSupply == 0) {
             require(amount0 > 0 && amount1 > 0, "INVALID_AMOUNTS");
             liquidity = newLiq - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
-            uint256 oldLiq = _computeLiquidity(_reserve0, _reserve1);
             liquidity = ((newLiq - oldLiq) * _totalSupply) / oldLiq;
         }
         require(liquidity != 0, "INSUFFICIENT_LIQUIDITY_MINTED");
@@ -122,7 +120,7 @@ contract HybridPool is IPool, TridentERC20 {
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 liquidity = balanceOf[address(this)];
 
-        uint256 _totalSupply = _mintFee(balance0, balance1);
+        (uint256 _totalSupply, ) = _mintFee(balance0, balance1);
 
         uint256 amount0 = (liquidity * balance0) / _totalSupply;
         uint256 amount1 = (liquidity * balance1) / _totalSupply;
@@ -149,7 +147,7 @@ contract HybridPool is IPool, TridentERC20 {
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 liquidity = balanceOf[address(this)];
 
-        uint256 _totalSupply = _mintFee(balance0, balance1);
+        (uint256 _totalSupply, ) = _mintFee(balance0, balance1);
 
         uint256 amount0 = (liquidity * balance0) / _totalSupply;
         uint256 amount1 = (liquidity * balance1) / _totalSupply;
@@ -382,11 +380,11 @@ contract HybridPool is IPool, TridentERC20 {
         }
     }
 
-    function _mintFee(uint256 _reserve0, uint256 _reserve1) internal returns (uint256 _totalSupply) {
+    function _mintFee(uint256 _reserve0, uint256 _reserve1) internal returns (uint256 _totalSupply, uint256 d) {
         _totalSupply = totalSupply;
         uint256 _dLast = dLast;
         if (_dLast != 0) {
-            uint256 d = _computeLiquidity(_reserve0, _reserve1);
+            d = _computeLiquidity(_reserve0, _reserve1);
             if (d > _dLast) {
                 // @dev `barFee` % of increase in liquidity.
                 // It's going to be slightly less than `barFee` % in reality due to the math.
