@@ -73,9 +73,9 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
         unchecked {
             MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
         }
-        barFee = IMasterDeployer(_masterDeployer).barFee();
-        barFeeTo = IMasterDeployer(_masterDeployer).barFeeTo();
-        bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
+        barFee = _masterDeployer.barFee();
+        barFeeTo = _masterDeployer.barFeeTo();
+        bento = IBentoBoxMinimal(_masterDeployer.bento());
         masterDeployer = _masterDeployer;
         unlocked = 1;
         if (_twapSupport) blockTimestampLast = 1;
