@@ -85,14 +85,16 @@ contract ConstantProductPool is IPool, TridentERC20 {
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 _totalSupply = totalSupply;
 
-        unchecked {
-            _totalSupply += _mintFee(_reserve0, _reserve1, _totalSupply);
-        }
-
+        uint256 computed = TridentMath.sqrt(balance0 * balance1);
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
         (uint256 fee0, uint256 fee1) = _nonOptimalMintFee(amount0, amount1, _reserve0, _reserve1);
-        uint256 computed = TridentMath.sqrt((balance0 - fee0) * (balance1 - fee1));
+        _reserve0 += uint112(fee0);
+        _reserve1 += uint112(fee1);
+
+        unchecked {
+            _totalSupply += _mintFee(_reserve0, _reserve1, _totalSupply);
+        }
 
         if (_totalSupply == 0) {
             require(amount0 > 0 && amount1 > 0, "INVALID_AMOUNTS");
@@ -107,12 +109,16 @@ contract ConstantProductPool is IPool, TridentERC20 {
             }
         } else {
             uint256 k = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
-            liquidity = ((computed - k) * _totalSupply) / k;
+            uint256 kIncrease;
+            unchecked {
+                kIncrease = computed - k;
+            }
+            liquidity = (kIncrease * _totalSupply) / k;
         }
         require(liquidity != 0, "INSUFFICIENT_LIQUIDITY_MINTED");
         _mint(recipient, liquidity);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        kLast = TridentMath.sqrt(balance0 * balance1);
+        kLast = computed;
         emit Mint(msg.sender, amount0, amount1, recipient);
     }
 

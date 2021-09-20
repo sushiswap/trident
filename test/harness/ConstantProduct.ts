@@ -580,13 +580,6 @@ function liquidityCalculations(
   barFee,
   swapFee
 ) {
-  const preMintComputed = sqrt(initialBalances[1].mul(initialBalances[2]));
-  const feeMint = preMintComputed.isZero()
-    ? ZERO
-    : initialBalances[0]
-        .mul(preMintComputed.sub(kLast).mul(barFee))
-        .div(preMintComputed.mul(MAX_FEE));
-  const updatedTotalSupply = feeMint.add(initialBalances[0]);
   const [fee0, fee1] = unoptimalMintFee(
     amount0,
     amount1,
@@ -594,10 +587,17 @@ function liquidityCalculations(
     initialBalances[2],
     swapFee
   );
+  const preMintComputed = sqrt(
+    initialBalances[1].add(fee0).mul(initialBalances[2].add(fee1))
+  );
+  const feeMint = preMintComputed.isZero()
+    ? ZERO
+    : initialBalances[0]
+        .mul(preMintComputed.sub(kLast).mul(barFee))
+        .div(preMintComputed.mul(MAX_FEE));
+  const updatedTotalSupply = initialBalances[0].add(feeMint);
   const computed = sqrt(
-    initialBalances[1]
-      .add(amount0.sub(fee0))
-      .mul(initialBalances[2].add(amount1.sub(fee1)))
+    initialBalances[1].add(amount0).mul(initialBalances[2].add(amount1))
   );
   const computedLiquidity = preMintComputed.isZero()
     ? computed.sub(BigNumber.from(1000))
