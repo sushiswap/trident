@@ -27,8 +27,8 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
     uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
 
     address public immutable barFeeTo;
-    address public immutable bento;
-    address public immutable masterDeployer;
+    IBentoBoxMinimal public immutable bento;
+    IMasterDeployer public immutable masterDeployer;
     address public immutable token0;
     address public immutable token1;
 
@@ -51,10 +51,10 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
         unlocked = 1;
     }
 
-    constructor(bytes memory _deployData, address _masterDeployer) {
-        (address _token0, address _token1, uint256 _swapFee, bool _twapSupport, address _whiteListManager, address _operator, bool _level2) = abi.decode(
+    constructor(bytes memory _deployData, IMasterDeployer _masterDeployer) {
+        (address _token0, address _token1, uint256 _swapFee, bool _twapSupport, IWhiteListManager _whiteListManager, address _operator, bool _level2) = abi.decode(
             _deployData,
-            (address, address, uint256, bool, address, address, bool)
+            (address, address, uint256, bool, IWhiteListManager, address, bool)
         );
 
         // @dev Factory ensures that the tokens are sorted.
@@ -66,10 +66,6 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
 
         TridentFranchisedERC20.initialize(_whiteListManager, _operator, _level2);
 
-        (, bytes memory _barFee) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
-        (, bytes memory _barFeeTo) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFeeTo.selector));
-        (, bytes memory _bento) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.bento.selector));
-
         token0 = _token0;
         token1 = _token1;
         swapFee = _swapFee;
@@ -77,9 +73,9 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
         unchecked {
             MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
         }
-        barFee = abi.decode(_barFee, (uint256));
-        barFeeTo = abi.decode(_barFeeTo, (address));
-        bento = abi.decode(_bento, (address));
+        barFee = IMasterDeployer(_masterDeployer).barFee();
+        barFeeTo = IMasterDeployer(_masterDeployer).barFeeTo();
+        bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
         masterDeployer = _masterDeployer;
         unlocked = 1;
         if (_twapSupport) blockTimestampLast = 1;
@@ -92,28 +88,31 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
         _checkWhiteList(recipient);
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
-        uint256 _totalSupply = totalSupply;
 
-        unchecked {
-            _totalSupply += _mintFee(_reserve0, _reserve1, _totalSupply);
-        }
-
+        uint256 computed = TridentMath.sqrt(balance0 * balance1);
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
         (uint256 fee0, uint256 fee1) = _nonOptimalMintFee(amount0, amount1, _reserve0, _reserve1);
-        uint256 computed = TridentMath.sqrt((balance0 - fee0) * (balance1 - fee1));
+        _reserve0 += uint112(fee0);
+        _reserve1 += uint112(fee1);
+
+        (uint256 _totalSupply, uint256 k) = _mintFee(_reserve0, _reserve1);
 
         if (_totalSupply == 0) {
-            _mint(address(0), MINIMUM_LIQUIDITY);
+            require(amount0 > 0 && amount1 > 0, "INVALID_AMOUNTS");
             liquidity = computed - MINIMUM_LIQUIDITY;
+            _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
-            uint256 k = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
-            liquidity = ((computed - k) * _totalSupply) / k;
+            uint256 kIncrease;
+            unchecked {
+                kIncrease = computed - k;
+            }
+            liquidity = (kIncrease * _totalSupply) / k;
         }
         require(liquidity != 0, "INSUFFICIENT_LIQUIDITY_MINTED");
         _mint(recipient, liquidity);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        kLast = TridentMath.sqrt(balance0 * balance1);
+        kLast = computed;
         emit Mint(msg.sender, amount0, amount1, recipient);
     }
 
@@ -123,12 +122,9 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
         _checkWhiteList(recipient);
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
-        uint256 _totalSupply = totalSupply;
         uint256 liquidity = balanceOf[address(this)];
 
-        unchecked {
-            _totalSupply += _mintFee(_reserve0, _reserve1, _totalSupply);
-        }
+        (uint256 _totalSupply, ) = _mintFee(_reserve0, _reserve1);
 
         uint256 amount0 = (liquidity * balance0) / _totalSupply;
         uint256 amount1 = (liquidity * balance1) / _totalSupply;
@@ -157,17 +153,17 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
         _checkWhiteList(recipient);
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
-        uint256 _totalSupply = totalSupply;
         uint256 liquidity = balanceOf[address(this)];
 
-        unchecked {
-            _totalSupply += _mintFee(_reserve0, _reserve1, _totalSupply);
-        }
+        (uint256 _totalSupply, ) = _mintFee(_reserve0, _reserve1);
 
         uint256 amount0 = (liquidity * balance0) / _totalSupply;
         uint256 amount1 = (liquidity * balance1) / _totalSupply;
 
         _burn(address(this), liquidity);
+        kLast = TridentMath.sqrt((uint256(_reserve0) - amount0) * (uint256(_reserve1) - amount1));
+
+        // @dev Swap one token for another.
         unchecked {
             if (tokenOut == token1) {
                 // @dev Swap `token0` for `token1`
@@ -188,7 +184,6 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
             }
         }
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        kLast = TridentMath.sqrt(balance0 * balance1);
         emit Burn(msg.sender, amount0, amount1, recipient);
     }
 
@@ -197,6 +192,7 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         if (level2) _checkWhiteList(recipient);
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
+        require(_reserve0 > 0, "POOL_UNINITIALIZED");
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 amountIn;
         address tokenOut;
@@ -227,6 +223,7 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
         );
         if (level2) _checkWhiteList(recipient);
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
+        require(_reserve0 > 0, "POOL_UNINITIALIZED");
         unchecked {
             if (tokenIn == token0) {
                 amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
@@ -251,8 +248,7 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
 
     /// @dev Updates `barFee` for Trident protocol.
     function updateBarFee() public {
-        (, bytes memory _barFee) = masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
-        barFee = abi.decode(_barFee, (uint256));
+        barFee = IMasterDeployer(masterDeployer).barFee();
     }
 
     function _getReserves()
@@ -270,12 +266,8 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
     }
 
     function _balance() internal view returns (uint256 balance0, uint256 balance1) {
-        // @dev balanceOf(address,address).
-        (, bytes memory _balance0) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token0, address(this)));
-        balance0 = abi.decode(_balance0, (uint256));
-        // @dev balanceOf(address,address).
-        (, bytes memory _balance1) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token1, address(this)));
-        balance1 = abi.decode(_balance1, (uint256));
+        balance0 = bento.balanceOf(token0, address(this));
+        balance1 = bento.balanceOf(token1, address(this));
     }
 
     function _update(
@@ -308,20 +300,18 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
         emit Sync(balance0, balance1);
     }
 
-    function _mintFee(
-        uint112 _reserve0,
-        uint112 _reserve1,
-        uint256 _totalSupply
-    ) internal returns (uint256 liquidity) {
+    function _mintFee(uint112 _reserve0, uint112 _reserve1) internal returns (uint256 _totalSupply, uint256 computed) {
+        _totalSupply = totalSupply;
         uint256 _kLast = kLast;
         if (_kLast != 0) {
-            uint256 computed = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
+            computed = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
             if (computed > _kLast) {
                 // @dev `barFee` % of increase in liquidity.
                 // It's going to be slightly less than `barFee` % in reality due to the math.
-                liquidity = (_totalSupply * (computed - _kLast) * barFee) / computed / MAX_FEE;
+                uint256 liquidity = (_totalSupply * (computed - _kLast) * barFee) / computed / MAX_FEE;
                 if (liquidity != 0) {
                     _mint(barFeeTo, liquidity);
+                    _totalSupply += liquidity;
                 }
             }
         }
@@ -343,11 +333,9 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
         bool unwrapBento
     ) internal {
         if (unwrapBento) {
-            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.withdraw.selector, token, address(this), to, 0, shares));
-            require(success, "WITHDRAW_FAILED");
+            bento.withdraw(token, address(this), to, 0, shares);
         } else {
-            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.transfer.selector, token, address(this), to, shares));
-            require(success, "TRANSFER_FAILED");
+            bento.transfer(token, address(this), to, shares);
         }
     }
 
