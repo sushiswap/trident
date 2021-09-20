@@ -89,22 +89,21 @@ contract HybridPool is IPool, TridentERC20 {
         address recipient = abi.decode(data, (address));
         (uint256 _reserve0, uint256 _reserve1) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
-        uint256 _totalSupply = totalSupply;
 
-        unchecked {
-            _totalSupply += _mintFee(_reserve0, _reserve1, _totalSupply);
-        }
-
+        uint256 newLiq = _computeLiquidity(balance0, balance1);
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
         (uint256 fee0, uint256 fee1) = _nonOptimalMintFee(amount0, amount1, _reserve0, _reserve1);
-        uint256 newLiq = _computeLiquidity(balance0 - fee0, balance1 - fee1);
+        _reserve0 += uint112(fee0);
+        _reserve1 += uint112(fee1);
+
+        (uint256 _totalSupply, uint256 oldLiq) = _mintFee(_reserve0, _reserve1);
 
         if (_totalSupply == 0) {
+            require(amount0 > 0 && amount1 > 0, "INVALID_AMOUNTS");
             liquidity = newLiq - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
-            uint256 oldLiq = _computeLiquidity(_reserve0, _reserve1);
             liquidity = ((newLiq - oldLiq) * _totalSupply) / oldLiq;
         }
         require(liquidity != 0, "INSUFFICIENT_LIQUIDITY_MINTED");
@@ -119,12 +118,9 @@ contract HybridPool is IPool, TridentERC20 {
     function burn(bytes calldata data) public override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
         (address recipient, bool unwrapBento) = abi.decode(data, (address, bool));
         (uint256 balance0, uint256 balance1) = _balance();
-        uint256 _totalSupply = totalSupply;
         uint256 liquidity = balanceOf[address(this)];
 
-        unchecked {
-            _totalSupply += _mintFee(balance0, balance1, _totalSupply);
-        }
+        (uint256 _totalSupply, ) = _mintFee(balance0, balance1);
 
         uint256 amount0 = (liquidity * balance0) / _totalSupply;
         uint256 amount1 = (liquidity * balance1) / _totalSupply;
@@ -149,18 +145,17 @@ contract HybridPool is IPool, TridentERC20 {
     function burnSingle(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenOut, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint256 balance0, uint256 balance1) = _balance();
-        uint256 _totalSupply = totalSupply;
         uint256 liquidity = balanceOf[address(this)];
 
-        unchecked {
-            _totalSupply += _mintFee(balance0, balance1, _totalSupply);
-        }
+        (uint256 _totalSupply, ) = _mintFee(balance0, balance1);
 
         uint256 amount0 = (liquidity * balance0) / _totalSupply;
         uint256 amount1 = (liquidity * balance1) / _totalSupply;
 
         _burn(address(this), liquidity);
+        dLast = _computeLiquidity(balance0 - amount0, balance1 - amount1);
 
+        // Swap tokens
         if (tokenOut == token1) {
             // @dev Swap `token0` for `token1`.
             // @dev Calculate `amountOut` as if the user first withdrew balanced liquidity and then swapped `token0` for `token1`.
@@ -168,7 +163,6 @@ contract HybridPool is IPool, TridentERC20 {
             _transfer(token1, amount1, recipient, unwrapBento);
             amountOut = amount1;
             amount0 = 0;
-            dLast = _computeLiquidity(balance0, balance1 - amountOut);
         } else {
             // @dev Swap `token1` for `token0`.
             require(tokenOut == token0, "INVALID_OUTPUT_TOKEN");
@@ -176,7 +170,6 @@ contract HybridPool is IPool, TridentERC20 {
             _transfer(token0, amount0, recipient, unwrapBento);
             amountOut = amount0;
             amount1 = 0;
-            dLast = _computeLiquidity(balance0 - amountOut, balance1);
         }
         _updateReserves();
         emit Burn(msg.sender, amount0, amount1, recipient);
@@ -387,20 +380,18 @@ contract HybridPool is IPool, TridentERC20 {
         }
     }
 
-    function _mintFee(
-        uint256 _reserve0,
-        uint256 _reserve1,
-        uint256 _totalSupply
-    ) internal returns (uint256 liquidity) {
+    function _mintFee(uint256 _reserve0, uint256 _reserve1) internal returns (uint256 _totalSupply, uint256 d) {
+        _totalSupply = totalSupply;
         uint256 _dLast = dLast;
         if (_dLast != 0) {
-            uint256 d = _computeLiquidity(_reserve0, _reserve1);
+            d = _computeLiquidity(_reserve0, _reserve1);
             if (d > _dLast) {
                 // @dev `barFee` % of increase in liquidity.
                 // It's going to be slightly less than `barFee` % in reality due to the math.
-                liquidity = (_totalSupply * (d - _dLast) * barFee) / d / MAX_FEE;
+                uint256 liquidity = (_totalSupply * (d - _dLast) * barFee) / d / MAX_FEE;
                 if (liquidity != 0) {
                     _mint(barFeeTo, liquidity);
+                    _totalSupply += liquidity;
                 }
             }
         }
