@@ -91,14 +91,13 @@ contract ConstantProductPool is IPool, TridentERC20 {
         _reserve0 += uint112(fee0);
         _reserve1 += uint112(fee1);
 
-        uint256 _totalSupply = _mintFee(_reserve0, _reserve1);
+        (uint256 _totalSupply, uint256 k) = _mintFee(_reserve0, _reserve1);
 
         if (_totalSupply == 0) {
             require(amount0 > 0 && amount1 > 0, "INVALID_AMOUNTS");
             liquidity = computed - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
-            uint256 k = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
             uint256 kIncrease;
             unchecked {
                 kIncrease = computed - k;
@@ -119,7 +118,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 liquidity = balanceOf[address(this)];
 
-        uint256 _totalSupply = _mintFee(_reserve0, _reserve1);
+        (uint256 _totalSupply, ) = _mintFee(_reserve0, _reserve1);
 
         uint256 amount0 = (liquidity * balance0) / _totalSupply;
         uint256 amount1 = (liquidity * balance1) / _totalSupply;
@@ -149,7 +148,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 liquidity = balanceOf[address(this)];
 
-        uint256 _totalSupply = _mintFee(_reserve0, _reserve1);
+        (uint256 _totalSupply, ) = _mintFee(_reserve0, _reserve1);
 
         uint256 amount0 = (liquidity * balance0) / _totalSupply;
         uint256 amount1 = (liquidity * balance1) / _totalSupply;
@@ -292,11 +291,11 @@ contract ConstantProductPool is IPool, TridentERC20 {
         emit Sync(balance0, balance1);
     }
 
-    function _mintFee(uint112 _reserve0, uint112 _reserve1) internal returns (uint256 _totalSupply) {
+    function _mintFee(uint112 _reserve0, uint112 _reserve1) internal returns (uint256 _totalSupply, uint256 computed) {
         _totalSupply = totalSupply;
         uint256 _kLast = kLast;
         if (_kLast != 0) {
-            uint256 computed = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
+            computed = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
             if (computed > _kLast) {
                 // @dev `barFee` % of increase in liquidity.
                 // It's going to be slightly less than `barFee` % in reality due to the math.
