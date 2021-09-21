@@ -154,7 +154,7 @@ contract ConcentratedLiquidityPool is IPool {
             if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += uint128(_liquidity);
         }
 
-        /// @dev Fees should have been claimed before position updates.
+        /// @dev Fees should have been collected before position updates.
         _updatePosition(params.positionOwner, params.lower, params.upper, int128(uint128(_liquidity)));
 
         (nearestTick) = Ticks.insert(
