@@ -4,15 +4,17 @@ pragma solidity >=0.8.0;
 
 import "../../interfaces/IConcentratedLiquidityPool.sol";
 import "../../interfaces/ITridentRouter.sol";
+import "../../interfaces/IMasterDeployer.sol";
 import "./TridentNFT.sol";
 
 /// @notice Trident Concentrated Liquidity Pool periphery contract that combines non-fungible position management and staking.
-contract ConcentratedLiquidityPosition is TridentNFT {
-    event Mint(IConcentratedLiquidityPool indexed pool, bytes mintData);
-    event Burn(IConcentratedLiquidityPool indexed pool, bytes burnData, uint256 indexed tokenId);
+abstract contract ConcentratedLiquidityPosition is TridentNFT {
+    event Mint(address indexed pool, address indexed recipient, uint256 indexed positionId);
+    event Burn(address indexed pool, address indexed owner, uint256 indexed positionId);
 
     address public immutable bento;
     address public immutable wETH;
+    address public immutable masterDeployer;
 
     mapping(uint256 => Position) public positions;
 
@@ -25,33 +27,29 @@ contract ConcentratedLiquidityPosition is TridentNFT {
         uint256 feeGrowthInside1;
     }
 
-    constructor(address _bento, address _wETH) {
+    constructor(
+        address _bento,
+        address _wETH,
+        address _masterDeployer
+    ) {
         bento = _bento;
         wETH = _wETH;
+        masterDeployer = _masterDeployer;
     }
 
-    function mint(
-        ITridentRouter.TokenInput[] memory tokenInput,
-        IConcentratedLiquidityPool pool,
-        bytes memory mintData
-    ) external {
-        (, int24 lower, , int24 upper, uint128 amount, address recipient) = abi.decode(
-            mintData,
-            (int24, int24, int24, int24, uint128, address)
-        );
-        for (uint256 i; i < tokenInput.length; i++) {
-            if (tokenInput[i].native) {
-                _depositToBentoBox(tokenInput[i].token, address(pool), tokenInput[i].amount);
-            } else {
-                _transfer(tokenInput[i].token, msg.sender, address(pool), tokenInput[i].amount, false);
-            }
-        }
-        pool.mint(mintData);
-        (uint256 feeGrowthInside0, uint256 feeGrowthInside1) = pool.rangeFeeGrowth(lower, upper);
-        positions[totalSupply] = Position(IConcentratedLiquidityPool(pool), amount, lower, upper, feeGrowthInside0, feeGrowthInside1);
-        // @dev Mint Position 'NFT'.
+    function positionMintCallback(
+        address recipient,
+        int24 lower,
+        int24 upper,
+        uint128 amount,
+        uint256 feeGrowthInside0,
+        uint256 feeGrowthInside1
+    ) external returns (uint256 positionId) {
+        require(IMasterDeployer(masterDeployer).pools(msg.sender), "nuh uh");
+        positions[totalSupply] = Position(IConcentratedLiquidityPool(msg.sender), amount, lower, upper, feeGrowthInside0, feeGrowthInside1);
+        positionId = totalSupply;
         _mint(recipient);
-        emit Mint(pool, mintData);
+        emit Mint(msg.sender, recipient, positionId);
     }
 
     function burn(
@@ -70,7 +68,7 @@ contract ConcentratedLiquidityPosition is TridentNFT {
             delete positions[tokenId];
             _burn(tokenId);
         }
-        emit Burn(position.pool, burnData, tokenId);
+        emit Burn(address(position.pool), msg.sender, tokenId);
     }
 
     function collect(

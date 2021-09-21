@@ -1,5 +1,7 @@
 import { ethers } from "hardhat";
-import { BigNumber, BigNumberish } from "ethers";
+import { BigNumber, BigNumberish, ethers } from "ethers";
+import { Contract } from "@ethersproject/contracts";
+import { ERC20Mock } from "../../types";
 
 export const ZERO = BigNumber.from(0);
 export const ONE = BigNumber.from(1);
@@ -44,4 +46,16 @@ export function printHumanReadable(arr) {
       return paddedX;
     })
   );
+}
+
+export function getFactories(contracts: string[]) {
+  return contracts.map((contract) => getFactory(contract));
+}
+
+export function getFactory(contract: string) {
+  return ethers.getContractFactory(contract);
+}
+
+export function sortTokens(tokens: ERC20Mock[]) {
+  return tokens.sort((a, b) => (a.address < b.address ? -1 : 1));
 }

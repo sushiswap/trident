@@ -11,4 +11,6 @@ interface IMasterDeployer {
     function bento() external view returns (address);
 
     function migrator() external view returns (address);
+
+    function pools(address pool) external view returns (bool);
 }
