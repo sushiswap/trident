@@ -79,6 +79,7 @@ describe("MultiPool Routing Tests", function () {
       amountIn,
       gasPrice
     );
+    expect(route.legs.length).equal(3);
 
     const routerParams = getComplexPathParams(
       route,
@@ -122,6 +123,7 @@ describe("MultiPool Routing Tests", function () {
       amountIn,
       gasPrice
     );
+    expect(route.legs.length).equal(2);
 
     const routerParams = getComplexPathParams(
       route,
