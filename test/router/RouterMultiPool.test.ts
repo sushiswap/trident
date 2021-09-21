@@ -26,7 +26,7 @@ describe("MultiPool Routing Tests", function () {
     const fromToken = topology.tokens[0];
     const toToken = topology.tokens[2];
     const baseToken = topology.tokens[1];
-    const [amountIn] = getIntegerRandomValue(30, rnd);
+    const [amountIn] = getIntegerRandomValue(20, rnd);
 
     const route = createRoute(
       fromToken,
@@ -69,7 +69,7 @@ describe("MultiPool Routing Tests", function () {
     const fromToken = topology.tokens[0];
     const toToken = topology.tokens[1];
     const baseToken = topology.tokens[1];
-    const [amountIn] = getIntegerRandomValue(30, rnd);
+    const [amountIn] = getIntegerRandomValue(20, rnd);
 
     const route = createRoute(
       fromToken,
@@ -113,7 +113,7 @@ describe("MultiPool Routing Tests", function () {
     const fromToken = topology.tokens[0];
     const toToken = topology.tokens[1];
     const baseToken = topology.tokens[1];
-    const [amountIn] = getIntegerRandomValue(30, rnd);
+    const [amountIn] = getIntegerRandomValue(20, rnd);
 
     const route = createRoute(
       fromToken,
@@ -157,7 +157,7 @@ describe("MultiPool Routing Tests", function () {
     const fromToken = topology.tokens[0];
     const toToken = topology.tokens[2];
     const baseToken = topology.tokens[1];
-    const [amountIn] = getIntegerRandomValue(30, rnd);
+    const [amountIn] = getIntegerRandomValue(20, rnd);
 
     const route = createRoute(
       fromToken,
