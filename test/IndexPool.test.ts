@@ -96,7 +96,7 @@ describe("IndexPool test", function () {
     );
 
     const tokens: string[] =
-      usdt.address.toUpperCase() > usdc.address.toUpperCase() ? [usdt.address, usdc.address] : [usdc.address, usdt.address];
+      usdt.address.toUpperCase() < usdc.address.toUpperCase() ? [usdt.address, usdc.address] : [usdc.address, usdt.address];
 
     // address[], uint256[], uint256
     const deployData = ethers.utils.defaultAbiCoder.encode(["address[]", "uint256[]", "uint256"], [tokens, tokenWeights, poolSwapFee]);

@@ -77,7 +77,7 @@ export async function initialize() {
       token0 = tokens[i + 1];
       token1 = tokens[i];
     }
-    const deployData = utils.defaultAbiCoder.encode(["address", "address", "uint8", "bool"], [token0.address, token1.address, 30, false]);
+    const deployData = utils.defaultAbiCoder.encode(["address", "address", "uint256", "bool"], [token0.address, token1.address, 30, false]);
     const salt = utils.keccak256(deployData);
     const constructorParams = utils.defaultAbiCoder.encode(["bytes", "address"], [deployData, masterDeployer.address]).substring(2);
     const initCodeHash = utils.keccak256(Pool.bytecode + constructorParams);
@@ -405,13 +405,13 @@ function unoptimalMintFee(amount0, amount1, reserve0, reserve1, swapFee) {
 }
 
 function liquidityCalculations(initialBalances, amount0, amount1, kLast, barFee, swapFee) {
-  const preMintComputed = sqrt(initialBalances[1].mul(initialBalances[2]));
+  const [fee0, fee1] = unoptimalMintFee(amount0, amount1, initialBalances[1], initialBalances[2], swapFee);
+  const preMintComputed = sqrt(initialBalances[1].add(fee0).mul(initialBalances[2].add(fee1)));
   const feeMint = preMintComputed.isZero()
     ? ZERO
     : initialBalances[0].mul(preMintComputed.sub(kLast).mul(barFee)).div(preMintComputed.mul(MAX_FEE));
-  const updatedTotalSupply = feeMint.add(initialBalances[0]);
-  const [fee0, fee1] = unoptimalMintFee(amount0, amount1, initialBalances[1], initialBalances[2], swapFee);
-  const computed = sqrt(initialBalances[1].add(amount0.sub(fee0)).mul(initialBalances[2].add(amount1.sub(fee1))));
+  const updatedTotalSupply = initialBalances[0].add(feeMint);
+  const computed = sqrt(initialBalances[1].add(amount0).mul(initialBalances[2].add(amount1)));
   const computedLiquidity = preMintComputed.isZero()
     ? computed.sub(BigNumber.from(1000))
     : computed.sub(preMintComputed).mul(updatedTotalSupply).div(preMintComputed);

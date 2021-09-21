@@ -11,16 +11,15 @@ import "../../libraries/concentratedPool/UnsafeMath.sol";
 import "../../libraries/concentratedPool/DyDxMath.sol";
 import "../../libraries/concentratedPool/SwapLib.sol";
 import "../../libraries/concentratedPool/Ticks.sol";
-import "hardhat/console.sol";
 
 interface IPositionManager {
     function positionMintCallback(
         address recipient,
         int24 lower,
         int24 upper,
-        uint128 amount /* ,
+        uint128 amount,
         uint256 feeGrowthInside0,
-        uint256 feeGrowthInside1 */
+        uint256 feeGrowthInside1
     ) external returns (uint256 positionId);
 }
 
@@ -154,7 +153,7 @@ contract ConcentratedLiquidityPool is IPool {
             if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += uint128(_liquidity);
         }
 
-        /// @dev Fees should have been claimed before position updates.
+        /// @dev Fees should have been collected before position updates.
         _updatePosition(params.positionOwner, params.lower, params.upper, int128(uint128(_liquidity)));
 
         (nearestTick) = Ticks.insert(
@@ -174,14 +173,11 @@ contract ConcentratedLiquidityPool is IPool {
         {
             (uint128 amount0Actual, uint128 amount1Actual) = _getAmountsForLiquidity(priceLower, priceUpper, currentPrice, _liquidity);
 
-            ITridentCallee(msg.sender).tridentMintCallback(
-                abi.encode(
-                    [
-                        ITridentRouter.TokenInput(token0, params.amount0native, amount0Actual),
-                        ITridentRouter.TokenInput(token1, params.amount1native, amount1Actual)
-                    ]
-                )
-            );
+            ITridentRouter.TokenInput[] memory callbackData = new ITridentRouter.TokenInput[](2);
+            callbackData[0] = ITridentRouter.TokenInput(token0, params.amount0native, amount0Actual);
+            callbackData[1] = ITridentRouter.TokenInput(token1, params.amount1native, amount1Actual);
+
+            ITridentCallee(msg.sender).tridentMintCallback(abi.encode(callbackData));
 
             // @dev This is safe because overflow is checked in {getAmountsForLiquidity}.
             unchecked {
@@ -197,12 +193,21 @@ contract ConcentratedLiquidityPool is IPool {
                     /// @dev balanceOf(address,address).
                     (, bytes memory _balance1) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token1, address(this)));
                     uint256 balance1 = abi.decode(_balance1, (uint256));
-                    require(amount1Actual + reserve0 <= balance1, "TOKEN1_MISSING");
+                    require(amount1Actual + reserve1 <= balance1, "TOKEN1_MISSING");
                     reserve1 += amount1Actual;
                 }
             }
 
-            IPositionManager(poolManager).positionMintCallback(params.recipient, params.lower, params.upper, uint128(_liquidity));
+            (uint256 feeGrowth0, uint256 feeGrowth1) = rangeFeeGrowth(params.lower, params.upper);
+
+            IPositionManager(poolManager).positionMintCallback(
+                params.recipient,
+                params.lower,
+                params.upper,
+                uint128(_liquidity),
+                feeGrowth0,
+                feeGrowth1
+            );
 
             emit Mint(msg.sender, amount0Actual, amount1Actual, params.recipient);
         }

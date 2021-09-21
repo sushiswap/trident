@@ -64,11 +64,18 @@ task("whitelist", "Whitelist Router on BentoBox").setAction(async function (_, {
   const router = await ethers.getContract("TridentRouter");
 
   const BentoBox = await ethers.getContractFactory("BentoBoxV1");
-  const bentoBox = BentoBox.attach(BENTOBOX_ADDRESS[chainId]);
+
+  let bentoBox;
+  try {
+    const _bentoBox = await ethers.getContract("BentoBoxV1");
+    bentoBox = BentoBox.attach(_bentoBox.address);
+  } catch ({}) {
+    bentoBox = BentoBox.attach(BENTOBOX_ADDRESS[chainId]);
+  }
 
   await (await bentoBox.connect(dev).whitelistMasterContract(router.address, true)).wait();
 
-  console.log("Router successfully whitelisted on BentoBox");
+  console.log(`Router successfully whitelisted on BentoBox (BentoBox: ${bentoBox.address})`);
 });
 
 task("router:add-liquidity", "Router add liquidity")
@@ -87,7 +94,7 @@ task("router:add-liquidity", "Router add liquidity")
   .addOptionalParam(
     "pool",
     "Pool",
-    "0xD9d63e8f9ab4ad74632e75dB09D2F23869c450B7", // dai/weth
+    "0x9066719B1d10cB535e01674ffF056A7e2f7f0A8B", // dai/weth
     types.string
   )
   .addParam("tokenADesired", "Token A Desired", BigNumber.from(10).pow(18).toString(), types.string)
@@ -102,7 +109,13 @@ task("router:add-liquidity", "Router add liquidity")
     const router = await ethers.getContract("TridentRouter");
 
     const BentoBox = await ethers.getContractFactory("BentoBoxV1");
-    const bentoBox = BentoBox.attach(BENTOBOX_ADDRESS[chainId]);
+    let bentoBox;
+    try {
+      const _bentoBox = await ethers.getContract("BentoBoxV1");
+      bentoBox = BentoBox.attach(_bentoBox.address);
+    } catch ({}) {
+      bentoBox = BentoBox.attach(BENTOBOX_ADDRESS[chainId]);
+    }
 
     const dev = await ethers.getNamedSigner("dev");
 
@@ -156,4 +169,33 @@ task("router:add-liquidity", "Router add liquidity")
     await (await router.connect(dev).addLiquidity(liquidityInput, pool, 1, data)).wait();
 
     console.log("Added liquidity");
+  });
+
+// misc helpers for testing purposes
+
+task("transfer-ownership", "").setAction(async function ({}, { ethers }) {
+  const dev = await ethers.getNamedSigner("dev");
+  const bentoBox = await ethers.getContract("BentoBoxV1");
+  await bentoBox.transferOwnership(dev.address, true, false);
+});
+
+task("strategy:add", "Add strategy to BentoBox")
+  .addParam("token", "Token of strategy", "0xd0A1E359811322d97991E03f863a0C30C2cF029C") // weth
+  .addParam("strategy", "Strategy", "0x65E58C475e6f9CeF0d79371cC278E7827a72b19b")
+  .setAction(async function ({ bento, token, strategy }, { ethers, getChainId }) {
+    const dev = await ethers.getNamedSigner("dev");
+    const chainId = await getChainId();
+    const BentoBox = await ethers.getContractFactory("BentoBoxV1");
+
+    let bentoBox;
+    try {
+      const _bentoBox = await ethers.getContract("BentoBoxV1");
+      bentoBox = BentoBox.attach(_bentoBox.address);
+    } catch ({}) {
+      bentoBox = BentoBox.attach(BENTOBOX_ADDRESS[chainId]);
+    }
+
+    await bentoBox.connect(dev).setStrategy(token, strategy);
+    await bentoBox.connect(dev).setStrategy(token, strategy); // testing version of bentobox has a strategy delay of 0
+    await bentoBox.connect(dev).setStrategyTargetPercentage(token, "70");
   });

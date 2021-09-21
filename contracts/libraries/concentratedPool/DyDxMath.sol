@@ -6,7 +6,6 @@ import "./FullMath.sol";
 import "./UnsafeMath.sol";
 
 /// @notice Math library that facilitates ranged liquidity calculations.
-/// @author @0xGasper.
 library DyDxMath {
     function getDy(
         uint256 liquidity,
@@ -52,10 +51,10 @@ library DyDxMath {
         } else {
             uint256 liquidity0 = FullMath.mulDiv(
                 dx,
-                FullMath.mulDiv(priceLower, currentPrice, 0x1000000000000000000000000),
-                priceUpper - priceLower
+                FullMath.mulDiv(priceUpper, currentPrice, 0x1000000000000000000000000),
+                priceUpper - currentPrice
             );
-            uint256 liquidity1 = FullMath.mulDiv(dy, 0x1000000000000000000000000, priceUpper - currentPrice);
+            uint256 liquidity1 = FullMath.mulDiv(dy, 0x1000000000000000000000000, currentPrice - priceLower);
             liquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
         }
     }

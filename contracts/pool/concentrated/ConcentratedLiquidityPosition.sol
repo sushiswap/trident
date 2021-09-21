@@ -45,7 +45,7 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         uint256 feeGrowthInside0,
         uint256 feeGrowthInside1
     ) external returns (uint256 positionId) {
-        require(IMasterDeployer(masterDeployer).pools(msg.sender));
+        require(IMasterDeployer(masterDeployer).pools(msg.sender), "nuh uh");
         positions[totalSupply] = Position(IConcentratedLiquidityPool(msg.sender), amount, lower, upper, feeGrowthInside0, feeGrowthInside1);
         positionId = totalSupply;
         _mint(recipient);

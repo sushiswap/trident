@@ -7,8 +7,24 @@ import { Multicall } from "../typechain/Multicall";
 import { ethers } from "hardhat";
 import { expect } from "chai";
 
+const E6 = BigNumber.from(10).pow(6);
+const E8 = BigNumber.from(10).pow(8);
+
 describe("Router", function () {
-  let alice, aliceEncoded, weth, sushi, bento, masterDeployer, tridentPoolFactory, router, pool, dai, daiSushiPool, daiWethPool;
+  let alice,
+    aliceEncoded,
+    weth,
+    sushi,
+    bento,
+    masterDeployer,
+    tridentPoolFactory,
+    router,
+    pool,
+    dai,
+    daiSushiPool,
+    daiWethPool,
+    sedona,
+    sedonaWethPool;
 
   before(async function () {
     [alice] = await ethers.getSigners();
@@ -24,6 +40,7 @@ describe("Router", function () {
     weth = await ERC20.deploy("WETH", "ETH", getBigNumber("10000000"));
     sushi = await ERC20.deploy("SUSHI", "SUSHI", getBigNumber("10000000"));
     dai = await ERC20.deploy("SUSHI", "SUSHI", getBigNumber("10000000"));
+    sedona = await ERC20.deploy("SED", "SED", getBigNumber("10000000"));
     bento = await Bento.deploy(weth.address);
     masterDeployer = await Deployer.deploy(17, alice.address, bento.address);
     tridentPoolFactory = await PoolFactory.deploy(masterDeployer.address);
@@ -38,10 +55,12 @@ describe("Router", function () {
     await sushi.approve(bento.address, BigNumber.from(10).pow(30));
     await weth.approve(bento.address, BigNumber.from(10).pow(30));
     await dai.approve(bento.address, BigNumber.from(10).pow(30));
+    await sedona.approve(bento.address, BigNumber.from(10).pow(30));
     // Make BentoBox token deposits
     await bento.deposit(sushi.address, alice.address, alice.address, BigNumber.from(10).pow(22), 0);
     await bento.deposit(weth.address, alice.address, alice.address, BigNumber.from(10).pow(22), 0);
     await bento.deposit(dai.address, alice.address, alice.address, BigNumber.from(10).pow(22), 0);
+    await bento.deposit(sedona.address, alice.address, alice.address, BigNumber.from(10).pow(22), 0);
     // Approve Router to spend 'alice' BentoBox tokens
     await bento.setMasterContractApproval(
       alice.address,
@@ -54,13 +73,13 @@ describe("Router", function () {
     // Pool deploy data
     let addresses = [weth.address, sushi.address].sort();
     const deployData = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8", "bool"],
+      ["address", "address", "uint256", "bool"],
       [addresses[0], addresses[1], 30, false]
     );
     pool = await Pool.attach((await (await masterDeployer.deployPool(tridentPoolFactory.address, deployData)).wait()).events[0].args[1]);
     addresses = [dai.address, sushi.address].sort();
     const deployData2 = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8", "bool"],
+      ["address", "address", "uint256", "bool"],
       [addresses[0], addresses[1], 30, false]
     );
     daiSushiPool = await Pool.attach(
@@ -70,12 +89,22 @@ describe("Router", function () {
     );
     addresses = [dai.address, weth.address].sort();
     const deployData3 = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8", "bool"],
+      ["address", "address", "uint256", "bool"],
       [addresses[0], addresses[1], 30, false]
     );
     daiWethPool = await Pool.attach(
       (
         await (await masterDeployer.deployPool(tridentPoolFactory.address, deployData3)).wait()
+      ).events[0].args[1]
+    );
+    addresses = [sedona.address, weth.address].sort();
+    const deployData4 = ethers.utils.defaultAbiCoder.encode(
+      ["address", "address", "uint256", "bool"],
+      [addresses[0], addresses[1], 30, false]
+    );
+    sedonaWethPool = await Pool.attach(
+      (
+        await (await masterDeployer.deployPool(tridentPoolFactory.address, deployData4)).wait()
       ).events[0].args[1]
     );
   });
@@ -96,6 +125,10 @@ describe("Router", function () {
       await bento.transfer(dai.address, alice.address, daiWethPool.address, BigNumber.from(10).pow(20));
       await daiWethPool.mint(aliceEncoded);
       expect(await daiWethPool.totalSupply()).gt(1);
+      await bento.transfer(weth.address, alice.address, sedonaWethPool.address, BigNumber.from(10).pow(20));
+      await bento.transfer(sedona.address, alice.address, sedonaWethPool.address, BigNumber.from(10).pow(20));
+      await sedonaWethPool.mint(aliceEncoded);
+      expect(await sedonaWethPool.totalSupply()).gt(1);
     });
 
     it("Should add liquidity", async function () {
@@ -357,6 +390,62 @@ describe("Router", function () {
       expect(await sushi.balanceOf(alice.address)).eq(oldAliceSushiBalance.sub(amountIn));
       expect(await bento.balanceOf(sushi.address, alice.address)).eq(oldAliceBentoSushiBalance);
       expect(await bento.balanceOf(weth.address, alice.address)).eq(oldAliceBentoWethBalance.add(expectedAmountOut));
+    });
+
+    it("Should do complex swap", async function () {
+      // sedona -> weth -> 40% dai
+      //                -> 60% sushi -> dai
+
+      let amountIn = BigNumber.from(10).pow(18);
+      let i = 0;
+      const wethAmountOut = await sedonaWethPool.getAmountOut(encodedTokenAmount(sedona.address, amountIn));
+      const daiWethAmountIn = wethAmountOut.mul(BigNumber.from(40).mul(E6)).div(E8);
+      const sushiWethAmountIn = wethAmountOut.sub(daiWethAmountIn);
+      const sushiAmountOut = await pool.getAmountOut(encodedTokenAmount(weth.address, sushiWethAmountIn));
+      const daiAmountOut = (await daiWethPool.getAmountOut(encodedTokenAmount(weth.address, daiWethAmountIn))).add(
+        await daiSushiPool.getAmountOut(encodedTokenAmount(sushi.address, sushiAmountOut))
+      );
+      let complexPathParams = {
+        initialPath: [
+          {
+            tokenIn: sedona.address,
+            pool: sedonaWethPool.address,
+            native: true,
+            amount: amountIn,
+            data: encodedSwapData(sedona.address, router.address, false), // Receiver for all complex path swaps must be the router
+          },
+        ],
+        percentagePath: [
+          {
+            tokenIn: weth.address,
+            pool: daiWethPool.address,
+            balancePercentage: BigNumber.from(40).mul(E6),
+            data: encodedSwapData(weth.address, router.address, false),
+          },
+          {
+            tokenIn: weth.address,
+            pool: pool.address,
+            // Since 40% of weth has already been spent, we need to spend 100% of the remaining weth here.
+            balancePercentage: BigNumber.from(100).mul(E6),
+            data: encodedSwapData(weth.address, router.address, false),
+          },
+          {
+            tokenIn: sushi.address,
+            pool: daiSushiPool.address,
+            balancePercentage: BigNumber.from(100).mul(E6),
+            data: encodedSwapData(sushi.address, router.address, false),
+          },
+        ],
+        output: [
+          {
+            token: dai.address,
+            to: alice.address,
+            unwrapBento: true,
+            minAmount: daiAmountOut,
+          },
+        ],
+      };
+      await router.complexPath(complexPathParams);
     });
   });
 });

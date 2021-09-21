@@ -58,7 +58,7 @@ describe("Router", function () {
     // Pool deploy data
     let addresses = [weth.address, usdc.address].sort();
     const deployData = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8", "uint256"],
+      ["address", "address", "uint256", "uint256"],
       [addresses[0], addresses[1], 30, 200000]
     );
 
@@ -66,7 +66,7 @@ describe("Router", function () {
 
     addresses = [dai.address, usdc.address].sort();
     const deployData2 = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8", "uint256"],
+      ["address", "address", "uint256", "uint256"],
       [addresses[0], addresses[1], 30, 200000]
     );
     daiUsdcPool = await Pool.attach(
@@ -225,13 +225,15 @@ describe("Router", function () {
       amountIn = expectedAmountOut;
       expectedAmountOut = await pool.getAmountOut(encodedTokenAmount(usdc, amountIn));
       expect(expectedAmountOut).lt(BigNumber.from(10).pow(18));
+      expect(expectedAmountOut).gt(1);
+
       params = swapParams(usdc.address, amountIn, pool.address, alice.address, 1, false);
 
       await router.exactInputSingle(params);
       expect(await bento.balanceOf(weth.address, alice.address)).lt(oldAliceWethBalance);
       expect(await bento.balanceOf(usdc.address, alice.address)).eq(oldAliceUsdcBalance);
       expect(await bento.balanceOf(weth.address, pool.address)).gt(oldPoolWethBalance);
-      expect(await bento.balanceOf(usdc.address, pool.address)).lt(oldPoolUsdcBalance);
+      expect(await bento.balanceOf(usdc.address, pool.address)).eq(oldPoolUsdcBalance);
     });
 
     it("Should handle multi hop swaps", async function () {
