@@ -18,7 +18,6 @@ abstract contract TridentERC20 {
     mapping(address => uint256) public balanceOf;
     /// @notice owner -> spender -> allowance mapping.
     mapping(address => mapping(address => uint256)) public allowance;
-
     /// @notice The EIP-712 typehash for this contract's {permit} struct.
     bytes32 public constant PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
     /// @notice The EIP-712 typehash for this contract's domain.
@@ -53,6 +52,8 @@ abstract contract TridentERC20 {
     /// @param amount The token `amount` to move.
     /// @return (bool) Returns 'true' if succeeded.
     function transfer(address recipient, uint256 amount) external returns (bool) {
+        _beforeTokenTransfer(msg.sender, recipient, amount);
+
         balanceOf[msg.sender] -= amount;
         // @dev This is safe from overflow - the sum of all user
         // balances can't exceed 'type(uint256).max'.
@@ -73,10 +74,12 @@ abstract contract TridentERC20 {
         address recipient,
         uint256 amount
     ) external returns (bool) {
+        _beforeTokenTransfer(sender, recipient, amount);
         if (allowance[sender][msg.sender] != type(uint256).max) {
             allowance[sender][msg.sender] -= amount;
         }
         balanceOf[sender] -= amount;
+
         // @dev This is safe from overflow - the sum of all user
         // balances can't exceed 'type(uint256).max'.
         unchecked {
@@ -114,6 +117,7 @@ abstract contract TridentERC20 {
     }
 
     function _mint(address recipient, uint256 amount) internal {
+        _beforeTokenTransfer(address(0x0), recipient, amount);
         totalSupply += amount;
         // @dev This is safe from overflow - the sum of all user
         // balances can't exceed 'type(uint256).max'.
@@ -124,6 +128,7 @@ abstract contract TridentERC20 {
     }
 
     function _burn(address sender, uint256 amount) internal {
+        _beforeTokenTransfer(sender, address(0x0), amount);
         balanceOf[sender] -= amount;
         // @dev This is safe from underflow - users won't ever
         // have a balance larger than `totalSupply`.
@@ -132,4 +137,10 @@ abstract contract TridentERC20 {
         }
         emit Transfer(sender, address(0), amount);
     }
+
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
 }
