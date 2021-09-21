@@ -259,13 +259,12 @@ export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: stri
 
   const routeLegs = multiRoute.legs.length; 
 
-  for (let legIndex = 0; legIndex < routeLegs; ++legIndex) { 
+  for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {  
 
-    const isLastLeg = legIndex === routeLegs - 1;
+    const recipentAddress = getRecipentAddress(multiRoute, legIndex, fromToken, senderAddress);
 
     if(multiRoute.legs[legIndex].token.address === fromToken){
-      
-      const dest = isLastLeg ? senderAddress : (multiRoute.legs[legIndex + 1].token.address === fromToken ? senderAddress : multiRoute.legs[legIndex + 1].address);
+       
       const initialPath: InitialPath = 
       {
         tokenIn: multiRoute.legs[legIndex].token.address,
@@ -274,13 +273,12 @@ export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: stri
         native: false,
         data: ethers.utils.defaultAbiCoder.encode(
           ["address", "address", "bool"],
-          [multiRoute.legs[legIndex].token.address, dest, false]
+          [multiRoute.legs[legIndex].token.address, recipentAddress, false]
         ),
       };
       initialPaths.push(initialPath);
     } 
-    else{ 
-      const dest = isLastLeg ? senderAddress : multiRoute.legs[legIndex + 1].address;
+    else{  
       const percentagePath: PercentagePath = 
       {
         tokenIn: multiRoute.legs[legIndex].token.address,
@@ -288,7 +286,7 @@ export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: stri
         balancePercentage: multiRoute.legs[legIndex].swapPortion * 1_000_000,
         data: ethers.utils.defaultAbiCoder.encode(
           ["address", "address", "bool"],
-          [multiRoute.legs[legIndex].token.address, dest, false]
+          [multiRoute.legs[legIndex].token.address, recipentAddress, false]
         ),
       }
       percentagePaths.push(percentagePath); 
@@ -305,5 +303,17 @@ export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: stri
   };
 
   return complexParams;
+}
+
+function getRecipentAddress(multiRoute: MultiRoute, legIndex: number, fromTokenAddress: string, senderAddress: string): string{
+  
+  const isLastLeg = legIndex === multiRoute.legs.length - 1;
+  
+  if(isLastLeg || multiRoute.legs[legIndex + 1].token.address === fromTokenAddress){
+    return senderAddress;
+  }
+  else{
+    return multiRoute.legs[legIndex + 1].address;
+  }
 }
 
