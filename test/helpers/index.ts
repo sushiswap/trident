@@ -48,7 +48,7 @@ export async function getAB3VariantTopoplogy(rnd: () => number): Promise<Topolog
 }
 
 export function createRoute(fromToken: RToken, toToken: RToken, baseToken: RToken, topology: Topology, amountIn: number, gasPrice: number): MultiRoute {
-  const route = findMultiRouting(fromToken, toToken, amountIn, topology.pools, baseToken, gasPrice, 100);
+  const route = findMultiRouting(fromToken, toToken, amountIn, topology.pools, baseToken, gasPrice, 32);
   return route;
 } 
 
@@ -78,85 +78,7 @@ export function getExactInputParams(
 
   return inputParams;
 }
-
-export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: string) {
-
-  let initialPaths: InitialPath[] = [];
-  let percentagePaths: PercentagePath[] = [];
-  let outputs: Output[] = [];
-
-  const routeLegs = multiRoute.legs.length; 
-
-  for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
-    
-    if(legIndex === 0) {
-      const initialPath: InitialPath = 
-      {
-        tokenIn: multiRoute.legs[legIndex].token.address,
-        pool: multiRoute.legs[legIndex].address,
-        amount: getBigNumber(undefined, multiRoute.amountIn),
-        native: false,
-        data: ethers.utils.defaultAbiCoder.encode(
-          ["address", "address", "bool"],
-          [multiRoute.legs[legIndex].token.address, multiRoute.legs[legIndex + 1].address, false] //to address
-        ),
-      };
-
-      initialPaths.push(initialPath);
-      continue;
-    }
-
-    if(legIndex === routeLegs-1){
-
-      //Create percent path for the final leg
-      const percentagePath: PercentagePath = 
-      {
-        tokenIn: multiRoute.legs[legIndex].token.address,
-        pool: multiRoute.legs[legIndex].address,
-        balancePercentage: multiRoute.legs[legIndex].swapPortion * 1_000_000,
-        data: ethers.utils.defaultAbiCoder.encode(
-          ["address", "address", "bool"],
-          [multiRoute.legs[legIndex].token.address, senderAddress, false]
-        ),
-      }
-      percentagePaths.push(percentagePath);
-
-
-      //Create output for the final leg
-      const output: Output =  
-      {
-        token: multiRoute.legs[legIndex].token.address,
-        to: senderAddress,
-        unwrapBento: false,
-        minAmount: getBigNumber(undefined, 0),
-      };
-      outputs.push(output);
-      continue;
-    }
-
-    //Create percent path for normal leg
-    const percentagePath: PercentagePath = 
-      {
-        tokenIn: multiRoute.legs[legIndex].token.address,
-        pool: multiRoute.legs[legIndex].address,
-        balancePercentage: multiRoute.legs[legIndex].swapPortion * 1_000_000,
-        data: ethers.utils.defaultAbiCoder.encode(
-          ["address", "address", "bool"],
-          [multiRoute.legs[legIndex].token.address, multiRoute.legs[legIndex + 1].address, false]
-        ),
-      }
-      percentagePaths.push(percentagePath); 
-  } 
-
-  const complexParams: ComplexPathParams = {
-    initialPath: initialPaths,
-    percentagePath: percentagePaths,
-    output: outputs,
-  };
-
-  return complexParams;
-}
-
+  
 export async function executeComplexPath(routerParams: ComplexPathParams, toTokenAddress: string) {
    
   let outputBalanceBefore: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
@@ -234,10 +156,10 @@ async function getTopoplogy(tokenCount: number, poolVariants: number, rnd: () =>
       const price1 = topology.prices[j];
 
       if(poolType % 2 == 0){
-        topology.pools.push(await getHybridPool(token0, token1, price0 / price1, poolDeployment))
+        topology.pools.push(await getHybridPool(token0, token1, price0 / price1, poolDeployment, rnd))
       }
       else{
-        topology.pools.push(await getCPPool(token0, token1, price0 / price1, poolDeployment))
+        topology.pools.push(await getCPPool(token0, token1, price0 / price1, poolDeployment, rnd))
       }
 
       poolType ++; 
@@ -320,4 +242,68 @@ async function approveAndFund(contracts: Contract[]){
   }
 } 
 
+export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: string, fromToken: string, toToken: string) {
+
+  let initialPaths: InitialPath[] = [];
+  let percentagePaths: PercentagePath[] = [];
+  let outputs: Output[] = [];
+
+  const output: Output =  
+  {
+    token: toToken,
+    to: senderAddress,
+    unwrapBento: false,
+    minAmount: getBigNumber(undefined, 0),
+  };
+  outputs.push(output);
+
+  const routeLegs = multiRoute.legs.length; 
+
+  for (let legIndex = 0; legIndex < routeLegs; ++legIndex) { 
+
+    const isLastLeg = legIndex === routeLegs - 1;
+
+    if(multiRoute.legs[legIndex].token.address === fromToken){
+      
+      const dest = isLastLeg ? senderAddress : (multiRoute.legs[legIndex + 1].token.address === fromToken ? senderAddress : multiRoute.legs[legIndex + 1].address);
+      const initialPath: InitialPath = 
+      {
+        tokenIn: multiRoute.legs[legIndex].token.address,
+        pool: multiRoute.legs[legIndex].address,
+        amount: getBigNumber(undefined, multiRoute.amountIn * (multiRoute.legs[legIndex].absolutePortion)),
+        native: false,
+        data: ethers.utils.defaultAbiCoder.encode(
+          ["address", "address", "bool"],
+          [multiRoute.legs[legIndex].token.address, dest, false]
+        ),
+      };
+      initialPaths.push(initialPath);
+    } 
+    else{ 
+      const dest = isLastLeg ? senderAddress : multiRoute.legs[legIndex + 1].address;
+      const percentagePath: PercentagePath = 
+      {
+        tokenIn: multiRoute.legs[legIndex].token.address,
+        pool: multiRoute.legs[legIndex].address,
+        balancePercentage: multiRoute.legs[legIndex].swapPortion * 1_000_000,
+        data: ethers.utils.defaultAbiCoder.encode(
+          ["address", "address", "bool"],
+          [multiRoute.legs[legIndex].token.address, dest, false]
+        ),
+      }
+      percentagePaths.push(percentagePath); 
+
+    }
+    
+    
+  } 
+
+  const complexParams: ComplexPathParams = {
+    initialPath: initialPaths,
+    percentagePath: percentagePaths,
+    output: outputs,
+  };
+
+  return complexParams;
+}
 
