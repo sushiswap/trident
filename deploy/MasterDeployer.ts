@@ -13,7 +13,8 @@ const deployFunction: DeployFunction = async function ({ ethers, deployments, ge
 
   let bentoBoxV1Address;
 
-  if (chainId === 31337) {
+  if (chainId === 31337 || chainId === 42) {
+    // for testing purposes we use a redeployed bentobox address
     bentoBoxV1Address = (await ethers.getContract("BentoBoxV1")).address;
   } else {
     if (!(chainId in WNATIVE)) {

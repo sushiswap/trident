@@ -45,7 +45,10 @@ describe("MasterDeployer", function () {
 
   describe("#deployPool", async function () {
     it("Reverts on non-whitelisted factory", async function () {
-      const deployData = defaultAbiCoder.encode(["address", "address", "uint8"], [...[this.weth.address, this.sushi.address].sort(), 30]);
+      const deployData = defaultAbiCoder.encode(
+        ["address", "address", "uint256", "bool"],
+        [...[this.weth.address, this.sushi.address].sort(), 30, true]
+      );
 
       await expect(this.masterDeployer.deployPool(this.constantProductPoolFactory.address, deployData)).to.be.revertedWith(
         "FACTORY_NOT_WHITELISTED"
@@ -56,11 +59,20 @@ describe("MasterDeployer", function () {
       await this.masterDeployer.addToWhitelist(this.constantProductPoolFactory.address);
 
       const deployData = defaultAbiCoder.encode(
-        ["address", "address", "uint8", "bool"],
+        ["address", "address", "uint256", "bool"],
         [...[this.weth.address, this.sushi.address].sort(), 30, true]
       );
 
       await this.masterDeployer.deployPool(this.constantProductPoolFactory.address, deployData);
+    });
+
+    it("Reverts on direct deployment via factory", async function () {
+      const deployData = defaultAbiCoder.encode(
+        ["address", "address", "uint256", "bool"],
+        [...[this.weth.address, this.sushi.address].sort(), 30, true]
+      );
+
+      await expect(this.constantProductPoolFactory.deployPool(deployData)).to.be.revertedWith("UNAUTHORIZED_DEPLOYER");
     });
 
     // TODO: Fix this
@@ -68,7 +80,7 @@ describe("MasterDeployer", function () {
       await this.masterDeployer.addToWhitelist(this.constantProductPoolFactory.address);
 
       const deployData = defaultAbiCoder.encode(
-        ["address", "address", "uint8", "bool"],
+        ["address", "address", "uint256", "bool"],
         [...[this.weth.address, this.sushi.address].sort(), 30, true]
       );
 

@@ -2,24 +2,24 @@
 
 pragma solidity >=0.8.0;
 
-import "../interfaces/IBentoBoxMinimal.sol";
-import "../interfaces/IMasterDeployer.sol";
-import "../interfaces/IPool.sol";
-import "../interfaces/ITridentCallee.sol";
-import "./TridentERC20.sol";
+import "../../interfaces/IBentoBoxMinimal.sol";
+import "../../interfaces/IMasterDeployer.sol";
+import "../../interfaces/IPool.sol";
+import "../../interfaces/ITridentCallee.sol";
+import "./TridentFranchisedERC20.sol";
 
-/// @notice Trident exchange pool template with constant mean formula for swapping among an array of ERC-20 tokens.
+/// @notice Trident exchange franchised pool template with constant mean formula for swapping among an array of ERC-20 tokens.
 /// @dev The reserves are stored as bento shares.
 ///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
-contract IndexPool is IPool, TridentERC20 {
+contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
     event Mint(address indexed sender, address tokenIn, uint256 amountIn, address indexed recipient);
     event Burn(address indexed sender, address tokenOut, uint256 amountOut, address indexed recipient);
 
     uint256 public immutable swapFee;
 
     address public immutable barFeeTo;
-    IBentoBoxMinimal public immutable bento;
-    IMasterDeployer public immutable masterDeployer;
+    address public immutable bento;
+    address public immutable masterDeployer;
 
     uint256 internal constant BASE = 10**18;
     uint256 internal constant MIN_TOKENS = 2;
@@ -42,7 +42,7 @@ contract IndexPool is IPool, TridentERC20 {
 
     uint256 public barFee;
 
-    bytes32 public constant override poolIdentifier = "Trident:Index";
+    bytes32 public constant override poolIdentifier = "Trident:FranchisedIndex";
 
     uint256 internal unlocked;
     modifier lock() {
@@ -59,11 +59,20 @@ contract IndexPool is IPool, TridentERC20 {
     }
 
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (address[] memory _tokens, uint136[] memory _weights, uint256 _swapFee) = abi.decode(_deployData, (address[], uint136[], uint256));
+        (
+            address[] memory _tokens,
+            uint136[] memory _weights,
+            uint256 _swapFee,
+            address _whiteListManager,
+            address _operator,
+            bool _level2
+        ) = abi.decode(_deployData, (address[], uint136[], uint256, address, address, bool));
         // @dev Factory ensures that the tokens are sorted.
         require(_tokens.length == _weights.length, "INVALID_ARRAYS");
         require(MIN_FEE <= _swapFee && _swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
         require(MIN_TOKENS <= _tokens.length && _tokens.length <= MAX_TOKENS, "INVALID_TOKENS_LENGTH");
+
+        TridentFranchisedERC20.initialize(_whiteListManager, _operator, _level2);
 
         for (uint256 i = 0; i < _tokens.length; i++) {
             require(_tokens[i] != address(0), "ZERO_ADDRESS");
@@ -77,11 +86,15 @@ contract IndexPool is IPool, TridentERC20 {
         // @dev This burns initial LP supply.
         _mint(address(0), INIT_POOL_SUPPLY);
 
+        (, bytes memory _barFee) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
+        (, bytes memory _barFeeTo) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFeeTo.selector));
+        (, bytes memory _bento) = _masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.bento.selector));
+
         swapFee = _swapFee;
-        barFee = IMasterDeployer(_masterDeployer).barFee();
-        barFeeTo = IMasterDeployer(_masterDeployer).barFeeTo();
-        bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
-        masterDeployer = IMasterDeployer(_masterDeployer);
+        barFee = abi.decode(_barFee, (uint256));
+        barFeeTo = abi.decode(_barFeeTo, (address));
+        bento = abi.decode(_bento, (address));
+        masterDeployer = _masterDeployer;
         unlocked = 1;
     }
 
@@ -89,7 +102,7 @@ contract IndexPool is IPool, TridentERC20 {
     /// The router must ensure that sufficient LP tokens are minted by using the return value.
     function mint(bytes calldata data) public override lock returns (uint256 liquidity) {
         (address recipient, uint256 toMint) = abi.decode(data, (address, uint256));
-
+        _checkWhiteList(recipient);
         uint120 ratio = uint120(_div(toMint, totalSupply));
 
         for (uint256 i = 0; i < tokens.length; i++) {
@@ -113,7 +126,7 @@ contract IndexPool is IPool, TridentERC20 {
     /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
     function burn(bytes calldata data) public override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
         (address recipient, bool unwrapBento, uint256 toBurn) = abi.decode(data, (address, bool, uint256));
-
+        _checkWhiteList(recipient);
         uint256 ratio = _div(toBurn, totalSupply);
 
         withdrawnAmounts = new TokenAmount[](tokens.length);
@@ -139,7 +152,7 @@ contract IndexPool is IPool, TridentERC20 {
     /// - i.e., the user gets a single token out by burning LP tokens.
     function burnSingle(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenOut, address recipient, bool unwrapBento, uint256 toBurn) = abi.decode(data, (address, address, bool, uint256));
-
+        _checkWhiteList(recipient);
         Record storage outRecord = records[tokenOut];
 
         amountOut = _computeSingleOutGivenPoolIn(outRecord.reserve, outRecord.weight, totalSupply, totalWeight, toBurn, swapFee);
@@ -160,7 +173,7 @@ contract IndexPool is IPool, TridentERC20 {
             data,
             (address, address, address, bool, uint256)
         );
-
+        if (level2) _checkWhiteList(recipient);
         Record storage inRecord = records[tokenIn];
         Record storage outRecord = records[tokenOut];
 
@@ -184,7 +197,7 @@ contract IndexPool is IPool, TridentERC20 {
             data,
             (address, address, address, bool, uint256, bytes)
         );
-
+        if (level2) _checkWhiteList(recipient);
         Record storage inRecord = records[tokenIn];
         Record storage outRecord = records[tokenOut];
 
@@ -206,11 +219,13 @@ contract IndexPool is IPool, TridentERC20 {
 
     /// @dev Updates `barFee` for Trident protocol.
     function updateBarFee() public {
-        barFee = IMasterDeployer(masterDeployer).barFee();
+        (, bytes memory _barFee) = masterDeployer.staticcall(abi.encodeWithSelector(IMasterDeployer.barFee.selector));
+        barFee = abi.decode(_barFee, (uint256));
     }
 
     function _balance(address token) internal view returns (uint256 balance) {
-        balance = bento.balanceOf(token, address(this));
+        (, bytes memory data) = bento.staticcall(abi.encodeWithSelector(IBentoBoxMinimal.balanceOf.selector, token, address(this)));
+        balance = abi.decode(data, (uint256));
     }
 
     function _getAmountOut(
@@ -325,9 +340,11 @@ contract IndexPool is IPool, TridentERC20 {
         bool unwrapBento
     ) internal {
         if (unwrapBento) {
-            bento.withdraw(token, address(this), to, 0, shares);
+            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.withdraw.selector, token, address(this), to, 0, shares));
+            require(success, "WITHDRAW_FAILED");
         } else {
-            bento.transfer(token, address(this), to, shares);
+            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.transfer.selector, token, address(this), to, shares));
+            require(success, "TRANSFER_FAILED");
         }
     }
 
