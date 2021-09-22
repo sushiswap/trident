@@ -21,8 +21,6 @@ export interface PoolDeploymentContracts {
   bentoContract: Contract,
   account: SignerWithAddress
 }
-
-// Complex path types
 export interface InitialPath {
   tokenIn: string;
   pool: string;
@@ -34,7 +32,7 @@ export interface InitialPath {
 export interface PercentagePath {
   tokenIn: string;
   pool: string;
-  balancePercentage: number; // @dev Multiplied by 10^6.
+  balancePercentage: number;
   data: string;
 }
 

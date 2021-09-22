@@ -3,13 +3,16 @@ import { ethers } from "hardhat";
 import { RHybridPool, RConstantProductPool, getBigNumber, RToken } from "@sushiswap/sdk";
 
 import { PoolDeploymentContracts } from "./helperInterfaces";
-import { choice } from "./randomHelper";
+import { choice, getRandom } from "./randomHelper";
+import { MAX_POOL_IMBALANCE, MAX_POOL_RESERVE, MIN_POOL_IMBALANCE, MIN_POOL_RESERVE } from "./constants";
  
 export async function getCPPool(t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts, rnd: () => number) {
 
   const fee = getPoolFee(rnd) * 10_000;  
-  const reserve1 = 1e19;
-  const reserve0 = 1e19 * price; 
+  const imbalance = getPoolImbalance(rnd);
+
+  const reserve1 = getPoolReserve(rnd);
+  const reserve0 = reserve1 * price * imbalance;  
 
   const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint256", "bool"],
@@ -39,8 +42,10 @@ export async function getHybridPool(t0: RToken, t1: RToken, price: number, deplo
 
   const fee = getPoolFee(rnd) * 10_000;
   const A = 7000;  
-  const reserve1 = 1e19;
-  const reserve0 = 1e19 * price; 
+  const imbalance = getPoolImbalance(rnd); 
+
+  const reserve1 = getPoolReserve(rnd);
+  const reserve0 = reserve1 * price * imbalance; 
  
   const deployData = ethers.utils.defaultAbiCoder.encode(
     ["address", "address", "uint256", "uint256"],
@@ -76,4 +81,12 @@ function getPoolFee(rnd: () => number) {
     2: 1
   })
   return fees[parseInt(cmd)]
+}
+
+function getPoolImbalance(rnd: () => number) {
+  return getRandom(rnd, MIN_POOL_IMBALANCE, MAX_POOL_IMBALANCE)
+}
+
+function getPoolReserve(rnd: () => number) {
+  return getRandom(rnd, MIN_POOL_RESERVE, MAX_POOL_RESERVE)
 }

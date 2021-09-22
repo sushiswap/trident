@@ -1,15 +1,26 @@
 import { ethers } from "hardhat";
-import { getBigNumber, RToken, MultiRoute, findMultiRouting } from "@sushiswap/sdk";
+import {
+  getBigNumber,
+  RToken,
+  MultiRoute,
+  findMultiRouting,
+} from "@sushiswap/sdk";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { BigNumber, Contract, ContractFactory } from "ethers";
 
-import { Topology, PoolDeploymentContracts, InitialPath, PercentagePath, Output, ComplexPathParams } from "./helperInterfaces";
+import {
+  Topology,
+  PoolDeploymentContracts,
+  InitialPath,
+  PercentagePath,
+  Output,
+  ComplexPathParams,
+} from "./helperInterfaces";
 import { getCPPool, getHybridPool } from "./poolHelpers";
-import { getTokenPrice } from "./priceHelper"; 
-import { ExactInputParams, Path } from "../utilities";
+import { getTokenPrice } from "./priceHelper";
 
 let alice: SignerWithAddress,
-  feeTo: SignerWithAddress, 
+  feeTo: SignerWithAddress,
   weth: Contract,
   bento: Contract,
   masterDeployer: Contract,
@@ -23,8 +34,8 @@ let alice: SignerWithAddress,
   ERC20Factory: ContractFactory;
 
 const tokenSupply = getBigNumber(undefined, Math.pow(10, 37));
-  
-export async function init() : Promise<SignerWithAddress> {
+
+export async function init(): Promise<SignerWithAddress> {
   await createAccounts();
   await deployContracts();
 
@@ -39,103 +50,93 @@ export async function getABCDTopoplogy(rnd: () => number): Promise<Topology> {
   return await getTopoplogy(4, 1, rnd);
 }
 
-export async function getAB2VariantTopoplogy(rnd: () => number): Promise<Topology> {
+export async function getAB2VariantTopoplogy(
+  rnd: () => number
+): Promise<Topology> {
   return await getTopoplogy(2, 2, rnd);
 }
 
-export async function getAB3VariantTopoplogy(rnd: () => number): Promise<Topology> {
+export async function getAB3VariantTopoplogy(
+  rnd: () => number
+): Promise<Topology> {
   return await getTopoplogy(2, 3, rnd);
 }
 
-export function createRoute(fromToken: RToken, toToken: RToken, baseToken: RToken, topology: Topology, amountIn: number, gasPrice: number): MultiRoute {
-  const route = findMultiRouting(fromToken, toToken, amountIn, topology.pools, baseToken, gasPrice, 32);
+export function createRoute(
+  fromToken: RToken,
+  toToken: RToken,
+  baseToken: RToken,
+  topology: Topology,
+  amountIn: number,
+  gasPrice: number
+): MultiRoute {
+  const route = findMultiRouting(
+    fromToken,
+    toToken,
+    amountIn,
+    topology.pools,
+    baseToken,
+    gasPrice,
+    32
+  );
   return route;
-} 
-
-export function getExactInputParams(
-  multiRoute: MultiRoute,
-  senderAddress: string,
-  toToken: string
-): ExactInputParams {
-  
-  let paths: Path[] = [
-    {
-      pool: multiRoute.legs[0].address,
-      data: ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "bool"],
-        [multiRoute.legs[0].token.address, senderAddress, false]
-      ),
-    }
-  ];
-
-  let inputParams: ExactInputParams = {
-    amountIn: getBigNumber(undefined, multiRoute.amountIn),
-    tokenIn: multiRoute.legs[0].token.address,
-    tokenOut: toToken,
-    amountOutMinimum: getBigNumber(undefined, 0),
-    path: paths,
-  };
-
-  return inputParams;
 }
-  
-export async function executeComplexPath(routerParams: ComplexPathParams, toTokenAddress: string) {
-   
-  let outputBalanceBefore: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
-  //console.log("Output balance before", outputBalanceBefore.toString());
+
+export async function executeComplexPath(
+  routerParams: ComplexPathParams,
+  toTokenAddress: string
+) {
+  let outputBalanceBefore: BigNumber = await bento.balanceOf(
+    toTokenAddress,
+    alice.address
+  );
 
   await (await router.connect(alice).complexPath(routerParams)).wait();
 
-  let outputBalanceAfter: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
-  //console.log("Output balance after", outputBalanceAfter.toString());
+  let outputBalanceAfter: BigNumber = await bento.balanceOf(
+    toTokenAddress,
+    alice.address
+  );
 
   return outputBalanceAfter.sub(outputBalanceBefore);
 }
 
-export async function executeExactInput(routerParams: ExactInputParams, toTokenAddress: string) {
-   
-  let outputBalanceBefore: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
-  //console.log("Output balance before", outputBalanceBefore.toString());
-
-  await (await router.connect(alice).exactInput(routerParams)).wait();
-
-  let outputBalanceAfter: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
-  //console.log("Output balance after", outputBalanceAfter.toString());
-
-  return outputBalanceAfter.sub(outputBalanceBefore);
-}
-  
-async function getTopoplogy(tokenCount: number, poolVariants: number, rnd: () => number): Promise<Topology> {
-   
+async function getTopoplogy(
+  tokenCount: number,
+  poolVariants: number,
+  rnd: () => number
+): Promise<Topology> {
   const tokenContracts: Contract[] = [];
 
   let topology: Topology = {
-    tokens: [], 
+    tokens: [],
     prices: [],
-    pools: []
+    pools: [],
   };
 
   const poolDeployment: PoolDeploymentContracts = {
     hybridPoolFactory: HybridPoolContractFactory,
     hybridPoolContract: hybridPool,
-    constPoolFactory: ConstantPoolContractFactory, 
-    constantPoolContract: constantProductPool, 
+    constPoolFactory: ConstantPoolContractFactory,
+    constantPoolContract: constantProductPool,
     masterDeployerContract: masterDeployer,
     bentoContract: bento,
-    account: alice
+    account: alice,
   };
 
   const poolCount = tokenCount - 1;
 
-  //Create tokens
   for (var i = 0; i < tokenCount; ++i) {
-    topology.tokens.push({ name: `Token${i}`, address: '' + i })
-    topology.prices.push(getTokenPrice(rnd)); 
+    topology.tokens.push({ name: `Token${i}`, address: "" + i });
+    topology.prices.push(getTokenPrice(rnd));
   }
 
-  //Deploy tokens 
   for (let i = 0; i < topology.tokens.length; i++) {
-    const tokenContract = await ERC20Factory.deploy(topology.tokens[0].name, topology.tokens[0].name , tokenSupply);
+    const tokenContract = await ERC20Factory.deploy(
+      topology.tokens[0].name,
+      topology.tokens[0].name,
+      tokenSupply
+    );
     await tokenContract.deployed();
     tokenContracts.push(tokenContract);
     topology.tokens[i].address = tokenContract.address;
@@ -143,28 +144,36 @@ async function getTopoplogy(tokenCount: number, poolVariants: number, rnd: () =>
 
   await approveAndFund(tokenContracts);
 
-  //Create pools 
   let poolType = 0;
   for (i = 0; i < poolCount; i++) {
     for (let index = 0; index < poolVariants; index++) {
       const j = i + 1;
-      
+
       const token0 = topology.tokens[i];
       const token1 = topology.tokens[j];
 
       const price0 = topology.prices[i];
       const price1 = topology.prices[j];
 
-      if(poolType % 2 == 0){
-        topology.pools.push(await getHybridPool(token0, token1, price0 / price1, poolDeployment, rnd))
-      }
-      else{
-        topology.pools.push(await getCPPool(token0, token1, price0 / price1, poolDeployment, rnd))
+      if (poolType % 2 == 0) {
+        topology.pools.push(
+          await getHybridPool(
+            token0,
+            token1,
+            price0 / price1,
+            poolDeployment,
+            rnd
+          )
+        );
+      } else {
+        topology.pools.push(
+          await getCPPool(token0, token1, price0 / price1, poolDeployment, rnd)
+        );
       }
 
-      poolType ++; 
+      poolType++;
     }
-  } 
+  }
 
   return topology;
 }
@@ -189,11 +198,10 @@ async function deployContracts() {
   ConstantPoolContractFactory = await ethers.getContractFactory(
     "ConstantProductPool"
   );
-  
+
   weth = await ERC20Factory.deploy("WETH", "WETH", tokenSupply);
   await weth.deployed();
 
-  // deploy bento
   bento = await BentoFactory.deploy(weth.address);
   await bento.deployed();
 
@@ -204,23 +212,18 @@ async function deployContracts() {
   );
   await masterDeployer.deployed();
 
-  // deploy hybrid pool
   hybridPool = await HybridPoolFactory.deploy(masterDeployer.address);
   await hybridPool.deployed();
 
-  // deploy constant product pool
   constantProductPool = await ConstPoolFactory.deploy(masterDeployer.address);
   await constantProductPool.deployed();
 
-  // whitelist the pools to master deployer
   await masterDeployer.addToWhitelist(hybridPool.address);
   await masterDeployer.addToWhitelist(constantProductPool.address);
 
-  // deploy the router
   router = await TridentRouterFactory.deploy(bento.address, weth.address);
   await router.deployed();
 
-  // whitelist router to bento
   await bento.whitelistMasterContract(router.address, true);
 
   await bento.setMasterContractApproval(
@@ -231,25 +234,34 @@ async function deployContracts() {
     "0x0000000000000000000000000000000000000000000000000000000000000000",
     "0x0000000000000000000000000000000000000000000000000000000000000000"
   );
-} 
+}
 
-async function approveAndFund(contracts: Contract[]){
+async function approveAndFund(contracts: Contract[]) {
   for (let index = 0; index < contracts.length; index++) {
     const tokenContract = contracts[index];
 
     await tokenContract.approve(bento.address, tokenSupply);
-    await bento.deposit(tokenContract.address, alice.address, alice.address, tokenSupply, 0); 
+    await bento.deposit(
+      tokenContract.address,
+      alice.address,
+      alice.address,
+      tokenSupply,
+      0
+    );
   }
-} 
+}
 
-export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: string, fromToken: string, toToken: string) {
-
+export function getComplexPathParams(
+  multiRoute: MultiRoute,
+  senderAddress: string,
+  fromToken: string,
+  toToken: string
+) {
   let initialPaths: InitialPath[] = [];
   let percentagePaths: PercentagePath[] = [];
   let outputs: Output[] = [];
 
-  const output: Output =  
-  {
+  const output: Output = {
     token: toToken,
     to: senderAddress,
     unwrapBento: false,
@@ -257,19 +269,24 @@ export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: stri
   };
   outputs.push(output);
 
-  const routeLegs = multiRoute.legs.length; 
+  const routeLegs = multiRoute.legs.length;
 
-  for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {  
+  for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
+    const recipentAddress = getRecipentAddress(
+      multiRoute,
+      legIndex,
+      fromToken,
+      senderAddress
+    );
 
-    const recipentAddress = getRecipentAddress(multiRoute, legIndex, fromToken, senderAddress);
-
-    if(multiRoute.legs[legIndex].token.address === fromToken){
-       
-      const initialPath: InitialPath = 
-      {
+    if (multiRoute.legs[legIndex].token.address === fromToken) {
+      const initialPath: InitialPath = {
         tokenIn: multiRoute.legs[legIndex].token.address,
         pool: multiRoute.legs[legIndex].address,
-        amount: getBigNumber(undefined, multiRoute.amountIn * (multiRoute.legs[legIndex].absolutePortion)),
+        amount: getBigNumber(
+          undefined,
+          multiRoute.amountIn * multiRoute.legs[legIndex].absolutePortion
+        ),
         native: false,
         data: ethers.utils.defaultAbiCoder.encode(
           ["address", "address", "bool"],
@@ -277,10 +294,8 @@ export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: stri
         ),
       };
       initialPaths.push(initialPath);
-    } 
-    else{  
-      const percentagePath: PercentagePath = 
-      {
+    } else {
+      const percentagePath: PercentagePath = {
         tokenIn: multiRoute.legs[legIndex].token.address,
         pool: multiRoute.legs[legIndex].address,
         balancePercentage: multiRoute.legs[legIndex].swapPortion * 1_000_000,
@@ -288,13 +303,10 @@ export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: stri
           ["address", "address", "bool"],
           [multiRoute.legs[legIndex].token.address, recipentAddress, false]
         ),
-      }
-      percentagePaths.push(percentagePath); 
-
+      };
+      percentagePaths.push(percentagePath);
     }
-    
-    
-  } 
+  }
 
   const complexParams: ComplexPathParams = {
     initialPath: initialPaths,
@@ -305,15 +317,20 @@ export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: stri
   return complexParams;
 }
 
-function getRecipentAddress(multiRoute: MultiRoute, legIndex: number, fromTokenAddress: string, senderAddress: string): string{
-  
+function getRecipentAddress(
+  multiRoute: MultiRoute,
+  legIndex: number,
+  fromTokenAddress: string,
+  senderAddress: string
+): string {
   const isLastLeg = legIndex === multiRoute.legs.length - 1;
-  
-  if(isLastLeg || multiRoute.legs[legIndex + 1].token.address === fromTokenAddress){
+
+  if (
+    isLastLeg ||
+    multiRoute.legs[legIndex + 1].token.address === fromTokenAddress
+  ) {
     return senderAddress;
-  }
-  else{
+  } else {
     return multiRoute.legs[legIndex + 1].address;
   }
 }
-
