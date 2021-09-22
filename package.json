@@ -1,6 +1,6 @@
 {
   "name": "@sushiswap/trident",
-  "version": "1.0.0-canary.7",
+  "version": "1.0.0-canary.8",
   "files": [
     "artifacts",
     "contracts",
