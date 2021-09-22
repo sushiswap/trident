@@ -67,6 +67,56 @@ task("constant-product-pool:deploy", "Constant Product Pool deploy")
     console.log(events);
   });
 
+task("constant-product-pool:address", "Constant Product Pool deploy")
+  .addOptionalParam(
+    "tokenA",
+    "Token A",
+    "0xd0A1E359811322d97991E03f863a0C30C2cF029C", // kovan weth
+    types.string
+  )
+  .addOptionalParam(
+    "tokenB",
+    "Token B",
+    "0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa", // kovan dai
+    types.string
+  )
+  .addOptionalParam("fee", "Fee tier", 30, types.int)
+  .addOptionalParam("twap", "Twap enabled", true, types.boolean)
+  .addOptionalParam("master", "Master Deployer Address", null, types.string)
+  .addOptionalParam("factory", "Factory Address", null, types.string)
+  .setAction(async function (
+    { tokenA, tokenB, fee, twap, master, factory },
+    { ethers }
+  ) {
+    if (!master) {
+      master = (await ethers.getContract("MasterDeployer")).address;
+    }
+    if (!factory) {
+      factory = (await ethers.getContract("ConstantProductPoolFactory"))
+        .address;
+    }
+
+    const deployData = ethers.utils.defaultAbiCoder.encode(
+      ["address", "address", "uint256", "bool"],
+      [...[tokenA, tokenB].sort(), fee, twap]
+    );
+    const salt = ethers.utils.keccak256(deployData);
+    const constructorParams = ethers.utils.defaultAbiCoder
+      .encode(["bytes", "address"], [deployData, master])
+      .substring(2);
+    const Pool = await ethers.getContractFactory("ConstantProductPool");
+    const initCodeHash = ethers.utils.keccak256(
+      Pool.bytecode + constructorParams
+    );
+    const poolAddress = ethers.utils.getCreate2Address(
+      factory,
+      salt,
+      initCodeHash
+    );
+
+    console.log(poolAddress);
+  });
+
 task("whitelist", "Whitelist Router on BentoBox").setAction(async function (
   _,
   { ethers, getChainId }
