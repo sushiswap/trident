@@ -1,11 +1,11 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
-import { Pool, RToken } from "@sushiswap/sdk";
+import { RPool, RToken } from "@sushiswap/tines";
 import { BigNumber, Contract, ContractFactory } from "ethers";
  
 export interface Topology {
   tokens: RToken[];
   prices: number[];
-  pools: Pool[];
+  pools: RPool[];
 }
   
 export interface Variants {

@@ -1,6 +1,6 @@
 import { Contract } from "ethers";
 import { ethers } from "hardhat";
-import { RHybridPool, RConstantProductPool, getBigNumber, RToken } from "@sushiswap/sdk";
+import { HybridRPool, ConstantProductRPool, getBigNumber, RToken } from "@sushiswap/tines";
 
 import { PoolDeploymentContracts } from "./helperInterfaces";
 import { choice, getRandom } from "./randomHelper";
@@ -28,14 +28,14 @@ export async function getCPPool(t0: RToken, t1: RToken, price: number, deploymen
 
   await constantProductPool.mint(ethers.utils.defaultAbiCoder.encode(["address"], [deploymentContracts.account.address]));
 
-  return new RConstantProductPool({
-    token0: t0,
-    token1: t1,
-    address: constantProductPool.address,
-    reserve0: getBigNumber(undefined, reserve0),
-    reserve1: getBigNumber(undefined, reserve1),
-    fee: fee / 10_000
-  })
+  return new ConstantProductRPool(
+    constantProductPool.address,
+    t0,
+    t1,
+    fee / 10_000,
+    getBigNumber(undefined, reserve0),
+    getBigNumber(undefined, reserve1),
+  )
 }
 
 export async function getHybridPool(t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts, rnd: () => number) {
@@ -62,15 +62,15 @@ export async function getHybridPool(t0: RToken, t1: RToken, price: number, deplo
 
     await hybridPool.mint(ethers.utils.defaultAbiCoder.encode(["address"], [deploymentContracts.account.address]));
 
-  return new RHybridPool({
-    token0: t0,
-    token1: t1,
-    address: hybridPool.address,
-    reserve0: getBigNumber(undefined, reserve0),
-    reserve1: getBigNumber(undefined, reserve1),
-    fee: fee / 10_000,
-    A: A
-  })
+  return new HybridRPool(
+    hybridPool.address,
+    t0,
+    t1,
+    fee / 10_000,
+    A,
+    getBigNumber(undefined, reserve0),
+    getBigNumber(undefined, reserve1),
+  )
 }
 
 function getPoolFee(rnd: () => number) {

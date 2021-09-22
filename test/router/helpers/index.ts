@@ -4,7 +4,7 @@ import {
   RToken,
   MultiRoute,
   findMultiRouting,
-} from "@sushiswap/sdk";
+}  from "@sushiswap/tines"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { BigNumber, Contract, ContractFactory } from "ethers";
 

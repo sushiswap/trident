@@ -795,10 +795,10 @@
   resolved "https://registry.npmjs.org/@sushiswap/prettier-config/-/prettier-config-0.1.0.tgz"
   integrity sha512-QD+xdR0VZbmqwSa1xMMkCh5KGCVQQLqN3VHS7VDh5rB4FtZKbUE8lNgKvtKwp38aG0zIlwZcbA+ASFBnWmbkJQ==
 
-"@sushiswap/sdk@5.0.0-canary.66":
-  version "5.0.0-canary.66"
-  resolved "https://registry.yarnpkg.com/@sushiswap/sdk/-/sdk-5.0.0-canary.66.tgz#e80cfa1205e8f4d31953bbdcccf8b1eb1cfa9311"
-  integrity sha512-/d2NDtBIM7H1fsJnGmWDGmqY5gsGyJ+Pj3c7RJPl+hVsDEz0NYcWzr7Yy991nS+FU56ny4RgKIpmPdmkGdJHwg==
+"@sushiswap/sdk@5.0.0-canary.87":
+  version "5.0.0-canary.87"
+  resolved "https://registry.yarnpkg.com/@sushiswap/sdk/-/sdk-5.0.0-canary.87.tgz#3e5738f584e8de5093899abde1db5a836f690ccd"
+  integrity sha512-JS4Pi/08j/AkdLXdgi4iEY8DS5FKX7JqpTU+GMbj44Gf38gfayC2iKsUMUQgmoo9cO84n0vX6i2sfbIsl0mXAQ==
   dependencies:
     big.js "^6.1.0"
     decimal.js-light "^2.5.0"
@@ -807,6 +807,11 @@
     tiny-invariant "^1.1.0"
     tiny-warning "^1.0.3"
     toformat "^2.0.0"
+
+"@sushiswap/tines@^0.1.1":
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/@sushiswap/tines/-/tines-0.1.1.tgz#2bed9e54905081126539aea837fc25f3d6f5c7a2"
+  integrity sha512-3GTmLP3R9DdO9z70GYVXfcr7nMecgIkVI141WewIGasojsCFQdrNb41ExOcXypweOwllEi459r7yn4dsikXRIg==
 
 "@szmarczak/http-timer@^1.1.2":
   version "1.1.2"
