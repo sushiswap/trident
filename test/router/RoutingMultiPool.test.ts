@@ -19,13 +19,6 @@ describe("MultiPool Routing Tests", function () {
     const baseToken = topology.tokens[1];
     const [amountIn] = getIntegerRandomValue(30, this.rnd);
 
-    topology.pools.forEach((pool) => {
-      console.log("");
-      console.log(`Pool ${topology.pools.indexOf(pool)} Reserves:`);
-      console.log(`Reserve 0: ${pool.reserve0.toString()}`);
-      console.log(`Reserve 1: ${pool.reserve1.toString()}`);
-    });
-
     const route = testHelper.createRoute(
       fromToken,
       toToken,
@@ -64,13 +57,6 @@ describe("MultiPool Routing Tests", function () {
     const toToken = topology.tokens[1];
     const baseToken = topology.tokens[1];
     const [amountIn] = getIntegerRandomValue(30, this.rnd);
-
-    topology.pools.forEach((pool) => {
-      console.log("");
-      console.log(`Pool ${topology.pools.indexOf(pool)} Reserves:`);
-      console.log(`Reserve 0: ${pool.reserve0.toString()}`);
-      console.log(`Reserve 1: ${pool.reserve1.toString()}`);
-    });
 
     const route = testHelper.createRoute(
       fromToken,
@@ -111,13 +97,6 @@ describe("MultiPool Routing Tests", function () {
     const baseToken = topology.tokens[1];
     const [amountIn] = getIntegerRandomValue(20, this.rnd);
 
-    topology.pools.forEach((pool) => {
-      console.log("");
-      console.log(`Pool ${topology.pools.indexOf(pool)} Reserves:`);
-      console.log(`Reserve 0: ${pool.reserve0.toString()}`);
-      console.log(`Reserve 1: ${pool.reserve1.toString()}`);
-    });
-
     const route = testHelper.createRoute(
       fromToken,
       toToken,
@@ -155,13 +134,6 @@ describe("MultiPool Routing Tests", function () {
     const toToken = topology.tokens[2];
     const baseToken = topology.tokens[1];
     const [amountIn] = getIntegerRandomValue(20, this.rnd);
-
-    topology.pools.forEach((pool) => {
-      console.log("");
-      console.log(`Pool ${topology.pools.indexOf(pool)} Reserves:`);
-      console.log(`Reserve 0: ${pool.reserve0.toString()}`);
-      console.log(`Reserve 1: ${pool.reserve1.toString()}`);
-    });
 
     const route = testHelper.createRoute(
       fromToken,
