@@ -28,7 +28,7 @@ export class Trident {
   public router!: TridentRouter;
   public concentratedPoolManager!: ConcentratedLiquidityPoolManager;
   public concentratedPoolFactory!: ConcentratedLiquidityPoolFactory;
-  public concentratedPool!: ConcentratedLiquidityPool;
+  public concentratedPool!: ConcentratedLiquidityPool[];
   public tickMath!: TickMathTest;
 
   public static get Instance() {
@@ -70,15 +70,58 @@ export class Trident {
 
   private async deployConcentratedCore(CLP: ContractFactory) {
     const [token0, token1] = sortTokens(this.tokens);
-    const price = BigNumber.from(2).pow(96).mul(randBetween(1, 10000000)).div(randBetween(1, 10000000));
-    const deployData = utils.defaultAbiCoder.encode(
-      ["address", "address", "uint24", "uint160"],
-      [token0.address, token1.address, 30, price]
-    );
-    await this.masterDeployer.deployPool(this.concentratedPoolFactory.address, deployData);
-    const poolCount = await this.concentratedPoolFactory.poolsCount(token0.address, token1.address);
-    const poolAddress = (await this.concentratedPoolFactory.getPools(token0.address, token1.address, poolCount.sub(1), poolCount))[0];
-    this.concentratedPool = (await CLP.attach(poolAddress)) as ConcentratedLiquidityPool;
+    let concentratedPool: any = [];
+    let prices: any = [];
+
+    // random price feed
+    prices.push(BigNumber.from(2).pow(96).mul(randBetween(1, 10000000)).div(randBetween(1, 10000000)));
+
+    // stable price feed
+    prices.push(BigNumber.from(2).pow(96).mul(1).div(1));
+
+    // low price feed
+    prices.push(BigNumber.from(2).pow(96).mul(2).div(1));
+
+    // mid price feed
+    prices.push(BigNumber.from(2).pow(96).mul(4).div(1));
+
+    // high price feed
+    prices.push(BigNumber.from(2).pow(96).mul(1).div(6));
+
+    let deployDataFee1: any = [];
+    let deployDataFee2: any = [];
+    let deployDataFee3: any = [];
+
+    for (let i = 0; i < prices.length; i++) {
+      deployDataFee1.push(
+        utils.defaultAbiCoder.encode(["address", "address", "uint24", "uint160"], [token0.address, token1.address, 5, prices[i]])
+      );
+      await this.masterDeployer.deployPool(this.concentratedPoolFactory.address, deployDataFee1[i]);
+      const poolCount = await this.concentratedPoolFactory.poolsCount(token0.address, token1.address);
+      const poolAddress = (await this.concentratedPoolFactory.getPools(token0.address, token1.address, poolCount.sub(1), poolCount))[0];
+      concentratedPool.push((await CLP.attach(poolAddress)) as ConcentratedLiquidityPool);
+    }
+
+    for (let i = 0; i < prices.length; i++) {
+      deployDataFee2.push(
+        utils.defaultAbiCoder.encode(["address", "address", "uint24", "uint160"], [token0.address, token1.address, 30, prices[i]])
+      );
+      await this.masterDeployer.deployPool(this.concentratedPoolFactory.address, deployDataFee2[i]);
+      const poolCount = await this.concentratedPoolFactory.poolsCount(token0.address, token1.address);
+      const poolAddress = (await this.concentratedPoolFactory.getPools(token0.address, token1.address, poolCount.sub(1), poolCount))[0];
+      concentratedPool.push((await CLP.attach(poolAddress)) as ConcentratedLiquidityPool);
+    }
+
+    for (let i = 0; i < prices.length; i++) {
+      deployDataFee3.push(
+        utils.defaultAbiCoder.encode(["address", "address", "uint24", "uint160"], [token0.address, token1.address, 100, prices[i]])
+      );
+      await this.masterDeployer.deployPool(this.concentratedPoolFactory.address, deployDataFee3[i]);
+      const poolCount = await this.concentratedPoolFactory.poolsCount(token0.address, token1.address);
+      const poolAddress = (await this.concentratedPoolFactory.getPools(token0.address, token1.address, poolCount.sub(1), poolCount))[0];
+      concentratedPool.push((await CLP.attach(poolAddress)) as ConcentratedLiquidityPool);
+    }
+    this.concentratedPool = concentratedPool;
   }
 
   private async deployTokens(ERC20: ContractFactory) {
