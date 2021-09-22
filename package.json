@@ -1,6 +1,6 @@
 {
   "name": "@sushiswap/trident",
-  "version": "1.0.0-canary.4",
+  "version": "1.0.0-canary.5",
   "files": [
     "artifacts",
     "contracts",
@@ -12,21 +12,21 @@
     "build": "hardhat compile",
     "console": "hardhat console",
     "mainnet:deploy": "hardhat --network mainnet deploy",
-    "mainnet:verify": "hardhat --network mainnet etherscan-verify --solc-input",
+    "mainnet:verify": "hardhat --network mainnet etherscan-verify --solc-input --license GPL-3.0 --force-license",
     "mainnet:export": "hardhat --network mainnet export",
     "testnet:deploy": "yarn ropsten:deploy && yarn rinkeby:deploy && yarn goerli:deploy && yarn kovan:deploy && yarn moonbase:deploy && yarn arbitrum:deploy",
     "ropsten:deploy": "hardhat --network ropsten deploy",
-    "ropsten:verify": "hardhat --network ropsten etherscan-verify --solc-input",
+    "ropsten:verify": "hardhat --network ropsten etherscan-verify --solc-input --license GPL-3.0 --force-license",
     "ropsten:export": "hardhat --network ropsten export --export exports/ropsten.json",
     "rinkeby:deploy": "hardhat --network rinkeby deploy",
-    "rinkeby:verify": "hardhat --network rinkeby etherscan-verify --solc-input",
+    "rinkeby:verify": "hardhat --network rinkeby etherscan-verify --solc-input --license GPL-3.0 --force-license",
     "rinkeby:export": "hardhat --network rinkeby export --export exports/rinkeby.json",
     "goerli:deploy": "hardhat --network goerli deploy",
-    "goerli:verify": "hardhat --network goerli etherscan-verify --solc-input",
+    "goerli:verify": "hardhat --network goerli etherscan-verify --solc-input --license GPL-3.0 --force-license",
     "goerli:export": "hardhat --network goerli export --export exports/goerli.json",
     "kovan:deploy": "hardhat --network kovan deploy",
     "kovan:export": "hardhat --network kovan export --export exports/kovan.json",
-    "kovan:verify": "hardhat --network kovan etherscan-verify --solc-input",
+    "kovan:verify": "hardhat --network kovan etherscan-verify --solc-input --license GPL-3.0 --force-license",
     "moonbase:deploy": "hardhat --network moonbase deploy",
     "moonbase:export": "hardhat --network moonbase export --export exports/moonbase.json",
     "arbitrum:deploy": "hardhat --network arbitrum deploy",
@@ -38,7 +38,7 @@
     "prettier": "prettier --write 'test/**/*.{js,ts}' && prettier --write contracts/**/*.sol",
     "lint": "yarn prettier && solhint -c .solhint.json contracts/**/*.sol",
     "prepare": "husky install",
-    "prepublishOnly": "hardhat export --export-all exports/all.json && hardhat compile"
+    "prepublishOnly": "hardhat compile && hardhat export --export-all exports/all.json"
   },
   "lint-staged": {
     "*.ts": [
