@@ -5,8 +5,8 @@ import { addLiquidityViaRouter, getTickAtCurrentPrice, initialize } from "./harn
 import { getBigNumber, randBetween, ZERO } from "./harness/helpers";
 import { Trident } from "./harness/Trident";
 
-// pool indexes (based on price) - 0 for random, 1 for stable, 2 for low, 3 for mid, 4 for high
-// pool indexes (based on fees) - 0-4 -> 0.05%, 5-9 -> 0.3%, 10-14 -> 1%
+// pool indexes (based on price) - 0 for stable, 1 for low, 2 for mid, 3 for high
+// pool indexes (based on fees) - 0-3 -> 0.05%, 4-7 -> 0.3%, 8-11 -> 1%
 
 describe.only("Concentrated Liquidity Product Pool", function () {
   let snapshotId: string;
@@ -24,7 +24,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
 
   describe("Add liquidity", function () {
     it("Should add liquidity", async function () {
-      const concentratedPool = trident.concentratedPool[1];
+      const concentratedPool = trident.concentratedPool[0];
       const tickAtPrice = await getTickAtCurrentPrice(concentratedPool);
       const lower = tickAtPrice % 2 == 0 ? tickAtPrice - 10000 : tickAtPrice - 10001;
       const upper = tickAtPrice % 2 == 0 ? tickAtPrice + 10001 : tickAtPrice + 10000;

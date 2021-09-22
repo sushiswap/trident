@@ -74,19 +74,19 @@ export class Trident {
     let prices: any = [];
 
     // random price feed
-    prices.push(BigNumber.from(2).pow(96).mul(randBetween(1, 10000000)).div(randBetween(1, 10000000)));
+    // prices.push(BigNumber.from(2).pow(96).mul(randBetween(1, 10000000)).div(randBetween(1, 10000000)));
 
     // stable price feed
     prices.push(BigNumber.from(2).pow(96).mul(1).div(1));
 
     // low price feed
-    prices.push(BigNumber.from(2).pow(96).mul(2).div(1));
+    prices.push(BigNumber.from(2).pow(96).mul(1).div(2));
 
     // mid price feed
-    prices.push(BigNumber.from(2).pow(96).mul(4).div(1));
+    prices.push(BigNumber.from(2).pow(96).mul(1).div(4));
 
     // high price feed
-    prices.push(BigNumber.from(2).pow(96).mul(1).div(6));
+    prices.push(BigNumber.from(2).pow(96).mul(1).div(5));
 
     let deployDataFee1: any = [];
     let deployDataFee2: any = [];
