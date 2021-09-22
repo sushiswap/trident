@@ -82,8 +82,18 @@ task("constant-product-pool:address", "Constant Product Pool deploy")
   )
   .addOptionalParam("fee", "Fee tier", 30, types.int)
   .addOptionalParam("twap", "Twap enabled", true, types.boolean)
-  .addOptionalParam("master", "Master Deployer Address", null, types.string)
-  .addOptionalParam("factory", "Factory Address", null, types.string)
+  .addOptionalParam(
+    "master",
+    "Master Deployer Address",
+    "0xcbD2dB3c724fA4349618fb390f736185Db21a1A1",
+    types.string
+  )
+  .addOptionalParam(
+    "factory",
+    "Factory Address",
+    "0xD6A52478FB50f0aaB6E3Bf86f691c0D61DF18f38",
+    types.string
+  )
   .setAction(async function (
     { tokenA, tokenB, fee, twap, master, factory },
     { ethers }
