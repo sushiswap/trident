@@ -38,7 +38,8 @@
     "prettier": "prettier --write 'test/**/*.{js,ts}' && prettier --write contracts/**/*.sol",
     "lint": "yarn prettier && solhint -c .solhint.json contracts/**/*.sol",
     "prepare": "husky install",
-    "prepublishOnly": "hardhat compile && hardhat export --export-all exports/all.json"
+    "prepublishOnly": "hardhat compile && hardhat export --export-all exports/all.json",
+    "bump": "yarn version --prerelease --preid=canary && npm publish --tag canary"
   },
   "lint-staged": {
     "*.ts": [
