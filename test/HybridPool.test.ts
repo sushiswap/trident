@@ -42,7 +42,11 @@ describe("Router", function () {
 
     tridentPoolFactory = await PoolFactory.deploy(masterDeployer.address);
     await tridentPoolFactory.deployed();
-    router = await SwapRouter.deploy(bento.address, weth.address);
+    router = await SwapRouter.deploy(
+      bento.address,
+      masterDeployer.address,
+      weth.address
+    );
     await router.deployed();
 
     // Whitelist pool factory in master deployer
@@ -90,7 +94,7 @@ describe("Router", function () {
     // Pool deploy data
     let addresses = [weth.address, usdc.address].sort();
     const deployData = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8", "uint256"],
+      ["address", "address", "uint256", "uint256"],
       [addresses[0], addresses[1], 30, 200000]
     );
 
@@ -107,7 +111,7 @@ describe("Router", function () {
 
     addresses = [dai.address, usdc.address].sort();
     const deployData2 = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint8", "uint256"],
+      ["address", "address", "uint256", "uint256"],
       [addresses[0], addresses[1], 30, 200000]
     );
     daiUsdcPool = await Pool.attach(
@@ -442,6 +446,8 @@ describe("Router", function () {
         encodedTokenAmount(usdc, amountIn)
       );
       expect(expectedAmountOut).lt(BigNumber.from(10).pow(18));
+      expect(expectedAmountOut).gt(1);
+
       params = swapParams(
         usdc.address,
         amountIn,
@@ -461,7 +467,7 @@ describe("Router", function () {
       expect(await bento.balanceOf(weth.address, pool.address)).gt(
         oldPoolWethBalance
       );
-      expect(await bento.balanceOf(usdc.address, pool.address)).lt(
+      expect(await bento.balanceOf(usdc.address, pool.address)).eq(
         oldPoolUsdcBalance
       );
     });
@@ -474,7 +480,6 @@ describe("Router", function () {
       expect(expectedAmountOutSingleHop).gt(1);
       let params = {
         tokenIn: weth.address,
-        tokenOut: usdc.address,
         amountIn: amountIn,
         amountOutMinimum: 1,
         path: [
