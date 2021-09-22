@@ -62,14 +62,7 @@ export async function getAB3VariantTopoplogy(
   return await getTopoplogy(2, 3, rnd);
 }
 
-export function createRoute(
-  fromToken: RToken,
-  toToken: RToken,
-  baseToken: RToken,
-  topology: Topology,
-  amountIn: number,
-  gasPrice: number
-): MultiRoute {
+export function createRoute(fromToken: RToken, toToken: RToken, baseToken: RToken, topology: Topology, amountIn: number, gasPrice: number ): MultiRoute | undefined {
   const route = findMultiRouting(
     fromToken,
     toToken,
@@ -221,7 +214,7 @@ async function deployContracts() {
   await masterDeployer.addToWhitelist(hybridPool.address);
   await masterDeployer.addToWhitelist(constantProductPool.address);
 
-  router = await TridentRouterFactory.deploy(bento.address, weth.address);
+  router = await TridentRouterFactory.deploy(bento.address, masterDeployer.address, weth.address);
   await router.deployed();
 
   await bento.whitelistMasterContract(router.address, true);

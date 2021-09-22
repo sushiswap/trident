@@ -27,6 +27,11 @@ describe("MultiPool Routing Tests", function () {
       amountIn,
       this.gasPrice
     );
+
+    if (route == undefined) {
+      throw "Failed to get route";
+    }
+
     expect(route.legs.length).equal(3);
 
     const routerParams = testHelper.getComplexPathParams(
@@ -66,6 +71,11 @@ describe("MultiPool Routing Tests", function () {
       amountIn,
       this.gasPrice
     );
+
+    if (route == undefined) {
+      throw "Failed to get route";
+    }
+
     expect(route.legs.length).equal(2);
 
     const routerParams = testHelper.getComplexPathParams(
@@ -106,6 +116,10 @@ describe("MultiPool Routing Tests", function () {
       this.gasPrice
     );
 
+    if (route == undefined) {
+      throw "Failed to get route";
+    }
+
     const routerParams = testHelper.getComplexPathParams(
       route,
       this.signer.address,
@@ -143,6 +157,10 @@ describe("MultiPool Routing Tests", function () {
       amountIn,
       this.gasPrice
     );
+
+    if (route == undefined) {
+      throw "Failed to get route";
+    }
 
     const routerParams = testHelper.getComplexPathParams(
       route,
