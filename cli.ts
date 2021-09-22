@@ -112,7 +112,7 @@ task("router:add-liquidity", "Router add liquidity")
   .addOptionalParam(
     "pool",
     "Pool",
-    "0xb8aB64e8D5C0092252bca7BCF39f71C56C50B7Ab", // dai/weth
+    "0x34DC0c3fff06EF015a2135444A33B12c0C5A3A71", // dai/weth
     types.string
   )
   .addParam(
