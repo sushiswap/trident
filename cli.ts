@@ -2,6 +2,8 @@ import { BENTOBOX_ADDRESS, ChainId } from "@sushiswap/core-sdk";
 import { BigNumber, constants } from "ethers";
 import { task, types } from "hardhat/config";
 
+// import { bytecode } from "./artifacts/contracts/pool/ConstantProductPool.sol/ConstantProductPool.json";
+
 const { MaxUint256 } = constants;
 
 // This is a sample Hardhat task. To learn how to create your own go to
@@ -82,29 +84,10 @@ task("constant-product-pool:address", "Constant Product Pool deploy")
   )
   .addOptionalParam("fee", "Fee tier", 30, types.int)
   .addOptionalParam("twap", "Twap enabled", true, types.boolean)
-  .addOptionalParam(
-    "master",
-    "Master Deployer Address",
-    "0xcbD2dB3c724fA4349618fb390f736185Db21a1A1",
-    types.string
-  )
-  .addOptionalParam(
-    "factory",
-    "Factory Address",
-    "0xD6A52478FB50f0aaB6E3Bf86f691c0D61DF18f38",
-    types.string
-  )
-  .setAction(async function (
-    { tokenA, tokenB, fee, twap, master, factory },
-    { ethers }
-  ) {
-    if (!master) {
-      master = (await ethers.getContract("MasterDeployer")).address;
-    }
-    if (!factory) {
-      factory = (await ethers.getContract("ConstantProductPoolFactory"))
-        .address;
-    }
+  .setAction(async function ({ tokenA, tokenB, fee, twap }, { ethers }) {
+    const master = (await ethers.getContract("MasterDeployer")).address;
+    const factory = (await ethers.getContract("ConstantProductPoolFactory"))
+      .address;
 
     const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint256", "bool"],
@@ -124,7 +107,12 @@ task("constant-product-pool:address", "Constant Product Pool deploy")
       initCodeHash
     );
 
-    console.log(poolAddress);
+    // console.log(
+    //   "is pool.bytecode identical to artifact bytecode?",
+    //   Pool.bytecode === bytecode
+    // );
+
+    console.log({ initCodeHash, poolAddress });
   });
 
 task("whitelist", "Whitelist Router on BentoBox").setAction(async function (
