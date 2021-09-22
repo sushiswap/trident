@@ -262,8 +262,6 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         } else {
             bento.transfer(tokenInput.token, cachedMsgSender, msg.sender, tokenInput.amount);
         }
-        // @dev Resets the `msg.sender`'s authorization.
-        cachedMsgSender = address(1);
     }
 
     /// @notice Can be used by the pool 'mint' functionality to take tokens from the user.
@@ -278,8 +276,6 @@ contract TridentRouter is ITridentRouter, TridentHelper {
                 bento.transfer(tokenInput[i].token, cachedMsgSender, msg.sender, tokenInput[i].amount);
             }
         }
-        // @dev Resets the `msg.sender`'s authorization.
-        cachedMsgSender = address(1);
     }
 
     /// @notice Recover mistakenly sent `bento` tokens.
