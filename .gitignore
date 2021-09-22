@@ -9,6 +9,9 @@ artifacts/
 types/
 typechain/
 
+# Exports
+exports/
+
 # Env
 .env
 
