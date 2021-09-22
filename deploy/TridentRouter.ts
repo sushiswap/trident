@@ -1,5 +1,4 @@
-import { BENTOBOX_ADDRESS, ChainId, WNATIVE } from "@sushiswap/sdk";
-
+import { BENTOBOX_ADDRESS, ChainId, WNATIVE } from "@sushiswap/core-sdk";
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
@@ -23,10 +22,6 @@ const deployFunction: DeployFunction = async function ({
     // for testing purposes we use a redeployed bentobox address
     bentoBoxV1Address = (await ethers.getContract("BentoBoxV1")).address;
     wethAddress = (await ethers.getContract("WETH9")).address;
-  } else if (chainId === 42) {
-    // for testing purposes we use a redeployed bentobox address
-    bentoBoxV1Address = (await ethers.getContract("BentoBoxV1")).address;
-    wethAddress = "0xd0A1E359811322d97991E03f863a0C30C2cF029C";
   } else {
     if (!(chainId in WNATIVE)) {
       throw Error(`No WETH on chain #${chainId}!`);
