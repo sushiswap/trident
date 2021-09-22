@@ -751,6 +751,18 @@
   dependencies:
     antlr4ts "^0.5.0-alpha.4"
 
+"@sushiswap/core-sdk@^0.1.2":
+  version "0.1.2"
+  resolved "https://registry.yarnpkg.com/@sushiswap/core-sdk/-/core-sdk-0.1.2.tgz#d6ae5d252bb603b2664f119988da50d96d0fff01"
+  integrity sha512-z7ks+cVG8nH5jiHMtZp4HzdDcnSLEm/Pd+aNav1ZjfgKrsVNNSAs6a6tjoEvK7GRj6XhM4RFyV772y4mIAkxjQ==
+  dependencies:
+    big.js "^6.1.0"
+    decimal.js-light "^2.5.0"
+    jsbi "^3.1.0"
+    tiny-invariant "^1.1.0"
+    tiny-warning "^1.0.0"
+    toformat "^2.0.0"
+
 "@sushiswap/prettier-config@^0.1.0":
   version "0.1.0"
   resolved "https://registry.yarnpkg.com/@sushiswap/prettier-config/-/prettier-config-0.1.0.tgz#4fdddf1ba2590025f78adf6cb54ed016344958a4"
@@ -8938,7 +8950,7 @@ tiny-invariant@^1.1.0:
   resolved "https://registry.yarnpkg.com/tiny-invariant/-/tiny-invariant-1.1.0.tgz#634c5f8efdc27714b7f386c35e6760991d230875"
   integrity sha512-ytxQvrb1cPc9WBEI/HSeYYoGD0kWnGEOR8RY6KomWLBVhqz0RgTwVO9dLrGz7dC+nN9llyI7OKAgRq8Vq4ZBSw==
 
-tiny-warning@^1.0.3:
+tiny-warning@^1.0.0, tiny-warning@^1.0.3:
   version "1.0.3"
   resolved "https://registry.yarnpkg.com/tiny-warning/-/tiny-warning-1.0.3.tgz#94a30db453df4c643d0fd566060d60a875d84754"
   integrity sha512-lBN9zLN/oAf68o3zNXYrdCt1kP8WsiGW8Oo2ka41b2IM5JL/S1CTyX1rW0mb/zSuJun0ZUrDxx4sqvYS2FWzPA==

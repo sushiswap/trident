@@ -6,7 +6,6 @@ import { getBigNumber } from "./utilities";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { Contract, ContractFactory } from "ethers";
 import { expect } from "chai";
-import { calcOutByIn } from "@sushiswap/sdk";
 
 // ------------- PARAMETERS -------------
 
