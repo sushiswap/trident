@@ -20,19 +20,38 @@ describe.only("Concentrated Liquidity Product Pool", function () {
   });
 
   describe("Add liquidity", () => {
-    it("Should add liquidity and mint NFTs", async () => {
+    it("Should add liquidity", async () => {
       const tickAtPrice = await getTickAtCurrentPrice(trident.concentratedPool);
-      const lower = tickAtPrice % 2 == 0 ? tickAtPrice - 10000 : tickAtPrice - 10001;
-      const upper = tickAtPrice % 2 == 0 ? tickAtPrice + 10001 : tickAtPrice + 10000;
+      let lower = tickAtPrice % 2 == 0 ? tickAtPrice - 10000 : tickAtPrice - 10001;
+      let upper = tickAtPrice % 2 == 0 ? tickAtPrice + 10001 : tickAtPrice + 10000;
+      let lowerOld = -887272;
+      let upperOld = lower;
 
       await addLiquidityViaRouter(
         trident.concentratedPool,
         getBigNumber(1000),
         getBigNumber(2000),
         false,
-        -887272,
+        lowerOld,
         lower,
+        upperOld,
+        upper,
+        trident.concentratedPoolManager.address,
+        trident.accounts[0].address
+      );
+
+      upperOld = upper;
+      lower -= 1000;
+      upper += 1000;
+
+      await addLiquidityViaRouter(
+        trident.concentratedPool,
+        getBigNumber(3000),
+        getBigNumber(2000),
+        true,
+        lowerOld,
         lower,
+        upperOld,
         upper,
         trident.concentratedPoolManager.address,
         trident.accounts[0].address

@@ -22,6 +22,7 @@ export async function addLiquidityViaRouter(
   const oldUserBalances = await Trident.Instance.getTokenBalance(tokens, positionRecipient, native);
   const oldPoolBalances = await Trident.Instance.getTokenBalance(tokens, pool.address, false);
   const oldLiquidity = await pool.liquidity();
+  const oldTotalSupply = await Trident.Instance.concentratedPoolManager.totalSupply();
   const liquidityIncrease = priceLower.lt(currentPrice) && currentPrice.lt(priceUpper) ? liquidity : "0";
   const { dy, dx } = getAmountForLiquidity(priceLower, currentPrice, priceUpper, liquidity);
   const [_lowerOldPreviousTick, _lowerOldNextTick, _lowerOldLiquidity] = await pool.ticks(lowerOld);
@@ -39,10 +40,9 @@ export async function addLiquidityViaRouter(
     positionRecipient
   );
   await Trident.Instance.router.addLiquidityLazy(pool.address, liquidity, mintData);
+
   const newLiquidity = await pool.liquidity();
-
-  expect(newLiquidity.toString()).to.be.eq(oldLiquidity.add(liquidityIncrease).toString(), "Liquidity didn't update correctly");
-
+  const newTotalSupply = await Trident.Instance.concentratedPoolManager.totalSupply();
   const newUserBalances = await Trident.Instance.getTokenBalance(tokens, positionRecipient, native);
   const newPoolBalances = await Trident.Instance.getTokenBalance(tokens, pool.address, false);
   const [lowerOldPreviousTick, lowerOldNextTick, lowerOldLiquidity] = await pool.ticks(lowerOld);
@@ -50,6 +50,7 @@ export async function addLiquidityViaRouter(
   const [lowerPreviousTick, lowerNextTick, lowerLiquidity] = await pool.ticks(lower);
   const [upperPreviousTick, upperNextTick, upperLiquidity] = await pool.ticks(upper);
 
+  expect(newLiquidity.toString()).to.be.eq(oldLiquidity.add(liquidityIncrease).toString(), "Liquidity didn't update correctly");
   expect(lowerOldPreviousTick).to.be.eq(_lowerOldPreviousTick, "Mistakenly updated previous pointer of lowerOld");
   if (upper < _lowerOldNextTick) {
     expect(upperNextTick).to.be.eq(_lowerOldNextTick);
@@ -78,11 +79,23 @@ export async function addLiquidityViaRouter(
     expect(upperOldNextTick).to.be.eq(upper, "Previous not pointing to old");
     expect(upperPreviousTick).to.be.eq(upperOld, "Next not pointing to new");
   }
-
   expect(newUserBalances[0].toString()).to.be.eq(oldUserBalances[0].sub(dx).toString(), "Didn't pay correct amount of token0");
   expect(newUserBalances[1].toString()).to.be.eq(oldUserBalances[1].sub(dy).toString(), "Didn't pay correct amount of token1");
   expect(newPoolBalances[0].toString()).to.be.eq(oldPoolBalances[0].add(dx).toString(), "Didn't receive correct amount of token0");
   expect(newPoolBalances[1].toString()).to.be.eq(oldPoolBalances[1].add(dy).toString(), "Didn't receive correct amount of token1");
+  if (positionOwner === Trident.Instance.concentratedPoolManager.address) {
+    expect(oldTotalSupply.add(1).toString()).to.be.eq(newTotalSupply.toString(), "nft wasn't minted");
+    const [_pool, _liquidity, _lower, _upper, _feeGrowth0, _feeGrowth1] = await Trident.Instance.concentratedPoolManager.positions(
+      oldTotalSupply
+    );
+    const nftOwner = await Trident.Instance.concentratedPoolManager.ownerOf(oldTotalSupply);
+    expect(nftOwner).to.be.eq(positionRecipient, "ower doesn't receive the nft position");
+    expect(_pool).to.be.eq(pool.address, "position isn't of the correct pool");
+    expect(_lower).to.be.eq(lower, "position doesn't have the correct lower tick");
+    expect(_upper).to.be.eq(upper, "position doesn't have the correct upper tick");
+    expect(_liquidity).to.be.eq(liquidity, "position doens't have the minted liquidity");
+    // TODO add function to calculate range fee growth here and ensure that positionManager saved the correct value
+  }
 }
 
 // use solidity here for convenience
