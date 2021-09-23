@@ -4,7 +4,6 @@ pragma solidity >=0.8.0;
 
 import "../interfaces/IBentoBoxMinimal.sol";
 import "../interfaces/IMasterDeployer.sol";
-import "../workInProgress/IMigrator.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/ITridentCallee.sol";
 import "../libraries/TridentMath.sol";
@@ -20,12 +19,14 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
     uint256 internal constant MINIMUM_LIQUIDITY = 1000;
 
-    uint8 internal constant PRECISION = 112;
     uint256 internal constant MAX_FEE = 10000; // @dev 100%.
     uint256 internal constant MAX_FEE_SQUARE = 100000000;
     uint256 internal constant E18 = uint256(10)**18;
     uint256 public immutable swapFee;
     uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
+    uint8 internal constant PRECISION = 112;
+    
+    uint8 internal unlocked;
 
     address public immutable barFeeTo;
     IBentoBoxMinimal public immutable bento;
@@ -44,7 +45,6 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
     bytes32 public constant override poolIdentifier = "Trident:ConstantProduct";
 
-    uint256 internal unlocked;
     modifier lock() {
         require(unlocked == 1, "LOCKED");
         unlocked = 2;
@@ -52,7 +52,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         unlocked = 1;
     }
 
-    constructor(bytes memory _deployData, address _masterDeployer) {
+    constructor(bytes memory _deployData, IMasterDeployer _masterDeployer) {
         (address _token0, address _token1, uint256 _swapFee, bool _twapSupport) = abi.decode(_deployData, (address, address, uint256, bool));
 
         // @dev Factory ensures that the tokens are sorted.
@@ -69,10 +69,10 @@ contract ConstantProductPool is IPool, TridentERC20 {
         unchecked {
             MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
         }
-        barFee = IMasterDeployer(_masterDeployer).barFee();
-        barFeeTo = IMasterDeployer(_masterDeployer).barFeeTo();
-        bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
-        masterDeployer = IMasterDeployer(_masterDeployer);
+        barFee = _masterDeployer.barFee();
+        barFeeTo = _masterDeployer.barFeeTo();
+        bento = IBentoBoxMinimal(_masterDeployer.bento());
+        masterDeployer = _masterDeployer;
         unlocked = 1;
         if (_twapSupport) blockTimestampLast = 1;
     }
@@ -156,7 +156,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         _burn(address(this), liquidity);
         kLast = TridentMath.sqrt((uint256(_reserve0) - amount0) * (uint256(_reserve1) - amount1));
 
-        // Swap one token for another
+        // @dev Swap one token for another.
         unchecked {
             if (tokenOut == token1) {
                 // @dev Swap `token0` for `token1`
