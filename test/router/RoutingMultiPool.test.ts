@@ -34,12 +34,19 @@ describe("MultiPool Routing Tests", function () {
 
     expect(route.legs.length).equal(3);
 
-    const routerParams = testHelper.getComplexPathParams(
+    const routerParams = testHelper.getTridentRouterParams(
       route,
       this.signer.address,
       fromToken.address,
       toToken.address
     );
+
+    // const testParams = testHelper.getTridentRouterParams(
+    //   route,
+    //   this.signer.address,
+    //   fromToken.address,
+    //   toToken.address
+    // );
 
     const amountOutPoolBN = await testHelper.executeComplexPath(
       routerParams,
@@ -78,7 +85,7 @@ describe("MultiPool Routing Tests", function () {
 
     expect(route.legs.length).equal(2);
 
-    const routerParams = testHelper.getComplexPathParams(
+    const routerParams = testHelper.getTridentRouterParams(
       route,
       this.signer.address,
       fromToken.address,

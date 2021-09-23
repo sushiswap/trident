@@ -36,6 +36,11 @@ export interface PercentagePath {
   data: string;
 }
 
+export interface Path {
+  pool: string;
+  data: string;
+}
+
 export interface Output {
   token: string;
   to: string;
@@ -47,4 +52,19 @@ export interface ComplexPathParams {
   initialPath: InitialPath[];
   percentagePath: PercentagePath[];
   output: Output[];
+}
+
+export interface ExactInputSingleParams {
+  amountIn: BigNumber
+  amountOutMinimum: BigNumber;
+  tokenIn: string;
+  pool: string;
+  data: string;
+}
+
+export interface ExactInputParams {
+  tokenIn: string;
+  amountIn: BigNumber
+  amountOutMinimum: BigNumber;
+  path: Path[];
 }
