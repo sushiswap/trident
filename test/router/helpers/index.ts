@@ -1,23 +1,12 @@
 import { ethers } from "hardhat";
-import {
-  getBigNumber,
-  RToken,
-  MultiRoute,
-  findMultiRouting,
-}  from "@sushiswap/tines"
+import { getBigNumber,RToken, MultiRoute, findMultiRouting, }  from "@sushiswap/tines"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { BigNumber, Contract, ContractFactory } from "ethers";
 
-import {
-  Topology,
-  PoolDeploymentContracts,
-  InitialPath,
-  PercentagePath,
-  Output,
-  ComplexPathParams,
-} from "./helperInterfaces";
+import { Topology, PoolDeploymentContracts, TridentRoute, } from "./helperInterfaces";
 import { getCPPool, getHybridPool } from "./poolHelpers";
 import { getTokenPrice } from "./priceHelper";
+import { RouteType } from "./constants";
 
 let alice: SignerWithAddress,
   feeTo: SignerWithAddress,
@@ -33,13 +22,17 @@ let alice: SignerWithAddress,
   ConstantPoolContractFactory: ContractFactory,
   ERC20Factory: ContractFactory;
 
-const tokenSupply = getBigNumber(undefined, Math.pow(10, 37));
+const tokenSupply = getBigNumber(Math.pow(10, 37));
 
 export async function init(): Promise<SignerWithAddress> {
   await createAccounts();
   await deployContracts();
 
   return alice;
+}
+
+export async function getSinglePool(rnd: () => number): Promise<Topology> {
+  return await getTopoplogy(2, 1, rnd);
 }
 
 export async function getABCTopoplogy(rnd: () => number): Promise<Topology> {
@@ -73,19 +66,27 @@ export function createRoute(fromToken: RToken, toToken: RToken, baseToken: RToke
     32
   );
   return route;
-}
+} 
 
-export async function executeComplexPath(
-  routerParams: ComplexPathParams,
-  toTokenAddress: string
-) {
-  let outputBalanceBefore: BigNumber = await bento.balanceOf(
-    toTokenAddress,
-    alice.address
-  );
+export async function executeTridentRoute(tridentRouteParams: TridentRoute, toTokenAddress: string) {
 
-  await (await router.connect(alice).complexPath(routerParams)).wait();
+  let outputBalanceBefore: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
 
+  switch (tridentRouteParams.routeType) {
+    case RouteType.Single:
+      await (await router.connect(alice).exactInputSingle(tridentRouteParams)).wait();
+      break;
+    
+    case RouteType.NonComplex:
+      await (await router.connect(alice).exactInput(tridentRouteParams)).wait();
+        break;
+    
+    case RouteType.Complex:
+    default:
+      await (await router.connect(alice).complexPath(tridentRouteParams)).wait();
+      break;
+  }
+ 
   let outputBalanceAfter: BigNumber = await bento.balanceOf(
     toTokenAddress,
     alice.address
@@ -242,90 +243,6 @@ async function approveAndFund(contracts: Contract[]) {
       0
     );
   }
-}
-
-export function getComplexPathParams(
-  multiRoute: MultiRoute,
-  senderAddress: string,
-  fromToken: string,
-  toToken: string
-) {
-  let initialPaths: InitialPath[] = [];
-  let percentagePaths: PercentagePath[] = [];
-  let outputs: Output[] = [];
-
-  const output: Output = {
-    token: toToken,
-    to: senderAddress,
-    unwrapBento: false,
-    minAmount: getBigNumber(undefined, 0),
-  };
-  outputs.push(output);
-
-  const routeLegs = multiRoute.legs.length;
-
-  for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
-    const recipentAddress = getRecipentAddress(
-      multiRoute,
-      legIndex,
-      fromToken,
-      senderAddress
-    );
-
-    if (multiRoute.legs[legIndex].token.address === fromToken) {
-      const initialPath: InitialPath = {
-        tokenIn: multiRoute.legs[legIndex].token.address,
-        pool: multiRoute.legs[legIndex].address,
-        amount: getBigNumber(
-          undefined,
-          multiRoute.amountIn * multiRoute.legs[legIndex].absolutePortion
-        ),
-        native: false,
-        data: ethers.utils.defaultAbiCoder.encode(
-          ["address", "address", "bool"],
-          [multiRoute.legs[legIndex].token.address, recipentAddress, false]
-        ),
-      };
-      initialPaths.push(initialPath);
-    } else {
-      const percentagePath: PercentagePath = {
-        tokenIn: multiRoute.legs[legIndex].token.address,
-        pool: multiRoute.legs[legIndex].address,
-        balancePercentage: multiRoute.legs[legIndex].swapPortion * 1_000_000,
-        data: ethers.utils.defaultAbiCoder.encode(
-          ["address", "address", "bool"],
-          [multiRoute.legs[legIndex].token.address, recipentAddress, false]
-        ),
-      };
-      percentagePaths.push(percentagePath);
-    }
-  }
-
-  const complexParams: ComplexPathParams = {
-    initialPath: initialPaths,
-    percentagePath: percentagePaths,
-    output: outputs,
-  };
-
-  return complexParams;
-}
-
-function getRecipentAddress(
-  multiRoute: MultiRoute,
-  legIndex: number,
-  fromTokenAddress: string,
-  senderAddress: string
-): string {
-  const isLastLeg = legIndex === multiRoute.legs.length - 1;
-
-  if (
-    isLastLeg ||
-    multiRoute.legs[legIndex + 1].token.address === fromTokenAddress
-  ) {
-    return senderAddress;
-  } else {
-    return multiRoute.legs[legIndex + 1].address;
-  }
-}
+} 
 
 export * from './routerParamsHelper'; 

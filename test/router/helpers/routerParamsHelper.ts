@@ -60,14 +60,15 @@ function getRecipentAddress(multiRoute: MultiRoute, legIndex: number, fromTokenA
 
 function getExactInputSingleParams(multiRoute: MultiRoute, senderAddress: string) :ExactInputSingleParams {
     return {
-        amountIn: getBigNumber(undefined, multiRoute.amountIn * multiRoute.legs[0].absolutePortion),
-        amountOutMinimum: getBigNumber(undefined, 0),
+        amountIn: getBigNumber(multiRoute.amountIn * multiRoute.legs[0].absolutePortion),
+        amountOutMinimum: getBigNumber(0),
         tokenIn: multiRoute.legs[0].token.address,
         pool: multiRoute.legs[0].address,
         data: ethers.utils.defaultAbiCoder.encode(
         ["address", "address", "bool"],
         [multiRoute.legs[0].token.address, senderAddress, false]
         ),
+        routeType: RouteType.Single
     }; 
 }
 
@@ -108,15 +109,16 @@ function getExactInputParams(multiRoute: MultiRoute, senderAddress: string, from
   
     let inputParams: ExactInputParams = {
       tokenIn: multiRoute.legs[0].token.address,
-      amountIn: getBigNumber(undefined, multiRoute.amountIn),
-      amountOutMinimum: getBigNumber(undefined, 0),
+      amountIn: getBigNumber(multiRoute.amountIn),
+      amountOutMinimum: getBigNumber(0),
       path: paths,
+      routeType: RouteType.NonComplex
     };
   
     return inputParams;
 }
 
-export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: string, fromToken: string, toToken: string ) {
+export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: string, fromToken: string, toToken: string ): ComplexPathParams {
     let initialPaths: InitialPath[] = [];
     let percentagePaths: PercentagePath[] = [];
     let outputs: Output[] = [];
@@ -125,7 +127,7 @@ export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: stri
       token: toToken,
       to: senderAddress,
       unwrapBento: false,
-      minAmount: getBigNumber(undefined, 0),
+      minAmount: getBigNumber(0),
     };
     outputs.push(output);
   
@@ -143,9 +145,7 @@ export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: stri
         const initialPath: InitialPath = {
           tokenIn: multiRoute.legs[legIndex].token.address,
           pool: multiRoute.legs[legIndex].address,
-          amount: getBigNumber(
-            undefined,
-            multiRoute.amountIn * multiRoute.legs[legIndex].absolutePortion
+          amount: getBigNumber(multiRoute.amountIn * multiRoute.legs[legIndex].absolutePortion
           ),
           native: false,
           data: ethers.utils.defaultAbiCoder.encode(
@@ -172,6 +172,7 @@ export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: stri
       initialPath: initialPaths,
       percentagePath: percentagePaths,
       output: outputs,
+      routeType: RouteType.Complex
     };
   
     return complexParams;

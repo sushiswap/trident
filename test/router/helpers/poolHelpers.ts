@@ -23,8 +23,8 @@ export async function getCPPool(t0: RToken, t1: RToken, price: number, deploymen
     await (await deploymentContracts.masterDeployerContract.deployPool(deploymentContracts.constantPoolContract.address, deployData)).wait()
   ).events[0].args[1]);
 
-  await deploymentContracts.bentoContract.transfer(t0.address, deploymentContracts.account.address, constantProductPool.address, getBigNumber(undefined, reserve0));
-  await deploymentContracts.bentoContract.transfer(t1.address, deploymentContracts.account.address, constantProductPool.address, getBigNumber(undefined, reserve1));
+  await deploymentContracts.bentoContract.transfer(t0.address, deploymentContracts.account.address, constantProductPool.address, getBigNumber(reserve0));
+  await deploymentContracts.bentoContract.transfer(t1.address, deploymentContracts.account.address, constantProductPool.address, getBigNumber(reserve1));
 
   await constantProductPool.mint(ethers.utils.defaultAbiCoder.encode(["address"], [deploymentContracts.account.address]));
 
@@ -33,8 +33,8 @@ export async function getCPPool(t0: RToken, t1: RToken, price: number, deploymen
     t0,
     t1,
     fee / 10_000,
-    getBigNumber(undefined, reserve0),
-    getBigNumber(undefined, reserve1),
+    getBigNumber(reserve0),
+    getBigNumber(reserve1),
   )
 }
 
@@ -57,8 +57,8 @@ export async function getHybridPool(t0: RToken, t1: RToken, price: number, deplo
     ).events[0].args[1]
   );
 
-    await deploymentContracts.bentoContract.transfer(t0.address, deploymentContracts.account.address, hybridPool.address, getBigNumber(undefined, reserve0));
-    await deploymentContracts.bentoContract.transfer(t1.address, deploymentContracts.account.address, hybridPool.address, getBigNumber(undefined, reserve1));
+    await deploymentContracts.bentoContract.transfer(t0.address, deploymentContracts.account.address, hybridPool.address, getBigNumber(reserve0));
+    await deploymentContracts.bentoContract.transfer(t1.address, deploymentContracts.account.address, hybridPool.address, getBigNumber(reserve1));
 
     await hybridPool.mint(ethers.utils.defaultAbiCoder.encode(["address"], [deploymentContracts.account.address]));
 
@@ -68,8 +68,8 @@ export async function getHybridPool(t0: RToken, t1: RToken, price: number, deplo
     t1,
     fee / 10_000,
     A,
-    getBigNumber(undefined, reserve0),
-    getBigNumber(undefined, reserve1),
+    getBigNumber(reserve0),
+    getBigNumber(reserve1),
   )
 }
 

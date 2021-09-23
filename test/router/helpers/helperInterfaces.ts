@@ -1,6 +1,7 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { RPool, RToken } from "@sushiswap/tines";
 import { BigNumber, Contract, ContractFactory } from "ethers";
+import { RouteType } from "./constants";
  
 export interface Topology {
   tokens: RToken[];
@@ -48,13 +49,13 @@ export interface Output {
   minAmount: BigNumber;
 }
 
-export interface ComplexPathParams {
+export interface ComplexPathParams extends TridentRoute {
   initialPath: InitialPath[];
   percentagePath: PercentagePath[];
   output: Output[];
 }
 
-export interface ExactInputSingleParams {
+export interface ExactInputSingleParams extends TridentRoute {
   amountIn: BigNumber
   amountOutMinimum: BigNumber;
   tokenIn: string;
@@ -62,9 +63,13 @@ export interface ExactInputSingleParams {
   data: string;
 }
 
-export interface ExactInputParams {
+export interface ExactInputParams extends TridentRoute {
   tokenIn: string;
   amountIn: BigNumber
   amountOutMinimum: BigNumber;
   path: Path[];
+}
+
+export interface TridentRoute {
+  routeType: RouteType
 }
