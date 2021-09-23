@@ -246,46 +246,9 @@ contract ConcentratedLiquidityPool is IPool {
         emit Burn(msg.sender, amount0, amount1, recipient);
     }
     
-    /// @dev Burns LP tokens sent to this contract and swaps one of the output tokens for another
-    /// - i.e., the user gets a single token out by burning LP tokens.
-    function burnSingle(bytes calldata data) external override returns (uint256 amountOut) {
-        (int24 lower, int24 upper, uint128 amount, address recipient, address tokenOut, bool unwrapBento) = abi.decode(
-            data,
-            (int24, int24, uint128, address, address, bool)
-        );
-
-        uint160 priceLower = TickMath.getSqrtRatioAtTick(lower);
-        uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper);
-        uint160 currentPrice = price;
-        // @dev This is safe because user cannot have overflow amount of LP to burn.
-        unchecked {
-            if (priceLower < currentPrice && currentPrice < priceUpper) liquidity -= amount;
-        }
-
-        (uint256 amount0, uint256 amount1) = _getAmountsForLiquidity(
-            uint256(priceLower),
-            uint256(priceUpper),
-            uint256(currentPrice),
-            uint256(amount)
-        );
-
-        (uint256 amount0fees, uint256 amount1fees) = _updatePosition(tx.origin, lower, upper, -int128(amount));
-        // @dev This is safe because overflow is checked in {updatePosition}.
-        unchecked {
-            amount0 += amount0fees;
-            amount1 += amount1fees;
-        }
-        
-        if (tokenOut == token1) {
-            bytes memory swapData = abi.encode(true, amount0, recipient, unwrapBento);
-            amountOut = swap(swapData);
-        } else {
-            bytes memory swapData = abi.encode(false, amount0, recipient, unwrapBento);
-            amountOut = swap(swapData);
-        }
-            
-        (nearestTick) = Ticks.remove(ticks, nearestTick, lower, upper, amount);
-        emit Burn(msg.sender, amount0, amount1, recipient);
+    /// @dev Reserved for IPool.
+    function burnSingle(bytes calldata) public pure override returns (uint256 amountOut) {
+        return amountOut;
     }
     
     /// @dev Collects LP token fees for user and updates position.
@@ -433,16 +396,9 @@ contract ConcentratedLiquidityPool is IPool {
         }
     }
     
-    /// @dev Swaps one token for another. The router must support swap callbacks and ensure there isn't too much slippage.
-    function flashSwap(bytes calldata data) external override returns (uint256 amountOut) {
-        (bool zeroForOne, uint256 inAmount, address recipient, bool unwrapBento, bytes memory context) = abi.decode(
-            data, 
-            (bool, uint256, address, bool, bytes)
-        );
-        
-        bytes memory swapData = abi.encode(zeroForOne, inAmount, recipient, unwrapBento);
-        amountOut = swap(swapData);
-        ITridentCallee(msg.sender).tridentSwapCallback(context);
+    /// @dev Reserved for IPool.
+    function flashSwap(bytes calldata) public pure override returns (uint256 finalAmountOut) {
+        return finalAmountOut;
     }
     
     /// @dev Updates `barFee` for Trident protocol.
@@ -637,9 +593,9 @@ contract ConcentratedLiquidityPool is IPool {
         assets[0] = token0;
         assets[1] = token1;
     }
-
-    function getAmountOut(bytes calldata) public view override returns (uint256 finalAmountOut) {
-        // TODO
+    
+    /// @dev Reserved for IPool.
+    function getAmountOut(bytes calldata) public pure override returns (uint256 finalAmountOut) {
         return finalAmountOut;
     }
     
