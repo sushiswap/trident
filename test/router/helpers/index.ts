@@ -73,15 +73,15 @@ export async function executeTridentRoute(tridentRouteParams: TridentRoute, toTo
   let outputBalanceBefore: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
 
   switch (tridentRouteParams.routeType) {
-    case RouteType.Single:
+    case RouteType.SinglePool:
       await (await router.connect(alice).exactInputSingle(tridentRouteParams)).wait();
       break;
     
-    case RouteType.NonComplex:
+    case RouteType.SinglePath:
       await (await router.connect(alice).exactInput(tridentRouteParams)).wait();
         break;
     
-    case RouteType.Complex:
+    case RouteType.ComplexPath:
     default:
       await (await router.connect(alice).complexPath(tridentRouteParams)).wait();
       break;

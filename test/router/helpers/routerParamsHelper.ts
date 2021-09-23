@@ -3,25 +3,25 @@ import { ethers } from "hardhat";
 import { getBigNumber, MultiRoute } from "@sushiswap/tines";
 
 import { RouteType } from "./constants";
-import { ComplexPathParams, ExactInputParams, ExactInputSingleParams, InitialPath, Output, Path, PercentagePath } from "./helperInterfaces";
+import { ComplexPathParams, ExactInputParams, ExactInputSingleParams, InitialPath, Output, Path, PercentagePath, TridentRoute } from "./helperInterfaces";
 
 
-export function getTridentRouterParams(multiRoute: MultiRoute, senderAddress: string, fromToken: string, toToken: string) {
+export function getTridentRouterParams(multiRoute: MultiRoute, senderAddress: string): ExactInputParams | ExactInputSingleParams | ComplexPathParams {
     const routeType = getRouteType(multiRoute);
     let routerParams;
   
     switch (routeType) {
-      case RouteType.Single:
+      case RouteType.SinglePool:
         routerParams = getExactInputSingleParams(multiRoute, senderAddress);
         break;
   
-      case RouteType.NonComplex:
-        routerParams = getExactInputParams(multiRoute, senderAddress, fromToken, toToken);
+      case RouteType.SinglePath:
+        routerParams = getExactInputParams(multiRoute, senderAddress, multiRoute.fromToken.address, multiRoute.toToken.address);
         break;
   
-      case RouteType.Complex:
+      case RouteType.ComplexPath:
       default:
-        routerParams = getComplexPathParams(multiRoute, senderAddress, fromToken, toToken);
+        routerParams = getComplexPathParams(multiRoute, senderAddress, multiRoute.fromToken.address, multiRoute.toToken.address);
         break;
     }
     
@@ -30,17 +30,17 @@ export function getTridentRouterParams(multiRoute: MultiRoute, senderAddress: st
 
 function getRouteType(multiRoute: MultiRoute) { 
     if(multiRoute.legs.length === 1){
-      return RouteType.Single;
+      return RouteType.SinglePool;
     }
   
     const routeInputTokens = multiRoute.legs.map(function (leg) { return leg.token.address});
   
     if((new Set(routeInputTokens)).size === routeInputTokens.length){
-      return RouteType.NonComplex;
+      return RouteType.SinglePath;
     }
   
     if((new Set(routeInputTokens)).size !== routeInputTokens.length){
-      return RouteType.Complex;
+      return RouteType.ComplexPath;
     }
   
     return "unknown";
@@ -68,7 +68,7 @@ function getExactInputSingleParams(multiRoute: MultiRoute, senderAddress: string
         ["address", "address", "bool"],
         [multiRoute.legs[0].token.address, senderAddress, false]
         ),
-        routeType: RouteType.Single
+        routeType: RouteType.SinglePool
     }; 
 }
 
@@ -112,7 +112,7 @@ function getExactInputParams(multiRoute: MultiRoute, senderAddress: string, from
       amountIn: getBigNumber(multiRoute.amountIn),
       amountOutMinimum: getBigNumber(0),
       path: paths,
-      routeType: RouteType.NonComplex
+      routeType: RouteType.SinglePath
     };
   
     return inputParams;
@@ -172,7 +172,7 @@ export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: stri
       initialPath: initialPaths,
       percentagePath: percentagePaths,
       output: outputs,
-      routeType: RouteType.Complex
+      routeType: RouteType.ComplexPath
     };
   
     return complexParams;

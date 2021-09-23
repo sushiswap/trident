@@ -4,7 +4,7 @@ export const MIN_POOL_IMBALANCE = 1 / (1 + 1e-3);
 export const MAX_POOL_IMBALANCE = 1 + 1e-3;
 
 export enum RouteType {
-    Single = "Single",
-    NonComplex = "NonComplex",
-    Complex = "Complex"
+    SinglePool = "SinglePool",
+    SinglePath = "SinglePath",
+    ComplexPath = "ComplexPath"
 }

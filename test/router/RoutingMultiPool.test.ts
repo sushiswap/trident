@@ -37,12 +37,10 @@ describe("MultiPool Routing Tests", function () {
 
     const routerParams = testHelper.getTridentRouterParams(
       route,
-      this.signer.address,
-      fromToken.address,
-      toToken.address
+      this.signer.address
     );
 
-    expect(routerParams.routeType).equal(RouteType.Complex);
+    expect(routerParams.routeType).equal(RouteType.ComplexPath);
 
     const amountOutPoolBN = await testHelper.executeTridentRoute(
       routerParams,
@@ -83,12 +81,10 @@ describe("MultiPool Routing Tests", function () {
 
     const routerParams = testHelper.getTridentRouterParams(
       route,
-      this.signer.address,
-      fromToken.address,
-      toToken.address
+      this.signer.address
     );
 
-    expect(routerParams.routeType).equal(RouteType.Complex);
+    expect(routerParams.routeType).equal(RouteType.ComplexPath);
 
     const amountOutPoolBN = await testHelper.executeTridentRoute(
       routerParams,
@@ -127,12 +123,10 @@ describe("MultiPool Routing Tests", function () {
 
     const routerParams = testHelper.getTridentRouterParams(
       route,
-      this.signer.address,
-      fromToken.address,
-      toToken.address
+      this.signer.address
     );
 
-    expect(routerParams.routeType).equal(RouteType.NonComplex);
+    expect(routerParams.routeType).equal(RouteType.SinglePath);
 
     const amountOutPoolBN = await testHelper.executeTridentRoute(
       routerParams,
@@ -171,12 +165,10 @@ describe("MultiPool Routing Tests", function () {
 
     const routerParams = testHelper.getTridentRouterParams(
       route,
-      this.signer.address,
-      fromToken.address,
-      toToken.address
+      this.signer.address
     );
 
-    expect(routerParams.routeType).equal(RouteType.NonComplex);
+    expect(routerParams.routeType).equal(RouteType.SinglePath);
 
     const amountOutPoolBN = await testHelper.executeTridentRoute(
       routerParams,
@@ -215,12 +207,10 @@ describe("MultiPool Routing Tests", function () {
 
     const routerParams = testHelper.getTridentRouterParams(
       route,
-      this.signer.address,
-      fromToken.address,
-      toToken.address
+      this.signer.address
     );
 
-    expect(routerParams.routeType).equal(RouteType.Single);
+    expect(routerParams.routeType).equal(RouteType.SinglePool);
 
     const amountOutPoolBN = await testHelper.executeTridentRoute(
       routerParams,
