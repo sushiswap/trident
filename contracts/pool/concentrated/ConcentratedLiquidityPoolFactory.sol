@@ -29,7 +29,7 @@ contract ConcentratedLiquidityPoolFactory is PoolDeployer {
 
         // @dev Salt is not actually needed since `_deployData` is part of creationCode and already contains the salt.
         bytes32 salt = keccak256(_deployData);
-        pool = address(new ConcentratedLiquidityPool{salt: salt}(_deployData, masterDeployer, positionManager));
+        pool = address(new ConcentratedLiquidityPool{salt: salt}(_deployData, IMasterDeployer(masterDeployer), positionManager));
         _registerPool(pool, tokens, salt);
     }
 }
