@@ -8,8 +8,6 @@ import "./interfaces/ITridentRouter.sol";
 import "./utils/TridentHelper.sol";
 import "./deployer/MasterDeployer.sol";
 
-//import "hardhat/console.sol";
-
 /// @notice Router contract that helps in swapping across Trident pools.
 contract TridentRouter is ITridentRouter, TridentHelper {
     /// @notice BentoBox token vault.

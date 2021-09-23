@@ -9,8 +9,8 @@ describe.only("Concentrated Liquidity Product Pool", function () {
   let snapshotId: string;
   let trident: Trident;
 
-  before(async function () {
-    trident = await initialize();
+  before(async () => {
+    trident = await Trident.Instance.init();
     snapshotId = await ethers.provider.send("evm_snapshot", []);
   });
 
@@ -19,8 +19,8 @@ describe.only("Concentrated Liquidity Product Pool", function () {
     snapshotId = await ethers.provider.send("evm_snapshot", []);
   });
 
-  describe("Add liquidity", function () {
-    it("Should add liquidity", async function () {
+  describe("Add liquidity", () => {
+    it("Should add liquidity and mint NFTs", async () => {
       const tickAtPrice = await getTickAtCurrentPrice(trident.concentratedPool);
       const lower = tickAtPrice % 2 == 0 ? tickAtPrice - 10000 : tickAtPrice - 10001;
       const upper = tickAtPrice % 2 == 0 ? tickAtPrice + 10001 : tickAtPrice + 10000;
@@ -29,13 +29,13 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         trident.concentratedPool,
         getBigNumber(1000),
         getBigNumber(2000),
-        true,
+        false,
         -887272,
         lower,
         lower,
         upper,
-        trident.accounts[0].address,
-        trident.concentratedPoolManager.address
+        trident.concentratedPoolManager.address,
+        trident.accounts[0].address
       );
     });
   });
