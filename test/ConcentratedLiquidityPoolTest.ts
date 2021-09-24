@@ -5,15 +5,12 @@ import { addLiquidityViaRouter, getTickAtCurrentPrice, initialize } from "./harn
 import { getBigNumber, randBetween, ZERO } from "./harness/helpers";
 import { Trident } from "./harness/Trident";
 
-// pool indexes (based on price) - 0 for stable, 1 for low, 2 for mid, 3 for high
-// pool indexes (based on fees) - 0-3 -> 0.05%, 4-7 -> 0.3%, 8-11 -> 1%
-
 describe.only("Concentrated Liquidity Product Pool", function () {
   let snapshotId: string;
   let trident: Trident;
 
-  before(async function () {
-    trident = await initialize();
+  before(async () => {
+    trident = await Trident.Instance.init();
     snapshotId = await ethers.provider.send("evm_snapshot", []);
   });
 
@@ -22,24 +19,42 @@ describe.only("Concentrated Liquidity Product Pool", function () {
     snapshotId = await ethers.provider.send("evm_snapshot", []);
   });
 
-  describe("Add liquidity", function () {
-    it("Should add liquidity", async function () {
-      const concentratedPool = trident.concentratedPool[0];
-      const tickAtPrice = await getTickAtCurrentPrice(concentratedPool);
-      const lower = tickAtPrice % 2 == 0 ? tickAtPrice - 10000 : tickAtPrice - 10001;
-      const upper = tickAtPrice % 2 == 0 ? tickAtPrice + 10001 : tickAtPrice + 10000;
+  describe("Add liquidity", () => {
+    it("Should add liquidity", async () => {
+      const tickAtPrice = await getTickAtCurrentPrice(trident.concentratedPool);
+      let lower = tickAtPrice % 2 == 0 ? tickAtPrice - 10000 : tickAtPrice - 10001;
+      let upper = tickAtPrice % 2 == 0 ? tickAtPrice + 10001 : tickAtPrice + 10000;
+      let lowerOld = -887272;
+      let upperOld = lower;
 
       await addLiquidityViaRouter(
-        concentratedPool,
+        trident.concentratedPool,
         getBigNumber(1000),
         getBigNumber(2000),
-        true,
-        -887272,
+        false,
+        lowerOld,
         lower,
-        lower,
+        upperOld,
         upper,
-        trident.accounts[0].address,
-        trident.concentratedPoolManager.address
+        trident.concentratedPoolManager.address,
+        trident.accounts[0].address
+      );
+
+      upperOld = upper;
+      lower -= 1000;
+      upper += 1000;
+
+      await addLiquidityViaRouter(
+        trident.concentratedPool,
+        getBigNumber(3000),
+        getBigNumber(2000),
+        true,
+        lowerOld,
+        lower,
+        upperOld,
+        upper,
+        trident.concentratedPoolManager.address,
+        trident.accounts[0].address
       );
     });
   });

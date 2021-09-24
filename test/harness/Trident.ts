@@ -23,6 +23,7 @@ export class Trident {
 
   public accounts!: SignerWithAddress[];
   public tokens!: ERC20Mock[];
+  public tokenMap: [{ string: ERC20Mock }] = {} as [{ string: ERC20Mock }];
   public bento!: BentoBoxV1;
   public masterDeployer!: MasterDeployer;
   public router!: TridentRouter;
@@ -66,6 +67,18 @@ export class Trident {
     });
 
     return this.initialising;
+  }
+
+  public async getTokenBalance(tokens: string[], address: string, native: boolean) {
+    const promises: Promise<BigNumber>[] = [];
+    for (let token of tokens) {
+      if (native) {
+        promises.push(this.tokenMap[token].balanceOf(address));
+      } else {
+        promises.push(this.bento.balanceOf(token, address));
+      }
+    }
+    return Promise.all(promises);
   }
 
   private async deployConcentratedCore(CLP: ContractFactory) {
@@ -129,6 +142,8 @@ export class Trident {
       ERC20.deploy("TokenA", "TOK", this.tokenSupply),
       ERC20.deploy("TokenB", "TOK", this.tokenSupply),
     ] as Promise<ERC20Mock>[]);
+    this.tokenMap[this.tokens[0].address] = this.tokens[0];
+    this.tokenMap[this.tokens[1].address] = this.tokens[1];
     this.tokens = sortTokens(this.tokens);
   }
 
@@ -160,8 +175,7 @@ export class Trident {
   }
 
   private async addFactoriesToWhitelist() {
-    await this.masterDeployer.addToWhitelist(this.concentratedPoolFactory.address);
-    // add others...
+    await Promise.all([this.masterDeployer.addToWhitelist(this.concentratedPoolFactory.address)]);
   }
 
   private async prepareBento() {
