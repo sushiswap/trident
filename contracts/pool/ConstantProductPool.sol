@@ -25,8 +25,6 @@ contract ConstantProductPool is IPool, TridentERC20 {
     uint256 public immutable swapFee;
     uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
     uint8 internal constant PRECISION = 112;
-    
-    uint8 internal unlocked;
 
     address public immutable barFeeTo;
     IBentoBoxMinimal public immutable bento;
@@ -44,7 +42,8 @@ contract ConstantProductPool is IPool, TridentERC20 {
     uint32 internal blockTimestampLast;
 
     bytes32 public constant override poolIdentifier = "Trident:ConstantProduct";
-
+    
+    uint256 internal unlocked;
     modifier lock() {
         require(unlocked == 1, "LOCKED");
         unlocked = 2;
