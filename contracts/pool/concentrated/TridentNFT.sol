@@ -172,8 +172,7 @@ abstract contract TridentNFT {
     }
 
     function _mint(address recipient) internal {
-        totalSupply++;
-        uint256 tokenId = totalSupply;
+        uint256 tokenId = totalSupply++;
         require(ownerOf[tokenId] == address(0), "ALREADY_MINTED");
         // @dev This is safe from overflow - the sum of all user
         // balances can't exceed 'type(uint256).max'.
