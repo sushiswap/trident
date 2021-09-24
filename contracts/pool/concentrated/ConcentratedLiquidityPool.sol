@@ -90,7 +90,7 @@ contract ConcentratedLiquidityPool is IPool {
         int24 nextTickToCross;
     }
 
-    struct AddLiquidityParams {
+    struct MintParams {
         int24 lowerOld; 
         int24 lower; 
         int24 upperOld; 
@@ -137,13 +137,19 @@ contract ConcentratedLiquidityPool is IPool {
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
     /// The router must ensure that sufficient LP tokens are minted by using the return value.
     function mint(bytes calldata data) external override lock returns (uint256 _liquidity) {
-        AddLiquidityParams memory params = abi.decode(data, (AddLiquidityParams));
+        MintParams memory mintParams = abi.decode(data, (MintParams));
 
-        uint256 priceLower = uint256(TickMath.getSqrtRatioAtTick(params.lower));
-        uint256 priceUpper = uint256(TickMath.getSqrtRatioAtTick(params.upper));
+        uint256 priceLower = uint256(TickMath.getSqrtRatioAtTick(mintParams.lower));
+        uint256 priceUpper = uint256(TickMath.getSqrtRatioAtTick(mintParams.upper));
         uint256 currentPrice = uint256(price);
 
-        _liquidity = DyDxMath.getLiquidityForAmounts(priceLower, priceUpper, currentPrice, params.amount1Desired, params.amount0Desired);
+        _liquidity = DyDxMath.getLiquidityForAmounts(
+            priceLower,
+            priceUpper,
+            currentPrice,
+            mintParams.amount1Desired,
+            mintParams.amount0Desired
+        );
 
         // @dev This is safe because overflow is checked in position minter contract.
         unchecked {
@@ -151,7 +157,7 @@ contract ConcentratedLiquidityPool is IPool {
         }
 
         // @dev Fees should have been collected before position updates.
-        _updatePosition(params.positionOwner, params.lower, params.upper, int128(uint128(_liquidity)));
+        _updatePosition(mintParams.positionOwner, mintParams.lower, mintParams.upper, int128(uint128(_liquidity)));
 
         (nearestTick) = Ticks.insert(
             ticks,
@@ -159,10 +165,10 @@ contract ConcentratedLiquidityPool is IPool {
             feeGrowthGlobal0,
             feeGrowthGlobal1,
             secondsPerLiquidity,
-            params.lowerOld,
-            params.lower,
-            params.upperOld,
-            params.upper,
+            mintParams.lowerOld,
+            mintParams.lower,
+            mintParams.upperOld,
+            mintParams.upper,
             uint128(_liquidity),
             uint160(currentPrice)
         );
@@ -171,8 +177,8 @@ contract ConcentratedLiquidityPool is IPool {
             (uint128 amount0Actual, uint128 amount1Actual) = _getAmountsForLiquidity(priceLower, priceUpper, currentPrice, _liquidity);
 
             ITridentRouter.TokenInput[] memory callbackData = new ITridentRouter.TokenInput[](2);
-            callbackData[0] = ITridentRouter.TokenInput(token0, params.amount0native, amount0Actual);
-            callbackData[1] = ITridentRouter.TokenInput(token1, params.amount1native, amount1Actual);
+            callbackData[0] = ITridentRouter.TokenInput(token0, mintParams.amount0native, amount0Actual);
+            callbackData[1] = ITridentRouter.TokenInput(token1, mintParams.amount1native, amount1Actual);
 
             ITridentCallee(msg.sender).tridentMintCallback(abi.encode(callbackData));
 
@@ -189,18 +195,18 @@ contract ConcentratedLiquidityPool is IPool {
                 }
             }
 
-            (uint256 feeGrowth0, uint256 feeGrowth1) = rangeFeeGrowth(params.lower, params.upper);
+            (uint256 feeGrowth0, uint256 feeGrowth1) = rangeFeeGrowth(mintParams.lower, mintParams.upper);
 
             IPositionManager(poolManager).positionMintCallback(
-                params.recipient,
-                params.lower,
-                params.upper,
+                mintParams.recipient,
+                mintParams.lower,
+                mintParams.upper,
                 uint128(_liquidity),
                 feeGrowth0,
                 feeGrowth1
             );
 
-            emit Mint(msg.sender, amount0Actual, amount1Actual, params.recipient);
+            emit Mint(msg.sender, amount0Actual, amount1Actual, mintParams.recipient);
         }
 
         return _liquidity;
@@ -228,7 +234,7 @@ contract ConcentratedLiquidityPool is IPool {
             uint256(amount)
         );
 
-        (uint256 amount0fees, uint256 amount1fees) = _updatePosition(tx.origin, lower, upper, -int128(amount));
+        (uint256 amount0fees, uint256 amount1fees) = _updatePosition(msg.sender, lower, upper, -int128(amount));
         // @dev This is safe because overflow is checked in {updatePosition}.
         unchecked {
             amount0 += amount0fees;
@@ -255,7 +261,7 @@ contract ConcentratedLiquidityPool is IPool {
     function collect(bytes calldata data) external lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
         (int24 lower, int24 upper, address recipient, bool unwrapBento) = abi.decode(data, (int24, int24, address, bool));
 
-        (uint256 amount0fees, uint256 amount1fees) = _updatePosition(tx.origin, lower, upper, 0);
+        (uint256 amount0fees, uint256 amount1fees) = _updatePosition(msg.sender, lower, upper, 0);
 
         withdrawnAmounts = new TokenAmount[](2);
         withdrawnAmounts[0] = TokenAmount({token: token0, amount: amount0fees});
