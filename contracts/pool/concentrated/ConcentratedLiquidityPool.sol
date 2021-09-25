@@ -16,7 +16,7 @@ import "../../libraries/concentratedPool/Ticks.sol";
 
 /// @notice Trident exchange pool template with concentrated liquidity and constant product formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares.
-///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
+//      The curve is applied to shares as well. This pool does not care about the underlying amounts.
 contract ConcentratedLiquidityPool is IPool {
     using Ticks for mapping(int24 => Ticks.Tick);
 
@@ -50,11 +50,11 @@ contract ConcentratedLiquidityPool is IPool {
     int24 public nearestTick; /// @dev Tick that is just below the current price. 
     
     /// @dev References for tickSpacing:
-    /// - univ3 1% -> 200 tickSpacing
-    /// - univ3 0.3% pool -> 60 tickSpacing -> 0.6% between ticks
-    /// - univ3 0.05% pool -> 10 tickSpacing -> 0.1% between ticks
-    /// - 100 tickSpacing -> 1% between ticks => 2% between ticks on starting position (*stable pairs are different)
-    int24 public immutable tickSpacing;
+    // - univ3 1% -> 200 tickSpacing
+    // - univ3 0.3% pool -> 60 tickSpacing -> 0.6% between ticks
+    // - univ3 0.05% pool -> 10 tickSpacing -> 0.1% between ticks
+    // - 100 tickSpacing -> 1% between ticks => 2% between ticks on starting position (*stable pairs are different)
+    uint24 public immutable tickSpacing;
     
     uint24 internal constant MAX_FEE = 10000; /// @dev 100%. 
     uint24 public immutable swapFee; /// @dev 1000 corresponds to 0.1% fee.
@@ -109,9 +109,9 @@ contract ConcentratedLiquidityPool is IPool {
         IMasterDeployer _masterDeployer,
         address _poolManager
     ) {
-        (address _token0, address _token1, uint24 _swapFee, uint160 _price, int24 _tickSpacing) = abi.decode(
+        (address _token0, address _token1, uint24 _swapFee, uint160 _price, uint24 _tickSpacing) = abi.decode(
             _deployData, 
-            (address, address, uint24, uint160, int24)
+            (address, address, uint24, uint160, uint24)
         );
 
         require(_token0 != address(0), "ZERO_ADDRESS");
@@ -135,7 +135,7 @@ contract ConcentratedLiquidityPool is IPool {
     }
     
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
-    /// The router must ensure that sufficient LP tokens are minted by using the return value.
+    // The router must ensure that sufficient LP tokens are minted by using the return value.
     function mint(bytes calldata data) external override lock returns (uint256 _liquidity) {
         MintParams memory mintParams = abi.decode(data, (MintParams));
 
@@ -162,6 +162,7 @@ contract ConcentratedLiquidityPool is IPool {
         (nearestTick) = Ticks.insert(
             ticks,
             nearestTick,
+            tickSpacing,
             feeGrowthGlobal0,
             feeGrowthGlobal1,
             secondsPerLiquidity,
@@ -273,10 +274,10 @@ contract ConcentratedLiquidityPool is IPool {
         emit Collect(msg.sender, amount0fees, amount1fees);
     }
     
-    /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
-    /// - price is √(y/x).
-    /// - x is token0.
-    /// - zero for one -> price will move down.
+    /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage
+    // - price is √(y/x)
+    // - x is token0
+    // - zero for one -> price will move down.
     function swap(bytes memory data) public override lock returns (uint256 amountOut) {
         (bool zeroForOne, uint256 inAmount, address recipient, bool unwrapBento) = abi.decode(data, (bool, uint256, address, bool));
 
@@ -306,14 +307,18 @@ contract ConcentratedLiquidityPool is IPool {
             bool cross;
             if (zeroForOne) {
                 /// @dev x for y
-                /// - price is going down
-                /// - max swap input within current tick range: Δx = Δ(1/√𝑃) · L.
+                // - price is going down
+                // - max swap input within current tick range: Δx = Δ(1/√𝑃) · L.
                 uint256 maxDx = DyDxMath.getDx(cache.currentLiquidity, nextTickPrice, cache.currentPrice, false);
+                
                 if (cache.input <= maxDx) {
                     /// @dev We can swap only within the current range.
                     uint256 liquidityPadded = cache.currentLiquidity << 96;
-                    /// @dev Calculate new price after swap: L · √𝑃 / (L + Δx · √𝑃)
-                    /// alternatively: L / (L / √𝑃 + Δx).
+                    /// @dev Calculate new price after swap: √𝑃[new] =  L · √𝑃 / (L + Δx · √𝑃)
+                    // ^ This is derrived from Δ(1/√𝑃)=Δx/L
+                    // (where Δ(1/√𝑃) is (1/√𝑃[old] - 1/√𝑃[new]) and we solve for √𝑃[new])
+                    // if an overflow happens we can use: √𝑃[new] = L / (L / √𝑃 + Δx)
+                    // ^ same as the above formula, but the fraction is divided by √𝑃.
                     uint256 newPrice = uint256(
                         FullMath.mulDivRoundingUp(liquidityPadded, cache.currentPrice, liquidityPadded + cache.currentPrice * cache.input)
                     );
@@ -323,7 +328,7 @@ contract ConcentratedLiquidityPool is IPool {
                         newPrice = uint160(UnsafeMath.divRoundingUp(liquidityPadded, liquidityPadded / cache.currentPrice + cache.input));
                     }
                     /// @dev Calculate output of swap
-                    /// - Δy = Δ√P · L.
+                    // - Δy = Δ√P · L.
                     output = DyDxMath.getDy(cache.currentLiquidity, newPrice, cache.currentPrice, false);
                     cache.currentPrice = newPrice;
                     cache.input = 0;
@@ -336,15 +341,15 @@ contract ConcentratedLiquidityPool is IPool {
                 }
             } else {
                 /// @dev Price is going up
-                /// - max swap within current tick range: Δy = Δ√P · L.
+                // - max swap within current tick range: Δy = Δ√P · L.
                 uint256 maxDy = DyDxMath.getDy(cache.currentLiquidity, cache.currentPrice, nextTickPrice, false);
                 if (cache.input <= maxDy) {
                     /// @dev We can swap only within the current range
-                    /// - calculate new price after swap ( ΔP = Δy/L ).
+                    // - calculate new price after swap ( ΔP = Δy/L ).
                     uint256 newPrice = cache.currentPrice +
                         FullMath.mulDiv(cache.input, 0x1000000000000000000000000, cache.currentLiquidity);
                     /// @dev Calculate output of swap
-                    /// - Δx = Δ(1/√P) · L.
+                    // - Δx = Δ(1/√P) · L.
                     output = DyDxMath.getDx(cache.currentLiquidity, cache.currentPrice, newPrice, false);
                     cache.currentPrice = newPrice;
                     cache.input = 0;
@@ -449,7 +454,6 @@ contract ConcentratedLiquidityPool is IPool {
         uint256 amountOut,
         uint256 totalFeeAmount
     ) internal {
-
         if (zeroForOne) {
             uint256 balance0 = _balance(token0);
             uint128 newBalance = reserve0 + inAmount;
@@ -521,17 +525,17 @@ contract ConcentratedLiquidityPool is IPool {
         }
     }
 
-    /// Generic formula for fee growth inside a range: (globalGrowth - growthBelow - growthAbove)
-    /// Available counters: global, outside u, outside v
+    /// @dev Generic formula for fee growth inside a range: (globalGrowth - growthBelow - growthAbove)
+    // - available counters: global, outside u, outside v.
 
-    ///                  u         ▼         v
-    /// ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - feeGrowthOutside(u) - feeGrowthOutside(v))
+    //                  u         ▼         v
+    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - feeGrowthOutside(u) - feeGrowthOutside(v))
 
-    ///             ▼    u                   v
-    /// ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - (global - feeGrowthOutside(u)) - feeGrowthOutside(v))
+    //             ▼    u                   v
+    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - (global - feeGrowthOutside(u)) - feeGrowthOutside(v))
 
-    ///                  u                   v    ▼
-    /// ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - feeGrowthOutside(u) - (global - feeGrowthOutside(v)))
+    //                  u                   v    ▼
+    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - feeGrowthOutside(u) - (global - feeGrowthOutside(v)))
 
     /// @notice Calculates the fee growth inside a range (per unit of liquidity).
     /// @dev Multiply `rangeFeeGrowth` delta by the provided liquidity to get accrued fees for some period.
