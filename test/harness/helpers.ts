@@ -1,4 +1,3 @@
-import { ethers } from "hardhat";
 import { BigNumber, BigNumberish, ethers } from "ethers";
 import { Contract } from "@ethersproject/contracts";
 import { ERC20Mock } from "../../types";
