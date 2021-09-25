@@ -11,6 +11,7 @@ import "../../libraries/concentratedPool/UnsafeMath.sol";
 import "../../libraries/concentratedPool/DyDxMath.sol";
 import "../../libraries/concentratedPool/SwapLib.sol";
 import "../../libraries/concentratedPool/Ticks.sol";
+import "hardhat/console.sol";
 
 interface IPositionManager {
     function positionMintCallback(
@@ -261,7 +262,6 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     function burnSingle(bytes calldata) external override returns (uint256 amountOut) {
-        // TODO
         return amountOut;
     }
 
@@ -315,11 +315,15 @@ contract ConcentratedLiquidityPool is IPool {
                 // - price is going down
                 // - max swap input within current tick range: Δx = Δ(1/√𝑃) · L.
                 uint256 maxDx = DyDxMath.getDx(cache.currentLiquidity, nextTickPrice, cache.currentPrice, false);
+
                 if (cache.input <= maxDx) {
                     // @dev We can swap only within the current range.
                     uint256 liquidityPadded = cache.currentLiquidity << 96;
-                    /// @dev Calculate new price after swap: L · √𝑃 / (L + Δx · √𝑃)
-                    // alternatively: L / (L / √𝑃 + Δx).
+                    /// @dev Calculate new price after swap: √𝑃[new] =  L · √𝑃 / (L + Δx · √𝑃)
+                    // ^ This is derrived from Δ(1/√𝑃)=Δx/L
+                    // (where Δ(1/√𝑃) is (1/√𝑃[old] - 1/√𝑃[new]) and we solve for √𝑃[new])
+                    // if an owerflow happens we can use: √𝑃[new] = L / (L / √𝑃 + Δx).
+                    // ^ same as the above forumula, but the fraction is divided by √𝑃
                     uint256 newPrice = uint256(
                         FullMath.mulDivRoundingUp(liquidityPadded, cache.currentPrice, liquidityPadded + cache.currentPrice * cache.input)
                     );
