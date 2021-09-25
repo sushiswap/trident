@@ -87,7 +87,7 @@ describe.skip("Concentrated liquidity pool", function () {
     let sqrtPrice = BigNumber.from("1807174424252647735792984898");
 
     let deployData0 = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint24", "uint160", "int24"],
+      ["address", "address", "uint24", "uint160", "uint24"],
       [dai.address, weth.address, 1000, sqrtPrice, 10]
     );
 
