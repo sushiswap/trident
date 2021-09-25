@@ -87,6 +87,7 @@ export class Trident {
     const [token0, token1] = sortTokens(this.tokens);
     const concentratedPools: ConcentratedLiquidityPool[] = [];
     const prices: BigNumber[] = [];
+    const tickSpacing = 10;
 
     // random price feed
     // prices.push(BigNumber.from(2).pow(96).mul(randBetween(1, 10000000)).div(randBetween(1, 10000000)));
@@ -106,7 +107,7 @@ export class Trident {
     const fees = [5, 30];
 
     function data(token0, token1, fee, price) {
-      return utils.defaultAbiCoder.encode(["address", "address", "uint24", "uint160"], [token0, token1, fee, price]);
+      return utils.defaultAbiCoder.encode(["address", "address", "uint24", "uint160", "uint24"], [token0, token1, fee, price, tickSpacing]);
     }
 
     for (let i = 0; i < prices.length; i++) {
@@ -118,7 +119,7 @@ export class Trident {
       }
     }
 
-    const poolAddresses = await this.concentratedPoolFactory.getPools(token0.address, token1.address, 0, fees.length * prices.length);
+    const poolAddresses = await this.concentratedPoolFactory.getPools(token0.address, token1.address, 0, fees.length * prices.length, tickSpacing);
 
     for (let poolAddress of poolAddresses) {
       concentratedPools.push((await CLP.attach(poolAddress)) as ConcentratedLiquidityPool);
