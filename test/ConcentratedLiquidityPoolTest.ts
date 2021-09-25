@@ -1,8 +1,6 @@
-import { BigNumber } from "@ethersproject/bignumber";
-import { expect } from "chai";
 import { ethers, network } from "hardhat";
-import { addLiquidityViaRouter, getTickAtCurrentPrice, initialize } from "./harness/Concentrated";
-import { getBigNumber, randBetween, ZERO } from "./harness/helpers";
+import { addLiquidityViaRouter, getDx, getTickAtCurrentPrice, swapViaRouter } from "./harness/Concentrated";
+import { getBigNumber } from "./harness/helpers";
 import { Trident } from "./harness/Trident";
 
 describe.only("Concentrated Liquidity Product Pool", function () {
@@ -19,43 +17,113 @@ describe.only("Concentrated Liquidity Product Pool", function () {
     snapshotId = await ethers.provider.send("evm_snapshot", []);
   });
 
-  describe("Add liquidity", () => {
-    it("Should add liquidity", async () => {
-      const tickAtPrice = await getTickAtCurrentPrice(trident.concentratedPool);
-      let lower = tickAtPrice % 2 == 0 ? tickAtPrice - 10000 : tickAtPrice - 10001;
-      let upper = tickAtPrice % 2 == 0 ? tickAtPrice + 10001 : tickAtPrice + 10000;
-      let lowerOld = -887272;
-      let upperOld = lower;
+  describe("Mint and swap", async () => {
+    it("Should mint liquidity (in / out of range, native / from bento, reusing ticks / new ticks)", async () => {
+      for (const pool of trident.concentratedPools) {
+        const tickAtPrice = await getTickAtCurrentPrice(pool);
+        const step = 13860;
+        // satisfy "lower even" & "upper odd" conditions
+        const lower = tickAtPrice - step + (tickAtPrice % 2 == 0 ? 0 : 1);
+        const upper = tickAtPrice + step + (tickAtPrice % 2 == 0 ? 1 : 0);
+        const min = -887272;
 
-      await addLiquidityViaRouter(
-        trident.concentratedPool,
-        getBigNumber(1000),
-        getBigNumber(2000),
-        false,
-        lowerOld,
-        lower,
-        upperOld,
-        upper,
-        trident.concentratedPoolManager.address,
-        trident.accounts[0].address
-      );
+        const addLiquidityParams = {
+          pool: pool,
+          amount0Desired: getBigNumber(50),
+          amount1Desired: getBigNumber(50),
+          native: true,
+          lowerOld: min,
+          lower,
+          upperOld: lower,
+          upper,
+          positionOwner: trident.concentratedPoolManager.address,
+          recipient: trident.accounts[0].address,
+        };
 
-      upperOld = upper;
-      lower -= 1000;
-      upper += 1000;
+        // normal mint
+        await addLiquidityViaRouter(addLiquidityParams);
 
-      await addLiquidityViaRouter(
-        trident.concentratedPool,
-        getBigNumber(3000),
-        getBigNumber(2000),
-        true,
-        lowerOld,
-        lower,
-        upperOld,
-        upper,
-        trident.concentratedPoolManager.address,
-        trident.accounts[0].address
-      );
+        // same range mint, from bento
+        addLiquidityParams.native = !addLiquidityParams.native;
+        await addLiquidityViaRouter(addLiquidityParams);
+
+        // normal mint, narrower range
+        addLiquidityParams.lowerOld = addLiquidityParams.lower;
+        addLiquidityParams.lower = lower + step / 3;
+        addLiquidityParams.upperOld = addLiquidityParams.lower;
+        addLiquidityParams.upper = upper - step / 3;
+        await addLiquidityViaRouter(addLiquidityParams);
+
+        // mint on the same lower tick
+        // @dev if a tick exists we dont' have to provide the tickOld param
+        addLiquidityParams.lower = lower;
+        addLiquidityParams.upperOld = upper;
+        addLiquidityParams.upper = upper + step;
+        await addLiquidityViaRouter(addLiquidityParams);
+
+        // mint on the same upper tick
+        addLiquidityParams.lower = lower - step;
+        addLiquidityParams.lowerOld = min;
+        addLiquidityParams.upper = upper;
+        await addLiquidityViaRouter(addLiquidityParams);
+
+        // mint below trading price
+        addLiquidityParams.lower = lower;
+        addLiquidityParams.upperOld = lower + step / 3;
+        addLiquidityParams.upper = upper - 1.5 * step;
+        await addLiquidityViaRouter(addLiquidityParams);
+
+        // mint above trading price
+        addLiquidityParams.lowerOld = upper - 1.5 * step;
+        addLiquidityParams.lower = lower + 1.5 * step;
+        addLiquidityParams.upper = upper;
+        await addLiquidityViaRouter(addLiquidityParams);
+      }
+    });
+
+    it("Should add liquidity and swap (without crossing)", async () => {
+      for (const pool of trident.concentratedPools) {
+        const tickAtPrice = await getTickAtCurrentPrice(pool);
+        const step = 13860;
+        const lower = tickAtPrice - step + (tickAtPrice % 2 == 0 ? 0 : 1);
+        const upper = tickAtPrice + step + (tickAtPrice % 2 == 0 ? 1 : 0);
+        const min = -887272;
+
+        const addLiquidityParams = {
+          pool: pool,
+          amount0Desired: getBigNumber(1000),
+          amount1Desired: getBigNumber(1000),
+          native: false,
+          lowerOld: min,
+          lower,
+          upperOld: lower,
+          upper,
+          positionOwner: trident.concentratedPoolManager.address,
+          recipient: trident.accounts[0].address,
+        };
+
+        await addLiquidityViaRouter(addLiquidityParams);
+
+        const lowerPrice = await Trident.Instance.tickMath.getSqrtRatioAtTick(lower);
+        const currentPrice = await Trident.Instance.tickMath.getSqrtRatioAtTick(tickAtPrice);
+        const maxDx = await getDx(await pool.liquidity(), lowerPrice, currentPrice, false);
+
+        const output = await swapViaRouter({
+          pool: pool,
+          unwrapBento: true,
+          zeroForOne: true,
+          inAmount: maxDx,
+          recipient: trident.accounts[0].address,
+        });
+
+        await swapViaRouter({
+          pool: pool,
+          unwrapBento: false,
+          zeroForOne: false,
+          inAmount: output,
+          recipient: trident.accounts[0].address,
+        });
+      }
     });
   });
 });
