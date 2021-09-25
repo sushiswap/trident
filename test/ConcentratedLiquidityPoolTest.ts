@@ -1,7 +1,7 @@
 import { BigNumber } from "@ethersproject/bignumber";
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
-import { addLiquidityViaRouter, getTickAtCurrentPrice, initialize } from "./harness/Concentrated";
+import { addLiquidityViaRouter, getTickAtCurrentPrice, swapViaRouter } from "./harness/Concentrated";
 import { getBigNumber, randBetween, ZERO } from "./harness/helpers";
 import { Trident } from "./harness/Trident";
 
@@ -19,43 +19,53 @@ describe.only("Concentrated Liquidity Product Pool", function () {
     snapshotId = await ethers.provider.send("evm_snapshot", []);
   });
 
-  describe("Add liquidity", () => {
-    it("Should add liquidity", async () => {
-      const tickAtPrice = await getTickAtCurrentPrice(trident.concentratedPool);
-      let lower = tickAtPrice % 2 == 0 ? tickAtPrice - 10000 : tickAtPrice - 10001;
-      let upper = tickAtPrice % 2 == 0 ? tickAtPrice + 10001 : tickAtPrice + 10000;
-      let lowerOld = -887272;
-      let upperOld = lower;
+  describe("Mint and swap", async () => {
+    it("Should add liquidity and swap (simple scenario)", async () => {
+      for (const pool of trident.concentratedPools) {
+        const tickAtPrice = await getTickAtCurrentPrice(pool);
+        let lower = tickAtPrice % 2 == 0 ? tickAtPrice - 10000 : tickAtPrice - 10001;
+        let upper = tickAtPrice % 2 == 0 ? tickAtPrice + 10001 : tickAtPrice + 10000;
+        let lowerOld = -887272;
+        let upperOld = lower;
 
-      await addLiquidityViaRouter(
-        trident.concentratedPool,
-        getBigNumber(1000),
-        getBigNumber(2000),
-        false,
-        lowerOld,
-        lower,
-        upperOld,
-        upper,
-        trident.concentratedPoolManager.address,
-        trident.accounts[0].address
-      );
+        const addLiquidityParams = {
+          pool: pool,
+          amount0Desired: getBigNumber(1000),
+          amount1Desired: getBigNumber(2000),
+          native: false,
+          lowerOld,
+          lower,
+          upperOld,
+          upper,
+          positionOwner: trident.concentratedPoolManager.address,
+          recipient: trident.accounts[0].address,
+        };
 
-      upperOld = upper;
-      lower -= 1000;
-      upper += 1000;
+        await addLiquidityViaRouter(addLiquidityParams);
 
-      await addLiquidityViaRouter(
-        trident.concentratedPool,
-        getBigNumber(3000),
-        getBigNumber(2000),
-        true,
-        lowerOld,
-        lower,
-        upperOld,
-        upper,
-        trident.concentratedPoolManager.address,
-        trident.accounts[0].address
-      );
+        addLiquidityParams.upperOld = upper;
+        addLiquidityParams.lower -= 1000;
+        addLiquidityParams.upper += 1000;
+        addLiquidityParams.native = true;
+
+        await addLiquidityViaRouter(addLiquidityParams);
+
+        await swapViaRouter({
+          pool: pool,
+          unwrapBento: true,
+          zeroForOne: true,
+          inAmount: getBigNumber(10),
+          recipient: trident.accounts[0].address,
+        });
+
+        await swapViaRouter({
+          pool: pool,
+          unwrapBento: true,
+          zeroForOne: false,
+          inAmount: getBigNumber(10),
+          recipient: trident.accounts[0].address,
+        });
+      }
     });
   });
 });

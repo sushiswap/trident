@@ -3,6 +3,7 @@
 pragma solidity >=0.8.0;
 
 import "./FullMath.sol";
+import "hardhat/console.sol";
 
 library SwapLib {
     function handleFees(
