@@ -1,6 +1,5 @@
 import { ethers } from "hardhat";
-import { BigNumber, BigNumberish, ethers } from "ethers";
-import { Contract } from "@ethersproject/contracts";
+import { BigNumber, BigNumberish } from "ethers";
 import { ERC20Mock } from "../../types";
 
 export const ZERO = BigNumber.from(0);

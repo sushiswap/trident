@@ -20,17 +20,17 @@ export async function swapViaRouter(params: {
   const nearest = await pool.nearestTick();
   let nextTickToCross = zeroForOne ? nearest : (await pool.ticks(nearest)).nextTick;
   let currentPrice = await pool.price();
-  const oldPrice = currentPrice;
   let currentLiquidity = await pool.liquidity();
   let input = inAmount;
   let output = BigNumber.from(0);
   let feeGrowthGlobalIncrease = BigNumber.from(0);
   let crossCount = 0;
+  let protocolFeeIncrease = BigNumber.from(0);
+  const oldPrice = currentPrice;
   const tokens = await Promise.all([pool.token0(), pool.token1()]);
   const [swapFee, barFee] = await Promise.all([pool.swapFee(), pool.barFee()]);
   const feeGrowthGlobalOld = await (zeroForOne ? pool.feeGrowthGlobal1() : pool.feeGrowthGlobal0());
   const oldProtocolFees = await (zeroForOne ? pool.token1ProtocolFee() : pool.token0ProtocolFee());
-  let protocolFeeIncrease = BigNumber.from(0);
   // TODO add balance update check
 
   while (input.gt(0)) {
