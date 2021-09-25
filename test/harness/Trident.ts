@@ -95,8 +95,7 @@ export class Trident {
     prices.push(TWO_POW_96);
 
     // low price feed
-    // whats the min and max value we support here??
-    prices.push(TWO_POW_96.div(16));
+    prices.push(TWO_POW_96.div(16)); // whats the min and max value we support here??
 
     // mid price feed
     prices.push(TWO_POW_96.mul(2));
@@ -104,7 +103,7 @@ export class Trident {
     // high price feed
     prices.push(TWO_POW_96.mul(16));
 
-    const fees = [5, 30, 100];
+    const fees = [5, 30];
 
     function data(token0, token1, fee, price) {
       return utils.defaultAbiCoder.encode(["address", "address", "uint24", "uint160"], [token0, token1, fee, price]);
@@ -119,7 +118,7 @@ export class Trident {
       }
     }
 
-    const poolAddresses = await this.concentratedPoolFactory.getPools(token0.address, token1.address, 0, fees.length * prices.length - 1);
+    const poolAddresses = await this.concentratedPoolFactory.getPools(token0.address, token1.address, 0, fees.length * prices.length);
 
     for (let poolAddress of poolAddresses) {
       concentratedPools.push((await CLP.attach(poolAddress)) as ConcentratedLiquidityPool);

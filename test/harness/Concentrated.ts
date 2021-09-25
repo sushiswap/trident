@@ -14,7 +14,7 @@ export async function swapViaRouter(params: {
   inAmount: BigNumber;
   recipient: string;
   unwrapBento: boolean;
-}) {
+}): Promise<BigNumber> {
   const { pool, zeroForOne, inAmount, recipient, unwrapBento } = params;
   const nearest = await pool.nearestTick();
   let nextTickToCross = zeroForOne ? nearest : (await pool.ticks(nearest)).nextTick;
@@ -30,7 +30,7 @@ export async function swapViaRouter(params: {
   const feeGrowthGlobalOld = await (zeroForOne ? pool.feeGrowthGlobal1() : pool.feeGrowthGlobal0());
   const oldProtocolFees = await (zeroForOne ? pool.token1ProtocolFee() : pool.token0ProtocolFee());
   let protocolFeeIncrease = BigNumber.from(0);
-  // todo add balance update check
+  // TODO add balance update check
 
   while (input.gt(0)) {
     const nextTickPrice = await getTickPrice(nextTickToCross);
@@ -40,7 +40,7 @@ export async function swapViaRouter(params: {
 
     if (zeroForOne) {
       const maxDx = await getDx(currentLiquidity, nextTickPrice, currentPrice, false);
-      if (input.lt(maxDx)) {
+      if (input.lte(maxDx)) {
         const liquidityPadded = currentLiquidity.mul(TWO_POW_96);
         newPrice = liquidityPadded
           .mul(currentPrice)
@@ -58,7 +58,7 @@ export async function swapViaRouter(params: {
     } else {
       // (price) numba' go up
       const maxDy = await getDy(currentLiquidity, currentPrice, nextTickPrice, false);
-      if (input.lt(maxDy)) {
+      if (input.lte(maxDy)) {
         newPrice = currentPrice.add(input.mul(TWO_POW_96).div(currentLiquidity));
         stepOutput = getDx(currentLiquidity, currentPrice, newPrice, false);
         currentPrice = newPrice;
@@ -70,7 +70,7 @@ export async function swapViaRouter(params: {
         cross = true;
       }
     }
-    const feeAmount = stepOutput.mul(swapFee).div(1e6).add(1); // lazy round up
+    const feeAmount = stepOutput.mul(swapFee).div(1e6).add(1); // lazy way of rounding up
     const protocolFee = feeAmount.mul(barFee).div(1e4).add(1); // todo - write an accurate function for round up division
     protocolFeeIncrease = protocolFeeIncrease.add(protocolFee);
     feeGrowthGlobalIncrease = feeGrowthGlobalIncrease.add(feeAmount.sub(protocolFee).mul(TWO_POW_128).div(currentLiquidity));
@@ -80,6 +80,7 @@ export async function swapViaRouter(params: {
       crossCount++;
       const liquidityChange = (await pool.ticks(nextTickToCross)).liquidity;
       const tickInfo = await pool.ticks(nextTickToCross);
+      // TODO if we run out of liquidity (tick == min | tick =0 max tick) we need to throw an error here
       if (zeroForOne) {
         if (nextTickToCross % 2 == 0) {
           currentLiquidity = currentLiquidity.sub(liquidityChange);
@@ -113,6 +114,7 @@ export async function swapViaRouter(params: {
   for (let i = 0; i < crossCount; i++) {
     nextNearest = (await pool.ticks(nextNearest))[zeroForOne ? "previousTick" : "nextTick"];
   }
+  // TODO check balannce changes and reserve changes are correct!
   expect((await pool.liquidity()).toString()).to.be.eq(currentLiquidity.toString(), "didn't set correct liquidity value");
   expect(await pool.nearestTick()).to.be.eq(nextNearest, "didn't update nearest tick pointer");
   expect(oldPrice.lt(newPrice) !== zeroForOne, "Price didn't move in the right direction");
@@ -121,6 +123,7 @@ export async function swapViaRouter(params: {
     feeGrowthGlobalOld.add(feeGrowthGlobalIncrease).toString(),
     "Didn't update the global fee tracker"
   );
+  return output;
 }
 
 export async function addLiquidityViaRouter(params: {
@@ -134,7 +137,7 @@ export async function addLiquidityViaRouter(params: {
   upper: BigNumber | number;
   positionOwner: string;
   recipient: string;
-}) {
+}): Promise<{ dy: BigNumber; dx: BigNumber }> {
   const { pool, amount0Desired, amount1Desired, native, lowerOld, lower, upperOld, upper, positionOwner, recipient } = params;
   const [currentPrice, priceLower, priceUpper] = await getPrices(pool, [lower, upper]);
   const liquidity = getLiquidityForAmount(priceLower, currentPrice, priceUpper, amount1Desired, amount0Desired);
@@ -145,8 +148,11 @@ export async function addLiquidityViaRouter(params: {
   const oldTotalSupply = await Trident.Instance.concentratedPoolManager.totalSupply();
   const liquidityIncrease = priceLower.lt(currentPrice) && currentPrice.lt(priceUpper) ? liquidity : "0";
   const { dy, dx } = getAmountForLiquidity(priceLower, currentPrice, priceUpper, liquidity);
-  const [_lowerOldPreviousTick, _lowerOldNextTick, _lowerOldLiquidity] = await pool.ticks(lowerOld);
-  const [_upperOldPreviousTick, _upperOldNextTick, _upperOldLiquidity] = await pool.ticks(upperOld);
+  const [oldLowerOldPreviousTick, oldLowerOldNextTick, oldLowerOldLiquidity] = await pool.ticks(lowerOld);
+  const [oldUpperOldPreviousTick, oldUpperOldNextTick, oldUpperOldLiquidity] = await pool.ticks(upperOld);
+  const [oldLowerPreviousTick, oldLowerNextTick, oldLowerLiquidity] = await pool.ticks(lower);
+  const [oldUpperPreviousTick, oldUpperNextTick, oldUpperLiquidity] = await pool.ticks(upper);
+  const oldPositionState = await pool.positions(positionOwner, lower, upper);
   const mintData = getMintData({
     lowerOld,
     lower,
@@ -162,42 +168,52 @@ export async function addLiquidityViaRouter(params: {
   await Trident.Instance.router.addLiquidityLazy(pool.address, liquidity, mintData);
 
   const newLiquidity = await pool.liquidity();
+  const newPrice = await pool.price();
   const newTotalSupply = await Trident.Instance.concentratedPoolManager.totalSupply();
   const newUserBalances = await Trident.Instance.getTokenBalance(tokens, recipient, native);
   const newPoolBalances = await Trident.Instance.getTokenBalance(tokens, pool.address, false);
-  const [lowerOldPreviousTick, lowerOldNextTick, lowerOldLiquidity] = await pool.ticks(lowerOld);
-  const [upperOldPreviousTick, upperOldNextTick, upperOldLiquidity] = await pool.ticks(upperOld);
-  const [lowerPreviousTick, lowerNextTick, lowerLiquidity] = await pool.ticks(lower);
-  const [upperPreviousTick, upperNextTick, upperLiquidity] = await pool.ticks(upper);
+  const newPositionState = await pool.positions(positionOwner, lower, upper);
+  const [newLowerOldPreviousTick, newLowerOldNextTick, newLowerOldLiquidity] = await pool.ticks(lowerOld);
+  const [newUpperOldPreviousTick, newUpperOldNextTick, newUpperOldLiquidity] = await pool.ticks(upperOld);
+  const [newLowerPreviousTick, newLowerNextTick, newLowerLiquidity] = await pool.ticks(lower);
+  const [newUpperPreviousTick, newUpperNextTick, newUpperLiquidity] = await pool.ticks(upper);
 
+  expect(newPrice.toString()).to.be.eq(currentPrice.toString(), "price changed by mistake");
   expect(newLiquidity.toString()).to.be.eq(oldLiquidity.add(liquidityIncrease).toString(), "Liquidity didn't update correctly");
-  expect(lowerOldPreviousTick).to.be.eq(_lowerOldPreviousTick, "Mistakenly updated previous pointer of lowerOld");
-  if (upper < _lowerOldNextTick) {
-    expect(upperNextTick).to.be.eq(_lowerOldNextTick);
-  }
-  if (lowerOld == lower) {
-    expect(lowerOldLiquidity.add(liquidity).toString()).to.be.eq(
-      lowerLiquidity.toString(),
-      "Didn't increase liquidity by the right amount"
+  expect(newLowerOldPreviousTick).to.be.eq(oldLowerOldPreviousTick, "Mistakenly updated previous pointer of lowerOld");
+  expect(newPositionState.liquidity.toString()).to.be.eq(
+    oldPositionState.liquidity.add(liquidity).toString(),
+    "didn't correctly update position's liquidity"
+  );
+  expect(newPositionState.feeGrowthInside0Last.toString()).to.be.eq("0", "didn't reset position's fee0 growth");
+  expect(newPositionState.feeGrowthInside1Last.toString()).to.be.eq("0", "didn't reset position's fee1 growth");
+
+  if (oldLowerLiquidity.gt(0)) {
+    // existing tick, lowerOld shouldn't get updated
+    expect(newLowerLiquidity.toString()).to.be.eq(
+      oldLowerLiquidity.add(liquidity).toString(),
+      "Didn't increase lower tick liquidity by the right amount"
     );
-    expect(_lowerOldPreviousTick).to.be.eq(lowerPreviousTick, "Previous tick mistekenly updated");
-    expect(_lowerOldNextTick).to.be.eq(lowerNextTick, "Previous tick mistekenly updated");
+    expect(newLowerPreviousTick).to.be.eq(oldLowerPreviousTick, "Previous tick mistekenly updated");
   } else {
-    expect(lowerLiquidity.toString()).to.be.eq(liquidity.toString(), "Didn't set correct liqiuidity value on new tick");
-    expect(lowerOld).to.be.eq(lowerPreviousTick, "Previous not pointing to old");
-    expect(lowerOldNextTick).to.be.eq(lower, "Next not pointing to new");
+    // new tick, lowerOld should get updated
+    expect(newLowerLiquidity.toString()).to.be.eq(liquidity.toString(), "Didn't set correct liqiuidity value on new tick");
+    expect(newLowerOldNextTick).to.be.eq(lower, "Old not pointing to new");
+    expect(newLowerPreviousTick).to.be.eq(lowerOld, "New tick now pointing to old");
   }
-  if (upperOld == upper) {
-    expect(upperOldLiquidity.add(liquidity).toString()).to.be.eq(
-      upperLiquidity.toString(),
-      "Didn't increase liquidity by the right amount"
+
+  if (oldUpperLiquidity.gt(0)) {
+    // existing tick, upperOld shouldn't get updated
+    expect(newUpperLiquidity.toString()).to.be.eq(
+      oldUpperLiquidity.add(liquidity).toString(),
+      "Didn't increase upper tick liquidity by the right amount"
     );
-    expect(_upperOldNextTick).to.be.eq(upperNextTick, "Next tick pointer mistekenly updated");
-    expect(_upperOldPreviousTick).to.be.eq(upperPreviousTick, "Previous tick pointer mistekenly updated");
+    expect(newUpperNextTick).to.be.eq(oldUpperNextTick, "Next tick pointer mistekenly updated");
   } else {
-    expect(upperLiquidity.toString()).to.be.eq(liquidity.toString(), "Didn't set correct liqiuidity value on new tick");
-    expect(upperOldNextTick).to.be.eq(upper, "Previous not pointing to old");
-    expect(upperPreviousTick).to.be.eq(upperOld, "Next not pointing to new");
+    // new tick
+    expect(newUpperLiquidity.toString()).to.be.eq(liquidity.toString(), "Didn't set correct liqiuidity value on new tick");
+    expect(newUpperOldNextTick).to.be.eq(upper, "Old tick not pointing to the new");
+    expect(newUpperPreviousTick).to.be.eq(upperOld, "New Tick not pointing to the old");
   }
   expect(newUserBalances[0].toString()).to.be.eq(oldUserBalances[0].sub(dx).toString(), "Didn't pay correct amount of token0");
   expect(newUserBalances[1].toString()).to.be.eq(oldUserBalances[1].sub(dy).toString(), "Didn't pay correct amount of token1");
@@ -214,8 +230,10 @@ export async function addLiquidityViaRouter(params: {
     expect(_lower).to.be.eq(lower, "position doesn't have the correct lower tick");
     expect(_upper).to.be.eq(upper, "position doesn't have the correct upper tick");
     expect(_liquidity).to.be.eq(liquidity, "position doens't have the minted liquidity");
+    // TODO check pool reserve change is correct!
     // TODO add function to calculate range fee growth here and ensure that positionManager saved the correct value
   }
+  return { dy, dx };
 }
 
 // use solidity here for convenience
@@ -244,11 +262,11 @@ export function getAmountForLiquidity(priceLower: BigNumber, currentPrice: BigNu
   if (priceUpper.lt(currentPrice)) {
     return {
       dy: getDy(liquidity, priceLower, priceUpper, true),
-      dx: 0,
+      dx: BigNumber.from(0),
     };
   } else if (currentPrice.lt(priceLower)) {
     return {
-      dy: 0,
+      dy: BigNumber.from(0),
       dx: getDx(liquidity, priceLower, priceUpper, true),
     };
   } else {
@@ -297,7 +315,7 @@ export function getDy(liquidity: BigNumber, priceLower: BigNumber, priceUpper: B
   return res;
 }
 
-function getDx(liquidity: BigNumber, priceLower: BigNumber, priceUpper: BigNumber, roundUp: boolean) {
+export function getDx(liquidity: BigNumber, priceLower: BigNumber, priceUpper: BigNumber, roundUp: boolean) {
   const res = liquidity.mul("0x1000000000000000000000000").mul(priceUpper.sub(priceLower)).div(priceUpper).div(priceLower);
   if (roundUp) return res.add(1);
   return res;
