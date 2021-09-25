@@ -23,7 +23,6 @@ export async function swapViaRouter(params: {
   let currentLiquidity = await pool.liquidity();
   let input = inAmount;
   let output = BigNumber.from(0);
-  let fees = BigNumber.from(0);
   let feeGrowthGlobalIncrease = BigNumber.from(0);
   let crossCount = 0;
   const tokens = await Promise.all([pool.token0(), pool.token1()]);

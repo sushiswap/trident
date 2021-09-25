@@ -20,50 +20,52 @@ describe.only("Concentrated Liquidity Product Pool", function () {
   });
 
   describe("Mint and swap", async () => {
-    it("Should add liquidity and mint NFTs", async () => {
-      const tickAtPrice = await getTickAtCurrentPrice(trident.concentratedPool);
-      let lower = tickAtPrice % 2 == 0 ? tickAtPrice - 10000 : tickAtPrice - 10001;
-      let upper = tickAtPrice % 2 == 0 ? tickAtPrice + 10001 : tickAtPrice + 10000;
-      let lowerOld = -887272;
-      let upperOld = lower;
+    it("Should add liquidity and swap (simple scenario)", async () => {
+      for (const pool of trident.concentratedPools) {
+        const tickAtPrice = await getTickAtCurrentPrice(pool);
+        let lower = tickAtPrice % 2 == 0 ? tickAtPrice - 10000 : tickAtPrice - 10001;
+        let upper = tickAtPrice % 2 == 0 ? tickAtPrice + 10001 : tickAtPrice + 10000;
+        let lowerOld = -887272;
+        let upperOld = lower;
 
-      const addLiquidityParams = {
-        pool: trident.concentratedPool,
-        amount0Desired: getBigNumber(1000),
-        amount1Desired: getBigNumber(2000),
-        native: false,
-        lowerOld,
-        lower,
-        upperOld,
-        upper,
-        positionOwner: trident.concentratedPoolManager.address,
-        recipient: trident.accounts[0].address,
-      };
+        const addLiquidityParams = {
+          pool: pool,
+          amount0Desired: getBigNumber(1000),
+          amount1Desired: getBigNumber(2000),
+          native: false,
+          lowerOld,
+          lower,
+          upperOld,
+          upper,
+          positionOwner: trident.concentratedPoolManager.address,
+          recipient: trident.accounts[0].address,
+        };
 
-      await addLiquidityViaRouter(addLiquidityParams);
+        await addLiquidityViaRouter(addLiquidityParams);
 
-      addLiquidityParams.upperOld = upper;
-      addLiquidityParams.lower -= 1000;
-      addLiquidityParams.upper += 1000;
-      addLiquidityParams.native = true;
+        addLiquidityParams.upperOld = upper;
+        addLiquidityParams.lower -= 1000;
+        addLiquidityParams.upper += 1000;
+        addLiquidityParams.native = true;
 
-      await addLiquidityViaRouter(addLiquidityParams);
+        await addLiquidityViaRouter(addLiquidityParams);
 
-      await swapViaRouter({
-        pool: trident.concentratedPool,
-        unwrapBento: true,
-        zeroForOne: true,
-        inAmount: getBigNumber(10),
-        recipient: trident.accounts[0].address,
-      });
+        await swapViaRouter({
+          pool: pool,
+          unwrapBento: true,
+          zeroForOne: true,
+          inAmount: getBigNumber(10),
+          recipient: trident.accounts[0].address,
+        });
 
-      await swapViaRouter({
-        pool: trident.concentratedPool,
-        unwrapBento: true,
-        zeroForOne: false,
-        inAmount: getBigNumber(10),
-        recipient: trident.accounts[0].address,
-      });
+        await swapViaRouter({
+          pool: pool,
+          unwrapBento: true,
+          zeroForOne: false,
+          inAmount: getBigNumber(10),
+          recipient: trident.accounts[0].address,
+        });
+      }
     });
   });
 });
