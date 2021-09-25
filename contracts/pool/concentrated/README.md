@@ -3,6 +3,10 @@
 Concentrated liquidity pools are a generalization of the traditional `xy = k` pool. With the traditional model all users provide liquidity on a `(0, inf)` price range where as in concentrated liquidity pools each user can pick their own range to provide liquidity on.
 This allows users to narrow down the liquidity provision range which amplifies their liquidity - meaning traders experience lesser price impact and liquidity providers accrue more fees. The biggest tradeoff being liquidity providers experience greater impermanent loss.
 
+![Regular liquidity positions](../../../pictures/regularLiquidity.png)
+
+![Concentrated liquidity positions](../../../pictures/concentratedLiquidity.png)
+
 ## Representing global liquidity state
 
 We represent the state of a pool's liquidity by using a linked list which starts at price 0 and ends at infinity. For every new position we insert two elements into the linked list based on the range's start and end price. To make the list more managable we limit the prices of the range to be some power of `1.0001`. E.g. our range can start at tick zero with a price of one `1.0000 = 1.0001^0` and end at tick 23028 which corresponds roughly to a price of ten. `10.0010 = 1.0001^23028`. With this approach we can cover the whole `(0, inf)` price range by using just `int24` as the exponent type.
