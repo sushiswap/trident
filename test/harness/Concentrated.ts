@@ -1,7 +1,8 @@
 import { BigNumber } from "@ethersproject/bignumber";
+import { getBigNumber } from "@sushiswap/sdk";
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { ConcentratedLiquidityPool, TridentRouter } from "../../types";
+import { ConcentratedLiquidityPool, ConcentratedLiquidityPoolManager, TridentRouter } from "../../types";
 import { swap } from "./ConstantProduct";
 import { Trident } from "./Trident";
 
@@ -124,6 +125,17 @@ export async function swapViaRouter(params: {
     "Didn't update the global fee tracker"
   );
   return output;
+}
+
+export async function removeLiquidityViaManager(params: {
+  tokenId: number;
+  liquidityAmount: BigNumber;
+  recipient: string;
+  unwrapBento: boolean;
+}): Promise<{ token0: BigNumber; token1: BigNumber }> {
+  const { tokenId, liquidityAmount, recipient, unwrapBento } = params;
+  await Trident.Instance.concentratedPoolManager.burn(tokenId, liquidityAmount, recipient, unwrapBento);
+  return { token0: BigNumber.from(0), token1: BigNumber.from(1) };
 }
 
 export async function addLiquidityViaRouter(params: {
