@@ -17,7 +17,7 @@ library SwapLib {
         uint256 feeGrowthGlobal
     )
         internal
-        pure
+        view
         returns (
             uint256,
             uint256,

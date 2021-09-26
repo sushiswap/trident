@@ -90,8 +90,8 @@ contract ConcentratedLiquidityPool is IPool {
         int24 upper;
         uint256 amount0Desired;
         uint256 amount1Desired;
-        bool amount0native;
-        bool amount1native;
+        bool token0native;
+        bool token1native;
         address positionOwner;
         address recipient;
     }
@@ -181,8 +181,8 @@ contract ConcentratedLiquidityPool is IPool {
             (uint128 amount0Actual, uint128 amount1Actual) = _getAmountsForLiquidity(priceLower, priceUpper, currentPrice, _liquidity);
 
             ITridentRouter.TokenInput[] memory callbackData = new ITridentRouter.TokenInput[](2);
-            callbackData[0] = ITridentRouter.TokenInput(token0, mintParams.amount0native, amount0Actual);
-            callbackData[1] = ITridentRouter.TokenInput(token1, mintParams.amount1native, amount1Actual);
+            callbackData[0] = ITridentRouter.TokenInput(token0, mintParams.token0native, amount0Actual);
+            callbackData[1] = ITridentRouter.TokenInput(token1, mintParams.token1native, amount1Actual);
 
             ITridentCallee(msg.sender).tridentMintCallback(abi.encode(callbackData));
 
@@ -308,46 +308,47 @@ contract ConcentratedLiquidityPool is IPool {
 
         while (cache.input != 0) {
             uint256 nextTickPrice = uint256(TickMath.getSqrtRatioAtTick(cache.nextTickToCross));
-            uint256 output;
-            bool cross;
+            uint256 output = 0;
+            bool cross = false;
+
             if (zeroForOne) {
-                // @dev x for y
-                // - price is going down
-                // - max swap input within current tick range: Δx = Δ(1/√𝑃) · L.
+                // Trading token 0 (x) for token 1 (y).
+                // Price is decreasing.
+                // Maximum input amount within current tick range: Δx = Δ(1/√𝑃) · L
                 uint256 maxDx = DyDxMath.getDx(cache.currentLiquidity, nextTickPrice, cache.currentPrice, false);
 
                 if (cache.input <= maxDx) {
                     // @dev We can swap only within the current range.
                     uint256 liquidityPadded = cache.currentLiquidity << 96;
-                    /// @dev Calculate new price after swap: √𝑃[new] =  L · √𝑃 / (L + Δx · √𝑃)
-                    // ^ This is derrived from Δ(1/√𝑃)=Δx/L
-                    // (where Δ(1/√𝑃) is (1/√𝑃[old] - 1/√𝑃[new]) and we solve for √𝑃[new])
-                    // if an owerflow happens we can use: √𝑃[new] = L / (L / √𝑃 + Δx).
-                    // ^ same as the above forumula, but the fraction is divided by √𝑃
+                    // Calculate new price after swap: √𝑃[new] =  L · √𝑃 / (L + Δx · √𝑃)
+                    // This is derrived from Δ(1/√𝑃) = Δx/L
+                    // where Δ(1/√𝑃) is 1/√𝑃[old] - 1/√𝑃[new] and we solve for √𝑃[new].
+                    // In case of an owerflow we can use: √𝑃[new] = L / (L / √𝑃 + Δx).
+                    // This is derrived by dividing the original fraction by √𝑃 on both sides
                     uint256 newPrice = uint256(
                         FullMath.mulDivRoundingUp(liquidityPadded, cache.currentPrice, liquidityPadded + cache.currentPrice * cache.input)
                     );
 
                     if (!(nextTickPrice <= newPrice && newPrice < cache.currentPrice)) {
-                        // @dev Overflow -> use a modified version of the formula.
+                        // Overflow. We use a modified version of the formula.
                         newPrice = uint160(UnsafeMath.divRoundingUp(liquidityPadded, liquidityPadded / cache.currentPrice + cache.input));
                     }
-                    // @dev Calculate output of swap
-                    // - Δy = Δ√P · L.
+                    // Based on the price difference calculate the output of th swap: Δy = Δ√P · L.
                     output = DyDxMath.getDy(cache.currentLiquidity, newPrice, cache.currentPrice, false);
                     cache.currentPrice = newPrice;
                     cache.input = 0;
                 } else {
-                    // @dev Swap & cross the tick.
+                    // Execute swap step and cross the tick.
                     output = DyDxMath.getDy(cache.currentLiquidity, nextTickPrice, cache.currentPrice, false);
                     cache.currentPrice = nextTickPrice;
                     cross = true;
                     cache.input -= maxDx;
                 }
             } else {
-                // @dev Price is going up
-                // - max swap within current tick range: Δy = Δ√P · L.
+                // Price is increasing
+                // Maximum swap amount within the current tick range: Δy = Δ√P · L.
                 uint256 maxDy = DyDxMath.getDy(cache.currentLiquidity, cache.currentPrice, nextTickPrice, false);
+
                 if (cache.input <= maxDy) {
                     // @dev We can swap only within the current range
                     // - calculate new price after swap ( ΔP = Δy/L ).
@@ -366,7 +367,6 @@ contract ConcentratedLiquidityPool is IPool {
                     cache.input -= maxDy;
                 }
             }
-
             (cache.totalFeeAmount, amountOut, cache.protocolFee, cache.feeGrowthGlobal) = SwapLib.handleFees(
                 output,
                 swapFee,
@@ -377,7 +377,6 @@ contract ConcentratedLiquidityPool is IPool {
                 cache.protocolFee,
                 cache.feeGrowthGlobal
             );
-
             if (cross) {
                 (cache.currentLiquidity, cache.nextTickToCross) = Ticks.cross(
                     ticks,
@@ -387,6 +386,18 @@ contract ConcentratedLiquidityPool is IPool {
                     cache.feeGrowthGlobal,
                     zeroForOne
                 );
+                if (cache.currentLiquidity == 0) {
+                    // We step into a zone that has liquidity; Or we reach the end of the linked list
+                    cache.currentPrice = uint256(TickMath.getSqrtRatioAtTick(cache.nextTickToCross));
+                    (cache.currentLiquidity, cache.nextTickToCross) = Ticks.cross(
+                        ticks,
+                        cache.nextTickToCross,
+                        secondsPerLiquidity,
+                        cache.currentLiquidity,
+                        cache.feeGrowthGlobal,
+                        zeroForOne
+                    );
+                }
             }
         }
 
