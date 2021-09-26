@@ -16,7 +16,7 @@ contract ConcentratedLiquidityPoolFactory is PoolDeployer {
 
     function deployPool(bytes memory _deployData) external returns (address pool) {
         (address tokenA, address tokenB, uint24 swapFee, uint160 price, uint24 tickSpacing) = abi.decode(
-            _deployData, 
+            _deployData,
             (address, address, uint24, uint160, uint24)
         );
         if (tokenA > tokenB) {

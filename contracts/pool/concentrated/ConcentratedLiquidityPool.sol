@@ -77,7 +77,6 @@ contract ConcentratedLiquidityPool is IPool {
         uint128 liquidity;
         uint256 feeGrowthInside0Last;
         uint256 feeGrowthInside1Last;
-        uint160 secondsPerLiquidityLast; /// <- might want to store this in the manager contract only
     }
 
     struct SwapCache {
@@ -159,13 +158,7 @@ contract ConcentratedLiquidityPool is IPool {
         /// @dev Fees should have been collected before position updates.
         _updatePosition(mintParams.positionOwner, mintParams.lower, mintParams.upper, int128(uint128(_liquidity)));
 
-        (nearestTick) = Ticks.insert(
-            ticks,
-            nearestTick,
-            tickSpacing,
-            feeGrowthGlobal0,
-            feeGrowthGlobal1,
-            secondsPerLiquidity,
+        _insertTick(
             mintParams.lowerOld,
             mintParams.lower,
             mintParams.upperOld,
@@ -209,8 +202,6 @@ contract ConcentratedLiquidityPool is IPool {
 
             emit Mint(msg.sender, amount0Actual, amount1Actual, mintParams.recipient);
         }
-
-        return _liquidity;
     }
 
     /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
@@ -632,5 +623,74 @@ contract ConcentratedLiquidityPool is IPool {
         _reserve0 = reserve0;
         _reserve1 = reserve1;
         _lastObservation = lastObservation;
+    }
+
+    function _insertTick(
+        int24 lowerOld,
+        int24 lower,
+        int24 upperOld,
+        int24 upper,
+        uint128 amount,
+        uint160 currentPrice
+    ) internal {
+        require(lower % int24(tickSpacing) == 0, "INVALID_TICK");
+        require((lower / int24(tickSpacing)) % 2 == 0, "LOWER_EVEN");
+
+        require(upper % int24(tickSpacing) == 0, "INVALID_TICK");
+        require((upper / int24(tickSpacing)) % 2 != 0, "UPPER_ODD"); // can be either -1 or 1
+
+        require(lower < upper, "WRONG_ORDER");
+        require(TickMath.MIN_TICK <= lower, "LOWER_RANGE");
+        require(upper <= TickMath.MAX_TICK, "UPPER_RANGE");
+
+        int24 currentNearestTick = nearestTick;
+
+        uint128 currentLowerLiquidity = ticks[lower].liquidity;
+        if (currentLowerLiquidity != 0 || lower == TickMath.MIN_TICK) {
+            // We are adding liquidity to an existing tick.
+            ticks[lower].liquidity = currentLowerLiquidity + amount;
+        } else {
+            // We are inserting a new tick.
+            Ticks.Tick storage old = ticks[lowerOld];
+            int24 oldNextTick = old.nextTick;
+
+            require((old.liquidity != 0 || lowerOld == TickMath.MIN_TICK) && lowerOld < lower && lower < oldNextTick, "LOWER_ORDER");
+
+            if (lower <= currentNearestTick) {
+                ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
+            } else {
+                ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, 0, 0, 0);
+            }
+
+            old.nextTick = lower;
+        }
+
+        uint128 currentUpperLiquidity = ticks[upper].liquidity;
+        if (currentUpperLiquidity != 0 || upper == TickMath.MAX_TICK) {
+            // We are adding liquidity to an existing tick.
+            ticks[upper].liquidity = currentUpperLiquidity + amount;
+        } else {
+            // Inserting a new tick.
+            Ticks.Tick storage old = ticks[upperOld];
+            int24 oldNextTick = old.nextTick;
+
+            require(old.liquidity != 0 && oldNextTick > upper && upperOld < upper, "UPPER_ORDER");
+
+            if (upper <= currentNearestTick) {
+                ticks[upper] = Ticks.Tick(upperOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
+            } else {
+                ticks[upper] = Ticks.Tick(upperOld, oldNextTick, amount, 0, 0, 0);
+            }
+
+            old.nextTick = upper;
+        }
+
+        int24 actualNearestTick = TickMath.getTickAtSqrtRatio(currentPrice);
+
+        if (currentNearestTick < upper && upper <= actualNearestTick) {
+            nearestTick = upper;
+        } else if (currentNearestTick < lower && lower <= actualNearestTick) {
+            nearestTick = lower;
+        }
     }
 }
