@@ -69,7 +69,6 @@ contract ConcentratedLiquidityPool is IPool {
         uint128 liquidity;
         uint256 feeGrowthInside0Last;
         uint256 feeGrowthInside1Last;
-        uint160 secondsPerLiquidityLast; // <- might want to store this in the manager contract only
     }
 
     struct SwapCache {
@@ -218,8 +217,6 @@ contract ConcentratedLiquidityPool is IPool {
 
             emit Mint(msg.sender, amount0Actual, amount1Actual, mintParams.recipient);
         }
-
-        return _liquidity;
     }
 
     function burn(bytes calldata data) external override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {

@@ -58,48 +58,53 @@ library Ticks {
         int24 upper,
         uint128 amount,
         uint160 currentPrice
-    ) internal returns (int24) {
+    ) internal returns (int24 currentNearestTick) {
         require(uint24(lower) % 2 == 0, "LOWER_EVEN");
         require(uint24(upper) % 2 == 1, "UPPER_ODD");
 
         require(lower < upper, "WRONG_ORDER");
 
-        require(TickMath.MIN_TICK <= lower && lower < TickMath.MAX_TICK, "LOWER_RANGE");
-        require(TickMath.MIN_TICK < upper && upper <= TickMath.MAX_TICK, "UPPER_RANGE");
+        // @dev since we know `lower` < `upper`, we don't need to check upper range for `lower` and lower range for `upper`.
+        require(TickMath.MIN_TICK <= lower, "LOWER_RANGE");
+        require(upper <= TickMath.MAX_TICK, "UPPER_RANGE");
 
-        int24 currentNearestTick = nearestTick;
+        currentNearestTick = nearestTick;
 
-        if (ticks[lower].liquidity != 0 || lower == TickMath.MIN_TICK) {
+        uint128 currentLowerLiquidity = ticks[lower].liquidity;
+        if (currentLowerLiquidity != 0 || lower == TickMath.MIN_TICK) {
             // We are adding liquidity to an existing tick.
-            ticks[lower].liquidity += amount;
+            ticks[lower].liquidity = currentLowerLiquidity + amount;
         } else {
             // We are inserting a new tick.
             Ticks.Tick storage old = ticks[lowerOld];
+            int24 oldNextTick = old.nextTick;
 
-            require((old.liquidity != 0 || lowerOld == TickMath.MIN_TICK) && lowerOld < lower && lower < old.nextTick, "LOWER_ORDER");
+            require((old.liquidity != 0 || lowerOld == TickMath.MIN_TICK) && lowerOld < lower && lower < oldNextTick, "LOWER_ORDER");
 
             if (lower <= currentNearestTick) {
-                ticks[lower] = Ticks.Tick(lowerOld, old.nextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
+                ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
             } else {
-                ticks[lower] = Ticks.Tick(lowerOld, old.nextTick, amount, 0, 0, 0);
+                ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, 0, 0, 0);
             }
 
             old.nextTick = lower;
         }
 
-        if (ticks[upper].liquidity != 0 || upper == TickMath.MAX_TICK) {
+        uint128 currentUpperLiquidity = ticks[upper].liquidity;
+        if (currentUpperLiquidity != 0 || upper == TickMath.MAX_TICK) {
             // We are adding liquidity to an existing tick.
-            ticks[upper].liquidity += amount;
+            ticks[upper].liquidity = currentUpperLiquidity + amount;
         } else {
             // Inserting a new tick.
             Ticks.Tick storage old = ticks[upperOld];
+            int24 oldNextTick = old.nextTick;
 
-            require(old.liquidity != 0 && old.nextTick > upper && upperOld < upper, "UPPER_ORDER");
+            require(old.liquidity != 0 && oldNextTick > upper && upperOld < upper, "UPPER_ORDER");
 
             if (upper <= currentNearestTick) {
-                ticks[upper] = Ticks.Tick(upperOld, old.nextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
+                ticks[upper] = Ticks.Tick(upperOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
             } else {
-                ticks[upper] = Ticks.Tick(upperOld, old.nextTick, amount, 0, 0, 0);
+                ticks[upper] = Ticks.Tick(upperOld, oldNextTick, amount, 0, 0, 0);
             }
 
             old.nextTick = upper;
@@ -110,8 +115,6 @@ library Ticks {
         if (currentNearestTick < lower && lower <= actualNearestTick) currentNearestTick = lower;
 
         if (currentNearestTick < upper && upper <= actualNearestTick) currentNearestTick = upper;
-
-        return currentNearestTick;
     }
 
     function remove(
