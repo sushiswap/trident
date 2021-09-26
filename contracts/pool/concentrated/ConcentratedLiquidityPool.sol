@@ -1,32 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.8.0;
 
+import "../../interfaces/IBentoBoxMinimal.sol";
+import "../../interfaces/IMasterDeployer.sol";
 import "../../interfaces/IPool.sol";
+import "../../interfaces/IPositionManager.sol";
 import "../../interfaces/ITridentCallee.sol";
 import "../../interfaces/ITridentRouter.sol";
-import "../../interfaces/IMasterDeployer.sol";
-import "../../libraries/concentratedPool/TickMath.sol";
 import "../../libraries/concentratedPool/FullMath.sol";
+import "../../libraries/concentratedPool/TickMath.sol";
 import "../../libraries/concentratedPool/UnsafeMath.sol";
 import "../../libraries/concentratedPool/DyDxMath.sol";
 import "../../libraries/concentratedPool/SwapLib.sol";
 import "../../libraries/concentratedPool/Ticks.sol";
 import "hardhat/console.sol";
 
-interface IPositionManager {
-    function positionMintCallback(
-        address recipient,
-        int24 lower,
-        int24 upper,
-        uint128 amount,
-        uint256 feeGrowthInside0,
-        uint256 feeGrowthInside1
-    ) external returns (uint256 positionId);
-}
-
 /// @notice Trident exchange pool template with concentrated liquidity and constant product formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares.
-///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
+//      The curve is applied to shares as well. This pool does not care about the underlying amounts.
 contract ConcentratedLiquidityPool is IPool {
     using Ticks for mapping(int24 => Ticks.Tick);
 
@@ -35,21 +26,18 @@ contract ConcentratedLiquidityPool is IPool {
     event Collect(address indexed sender, uint256 amount0, uint256 amount1);
     event Sync(uint256 reserveShares0, uint256 reserveShares1);
 
-    uint24 internal constant MAX_FEE = 10000; // @dev 100%.
-    uint24 public immutable swapFee; // @dev 1000 corresponds to 0.1% fee.
-
     address public immutable barFeeTo;
-    address public immutable bento;
-    address public immutable masterDeployer;
+    IBentoBoxMinimal public immutable bento;
+    IMasterDeployer public immutable masterDeployer;
     address public immutable poolManager;
     address public immutable token0;
     address public immutable token1;
 
-    uint160 public price; /// @dev sqrt of price aka. √(y/x), multiplied by 2^96.
+    uint32 public lastObservation;
     uint128 public liquidity;
-    int24 public nearestTick; /// @dev Tick that is just below the current price.
+    uint160 public secondsPerLiquidity; /// @dev Multiplied by 2^128.
 
-    uint256 public feeGrowthGlobal0; /// @dev all fee growth counters are multiplied by 2^128
+    uint256 public feeGrowthGlobal0; /// @dev All fee growth counters are multiplied by 2^128.
     uint256 public feeGrowthGlobal1;
 
     uint256 public barFee;
@@ -59,8 +47,28 @@ contract ConcentratedLiquidityPool is IPool {
     uint128 public reserve0; /// @dev Bento share balance tracker.
     uint128 public reserve1;
 
-    uint160 public secondsPerLiquidity; /// @dev multiplied by 2^128
-    uint32 public lastObservation;
+    uint160 public price; /// @dev Sqrt of price aka. √(y/x), multiplied by 2^96.
+    int24 public nearestTick; /// @dev Tick that is just below the current price.
+
+    /// @dev References for tickSpacing:
+    // - univ3 1% -> 200 tickSpacing
+    // - univ3 0.3% pool -> 60 tickSpacing -> 0.6% between ticks
+    // - univ3 0.05% pool -> 10 tickSpacing -> 0.1% between ticks
+    // - 100 tickSpacing -> 1% between ticks => 2% between ticks on starting position (*stable pairs are different)
+    uint24 public immutable tickSpacing;
+
+    uint24 internal constant MAX_FEE = 10000; /// @dev 100%.
+    uint24 public immutable swapFee; /// @dev 1000 corresponds to 0.1% fee.
+
+    bytes32 public constant override poolIdentifier = "Trident:ConcentratedLiquidity";
+
+    uint256 internal unlocked;
+    modifier lock() {
+        require(unlocked == 1, "LOCKED");
+        unlocked = 2;
+        _;
+        unlocked = 1;
+    }
 
     mapping(int24 => Ticks.Tick) public ticks;
     mapping(address => mapping(int24 => mapping(int24 => Position))) public positions;
@@ -69,7 +77,7 @@ contract ConcentratedLiquidityPool is IPool {
         uint128 liquidity;
         uint256 feeGrowthInside0Last;
         uint256 feeGrowthInside1Last;
-        uint160 secondsPerLiquidityLast; // <- might want to store this in the manager contract only
+        uint160 secondsPerLiquidityLast; /// <- might want to store this in the manager contract only
     }
 
     struct SwapCache {
@@ -96,30 +104,16 @@ contract ConcentratedLiquidityPool is IPool {
         address recipient;
     }
 
-    /*
-    univ3 1% -> 200 tickSpacing
-    univ3 0.3% pool -> 60 tickSpacing -> 0.6% between ticks
-    univ3 0.05% pool -> 10 tickSpacing -> 0.1% between ticks
-    100 tickSpacing -> 1% between ticks => 2% between ticks on starting position (*stable pairs are different)
-    */
-
-    bytes32 public constant override poolIdentifier = "Trident:ConcentratedLiquidity";
-
-    uint256 private unlocked;
-    modifier lock() {
-        require(unlocked == 1, "LOCKED");
-        unlocked = 2;
-        _;
-        unlocked = 1;
-    }
-
     /// @dev Only set immutable variables here - state changes made here will not be used.
     constructor(
         bytes memory _deployData,
-        address _masterDeployer,
+        IMasterDeployer _masterDeployer,
         address _poolManager
     ) {
-        (address _token0, address _token1, uint24 _swapFee, uint160 _price) = abi.decode(_deployData, (address, address, uint24, uint160));
+        (address _token0, address _token1, uint24 _swapFee, uint160 _price, uint24 _tickSpacing) = abi.decode(
+            _deployData,
+            (address, address, uint24, uint160, uint24)
+        );
 
         require(_token0 != address(0), "ZERO_ADDRESS");
         require(_token0 != _token1, "IDENTICAL_ADDRESSES");
@@ -129,17 +123,20 @@ contract ConcentratedLiquidityPool is IPool {
         token1 = _token1;
         swapFee = _swapFee;
         price = _price;
+        tickSpacing = _tickSpacing;
         ticks[TickMath.MIN_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
         ticks[TickMath.MAX_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
         nearestTick = TickMath.MIN_TICK;
-        bento = IMasterDeployer(_masterDeployer).bento();
-        barFeeTo = IMasterDeployer(_masterDeployer).barFeeTo();
-        barFee = IMasterDeployer(_masterDeployer).barFee();
+        bento = IBentoBoxMinimal(_masterDeployer.bento());
+        barFeeTo = _masterDeployer.barFeeTo();
+        barFee = _masterDeployer.barFee();
         masterDeployer = _masterDeployer;
         poolManager = _poolManager;
         unlocked = 1;
     }
 
+    /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
+    // The router must ensure that sufficient LP tokens are minted by using the return value.
     function mint(bytes calldata data) external override lock returns (uint256 _liquidity) {
         MintParams memory mintParams = abi.decode(data, (MintParams));
 
@@ -155,7 +152,7 @@ contract ConcentratedLiquidityPool is IPool {
             mintParams.amount0Desired
         );
 
-        // @dev This is safe because overflow is checked in position minter contract.
+        /// @dev This is safe because overflow is checked in position minter contract.
         unchecked {
             if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += uint128(_liquidity);
         }
@@ -166,6 +163,7 @@ contract ConcentratedLiquidityPool is IPool {
         (nearestTick) = Ticks.insert(
             ticks,
             nearestTick,
+            tickSpacing,
             feeGrowthGlobal0,
             feeGrowthGlobal1,
             secondsPerLiquidity,
@@ -186,21 +184,15 @@ contract ConcentratedLiquidityPool is IPool {
 
             ITridentCallee(msg.sender).tridentMintCallback(abi.encode(callbackData));
 
-            // @dev This is safe because overflow is checked in {getAmountsForLiquidity}.
+            /// @dev This is safe because overflow is checked in {getAmountsForLiquidity}.
             unchecked {
                 if (amount0Actual != 0) {
-                    /// @dev balanceOf(address,address).
-                    (, bytes memory _balance0) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token0, address(this)));
-                    uint256 balance0 = abi.decode(_balance0, (uint256));
-                    require(amount0Actual + reserve0 <= balance0, "TOKEN0_MISSING");
+                    require(amount0Actual + reserve0 <= _balance(token0), "TOKEN0_MISSING");
                     reserve0 += amount0Actual;
                 }
 
                 if (amount1Actual != 0) {
-                    /// @dev balanceOf(address,address).
-                    (, bytes memory _balance1) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token1, address(this)));
-                    uint256 balance1 = abi.decode(_balance1, (uint256));
-                    require(amount1Actual + reserve1 <= balance1, "TOKEN1_MISSING");
+                    require(amount1Actual + reserve1 <= _balance(token1), "TOKEN1_MISSING");
                     reserve1 += amount1Actual;
                 }
             }
@@ -222,6 +214,7 @@ contract ConcentratedLiquidityPool is IPool {
         return _liquidity;
     }
 
+    /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
     function burn(bytes calldata data) external override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
         (int24 lower, int24 upper, uint128 amount, address recipient, bool unwrapBento) = abi.decode(
             data,
@@ -231,7 +224,7 @@ contract ConcentratedLiquidityPool is IPool {
         uint160 priceLower = TickMath.getSqrtRatioAtTick(lower);
         uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper);
         uint160 currentPrice = price;
-        // @dev This is safe because user cannot have overflow amount of LP to burn.
+        /// @dev This is safe because user cannot have overflow amount of LP to burn.
         unchecked {
             if (priceLower < currentPrice && currentPrice < priceUpper) liquidity -= amount;
         }
@@ -244,7 +237,7 @@ contract ConcentratedLiquidityPool is IPool {
         );
 
         (uint256 amount0fees, uint256 amount1fees) = _updatePosition(msg.sender, lower, upper, -int128(amount));
-        // @dev This is safe because overflow is checked in {updatePosition}.
+        /// @dev This is safe because overflow is checked in {updatePosition}.
         unchecked {
             amount0 += amount0fees;
             amount1 += amount1fees;
@@ -261,10 +254,12 @@ contract ConcentratedLiquidityPool is IPool {
         emit Burn(msg.sender, amount0, amount1, recipient);
     }
 
-    function burnSingle(bytes calldata) external override returns (uint256 amountOut) {
+    /// @dev Reserved for IPool.
+    function burnSingle(bytes calldata) public pure override returns (uint256 amountOut) {
         return amountOut;
     }
 
+    /// @dev Collects LP token fees for user and updates position.
     function collect(bytes calldata data) external lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
         (int24 lower, int24 upper, address recipient, bool unwrapBento) = abi.decode(data, (int24, int24, address, bool));
 
@@ -280,10 +275,11 @@ contract ConcentratedLiquidityPool is IPool {
         emit Collect(msg.sender, amount0fees, amount1fees);
     }
 
-    /// @dev price is √(y/x)
-    /// - x is token0
-    /// - zero for one -> price will move down.
-    function swap(bytes calldata data) external override lock returns (uint256 amountOut) {
+    /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage
+    // - price is √(y/x)
+    // - x is token0
+    // - zero for one -> price will move down.
+    function swap(bytes memory data) public override lock returns (uint256 amountOut) {
         (bool zeroForOne, uint256 inAmount, address recipient, bool unwrapBento) = abi.decode(data, (bool, uint256, address, bool));
 
         SwapCache memory cache = SwapCache({
@@ -299,7 +295,7 @@ contract ConcentratedLiquidityPool is IPool {
 
         {
             uint256 timestamp = block.timestamp;
-            uint256 diff = timestamp - uint256(lastObservation); // underflow in 2106
+            uint256 diff = timestamp - uint256(lastObservation); /// @dev Underflow in 2106.
             if (diff > 0 && liquidity > 0) {
                 lastObservation = uint32(timestamp);
                 secondsPerLiquidity += uint160((diff << 128) / liquidity);
@@ -318,7 +314,7 @@ contract ConcentratedLiquidityPool is IPool {
                 uint256 maxDx = DyDxMath.getDx(cache.currentLiquidity, nextTickPrice, cache.currentPrice, false);
 
                 if (cache.input <= maxDx) {
-                    // @dev We can swap only within the current range.
+                    /// @dev We can swap only within the current range.
                     uint256 liquidityPadded = cache.currentLiquidity << 96;
                     // Calculate new price after swap: √𝑃[new] =  L · √𝑃 / (L + Δx · √𝑃)
                     // This is derrived from Δ(1/√𝑃) = Δx/L
@@ -350,17 +346,17 @@ contract ConcentratedLiquidityPool is IPool {
                 uint256 maxDy = DyDxMath.getDy(cache.currentLiquidity, cache.currentPrice, nextTickPrice, false);
 
                 if (cache.input <= maxDy) {
-                    // @dev We can swap only within the current range
+                    /// @dev We can swap only within the current range
                     // - calculate new price after swap ( ΔP = Δy/L ).
                     uint256 newPrice = cache.currentPrice +
                         FullMath.mulDiv(cache.input, 0x1000000000000000000000000, cache.currentLiquidity);
-                    // @dev Calculate output of swap
+                    /// @dev Calculate output of swap
                     // - Δx = Δ(1/√P) · L.
                     output = DyDxMath.getDx(cache.currentLiquidity, cache.currentPrice, newPrice, false);
                     cache.currentPrice = newPrice;
                     cache.input = 0;
                 } else {
-                    // @dev Swap & cross the tick.
+                    /// @dev Swap & cross the tick.
                     output = DyDxMath.getDx(cache.currentLiquidity, cache.currentPrice, nextTickPrice, false);
                     cache.currentPrice = nextTickPrice;
                     cross = true;
@@ -423,70 +419,26 @@ contract ConcentratedLiquidityPool is IPool {
         }
     }
 
-    function _updateReserves(
-        bool zeroForOne,
-        uint128 inAmount,
-        uint256 amountOut,
-        uint256 totalFeeAmount
-    ) internal {
-        (uint256 amount0, uint256 amount1) = _balance();
-
-        if (zeroForOne) {
-            uint128 newBalance = reserve0 + inAmount;
-            require(uint256(newBalance) <= amount0, "TOKEN0_MISSING");
-            reserve0 = newBalance;
-            reserve1 -= (uint128(amountOut) + uint128(totalFeeAmount));
-        } else {
-            uint128 newBalance = reserve1 + inAmount;
-            require(uint256(newBalance) <= amount1, "TOKEN1_MISSING");
-            reserve1 = newBalance;
-            reserve0 -= (uint128(amountOut) + uint128(totalFeeAmount));
-        }
-    }
-
-    function _updateFees(
-        bool zeroForOne,
-        uint256 feeGrowthGlobal,
-        uint128 protocolFee
-    ) internal {
-        if (zeroForOne) {
-            feeGrowthGlobal1 += feeGrowthGlobal;
-            token1ProtocolFee += protocolFee;
-        } else {
-            feeGrowthGlobal0 += feeGrowthGlobal;
-            token0ProtocolFee += protocolFee;
-        }
-    }
-
-    function flashSwap(bytes calldata) external override returns (uint256 finalAmountOut) {
-        // TODO
+    /// @dev Reserved for IPool.
+    function flashSwap(bytes calldata) public pure override returns (uint256 finalAmountOut) {
         return finalAmountOut;
     }
 
-    function _balance() internal view returns (uint256 balance0, uint256 balance1) {
-        // @dev balanceOf(address,address).
-        (, bytes memory _balance0) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token0, address(this)));
-        balance0 = abi.decode(_balance0, (uint256));
-        // @dev balanceOf(address,address).
-        (, bytes memory _balance1) = bento.staticcall(abi.encodeWithSelector(0xf7888aec, token1, address(this)));
-        balance1 = abi.decode(_balance1, (uint256));
+    /// @dev Updates `barFee` for Trident protocol.
+    function updateBarFee() public {
+        barFee = IMasterDeployer(masterDeployer).barFee();
     }
 
-    function _transfer(
-        address token,
-        uint256 shares,
-        address to,
-        bool unwrapBento
-    ) internal {
-        if (unwrapBento) {
-            // @dev withdraw(address,address,address,uint256,uint256).
-            (bool success, ) = bento.call(abi.encodeWithSelector(0x97da6d30, token, address(this), to, 0, shares));
-            require(success, "WITHDRAW_FAILED");
-        } else {
-            // @dev transfer(address,address,address,uint256).
-            (bool success, ) = bento.call(abi.encodeWithSelector(0xf18d03cc, token, address(this), to, shares));
-            require(success, "TRANSFER_FAILED");
-        }
+    /// @dev Collects fees for Trident protocol.
+    function collectProtocolFee() public lock {
+        _transfer(token0, token0ProtocolFee - 1, barFeeTo, false);
+        _transfer(token1, token1ProtocolFee - 1, barFeeTo, false);
+        token0ProtocolFee = 1;
+        token1ProtocolFee = 1;
+    }
+
+    function _balance(address token) internal view returns (uint256 balance) {
+        balance = bento.balanceOf(token, address(this));
     }
 
     function _getAmountsForLiquidity(
@@ -505,6 +457,41 @@ contract ConcentratedLiquidityPool is IPool {
             /// @dev Supply both tokens.
             token0amount = uint128(DyDxMath.getDx(liquidityAmount, currentPrice, priceUpper, true));
             token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, currentPrice, true));
+        }
+    }
+
+    function _updateReserves(
+        bool zeroForOne,
+        uint128 inAmount,
+        uint256 amountOut,
+        uint256 totalFeeAmount
+    ) internal {
+        if (zeroForOne) {
+            uint256 balance0 = _balance(token0);
+            uint128 newBalance = reserve0 + inAmount;
+            require(uint256(newBalance) <= balance0, "TOKEN0_MISSING");
+            reserve0 = newBalance;
+            reserve1 -= (uint128(amountOut) + uint128(totalFeeAmount));
+        } else {
+            uint256 balance1 = _balance(token1);
+            uint128 newBalance = reserve1 + inAmount;
+            require(uint256(newBalance) <= balance1, "TOKEN1_MISSING");
+            reserve1 = newBalance;
+            reserve0 -= (uint128(amountOut) + uint128(totalFeeAmount));
+        }
+    }
+
+    function _updateFees(
+        bool zeroForOne,
+        uint256 feeGrowthGlobal,
+        uint128 protocolFee
+    ) internal {
+        if (zeroForOne) {
+            feeGrowthGlobal1 += feeGrowthGlobal;
+            token1ProtocolFee += protocolFee;
+        } else {
+            feeGrowthGlobal0 += feeGrowthGlobal;
+            token0ProtocolFee += protocolFee;
         }
     }
 
@@ -537,8 +524,21 @@ contract ConcentratedLiquidityPool is IPool {
         position.feeGrowthInside1Last = growth1current;
     }
 
-    // Generic formula for fee growth inside a range: (globalGrowth - growthBelow - growthAbove)
-    // Available counters: global, outside u, outside v
+    function _transfer(
+        address token,
+        uint256 shares,
+        address to,
+        bool unwrapBento
+    ) internal {
+        if (unwrapBento) {
+            bento.withdraw(token, address(this), to, 0, shares);
+        } else {
+            bento.transfer(token, address(this), to, shares);
+        }
+    }
+
+    /// @dev Generic formula for fee growth inside a range: (globalGrowth - growthBelow - growthAbove)
+    // - available counters: global, outside u, outside v.
 
     //                  u         ▼         v
     // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - feeGrowthOutside(u) - feeGrowthOutside(v))
@@ -550,14 +550,14 @@ contract ConcentratedLiquidityPool is IPool {
     // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - feeGrowthOutside(u) - (global - feeGrowthOutside(v)))
 
     /// @notice Calculates the fee growth inside a range (per unit of liquidity).
-    /// @dev Multiply rangeFeeGrowth delta by the provided liquidity to get accrued fees for some period.
+    /// @dev Multiply `rangeFeeGrowth` delta by the provided liquidity to get accrued fees for some period.
     function rangeFeeGrowth(int24 lowerTick, int24 upperTick) public view returns (uint256 feeGrowthInside0, uint256 feeGrowthInside1) {
         int24 currentTick = nearestTick;
 
         Ticks.Tick storage lower = ticks[lowerTick];
         Ticks.Tick storage upper = ticks[upperTick];
 
-        // @dev Calculate fee growth below & above.
+        /// @dev Calculate fee growth below & above.
         uint256 _feeGrowthGlobal0 = feeGrowthGlobal0;
         uint256 _feeGrowthGlobal1 = feeGrowthGlobal1;
         uint256 feeGrowthBelow0;
@@ -616,19 +616,22 @@ contract ConcentratedLiquidityPool is IPool {
         assets[1] = token1;
     }
 
-    function collectProtocolFee() external lock {
-        _transfer(token0, token0ProtocolFee - 1, barFeeTo, false);
-        _transfer(token1, token1ProtocolFee - 1, barFeeTo, false);
-        token0ProtocolFee = 1;
-        token1ProtocolFee = 1;
-    }
-
-    function updateBarFee() public {
-        barFee = IMasterDeployer(masterDeployer).barFee();
-    }
-
-    function getAmountOut(bytes calldata) public view override returns (uint256 finalAmountOut) {
-        // TODO
+    /// @dev Reserved for IPool.
+    function getAmountOut(bytes calldata) public pure override returns (uint256 finalAmountOut) {
         return finalAmountOut;
+    }
+
+    function getReserves()
+        public
+        view
+        returns (
+            uint128 _reserve0,
+            uint128 _reserve1,
+            uint32 _lastObservation
+        )
+    {
+        _reserve0 = reserve0;
+        _reserve1 = reserve1;
+        _lastObservation = lastObservation;
     }
 }

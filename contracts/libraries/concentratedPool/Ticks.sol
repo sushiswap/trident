@@ -4,6 +4,7 @@ pragma solidity >=0.8.0;
 
 import "./TickMath.sol";
 
+/// @notice Tick management library for ranged liquidity.
 library Ticks {
     struct Tick {
         int24 previousTick;
@@ -49,6 +50,7 @@ library Ticks {
     function insert(
         mapping(int24 => Tick) storage ticks,
         int24 nearestTick,
+        uint24 tickSpacing,
         uint256 feeGrowthGlobal0,
         uint256 feeGrowthGlobal1,
         uint160 secondsPerLiquidity,
@@ -59,8 +61,11 @@ library Ticks {
         uint128 amount,
         uint160 currentPrice
     ) internal returns (int24) {
-        require(uint24(lower) % 2 == 0, "LOWER_EVEN");
-        require(uint24(upper) % 2 == 1, "UPPER_ODD");
+        require(uint24(lower) % tickSpacing == 0, "INVALID_TICK");
+        require((uint24(lower) / tickSpacing) % 2 == 0, "LOWER_EVEN");
+
+        require(uint24(upper) % tickSpacing == 0, "INVALID_TICK");
+        require((uint24(upper) / tickSpacing) % 2 == 1, "UPPER_ODD");
 
         require(lower < upper, "WRONG_ORDER");
 
@@ -91,7 +96,7 @@ library Ticks {
             // We are adding liquidity to an existing tick.
             ticks[upper].liquidity += amount;
         } else {
-            // Inserting a new tick.
+            // We are inserting a new tick.
             Ticks.Tick storage old = ticks[upperOld];
 
             require(old.liquidity != 0 && old.nextTick > upper && upperOld < upper, "UPPER_ORDER");
