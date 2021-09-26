@@ -1,5 +1,5 @@
-import { BigNumber, BigNumberish, ethers } from "ethers";
-import { Contract } from "@ethersproject/contracts";
+import { ethers } from "hardhat";
+import { BigNumber, BigNumberish } from "ethers";
 import { ERC20Mock } from "../../types";
 
 export const ZERO = BigNumber.from(0);
@@ -57,4 +57,11 @@ export function getFactory(contract: string) {
 
 export function sortTokens(tokens: ERC20Mock[]) {
   return tokens.sort((a, b) => (a.address < b.address ? -1 : 1));
+}
+
+export function divRoundingUp(numba: BigNumber, denominator: BigNumberish): BigNumber {
+  const res = numba.div(denominator);
+  const remainder = numba.mod(denominator);
+  if (remainder.eq(0)) return res;
+  return res.add(1);
 }

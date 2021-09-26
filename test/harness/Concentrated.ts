@@ -1,9 +1,10 @@
-import { BigNumber } from "@ethersproject/bignumber";
+import { BigNumber, BigNumberish } from "@ethersproject/bignumber";
 import { getBigNumber } from "@sushiswap/sdk";
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { ConcentratedLiquidityPool, ConcentratedLiquidityPoolManager, TridentRouter } from "../../types";
 import { swap } from "./ConstantProduct";
+import { divRoundingUp } from "./helpers";
 import { Trident } from "./Trident";
 
 const TWO_POW_96 = BigNumber.from(2).pow(96);
@@ -18,40 +19,40 @@ export async function swapViaRouter(params: {
 }): Promise<BigNumber> {
   const { pool, zeroForOne, inAmount, recipient, unwrapBento } = params;
   const nearest = await pool.nearestTick();
+
   let nextTickToCross = zeroForOne ? nearest : (await pool.ticks(nearest)).nextTick;
   let currentPrice = await pool.price();
-  const oldPrice = currentPrice;
   let currentLiquidity = await pool.liquidity();
   let input = inAmount;
   let output = BigNumber.from(0);
   let feeGrowthGlobalIncrease = BigNumber.from(0);
   let crossCount = 0;
+  let protocolFeeIncrease = BigNumber.from(0);
+
+  const oldPrice = currentPrice;
   const tokens = await Promise.all([pool.token0(), pool.token1()]);
   const [swapFee, barFee] = await Promise.all([pool.swapFee(), pool.barFee()]);
   const feeGrowthGlobalOld = await (zeroForOne ? pool.feeGrowthGlobal1() : pool.feeGrowthGlobal0());
   const oldProtocolFees = await (zeroForOne ? pool.token1ProtocolFee() : pool.token0ProtocolFee());
-  let protocolFeeIncrease = BigNumber.from(0);
   // TODO add balance update check
 
   while (input.gt(0)) {
     const nextTickPrice = await getTickPrice(nextTickToCross);
+    let cross = false;
     let stepOutput;
     let newPrice;
-    let cross = false;
 
     if (zeroForOne) {
       const maxDx = await getDx(currentLiquidity, nextTickPrice, currentPrice, false);
+
       if (input.lte(maxDx)) {
         const liquidityPadded = currentLiquidity.mul(TWO_POW_96);
-        newPrice = liquidityPadded
-          .mul(currentPrice)
-          .div(liquidityPadded.add(currentPrice.mul(input)))
-          .add(1);
+        newPrice = divRoundingUp(liquidityPadded.mul(currentPrice), liquidityPadded.add(currentPrice.mul(input)));
         stepOutput = getDy(currentLiquidity, newPrice, currentPrice, false);
         currentPrice = newPrice;
         input = BigNumber.from(0);
       } else {
-        stepOutput = getDy(currentLiquidity, nextTickPrice, currentLiquidity, false);
+        stepOutput = getDy(currentLiquidity, nextTickPrice, currentPrice, false);
         currentPrice = nextTickPrice;
         input = input.sub(maxDx);
         cross = true;
@@ -71,11 +72,14 @@ export async function swapViaRouter(params: {
         cross = true;
       }
     }
-    const feeAmount = stepOutput.mul(swapFee).div(1e6).add(1); // lazy way of rounding up
-    const protocolFee = feeAmount.mul(barFee).div(1e4).add(1); // todo - write an accurate function for round up division
-    protocolFeeIncrease = protocolFeeIncrease.add(protocolFee);
-    feeGrowthGlobalIncrease = feeGrowthGlobalIncrease.add(feeAmount.sub(protocolFee).mul(TWO_POW_128).div(currentLiquidity));
-    output = output.add(stepOutput.sub(feeAmount));
+
+    if (currentLiquidity.gt(0)) {
+      const feeAmount = divRoundingUp(stepOutput.mul(swapFee), BigNumber.from(1e6));
+      const protocolFee = divRoundingUp(feeAmount.mul(barFee), BigNumber.from(1e4));
+      protocolFeeIncrease = protocolFeeIncrease.add(protocolFee);
+      feeGrowthGlobalIncrease = feeGrowthGlobalIncrease.add(feeAmount.sub(protocolFee).mul(TWO_POW_128).div(currentLiquidity));
+      output = output.add(stepOutput.sub(feeAmount));
+    }
 
     if (cross) {
       crossCount++;
@@ -95,10 +99,11 @@ export async function swapViaRouter(params: {
         } else {
           currentLiquidity = currentLiquidity.sub(liquidityChange);
         }
-        nextTickToCross = tickInfo.previousTick;
+        nextTickToCross = tickInfo.nextTick;
       }
     }
   }
+
   const swapData = getSwapData({ zeroForOne, inAmount, recipient, unwrapBento });
   const routerData = {
     amountIn: inAmount,
@@ -107,19 +112,26 @@ export async function swapViaRouter(params: {
     tokenIn: zeroForOne ? tokens[0] : tokens[1],
     data: swapData,
   };
+
   await Trident.Instance.router.exactInputSingle(routerData);
+
   const feeGrowthGlobalnew = await (zeroForOne ? pool.feeGrowthGlobal1() : pool.feeGrowthGlobal0());
   const protocolFeesNew = await (zeroForOne ? pool.token1ProtocolFee() : pool.token0ProtocolFee());
   const newPrice = await pool.price();
+
   let nextNearest = nearest;
   for (let i = 0; i < crossCount; i++) {
     nextNearest = (await pool.ticks(nextNearest))[zeroForOne ? "previousTick" : "nextTick"];
   }
+
   // TODO check balannce changes and reserve changes are correct!
   expect((await pool.liquidity()).toString()).to.be.eq(currentLiquidity.toString(), "didn't set correct liquidity value");
   expect(await pool.nearestTick()).to.be.eq(nextNearest, "didn't update nearest tick pointer");
   expect(oldPrice.lt(newPrice) !== zeroForOne, "Price didn't move in the right direction");
-  expect(protocolFeesNew.toString()).to.be.eq(oldProtocolFees.add(protocolFeeIncrease).toString(), "didn't update protocol fee counter");
+  expect(protocolFeesNew.toString()).to.be.eq(
+    oldProtocolFees.add(protocolFeeIncrease).toString(),
+    "Didn't update protocol fee counter correctly"
+  );
   expect(feeGrowthGlobalnew.toString()).to.be.eq(
     feeGrowthGlobalOld.add(feeGrowthGlobalIncrease).toString(),
     "Didn't update the global fee tracker"
@@ -322,13 +334,53 @@ export function getTickAtPrice(price: BigNumber) {
 }
 
 export function getDy(liquidity: BigNumber, priceLower: BigNumber, priceUpper: BigNumber, roundUp: boolean) {
-  const res = liquidity.mul(priceUpper.sub(priceLower)).div("0x1000000000000000000000000");
-  if (roundUp) return res.add(1); // lazy round up
-  return res;
+  if (roundUp) {
+    return divRoundingUp(liquidity.mul(priceUpper.sub(priceLower)), BigNumber.from("0x1000000000000000000000000"));
+  } else {
+    return liquidity.mul(priceUpper.sub(priceLower)).div("0x1000000000000000000000000");
+  }
 }
 
 export function getDx(liquidity: BigNumber, priceLower: BigNumber, priceUpper: BigNumber, roundUp: boolean) {
-  const res = liquidity.mul("0x1000000000000000000000000").mul(priceUpper.sub(priceLower)).div(priceUpper).div(priceLower);
-  if (roundUp) return res.add(1);
-  return res;
+  if (roundUp) {
+    return divRoundingUp(liquidity.mul("0x1000000000000000000000000").mul(priceUpper.sub(priceLower)).div(priceUpper), priceLower);
+  } else {
+    return liquidity.mul("0x1000000000000000000000000").mul(priceUpper.sub(priceLower)).div(priceUpper).div(priceLower);
+  }
+}
+
+export class LinkedListHelper {
+  min: number;
+  values: number[] = [];
+  constructor(min: number) {
+    this.min = min;
+    this.reset();
+  }
+
+  // insert a tick in the linked list; return what the previous tick was
+  // if thick already exists just return it
+  insert(tick) {
+    let old = this.values[0];
+    let i = 0;
+    while (++i < this.values.length) {
+      if (this.values[i] < tick) old = this.values[i];
+    }
+    if (!this.values.includes(tick)) {
+      this.values.push(tick);
+      this.values = this.values.sort((a, b) => a - b);
+    }
+    return old;
+  }
+
+  reset() {
+    this.values = [this.min];
+  }
+
+  setTicks(lower, upper, params) {
+    params.lower = lower;
+    params.upper = upper;
+    params.lowerOld = this.insert(lower);
+    params.upperOld = this.insert(upper);
+    return params;
+  }
 }
