@@ -5,6 +5,7 @@ pragma solidity >=0.8.0;
 import "./FullMath.sol";
 import "hardhat/console.sol";
 
+/// @notice Math library that facilitates fee handling for Trident Concentrated Liquidity Pools.
 library SwapLib {
     function handleFees(
         uint256 output,
