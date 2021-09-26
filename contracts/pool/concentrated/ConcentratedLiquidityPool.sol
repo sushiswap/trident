@@ -51,10 +51,10 @@ contract ConcentratedLiquidityPool is IPool {
     int24 public nearestTick; /// @dev Tick that is just below the current price.
 
     /// @dev References for tickSpacing:
-    // - univ3 1% -> 200 tickSpacing
-    // - univ3 0.3% pool -> 60 tickSpacing -> 0.6% between ticks
-    // - univ3 0.05% pool -> 10 tickSpacing -> 0.1% between ticks
-    // - 100 tickSpacing -> 1% between ticks => 2% between ticks on starting position (*stable pairs are different)
+    // - 1% -> 200 tickSpacing
+    // - 0.3% pool -> 60 tickSpacing -> 0.6% between ticks
+    // - 0.05% pool -> 10 tickSpacing -> 0.1% between ticks
+    // - 100 tickSpacing -> 1% between ticks => 2% between ticks on starting position (*stable pairs are different).
     uint24 public immutable tickSpacing;
 
     uint24 internal constant MAX_FEE = 10000; /// @dev 100%.
@@ -142,7 +142,7 @@ contract ConcentratedLiquidityPool is IPool {
         uint256 priceUpper = uint256(TickMath.getSqrtRatioAtTick(mintParams.upper));
         uint256 currentPrice = uint256(price);
 
-        _liquidity = DyDxMath.getLiquidityForAmounts(
+        _liquidity = _getLiquidityForAmounts(
             priceLower,
             priceUpper,
             currentPrice,
@@ -301,7 +301,7 @@ contract ConcentratedLiquidityPool is IPool {
                 // Trading token 0 (x) for token 1 (y).
                 // Price is decreasing.
                 // Maximum input amount within current tick range: Δx = Δ(1/√𝑃) · L
-                uint256 maxDx = DyDxMath.getDx(cache.currentLiquidity, nextTickPrice, cache.currentPrice, false);
+                uint256 maxDx = _getDx(cache.currentLiquidity, nextTickPrice, cache.currentPrice, false);
 
                 if (cache.input <= maxDx) {
                     /// @dev We can swap only within the current range.
@@ -320,12 +320,12 @@ contract ConcentratedLiquidityPool is IPool {
                         newPrice = uint160(UnsafeMath.divRoundingUp(liquidityPadded, liquidityPadded / cache.currentPrice + cache.input));
                     }
                     // Based on the price difference calculate the output of th swap: Δy = Δ√P · L.
-                    output = DyDxMath.getDy(cache.currentLiquidity, newPrice, cache.currentPrice, false);
+                    output = _getDy(cache.currentLiquidity, newPrice, cache.currentPrice, false);
                     cache.currentPrice = newPrice;
                     cache.input = 0;
                 } else {
                     // Execute swap step and cross the tick.
-                    output = DyDxMath.getDy(cache.currentLiquidity, nextTickPrice, cache.currentPrice, false);
+                    output = _getDy(cache.currentLiquidity, nextTickPrice, cache.currentPrice, false);
                     cache.currentPrice = nextTickPrice;
                     cross = true;
                     cache.input -= maxDx;
@@ -333,7 +333,7 @@ contract ConcentratedLiquidityPool is IPool {
             } else {
                 // Price is increasing
                 // Maximum swap amount within the current tick range: Δy = Δ√P · L.
-                uint256 maxDy = DyDxMath.getDy(cache.currentLiquidity, cache.currentPrice, nextTickPrice, false);
+                uint256 maxDy = _getDy(cache.currentLiquidity, cache.currentPrice, nextTickPrice, false);
 
                 if (cache.input <= maxDy) {
                     /// @dev We can swap only within the current range
@@ -342,12 +342,12 @@ contract ConcentratedLiquidityPool is IPool {
                         FullMath.mulDiv(cache.input, 0x1000000000000000000000000, cache.currentLiquidity);
                     /// @dev Calculate output of swap
                     // - Δx = Δ(1/√P) · L.
-                    output = DyDxMath.getDx(cache.currentLiquidity, cache.currentPrice, newPrice, false);
+                    output = _getDx(cache.currentLiquidity, cache.currentPrice, newPrice, false);
                     cache.currentPrice = newPrice;
                     cache.input = 0;
                 } else {
                     /// @dev Swap & cross the tick.
-                    output = DyDxMath.getDx(cache.currentLiquidity, cache.currentPrice, nextTickPrice, false);
+                    output = _getDx(cache.currentLiquidity, cache.currentPrice, nextTickPrice, false);
                     cache.currentPrice = nextTickPrice;
                     cross = true;
                     cache.input -= maxDy;
@@ -430,6 +430,36 @@ contract ConcentratedLiquidityPool is IPool {
     function _balance(address token) internal view returns (uint256 balance) {
         balance = bento.balanceOf(token, address(this));
     }
+    
+    function _getDy(
+        uint256 _liquidity,
+        uint256 priceLower,
+        uint256 priceUpper,
+        bool roundUp
+    ) internal pure returns (uint256 dy) {
+        unchecked {
+            if (roundUp) {
+                dy = FullMath.mulDivRoundingUp(_liquidity, priceUpper - priceLower, 0x1000000000000000000000000);
+            } else {
+                dy = FullMath.mulDiv(_liquidity, priceUpper - priceLower, 0x1000000000000000000000000);
+            }
+        }
+    }
+
+    function _getDx(
+        uint256 _liquidity,
+        uint256 priceLower,
+        uint256 priceUpper,
+        bool roundUp
+    ) internal pure returns (uint256 dx) {
+        unchecked {
+            if (roundUp) {
+                dx = UnsafeMath.divRoundingUp(FullMath.mulDivRoundingUp(_liquidity << 96, priceUpper - priceLower, priceUpper), priceLower);
+            } else {
+                dx = FullMath.mulDiv(_liquidity << 96, priceUpper - priceLower, priceUpper) / priceLower;
+            }
+        }
+    }
 
     function _getAmountsForLiquidity(
         uint256 priceLower,
@@ -439,14 +469,105 @@ contract ConcentratedLiquidityPool is IPool {
     ) internal pure returns (uint128 token0amount, uint128 token1amount) {
         if (priceUpper <= currentPrice) {
             /// @dev Only supply token1 (token1 is Y).
-            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, priceUpper, true));
+            token1amount = uint128(_getDy(liquidityAmount, priceLower, priceUpper, true));
         } else if (currentPrice <= priceLower) {
             /// @dev Only supply token0 (token0 is X).
-            token0amount = uint128(DyDxMath.getDx(liquidityAmount, priceLower, priceUpper, true));
+            token0amount = uint128(_getDx(liquidityAmount, priceLower, priceUpper, true));
         } else {
             /// @dev Supply both tokens.
-            token0amount = uint128(DyDxMath.getDx(liquidityAmount, currentPrice, priceUpper, true));
-            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, currentPrice, true));
+            token0amount = uint128(_getDx(liquidityAmount, currentPrice, priceUpper, true));
+            token1amount = uint128(_getDy(liquidityAmount, priceLower, currentPrice, true));
+        }
+    }
+    
+    function _getLiquidityForAmounts(
+        uint256 priceLower,
+        uint256 priceUpper,
+        uint256 currentPrice,
+        uint256 dy,
+        uint256 dx
+    ) internal pure returns (uint256 _liquidity) {
+        if (priceUpper <= currentPrice) {
+            _liquidity = FullMath.mulDiv(dy, 0x1000000000000000000000000, priceUpper - priceLower);
+        } else if (currentPrice <= priceLower) {
+            _liquidity = FullMath.mulDiv(dx, FullMath.mulDiv(priceLower, priceUpper, 0x1000000000000000000000000), priceUpper - priceLower);
+        } else {
+            uint256 liquidity0 = FullMath.mulDiv(
+                dx,
+                FullMath.mulDiv(priceUpper, currentPrice, 0x1000000000000000000000000),
+                priceUpper - currentPrice
+            );
+            uint256 liquidity1 = FullMath.mulDiv(dy, 0x1000000000000000000000000, currentPrice - priceLower);
+            _liquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
+        }
+    }
+    
+    function _insertTick(
+        int24 lowerOld,
+        int24 lower,
+        int24 upperOld,
+        int24 upper,
+        uint128 amount,
+        uint160 currentPrice
+    ) internal {
+        require(lower % int24(tickSpacing) == 0, "INVALID_TICK");
+        require((lower / int24(tickSpacing)) % 2 == 0, "LOWER_EVEN");
+
+        require(upper % int24(tickSpacing) == 0, "INVALID_TICK");
+        require((upper / int24(tickSpacing)) % 2 != 0, "UPPER_ODD"); /// @dev Can be either -1 or 1.
+
+        require(lower < upper, "WRONG_ORDER");
+        require(TickMath.MIN_TICK <= lower, "LOWER_RANGE");
+        require(upper <= TickMath.MAX_TICK, "UPPER_RANGE");
+
+        int24 currentNearestTick = nearestTick;
+
+        uint128 currentLowerLiquidity = ticks[lower].liquidity;
+        if (currentLowerLiquidity != 0 || lower == TickMath.MIN_TICK) {
+            /// @dev We are adding liquidity to an existing tick.
+            ticks[lower].liquidity = currentLowerLiquidity + amount;
+        } else {
+            /// @dev We are inserting a new tick.
+            Ticks.Tick storage old = ticks[lowerOld];
+            int24 oldNextTick = old.nextTick;
+
+            require((old.liquidity != 0 || lowerOld == TickMath.MIN_TICK) && lowerOld < lower && lower < oldNextTick, "LOWER_ORDER");
+
+            if (lower <= currentNearestTick) {
+                ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
+            } else {
+                ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, 0, 0, 0);
+            }
+
+            old.nextTick = lower;
+        }
+
+        uint128 currentUpperLiquidity = ticks[upper].liquidity;
+        if (currentUpperLiquidity != 0 || upper == TickMath.MAX_TICK) {
+            /// @dev We are adding liquidity to an existing tick.
+            ticks[upper].liquidity = currentUpperLiquidity + amount;
+        } else {
+            /// @dev We are inserting a new tick.
+            Ticks.Tick storage old = ticks[upperOld];
+            int24 oldNextTick = old.nextTick;
+
+            require(old.liquidity != 0 && oldNextTick > upper && upperOld < upper, "UPPER_ORDER");
+
+            if (upper <= currentNearestTick) {
+                ticks[upper] = Ticks.Tick(upperOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
+            } else {
+                ticks[upper] = Ticks.Tick(upperOld, oldNextTick, amount, 0, 0, 0);
+            }
+
+            old.nextTick = upper;
+        }
+
+        int24 actualNearestTick = TickMath.getTickAtSqrtRatio(currentPrice);
+
+        if (currentNearestTick < upper && upper <= actualNearestTick) {
+            nearestTick = upper;
+        } else if (currentNearestTick < lower && lower <= actualNearestTick) {
+            nearestTick = lower;
         }
     }
 
@@ -623,74 +744,5 @@ contract ConcentratedLiquidityPool is IPool {
         _reserve0 = reserve0;
         _reserve1 = reserve1;
         _lastObservation = lastObservation;
-    }
-
-    function _insertTick(
-        int24 lowerOld,
-        int24 lower,
-        int24 upperOld,
-        int24 upper,
-        uint128 amount,
-        uint160 currentPrice
-    ) internal {
-        require(lower % int24(tickSpacing) == 0, "INVALID_TICK");
-        require((lower / int24(tickSpacing)) % 2 == 0, "LOWER_EVEN");
-
-        require(upper % int24(tickSpacing) == 0, "INVALID_TICK");
-        require((upper / int24(tickSpacing)) % 2 != 0, "UPPER_ODD"); // can be either -1 or 1
-
-        require(lower < upper, "WRONG_ORDER");
-        require(TickMath.MIN_TICK <= lower, "LOWER_RANGE");
-        require(upper <= TickMath.MAX_TICK, "UPPER_RANGE");
-
-        int24 currentNearestTick = nearestTick;
-
-        uint128 currentLowerLiquidity = ticks[lower].liquidity;
-        if (currentLowerLiquidity != 0 || lower == TickMath.MIN_TICK) {
-            // We are adding liquidity to an existing tick.
-            ticks[lower].liquidity = currentLowerLiquidity + amount;
-        } else {
-            // We are inserting a new tick.
-            Ticks.Tick storage old = ticks[lowerOld];
-            int24 oldNextTick = old.nextTick;
-
-            require((old.liquidity != 0 || lowerOld == TickMath.MIN_TICK) && lowerOld < lower && lower < oldNextTick, "LOWER_ORDER");
-
-            if (lower <= currentNearestTick) {
-                ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
-            } else {
-                ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, 0, 0, 0);
-            }
-
-            old.nextTick = lower;
-        }
-
-        uint128 currentUpperLiquidity = ticks[upper].liquidity;
-        if (currentUpperLiquidity != 0 || upper == TickMath.MAX_TICK) {
-            // We are adding liquidity to an existing tick.
-            ticks[upper].liquidity = currentUpperLiquidity + amount;
-        } else {
-            // Inserting a new tick.
-            Ticks.Tick storage old = ticks[upperOld];
-            int24 oldNextTick = old.nextTick;
-
-            require(old.liquidity != 0 && oldNextTick > upper && upperOld < upper, "UPPER_ORDER");
-
-            if (upper <= currentNearestTick) {
-                ticks[upper] = Ticks.Tick(upperOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
-            } else {
-                ticks[upper] = Ticks.Tick(upperOld, oldNextTick, amount, 0, 0, 0);
-            }
-
-            old.nextTick = upper;
-        }
-
-        int24 actualNearestTick = TickMath.getTickAtSqrtRatio(currentPrice);
-
-        if (currentNearestTick < upper && upper <= actualNearestTick) {
-            nearestTick = upper;
-        } else if (currentNearestTick < lower && lower <= actualNearestTick) {
-            nearestTick = lower;
-        }
     }
 }
