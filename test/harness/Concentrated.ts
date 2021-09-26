@@ -348,3 +348,39 @@ export function getDx(liquidity: BigNumber, priceLower: BigNumber, priceUpper: B
     return liquidity.mul("0x1000000000000000000000000").mul(priceUpper.sub(priceLower)).div(priceUpper).div(priceLower);
   }
 }
+
+export class LinkedListHelper {
+  min: number;
+  values: number[] = [];
+  constructor(min: number) {
+    this.min = min;
+    this.reset();
+  }
+
+  // insert a tick in the linked list; return what the previous tick was
+  // if thick already exists just return it
+  insert(tick) {
+    let old = this.values[0];
+    let i = 0;
+    while (++i < this.values.length) {
+      if (this.values[i] < tick) old = this.values[i];
+    }
+    if (!this.values.includes(tick)) {
+      this.values.push(tick);
+      this.values = this.values.sort((a, b) => a - b);
+    }
+    return old;
+  }
+
+  reset() {
+    this.values = [this.min];
+  }
+
+  setTicks(lower, upper, params) {
+    params.lower = lower;
+    params.upper = upper;
+    params.lowerOld = this.insert(lower);
+    params.upperOld = this.insert(upper);
+    return params;
+  }
+}

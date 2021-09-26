@@ -3,7 +3,9 @@
 pragma solidity >=0.8.0;
 
 import "./TickMath.sol";
+import "hardhat/console.sol";
 
+/// @notice Tick management library for ranged liquidity.
 library Ticks {
     struct Tick {
         int24 previousTick;
