@@ -129,7 +129,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
       }
     });
 
-    it.only("Should add liquidity and swap (with crossing ticks)", async () => {
+    it("Should add liquidity and swap (with crossing ticks)", async () => {
       for (const pool of [trident.concentratedPools[0]]) {
         helper.reset();
 
@@ -162,6 +162,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         addLiquidityParams = helper.setTicks(lower - 10 * step, upper + 10 * step, addLiquidityParams);
         await addLiquidityViaRouter(addLiquidityParams);
 
+        // swap accross the range and back
         //                       ▼ - - - - - - -> ▼
         // ----------------|xxxxxxxxxxx|-----|xxxxxxxxxx|--------
         // ----|xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx|-----
