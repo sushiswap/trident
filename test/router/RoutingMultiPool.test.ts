@@ -7,9 +7,59 @@ import { RouteType } from "./helpers/constants";
 
 describe("MultiPool Routing Tests", function () {
   beforeEach(async function () {
-    this.signer = await testHelper.init();
+    [this.signer, this.tridentRouterAddress] = await testHelper.init();
     this.gasPrice = 1 * 200 * 1e-9;
     this.rnd = seedrandom("2");
+  });
+
+  it("Should Test Normal Values with 5 pools & bridge", async function () {
+    const topology = await testHelper.getFivePoolBridge(this.rnd);
+
+    const fromToken = topology.tokens[0];
+    const toToken = topology.tokens[3];
+    const baseToken = topology.tokens[2];
+
+    const route = testHelper.createRoute(
+      fromToken,
+      toToken,
+      baseToken,
+      topology,
+      1000000,
+      this.gasPrice
+    );
+
+    if (route == undefined) {
+      throw "Failed to get route";
+    }
+
+    expect(route.legs.length).equal(5);
+
+    const routerParams = testHelper.getTridentRouterParams(
+      route,
+      this.signer.address,
+      this.tridentRouterAddress
+    );
+
+    expect(routerParams.routeType).equal(RouteType.ComplexPath);
+
+    const amountOutPoolBN = await testHelper.executeTridentRoute(
+      routerParams,
+      toToken.address
+    );
+
+    console.log();
+    console.log(">>>>>>>> <<<<<<<<");
+    console.log(`Expected output: ${route.amountOut.toString()}`);
+    console.log(`Actual output: ${amountOutPoolBN.toString()}`);
+    console.log(">>>>>>>> <<<<<<<<");
+
+    expect(
+      areCloseValues(
+        route.amountOut,
+        parseInt(amountOutPoolBN.toString()),
+        1e-14
+      )
+    ).to.equal(true, "predicted amount did not equal actual swapped amount");
   });
 
   it("Should Test Normal Values with 3 Parallel Pools", async function () {
@@ -37,7 +87,8 @@ describe("MultiPool Routing Tests", function () {
 
     const routerParams = testHelper.getTridentRouterParams(
       route,
-      this.signer.address
+      this.signer.address,
+      this.tridentRouterAddress
     );
 
     expect(routerParams.routeType).equal(RouteType.ComplexPath);
@@ -81,7 +132,8 @@ describe("MultiPool Routing Tests", function () {
 
     const routerParams = testHelper.getTridentRouterParams(
       route,
-      this.signer.address
+      this.signer.address,
+      this.tridentRouterAddress
     );
 
     expect(routerParams.routeType).equal(RouteType.ComplexPath);
@@ -123,7 +175,8 @@ describe("MultiPool Routing Tests", function () {
 
     const routerParams = testHelper.getTridentRouterParams(
       route,
-      this.signer.address
+      this.signer.address,
+      this.tridentRouterAddress
     );
 
     expect(routerParams.routeType).equal(RouteType.SinglePath);
@@ -165,7 +218,8 @@ describe("MultiPool Routing Tests", function () {
 
     const routerParams = testHelper.getTridentRouterParams(
       route,
-      this.signer.address
+      this.signer.address,
+      this.tridentRouterAddress
     );
 
     expect(routerParams.routeType).equal(RouteType.SinglePath);
@@ -207,7 +261,8 @@ describe("MultiPool Routing Tests", function () {
 
     const routerParams = testHelper.getTridentRouterParams(
       route,
-      this.signer.address
+      this.signer.address,
+      this.tridentRouterAddress
     );
 
     expect(routerParams.routeType).equal(RouteType.SinglePool);
