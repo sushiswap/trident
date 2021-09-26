@@ -162,12 +162,7 @@ contract ConcentratedLiquidityPool is IPool {
         /// @dev Fees should have been collected before position updates.
         _updatePosition(mintParams.positionOwner, mintParams.lower, mintParams.upper, int128(uint128(_liquidity)));
 
-        (nearestTick) = Ticks.insert(
-            ticks,
-            nearestTick,
-            feeGrowthGlobal0,
-            feeGrowthGlobal1,
-            secondsPerLiquidity,
+        _insertTick(
             mintParams.lowerOld,
             mintParams.lower,
             mintParams.upperOld,
@@ -627,5 +622,73 @@ contract ConcentratedLiquidityPool is IPool {
     function getAmountOut(bytes calldata) public view override returns (uint256 finalAmountOut) {
         // TODO
         return finalAmountOut;
+    }
+
+    function _insertTick(
+        int24 lowerOld,
+        int24 lower,
+        int24 upperOld,
+        int24 upper,
+        uint128 amount,
+        uint160 currentPrice
+    ) internal {
+        require(uint24(lower) % 2 == 0, "LOWER_EVEN");
+        require(uint24(upper) % 2 == 1, "UPPER_ODD");
+
+        require(lower < upper, "WRONG_ORDER");
+
+        // @dev since we know `lower` < `upper`, we don't need to check upper range for `lower` and lower range for `upper`.
+        require(TickMath.MIN_TICK <= lower, "LOWER_RANGE");
+        require(upper <= TickMath.MAX_TICK, "UPPER_RANGE");
+
+        int24 currentNearestTick = nearestTick;
+
+        uint128 currentLowerLiquidity = ticks[lower].liquidity;
+        if (currentLowerLiquidity != 0 || lower == TickMath.MIN_TICK) {
+            // We are adding liquidity to an existing tick.
+            ticks[lower].liquidity = currentLowerLiquidity + amount;
+        } else {
+            // We are inserting a new tick.
+            Ticks.Tick storage old = ticks[lowerOld];
+            int24 oldNextTick = old.nextTick;
+
+            require((old.liquidity != 0 || lowerOld == TickMath.MIN_TICK) && lowerOld < lower && lower < oldNextTick, "LOWER_ORDER");
+
+            if (lower <= currentNearestTick) {
+                ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
+            } else {
+                ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, 0, 0, 0);
+            }
+
+            old.nextTick = lower;
+        }
+
+        uint128 currentUpperLiquidity = ticks[upper].liquidity;
+        if (currentUpperLiquidity != 0 || upper == TickMath.MAX_TICK) {
+            // We are adding liquidity to an existing tick.
+            ticks[upper].liquidity = currentUpperLiquidity + amount;
+        } else {
+            // Inserting a new tick.
+            Ticks.Tick storage old = ticks[upperOld];
+            int24 oldNextTick = old.nextTick;
+
+            require(old.liquidity != 0 && oldNextTick > upper && upperOld < upper, "UPPER_ORDER");
+
+            if (upper <= currentNearestTick) {
+                ticks[upper] = Ticks.Tick(upperOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
+            } else {
+                ticks[upper] = Ticks.Tick(upperOld, oldNextTick, amount, 0, 0, 0);
+            }
+
+            old.nextTick = upper;
+        }
+
+        int24 actualNearestTick = TickMath.getTickAtSqrtRatio(currentPrice);
+
+        if (currentNearestTick < upper && upper <= actualNearestTick) {
+            nearestTick = upper;
+        } else if (currentNearestTick < lower && lower <= actualNearestTick) {
+            nearestTick = lower;
+        }
     }
 }
