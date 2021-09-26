@@ -9,7 +9,7 @@ library Ticks {
         int24 previousTick;
         int24 nextTick;
         uint128 liquidity;
-        uint256 feeGrowthOutside0; // @dev Per unit of liquidity.
+        uint256 feeGrowthOutside0; // Per unit of liquidity.
         uint256 feeGrowthOutside1;
         uint160 secondsPerLiquidityOutside;
     }
@@ -24,7 +24,7 @@ library Ticks {
     ) internal returns (uint256, int24) {
         ticks[nextTickToCross].secondsPerLiquidityOutside = secondsPerLiquidity - ticks[nextTickToCross].secondsPerLiquidityOutside;
         if (zeroForOne) {
-            // Going left.
+            // Moving forward through the linked list
             if (nextTickToCross % 2 == 0) {
                 currentLiquidity -= ticks[nextTickToCross].liquidity;
             } else {
@@ -33,7 +33,7 @@ library Ticks {
             nextTickToCross = ticks[nextTickToCross].previousTick;
             ticks[nextTickToCross].feeGrowthOutside0 = feeGrowthGlobal - ticks[nextTickToCross].feeGrowthOutside0;
         } else {
-            // Going right.
+            // Moving backwards through the linked list
             if (nextTickToCross % 2 == 0) {
                 currentLiquidity += ticks[nextTickToCross].liquidity;
             } else {
@@ -70,10 +70,10 @@ library Ticks {
         int24 currentNearestTick = nearestTick;
 
         if (ticks[lower].liquidity != 0 || lower == TickMath.MIN_TICK) {
-            // @dev We are adding liquidity to an existing tick.
+            // We are adding liquidity to an existing tick.
             ticks[lower].liquidity += amount;
         } else {
-            // @dev Inserting a new tick.
+            // We are inserting a new tick.
             Ticks.Tick storage old = ticks[lowerOld];
 
             require((old.liquidity != 0 || lowerOld == TickMath.MIN_TICK) && lowerOld < lower && lower < old.nextTick, "LOWER_ORDER");
@@ -88,10 +88,10 @@ library Ticks {
         }
 
         if (ticks[upper].liquidity != 0 || upper == TickMath.MAX_TICK) {
-            // @dev We are adding liquidity to an existing tick.
+            // We are adding liquidity to an existing tick.
             ticks[upper].liquidity += amount;
         } else {
-            // @dev Inserting a new tick.
+            // Inserting a new tick.
             Ticks.Tick storage old = ticks[upperOld];
 
             require(old.liquidity != 0 && old.nextTick > upper && upperOld < upper, "UPPER_ORDER");
@@ -124,7 +124,7 @@ library Ticks {
         Ticks.Tick storage current = ticks[lower];
 
         if (lower != TickMath.MIN_TICK && current.liquidity == amount) {
-            /// @dev Delete lower tick.
+            // Delete lower tick.
             Ticks.Tick storage previous = ticks[current.previousTick];
             Ticks.Tick storage next = ticks[current.nextTick];
 
@@ -141,7 +141,7 @@ library Ticks {
         current = ticks[upper];
 
         if (upper != TickMath.MAX_TICK && current.liquidity == amount) {
-            // @dev Delete upper tick.
+            // Delete upper tick.
             Ticks.Tick storage previous = ticks[current.previousTick];
             Ticks.Tick storage next = ticks[current.nextTick];
 

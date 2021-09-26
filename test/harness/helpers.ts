@@ -58,3 +58,10 @@ export function getFactory(contract: string) {
 export function sortTokens(tokens: ERC20Mock[]) {
   return tokens.sort((a, b) => (a.address < b.address ? -1 : 1));
 }
+
+export function divRoundingUp(numba: BigNumber, denominator: BigNumberish): BigNumber {
+  const res = numba.div(denominator);
+  const remainder = numba.mod(denominator);
+  if (remainder.eq(0)) return res;
+  return res.add(1);
+}
