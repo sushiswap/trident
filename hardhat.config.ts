@@ -15,6 +15,8 @@ import "@typechain/hardhat";
 import "hardhat-tracer";
 import "./cli";
 
+import "hardhat-deploy-ethers";
+
 import { HardhatUserConfig } from "hardhat/config";
 import { removeConsoleLog } from "hardhat-preprocessor";
 
