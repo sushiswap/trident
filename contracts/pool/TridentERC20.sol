@@ -18,7 +18,7 @@ abstract contract TridentERC20 {
     mapping(address => uint256) public balanceOf;
     /// @notice owner -> spender -> allowance mapping.
     mapping(address => mapping(address => uint256)) public allowance;
-    
+
     /// @notice Chain Id at this contract's deployment.
     uint256 internal immutable DOMAIN_SEPARATOR_CHAIN_ID;
     /// @notice EIP-712 typehash for this contract's domain at deployment.
@@ -32,7 +32,7 @@ abstract contract TridentERC20 {
         DOMAIN_SEPARATOR_CHAIN_ID = block.chainid;
         _DOMAIN_SEPARATOR = _calculateDomainSeparator();
     }
-    
+
     function _calculateDomainSeparator() internal view returns (bytes32 domainSeperator) {
         domainSeperator = keccak256(
             abi.encode(
@@ -44,7 +44,7 @@ abstract contract TridentERC20 {
             )
         );
     }
-    
+
     /// @notice EIP-712 typehash for this contract's domain.
     function DOMAIN_SEPARATOR() public view returns (bytes32 domainSeperator) {
         domainSeperator = block.chainid == DOMAIN_SEPARATOR_CHAIN_ID ? _DOMAIN_SEPARATOR : _calculateDomainSeparator();

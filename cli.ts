@@ -1,6 +1,8 @@
-import { BENTOBOX_ADDRESS, ChainId } from "@sushiswap/sdk";
+import { BENTOBOX_ADDRESS, ChainId } from "@sushiswap/core-sdk";
 import { BigNumber, constants } from "ethers";
 import { task, types } from "hardhat/config";
+
+// import { bytecode } from "./artifacts/contracts/pool/ConstantProductPool.sol/ConstantProductPool.json";
 
 const { MaxUint256 } = constants;
 
@@ -67,6 +69,52 @@ task("constant-product-pool:deploy", "Constant Product Pool deploy")
     console.log(events);
   });
 
+task("constant-product-pool:address", "Constant Product Pool deploy")
+  .addOptionalParam(
+    "tokenA",
+    "Token A",
+    "0xd0A1E359811322d97991E03f863a0C30C2cF029C", // kovan weth
+    types.string
+  )
+  .addOptionalParam(
+    "tokenB",
+    "Token B",
+    "0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa", // kovan dai
+    types.string
+  )
+  .addOptionalParam("fee", "Fee tier", 30, types.int)
+  .addOptionalParam("twap", "Twap enabled", true, types.boolean)
+  .setAction(async function ({ tokenA, tokenB, fee, twap }, { ethers }) {
+    const master = (await ethers.getContract("MasterDeployer")).address;
+    const factory = (await ethers.getContract("ConstantProductPoolFactory"))
+      .address;
+
+    const deployData = ethers.utils.defaultAbiCoder.encode(
+      ["address", "address", "uint256", "bool"],
+      [...[tokenA, tokenB].sort(), fee, twap]
+    );
+    const salt = ethers.utils.keccak256(deployData);
+    const constructorParams = ethers.utils.defaultAbiCoder
+      .encode(["bytes", "address"], [deployData, master])
+      .substring(2);
+    const Pool = await ethers.getContractFactory("ConstantProductPool");
+    const initCodeHash = ethers.utils.keccak256(
+      Pool.bytecode + constructorParams
+    );
+    const poolAddress = ethers.utils.getCreate2Address(
+      factory,
+      salt,
+      initCodeHash
+    );
+
+    // console.log(
+    //   "is pool.bytecode identical to artifact bytecode?",
+    //   Pool.bytecode === bytecode
+    // );
+
+    console.log({ initCodeHash, poolAddress });
+  });
+
 task("whitelist", "Whitelist Router on BentoBox").setAction(async function (
   _,
   { ethers, getChainId }
@@ -112,7 +160,7 @@ task("router:add-liquidity", "Router add liquidity")
   .addOptionalParam(
     "pool",
     "Pool",
-    "0x9066719B1d10cB535e01674ffF056A7e2f7f0A8B", // dai/weth
+    "0x34DC0c3fff06EF015a2135444A33B12c0C5A3A71", // dai/weth
     types.string
   )
   .addParam(
@@ -155,12 +203,12 @@ task("router:add-liquidity", "Router add liquidity")
       {
         token: tokenA,
         native: false,
-        amount: ethers.BigNumber.from(10).pow(17),
+        amount: ethers.BigNumber.from(10).pow(12),
       },
       {
         token: tokenB,
         native: false,
-        amount: ethers.BigNumber.from(10).pow(17),
+        amount: ethers.BigNumber.from(10).pow(12),
       },
     ];
 
@@ -188,8 +236,8 @@ task("router:add-liquidity", "Router add liquidity")
           liquidityInput[0].token,
           dev.address,
           dev.address,
-          liquidityInput[0].amount,
-          0
+          0,
+          liquidityInput[0].amount
         )
     ).wait();
     await (
@@ -199,23 +247,26 @@ task("router:add-liquidity", "Router add liquidity")
           liquidityInput[1].token,
           dev.address,
           dev.address,
-          liquidityInput[1].amount,
-          0
+          0,
+          liquidityInput[1].amount
         )
     ).wait();
 
     console.log("Deposited");
 
-    await bentoBox
-      .connect(dev)
-      .setMasterContractApproval(
-        dev.address,
-        router.address,
-        true,
-        "0",
-        "0x0000000000000000000000000000000000000000000000000000000000000000",
-        "0x0000000000000000000000000000000000000000000000000000000000000000"
-      );
+    await (
+      await bentoBox
+        .connect(dev)
+        .setMasterContractApproval(
+          dev.address,
+          router.address,
+          true,
+          "0",
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    ).wait();
+
     console.log("Set master contract approval");
 
     const data = ethers.utils.defaultAbiCoder.encode(
@@ -231,12 +282,6 @@ task("router:add-liquidity", "Router add liquidity")
   });
 
 // misc helpers for testing purposes
-
-task("transfer-ownership", "").setAction(async function ({}, { ethers }) {
-  const dev = await ethers.getNamedSigner("dev");
-  const bentoBox = await ethers.getContract("BentoBoxV1");
-  await bentoBox.transferOwnership(dev.address, true, false);
-});
 
 task("strategy:add", "Add strategy to BentoBox")
   .addParam(
