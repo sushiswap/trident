@@ -407,7 +407,7 @@ contract ConcentratedLiquidityPool is IPool {
             liquidity = uint128(cache.currentLiquidity);
         }
 
-        _updateReserves(zeroForOne, uint128(inAmount), amountOut, cache.totalFeeAmount);
+        _updateReserves(zeroForOne, uint128(inAmount), amountOut);
 
         _updateFees(zeroForOne, cache.feeGrowthGlobal, uint128(cache.protocolFee));
 
@@ -464,21 +464,20 @@ contract ConcentratedLiquidityPool is IPool {
     function _updateReserves(
         bool zeroForOne,
         uint128 inAmount,
-        uint256 amountOut,
-        uint256 totalFeeAmount
+        uint256 amountOut
     ) internal {
         if (zeroForOne) {
             uint256 balance0 = _balance(token0);
             uint128 newBalance = reserve0 + inAmount;
             require(uint256(newBalance) <= balance0, "TOKEN0_MISSING");
             reserve0 = newBalance;
-            reserve1 -= (uint128(amountOut) + uint128(totalFeeAmount));
+            reserve1 -= uint128(amountOut);
         } else {
             uint256 balance1 = _balance(token1);
             uint128 newBalance = reserve1 + inAmount;
             require(uint256(newBalance) <= balance1, "TOKEN1_MISSING");
             reserve1 = newBalance;
-            reserve0 -= (uint128(amountOut) + uint128(totalFeeAmount));
+            reserve0 -= uint128(amountOut);
         }
     }
 

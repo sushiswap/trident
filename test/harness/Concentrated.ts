@@ -177,14 +177,8 @@ export async function swapViaRouter(params: {
     oldPoolBalances[1].add(zeroForOne ? output.mul(-1) : inAmount).toString(),
     "didn't transfer the correct token 1 amount"
   );
-  expect(newReserve0.toString()).to.be.eq(
-    oldReserve0.add(zeroForOne ? inAmount : output.add(totalFees).mul(-1)),
-    "Didn't update reserve0 correctly"
-  );
-  expect(newReserve1.toString()).to.be.eq(
-    oldReserve1.add(zeroForOne ? output.add(totalFees).mul(-1) : inAmount),
-    "Didn't update reserve1 correctly"
-  );
+  expect(newReserve0.toString()).to.be.eq(oldReserve0.add(zeroForOne ? inAmount : output.mul(-1)), "Didn't update reserve0 correctly");
+  expect(newReserve1.toString()).to.be.eq(oldReserve1.add(zeroForOne ? output.mul(-1) : inAmount), "Didn't update reserve1 correctly");
   expect((await pool.liquidity()).toString()).to.be.eq(currentLiquidity.toString(), "didn't set correct liquidity value");
   expect(await pool.nearestTick()).to.be.eq(nextNearest, "didn't update nearest tick pointer");
   expect(oldPrice.lt(newPrice) !== zeroForOne, "Price didn't move in the right direction");
