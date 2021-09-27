@@ -156,7 +156,6 @@ contract ConcentratedLiquidityPool is IPool {
         }
 
         {
-            require(_liquidity < 2**127, "LIQUIDITY_OVERFLOW");
             (uint256 amount0fees, uint256 amount1fees) = _updatePosition(
                 mintParams.positionOwner,
                 mintParams.lower,
