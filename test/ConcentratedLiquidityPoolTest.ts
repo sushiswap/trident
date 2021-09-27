@@ -365,5 +365,56 @@ describe.only("Concentrated Liquidity Product Pool", function () {
     it.skip("Should create incentive", async () => {});
   });
 
-  describe("Invalid actions", async () => {});
+  describe("Invalid actions", async () => {
+    it("Should fail to mint with incorrect parameters for INVALID_TICK (LOWER), LOWER_EVEN, INVALID_TICK (UPPER), UPPER_ODD, WRONG_ORDER, LOWER_RANGE, UPPER_RANGE", async () => {
+      for (const pool of trident.concentratedPools) {
+        helper.reset();
+        const tickSpacing = await pool.tickSpacing();
+        const tickAtPrice = await getTickAtCurrentPrice(pool);
+        const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
+        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+
+        // INVALID_TICK (LOWER)
+        let lower = nearestEvenValidTick - step + 1;
+        let upper = nearestEvenValidTick + step + tickSpacing;
+        let addLiquidityParams = {
+          pool: pool,
+          amount0Desired: getBigNumber(50),
+          amount1Desired: getBigNumber(50),
+          native: true,
+          lowerOld: helper.insert(lower),
+          lower: nearestEvenValidTick - step + 1,
+          upperOld: helper.insert(upper),
+          upper: nearestEvenValidTick + step + tickSpacing,
+          positionOwner: trident.concentratedPoolManager.address,
+          recipient: trident.accounts[0].address,
+        };
+        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("INVALID_TICK");
+
+        // LOWER_EVEN
+        addLiquidityParams.lower = nearestEvenValidTick - step + tickSpacing;
+        addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing;
+        addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
+        addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
+        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("LOWER_EVEN");
+
+        // INVALID_TICK (UPPER)
+        addLiquidityParams.lower = nearestEvenValidTick - step;
+        addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing + 1;
+        addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
+        addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
+        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("INVALID_TICK");
+
+        // UPPER_ODD
+        addLiquidityParams.lower = nearestEvenValidTick - step;
+        addLiquidityParams.upper = nearestEvenValidTick + step;
+        addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
+        addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
+        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("UPPER_ODD");
+
+        // TODO: WRONG_ORDER, LOWER_RANGE, UPPER_RANGE
+        // TODO: invalid lower old & upper old ticks
+      }
+    });
+  });
 });
