@@ -6,8 +6,6 @@ import "../../interfaces/IBentoBoxMinimal.sol";
 import "../../interfaces/IConcentratedLiquidityPool.sol";
 import "../../interfaces/IMasterDeployer.sol";
 import "../../interfaces/ITridentRouter.sol";
-import "../../interfaces/IPool.sol";
-import "../../interfaces/IMasterDeployer.sol";
 import "../../libraries/concentratedPool/FullMath.sol";
 import "./TridentNFT.sol";
 import "hardhat/console.sol";
@@ -28,7 +26,7 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         uint128 liquidity;
         int24 lower;
         int24 upper;
-        uint256 feeGrowthInside0; // @dev Per unit of liquidity.
+        uint256 feeGrowthInside0; /// @dev Per unit of liquidity.
         uint256 feeGrowthInside1;
     }
 
@@ -46,7 +44,7 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         uint256 feeGrowthInside0,
         uint256 feeGrowthInside1
     ) external returns (uint256 positionId) {
-        require(IMasterDeployer(masterDeployer).pools(msg.sender), "nuh uh");
+        require(IMasterDeployer(masterDeployer).pools(msg.sender), "NOT_POOL");
         positions[totalSupply] = Position(IConcentratedLiquidityPool(msg.sender), amount, lower, upper, feeGrowthInside0, feeGrowthInside1);
         positionId = totalSupply;
         _mint(recipient);
@@ -93,8 +91,7 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
             0x100000000000000000000000000000000
         );
 
-        address token0 = position.pool.token0(); // todo - add helper function to pool to return both tokens if we can afford it
-        address token1 = position.pool.token1();
+        (address token0, address token1) = _getAssets(position.pool);
 
         position.feeGrowthInside0 = feeGrowthInside0;
         position.feeGrowthInside1 = feeGrowthInside1;
@@ -108,12 +105,18 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
             uint256 newBalance0 = amount0fees + balance0;
             uint256 newBalance1 = amount1fees + balance1;
 
-            // Rounding errors due to frequent claiming of other users in the same position may cost us some raw
+            /// @dev Rounding errors due to frequent claiming of other users in the same position may cost us some raw
             if (token0amount > newBalance0) token0amount = newBalance0;
             if (token1amount > newBalance1) token1amount = newBalance1;
         }
         _transfer(position.pool.token0(), address(this), recipient, token0amount, unwrapBento);
         _transfer(position.pool.token1(), address(this), recipient, token1amount, unwrapBento);
+    }
+    
+    function _getAssets(IConcentratedLiquidityPool pool) internal view returns (address token0, address token1) {
+        address[] memory pair = pool.getAssets();
+        token0 = pair[0];
+        token1 = pair[1];
     }
 
     function _transfer(
