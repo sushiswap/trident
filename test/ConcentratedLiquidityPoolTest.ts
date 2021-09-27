@@ -3,6 +3,7 @@ import { ethers, network } from "hardhat";
 import {
   addLiquidityViaRouter,
   collectFees,
+  collectProtocolFee,
   getDx,
   getDy,
   getTickAtCurrentPrice,
@@ -357,6 +358,76 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           "fees 1 weren't proportionally split"
         );
         expect(outsidePositionFees.dy.toString()).to.be.eq("0", "fees were acredited to a position not in range");
+      }
+    });
+
+    it("Should collect protocolFee", async () => {
+      for (const pool of trident.concentratedPools) {
+        helper.reset();
+
+        const tickSpacing = await pool.tickSpacing();
+        const tickAtPrice = await getTickAtCurrentPrice(pool);
+        const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
+        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+        const token0 = await pool.token0();
+        const token1 = await pool.token1();
+        const barFeeTo = await pool.barFeeTo();
+        const oldBarFeeToBalanceToken0 = await Trident.Instance.bento.balanceOf(token0, barFeeTo);
+        const oldBarFeeToBalanceToken1 = await Trident.Instance.bento.balanceOf(token1, barFeeTo);
+
+        // assume increasing tick value by one step brings us to a valid tick
+        // satisfy "lower even" & "upper odd" conditions
+        let lower = nearestEvenValidTick - step;
+        let upper = nearestEvenValidTick + step + tickSpacing;
+
+        let addLiquidityParams = {
+          pool: pool,
+          amount0Desired: getBigNumber(1000),
+          amount1Desired: getBigNumber(1000),
+          native: false,
+          lowerOld: helper.insert(lower),
+          lower,
+          upperOld: helper.insert(upper),
+          upper,
+          positionOwner: trident.concentratedPoolManager.address,
+          recipient: defaultAddress,
+        };
+
+        await addLiquidityViaRouter(addLiquidityParams);
+
+        const lowerPrice = await Trident.Instance.tickMath.getSqrtRatioAtTick(lower);
+        const currentPrice = await pool.price();
+        const maxDx = await getDx(await pool.liquidity(), lowerPrice, currentPrice, false);
+
+        // swap back and forth
+        const output = await swapViaRouter({
+          pool: pool,
+          unwrapBento: true,
+          zeroForOne: true,
+          inAmount: maxDx,
+          recipient: defaultAddress,
+        });
+
+        await swapViaRouter({
+          pool: pool,
+          unwrapBento: false,
+          zeroForOne: false,
+          inAmount: output,
+          recipient: defaultAddress,
+        });
+
+        const { token0ProtocolFee, token1ProtocolFee } = await collectProtocolFee({ pool: pool });
+        const barFeeToBalanceToken0 = await Trident.Instance.bento.balanceOf(token0, barFeeTo);
+        const barFeeToBalanceToken1 = await Trident.Instance.bento.balanceOf(token1, barFeeTo);
+
+        expect(barFeeToBalanceToken0.toString()).to.be.eq(
+          oldBarFeeToBalanceToken0.add(token0ProtocolFee),
+          "didn't send the correct amount of token0 protocol fee to bar fee to"
+        );
+        expect(barFeeToBalanceToken1.toString()).to.be.eq(
+          oldBarFeeToBalanceToken1.add(token1ProtocolFee),
+          "didn't send the correct amount of token0 protocol fee to bar fee to"
+        );
       }
     });
 

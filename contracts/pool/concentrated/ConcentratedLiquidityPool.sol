@@ -429,13 +429,20 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     /// @dev Collects fees for Trident protocol.
-    function collectProtocolFee() public lock {
-        _transfer(token0, token0ProtocolFee - 1, barFeeTo, false);
-        _transfer(token1, token1ProtocolFee - 1, barFeeTo, false);
-        reserve0 -= uint128(token0ProtocolFee - 1);
-        reserve1 -= uint128(token1ProtocolFee - 1);
-        token0ProtocolFee = 1;
-        token1ProtocolFee = 1;
+    function collectProtocolFee() external lock returns (uint128 amount0, uint128 amount1) {
+        if (token0ProtocolFee > 1) {
+            amount0 = token0ProtocolFee - 1;
+            token0ProtocolFee = 1;
+            reserve0 -= amount0;
+            _transfer(token0, amount0, barFeeTo, false);
+        }
+
+        if (token1ProtocolFee > 1) {
+            amount1 = token1ProtocolFee - 1;
+            token1ProtocolFee = 1;
+            reserve1 -= amount1;
+            _transfer(token1, amount1, barFeeTo, false);
+        }
     }
 
     function _balance(address token) internal view returns (uint256 balance) {
