@@ -89,7 +89,7 @@ export class Trident {
     const prices: BigNumber[] = [];
 
     // random price feed
-    // prices.push(BigNumber.from(2).pow(96).mul(randBetween(1, 10000000)).div(randBetween(1, 10000000)));
+    // prices."push(BigNumber.from(2).pow(96).mul(randBetween(1, 10000000)).div(randBetween(1, 10000000)));
 
     // stable price feed
     prices.push(TWO_POW_96);
@@ -161,7 +161,6 @@ export class Trident {
     TickMath: ContractFactory
   ) {
     this.concentratedPoolManager = (await ConcentratedPoolManager.deploy(
-      this.bento.address,
       this.tokens[0].address,
       this.masterDeployer.address
     )) as ConcentratedLiquidityPoolManager;

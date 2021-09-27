@@ -15,6 +15,8 @@ interface IConcentratedLiquidityPool is IPool {
         uint160 secondsPerLiquidityOutside;
     }
 
+    function price() external view returns (uint160);
+
     function token0() external view returns (address);
 
     function token1() external view returns (address);

@@ -2,19 +2,24 @@
 
 pragma solidity >=0.8.0;
 
+import "../../interfaces/IBentoBoxMinimal.sol";
 import "../../interfaces/IConcentratedLiquidityPool.sol";
-import "../../interfaces/ITridentRouter.sol";
 import "../../interfaces/IMasterDeployer.sol";
+import "../../interfaces/ITridentRouter.sol";
+import "../../interfaces/IPool.sol";
+import "../../interfaces/IMasterDeployer.sol";
+import "../../libraries/concentratedPool/FullMath.sol";
 import "./TridentNFT.sol";
+import "hardhat/console.sol";
 
 /// @notice Trident Concentrated Liquidity Pool periphery contract that combines non-fungible position management and staking.
 abstract contract ConcentratedLiquidityPosition is TridentNFT {
     event Mint(address indexed pool, address indexed recipient, uint256 indexed positionId);
     event Burn(address indexed pool, address indexed owner, uint256 indexed positionId);
 
-    address public immutable bento;
     address public immutable wETH;
-    address public immutable masterDeployer;
+    IBentoBoxMinimal public immutable bento;
+    IMasterDeployer public immutable masterDeployer;
 
     mapping(uint256 => Position) public positions;
 
@@ -27,14 +32,10 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         uint256 feeGrowthInside1;
     }
 
-    constructor(
-        address _bento,
-        address _wETH,
-        address _masterDeployer
-    ) {
-        bento = _bento;
+    constructor(address _wETH, address _masterDeployer) {
         wETH = _wETH;
-        masterDeployer = _masterDeployer;
+        masterDeployer = IMasterDeployer(_masterDeployer);
+        bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
     }
 
     function positionMintCallback(
@@ -77,41 +78,44 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         bool unwrapBento
     ) external returns (uint256 token0amount, uint256 token1amount) {
         require(msg.sender == ownerOf[tokenId], "NOT_ID_OWNER");
+
         Position storage position = positions[tokenId];
-        bytes memory collectData = abi.encode(position.lower, position.upper, recipient, false);
         (uint256 feeGrowthInside0, uint256 feeGrowthInside1) = position.pool.rangeFeeGrowth(position.lower, position.upper);
-        position.pool.collect(collectData);
-        token0amount = (feeGrowthInside0 - position.feeGrowthInside0) * position.liquidity;
-        token1amount = (feeGrowthInside1 - position.feeGrowthInside1) * position.liquidity;
+
+        token0amount = FullMath.mulDiv(
+            feeGrowthInside0 - position.feeGrowthInside0,
+            position.liquidity,
+            0x100000000000000000000000000000000
+        );
+        token1amount = FullMath.mulDiv(
+            feeGrowthInside1 - position.feeGrowthInside1,
+            position.liquidity,
+            0x100000000000000000000000000000000
+        );
+
+        address token0 = position.pool.token0(); // todo - add helper function to pool to return both tokens if we can afford it
+        address token1 = position.pool.token1();
+
         position.feeGrowthInside0 = feeGrowthInside0;
         position.feeGrowthInside1 = feeGrowthInside1;
+
+        uint256 balance0 = bento.balanceOf(token0, address(this));
+        uint256 balance1 = bento.balanceOf(token1, address(this));
+
+        if (balance0 < token0amount || balance1 < token1amount) {
+            IPool.TokenAmount[] memory tokenAmounts = position.pool.collect(
+                abi.encode(position.lower, position.upper, address(this), false)
+            );
+
+            uint256 newBalance0 = tokenAmounts[0].amount + balance0;
+            uint256 newBalance1 = tokenAmounts[1].amount + balance1;
+
+            // Take care of rounding errors
+            if (newBalance0 < token0amount) token0amount = newBalance0;
+            if (newBalance1 < token1amount) token1amount = newBalance1;
+        }
         _transfer(position.pool.token0(), address(this), recipient, token0amount, unwrapBento);
         _transfer(position.pool.token1(), address(this), recipient, token1amount, unwrapBento);
-    }
-
-    function _depositToBentoBox(
-        address token,
-        address recipient,
-        uint256 amount
-    ) internal {
-        if (token == wETH && address(this).balance != 0) {
-            // @dev toAmount(address,uint256,bool).
-            (, bytes memory _underlyingAmount) = bento.call(abi.encodeWithSelector(0x56623118, wETH, amount, true));
-            uint256 underlyingAmount = abi.decode(_underlyingAmount, (uint256));
-            if (address(this).balance > underlyingAmount) {
-                // @dev Deposit ETH into `recipient` `bento` account -
-                // deposit(address,address,address,uint256,uint256).
-                (bool ethDepositSuccess, ) = bento.call{value: underlyingAmount}(
-                    abi.encodeWithSelector(0x02b9446c, token, msg.sender, recipient, amount)
-                );
-                require(ethDepositSuccess, "ETH_DEPOSIT_FAILED");
-                return;
-            }
-        }
-        // @dev Deposit ERC-20 token into `recipient` `bento` account
-        // - deposit(address,address,address,uint256,uint256).
-        (bool depositSuccess, ) = bento.call(abi.encodeWithSelector(0x02b9446c, token, msg.sender, recipient, amount));
-        require(depositSuccess, "DEPOSIT_FAILED");
     }
 
     function _transfer(
@@ -122,13 +126,9 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         bool unwrapBento
     ) internal {
         if (unwrapBento) {
-            // @dev withdraw(address,address,address,uint256,uint256).
-            (bool withdrawSuccess, ) = bento.call(abi.encodeWithSelector(0x97da6d30, token, from, to, 0, shares));
-            require(withdrawSuccess, "WITHDRAW_FAILED");
+            bento.withdraw(token, from, to, 0, shares);
         } else {
-            // @dev transfer(address,address,address,uint256).
-            (bool transferSuccess, ) = bento.call(abi.encodeWithSelector(0xf18d03cc, token, from, to, shares));
-            require(transferSuccess, "TRANSFER_FAILED");
+            bento.transfer(token, from, to, shares);
         }
     }
 }
