@@ -155,8 +155,16 @@ contract ConcentratedLiquidityPool is IPool {
             if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += uint128(_liquidity);
         }
 
-        /// @dev Fees should have been collected before position updates.
-        _updatePosition(mintParams.positionOwner, mintParams.lower, mintParams.upper, int128(uint128(_liquidity)));
+        {
+            (uint256 amount0fees, uint256 amount1fees) = _updatePosition(
+                mintParams.positionOwner,
+                mintParams.lower,
+                mintParams.upper,
+                int128(uint128(_liquidity))
+            );
+            if (amount0fees > 0) _transfer(token0, amount0fees, mintParams.positionOwner, false);
+            if (amount1fees > 0) _transfer(token1, amount1fees, mintParams.positionOwner, false);
+        }
 
         _insertTick(
             mintParams.lowerOld,
@@ -248,17 +256,13 @@ contract ConcentratedLiquidityPool is IPool {
     function burnSingle(bytes calldata) public pure override returns (uint256) {}
 
     /// @dev Collects LP token fees for user and updates position.
-    function collect(bytes calldata data) external lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
-        (int24 lower, int24 upper, address recipient, bool unwrapBento) = abi.decode(data, (int24, int24, address, bool));
+    function collect(bytes calldata data) external lock returns (uint256 amount0fees, uint256 amount1fees) {
+        (int24 lower, int24 upper, address recipient) = abi.decode(data, (int24, int24, address));
 
-        (uint256 amount0fees, uint256 amount1fees) = _updatePosition(msg.sender, lower, upper, 0);
+        (amount0fees, amount1fees) = _updatePosition(msg.sender, lower, upper, 0);
 
-        withdrawnAmounts = new TokenAmount[](2);
-        withdrawnAmounts[0] = TokenAmount({token: token0, amount: amount0fees});
-        withdrawnAmounts[1] = TokenAmount({token: token1, amount: amount1fees});
-
-        _transfer(token0, amount0fees, recipient, unwrapBento);
-        _transfer(token1, amount1fees, recipient, unwrapBento);
+        _transfer(token0, amount0fees, recipient, false);
+        _transfer(token1, amount1fees, recipient, false);
 
         emit Collect(msg.sender, amount0fees, amount1fees);
     }

@@ -103,16 +103,14 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         uint256 balance1 = bento.balanceOf(token1, address(this));
 
         if (balance0 < token0amount || balance1 < token1amount) {
-            IPool.TokenAmount[] memory tokenAmounts = position.pool.collect(
-                abi.encode(position.lower, position.upper, address(this), false)
-            );
+            (uint256 amount0fees, uint256 amount1fees) = position.pool.collect(abi.encode(position.lower, position.upper, address(this)));
 
-            uint256 newBalance0 = tokenAmounts[0].amount + balance0;
-            uint256 newBalance1 = tokenAmounts[1].amount + balance1;
+            uint256 newBalance0 = amount0fees + balance0;
+            uint256 newBalance1 = amount1fees + balance1;
 
-            // Take care of rounding errors
-            if (newBalance0 < token0amount) token0amount = newBalance0;
-            if (newBalance1 < token1amount) token1amount = newBalance1;
+            // Rounding errors due to frequent claiming of other users in the same position may cost us some raw
+            if (token0amount > newBalance0) token0amount = newBalance0;
+            if (token1amount > newBalance1) token1amount = newBalance1;
         }
         _transfer(position.pool.token0(), address(this), recipient, token0amount, unwrapBento);
         _transfer(position.pool.token1(), address(this), recipient, token1amount, unwrapBento);
