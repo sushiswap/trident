@@ -245,9 +245,7 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     /// @dev Reserved for IPool.
-    function burnSingle(bytes calldata) public pure override returns (uint256 amountOut) {
-        return amountOut;
-    }
+    function burnSingle(bytes calldata) public pure override returns (uint256) {}
 
     /// @dev Collects LP token fees for user and updates position.
     function collect(bytes calldata data) external lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
@@ -304,7 +302,7 @@ contract ConcentratedLiquidityPool is IPool {
                 uint256 maxDx = DyDxMath.getDx(cache.currentLiquidity, nextTickPrice, cache.currentPrice, false);
 
                 if (cache.input <= maxDx) {
-                    /// @dev We can swap only within the current range.
+                    // We can swap within the current range.
                     uint256 liquidityPadded = cache.currentLiquidity << 96;
                     // Calculate new price after swap: √𝑃[new] =  L · √𝑃 / (L + Δx · √𝑃)
                     // This is derrived from Δ(1/√𝑃) = Δx/L
@@ -336,8 +334,8 @@ contract ConcentratedLiquidityPool is IPool {
                 uint256 maxDy = DyDxMath.getDy(cache.currentLiquidity, cache.currentPrice, nextTickPrice, false);
 
                 if (cache.input <= maxDy) {
-                    /// @dev We can swap only within the current range
-                    // - calculate new price after swap ( ΔP = Δy/L ).
+                    // We can swap within the current range
+                    // Calculate new price after swap: ΔP = Δy/L
                     uint256 newPrice = cache.currentPrice +
                         FullMath.mulDiv(cache.input, 0x1000000000000000000000000, cache.currentLiquidity);
                     /// @dev Calculate output of swap
@@ -410,9 +408,7 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     /// @dev Reserved for IPool.
-    function flashSwap(bytes calldata) public pure override returns (uint256 finalAmountOut) {
-        return finalAmountOut;
-    }
+    function flashSwap(bytes calldata) public pure override returns (uint256) {}
 
     /// @dev Updates `barFee` for Trident protocol.
     function updateBarFee() public {
@@ -477,10 +473,10 @@ contract ConcentratedLiquidityPool is IPool {
         uint128 protocolFee
     ) internal {
         if (zeroForOne) {
-            feeGrowthGlobal1 += feeGrowthGlobal;
+            feeGrowthGlobal1 = feeGrowthGlobal;
             token1ProtocolFee += protocolFee;
         } else {
-            feeGrowthGlobal0 += feeGrowthGlobal;
+            feeGrowthGlobal0 = feeGrowthGlobal;
             token0ProtocolFee += protocolFee;
         }
     }
@@ -494,7 +490,6 @@ contract ConcentratedLiquidityPool is IPool {
         Position storage position = positions[owner][lower][upper];
 
         (uint256 growth0current, uint256 growth1current) = rangeFeeGrowth(lower, upper);
-
         amount0fees = FullMath.mulDiv(
             growth0current - position.feeGrowthInside0Last,
             position.liquidity,
@@ -547,7 +542,7 @@ contract ConcentratedLiquidityPool is IPool {
         Ticks.Tick storage lower = ticks[lowerTick];
         Ticks.Tick storage upper = ticks[upperTick];
 
-        /// @dev Calculate fee growth below & above.
+        // Calculate fee growth below & above.
         uint256 _feeGrowthGlobal0 = feeGrowthGlobal0;
         uint256 _feeGrowthGlobal1 = feeGrowthGlobal1;
         uint256 feeGrowthBelow0;
@@ -661,8 +656,8 @@ contract ConcentratedLiquidityPool is IPool {
             } else {
                 ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, 0, 0, 0);
             }
-
             old.nextTick = lower;
+            ticks[oldNextTick].previousTick = lower;
         }
 
         uint128 currentUpperLiquidity = ticks[upper].liquidity;
@@ -681,8 +676,8 @@ contract ConcentratedLiquidityPool is IPool {
             } else {
                 ticks[upper] = Ticks.Tick(upperOld, oldNextTick, amount, 0, 0, 0);
             }
-
             old.nextTick = upper;
+            ticks[oldNextTick].previousTick = upper;
         }
 
         int24 actualNearestTick = TickMath.getTickAtSqrtRatio(currentPrice);

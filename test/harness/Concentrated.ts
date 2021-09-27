@@ -10,6 +10,45 @@ import { Trident } from "./Trident";
 const TWO_POW_96 = BigNumber.from(2).pow(96);
 const TWO_POW_128 = BigNumber.from(2).pow(128);
 
+export async function collectFees(params: {
+  pool: ConcentratedLiquidityPool;
+  tokenId: number | BigNumber;
+  recipient: string;
+  unwrapBento: boolean;
+}) {
+  const { pool, tokenId, recipient, unwrapBento } = params;
+  const position = await Trident.Instance.concentratedPoolManager.positions(tokenId);
+  const range = await pool.rangeFeeGrowth(position.lower, position.upper);
+  const token0feeGrowth = range.feeGrowthInside0.sub(position.feeGrowthInside0);
+  const token1feeGrowth = range.feeGrowthInside1.sub(position.feeGrowthInside1);
+  const token0expected = token0feeGrowth.mul(position.liquidity).div(TWO_POW_128);
+  const token1expected = token1feeGrowth.mul(position.liquidity).div(TWO_POW_128);
+  const tokens = await Promise.all([pool.token0(), pool.token1()]);
+  const oldUserBalances = await Trident.Instance.getTokenBalance(tokens, recipient, false);
+
+  await Trident.Instance.concentratedPoolManager.collect(tokenId, recipient, unwrapBento);
+
+  const nwePosition = await Trident.Instance.concentratedPoolManager.positions(tokenId);
+  const newUserBalances = await Trident.Instance.getTokenBalance(tokens, recipient, false);
+  expect(nwePosition.feeGrowthInside0.toString()).to.be.eq(range.feeGrowthInside0.toString(), "didn't update fee growth to correct value");
+  expect(nwePosition.feeGrowthInside1.toString()).to.be.eq(range.feeGrowthInside1.toString(), "didn't update fee growth to correct value");
+  expect(newUserBalances[0].div(100).toString()).to.be.eq(
+    oldUserBalances[0].add(token0expected).div(100).toString(),
+    "didn't credit token0 fees"
+  );
+  expect(newUserBalances[1].div(100).toString()).to.be.eq(
+    oldUserBalances[1].add(token1expected).div(100).toString(),
+    "didn't credit token1 fees"
+  );
+
+  await Trident.Instance.concentratedPoolManager.collect(tokenId, recipient, unwrapBento);
+
+  const newerUserBalances = await Trident.Instance.getTokenBalance(tokens, recipient, false);
+  expect(newerUserBalances[0].toString()).to.be.eq(newUserBalances[0].toString(), "double dipping");
+  expect(newerUserBalances[1].toString()).to.be.eq(newUserBalances[1].toString(), "double dipping");
+  return { dx: token0expected, dy: token0expected };
+}
+
 export async function swapViaRouter(params: {
   pool: ConcentratedLiquidityPool;
   zeroForOne: boolean; // true => we are moving left
@@ -27,6 +66,7 @@ export async function swapViaRouter(params: {
   let output = BigNumber.from(0);
   let feeGrowthGlobalIncrease = BigNumber.from(0);
   let crossCount = 0;
+  let totalFees = BigNumber.from(0);
   let protocolFeeIncrease = BigNumber.from(0);
 
   const oldPrice = currentPrice;
@@ -34,7 +74,8 @@ export async function swapViaRouter(params: {
   const [swapFee, barFee] = await Promise.all([pool.swapFee(), pool.barFee()]);
   const feeGrowthGlobalOld = await (zeroForOne ? pool.feeGrowthGlobal1() : pool.feeGrowthGlobal0());
   const oldProtocolFees = await (zeroForOne ? pool.token1ProtocolFee() : pool.token0ProtocolFee());
-  // TODO add balance update check
+  const oldPoolBalances = await Trident.Instance.getTokenBalance(tokens, pool.address, false);
+  const [oldReserve0, oldReserve1] = await Promise.all([pool.reserve0(), pool.reserve1()]);
 
   while (input.gt(0)) {
     const nextTickPrice = await getTickPrice(nextTickToCross);
@@ -60,6 +101,7 @@ export async function swapViaRouter(params: {
     } else {
       // (price) numba' go up
       const maxDy = await getDy(currentLiquidity, currentPrice, nextTickPrice, false);
+
       if (input.lte(maxDy)) {
         newPrice = currentPrice.add(input.mul(TWO_POW_96).div(currentLiquidity));
         stepOutput = getDx(currentLiquidity, currentPrice, newPrice, false);
@@ -75,6 +117,7 @@ export async function swapViaRouter(params: {
 
     if (currentLiquidity.gt(0)) {
       const feeAmount = divRoundingUp(stepOutput.mul(swapFee), BigNumber.from(1e6));
+      totalFees = totalFees.add(feeAmount);
       const protocolFee = divRoundingUp(feeAmount.mul(barFee), BigNumber.from(1e4));
       protocolFeeIncrease = protocolFeeIncrease.add(protocolFee);
       feeGrowthGlobalIncrease = feeGrowthGlobalIncrease.add(feeAmount.sub(protocolFee).mul(TWO_POW_128).div(currentLiquidity));
@@ -118,13 +161,30 @@ export async function swapViaRouter(params: {
   const feeGrowthGlobalnew = await (zeroForOne ? pool.feeGrowthGlobal1() : pool.feeGrowthGlobal0());
   const protocolFeesNew = await (zeroForOne ? pool.token1ProtocolFee() : pool.token0ProtocolFee());
   const newPrice = await pool.price();
+  const newPoolBalances = await Trident.Instance.getTokenBalance(tokens, pool.address, false);
+  const [newReserve0, newReserve1] = await Promise.all([pool.reserve0(), pool.reserve1()]);
 
   let nextNearest = nearest;
   for (let i = 0; i < crossCount; i++) {
     nextNearest = (await pool.ticks(nextNearest))[zeroForOne ? "previousTick" : "nextTick"];
   }
 
-  // TODO check balannce changes and reserve changes are correct!
+  expect(newPoolBalances[0].toString()).to.be.eq(
+    oldPoolBalances[0].add(zeroForOne ? inAmount : output.mul(-1)).toString(),
+    "didn't transfer the correct token 0 amount"
+  );
+  expect(newPoolBalances[1].toString()).to.be.eq(
+    oldPoolBalances[1].add(zeroForOne ? output.mul(-1) : inAmount).toString(),
+    "didn't transfer the correct token 1 amount"
+  );
+  expect(newReserve0.toString()).to.be.eq(
+    oldReserve0.add(zeroForOne ? inAmount : output.add(totalFees).mul(-1)),
+    "Didn't update reserve0 correctly"
+  );
+  expect(newReserve1.toString()).to.be.eq(
+    oldReserve1.add(zeroForOne ? output.add(totalFees).mul(-1) : inAmount),
+    "Didn't update reserve1 correctly"
+  );
   expect((await pool.liquidity()).toString()).to.be.eq(currentLiquidity.toString(), "didn't set correct liquidity value");
   expect(await pool.nearestTick()).to.be.eq(nextNearest, "didn't update nearest tick pointer");
   expect(oldPrice.lt(newPrice) !== zeroForOne, "Price didn't move in the right direction");
@@ -161,7 +221,7 @@ export async function addLiquidityViaRouter(params: {
   upper: BigNumber | number;
   positionOwner: string;
   recipient: string;
-}): Promise<{ dy: BigNumber; dx: BigNumber }> {
+}): Promise<{ dy: BigNumber; dx: BigNumber; tokenId: BigNumber }> {
   const { pool, amount0Desired, amount1Desired, native, lowerOld, lower, upperOld, upper, positionOwner, recipient } = params;
   const [currentPrice, priceLower, priceUpper] = await getPrices(pool, [lower, upper]);
   const liquidity = getLiquidityForAmount(priceLower, currentPrice, priceUpper, amount1Desired, amount0Desired);
@@ -257,7 +317,7 @@ export async function addLiquidityViaRouter(params: {
     // TODO check pool reserve change is correct!
     // TODO add function to calculate range fee growth here and ensure that positionManager saved the correct value
   }
-  return { dy, dx };
+  return { dy, dx, tokenId: oldTotalSupply };
 }
 
 // use solidity here for convenience
