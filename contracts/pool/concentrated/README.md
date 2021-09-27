@@ -1,7 +1,6 @@
 # Concentrated Liquidity Pools
 
 Concentrated liquidity pools are a generalization of the traditional `xy = k` pool. With the traditional model all users provide liquidity on a `(0, inf)` price range where as in concentrated liquidity pools each user can pick their own range to provide liquidity on.
-
 This allows users to narrow down the liquidity provision range which amplifies their liquidity - meaning traders experience lesser price impact and liquidity providers accrue more fees. The biggest tradeoff being liquidity providers experience greater impermanent loss.
 
 ![Regular liquidity positions](../../../pictures/regularLiquidity.png)
@@ -31,7 +30,6 @@ We repeat this step untill we use up all of the swap input amount.
 Pool may be trading inside and outside of a given position. To calcualte fees belonging to a specific position we keep track of a couple of counters.
 
 We store a **feeGrowthGlobal** accumulator which increases on every swap step by the swap amount divided by the current liquidity `feeGrowthGlobal += feeAmount / currentLiquidity`.
-
 Every tick also keeps track of the **feeGrowthOutside** accumulator. This stores the fee growth that has happened on the side of the tick where trading isn't currently happening. It is updated each time a tick is crossed: `feeGrowthOutside = feeGrowthGlobal - feeGrowthOutside`.
 
 Using the `feeGrowthGlobal` and `feeGrowthOutside` variables we can calculate the feeGrowth that has happened above or below any specific tick.
@@ -58,8 +56,8 @@ Users can chose for their liquidity position to be owned by the `ConcentratedLiq
 
 Calculating price impact:
 
--     Δ√𝑃 = Δy / L
--     Δ(1/√𝑃) = Δx / L
+- Δ√𝑃 = Δy / L
+- Δ(1/√𝑃) = Δx / L
 
 > Where x is token0 and y is token1
 
