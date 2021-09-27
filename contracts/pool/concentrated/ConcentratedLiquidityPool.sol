@@ -517,9 +517,7 @@ contract ConcentratedLiquidityPool is IPool {
             0x100000000000000000000000000000000
         );
 
-        if (amount < 0) position.liquidity -= uint128(amount);
-        if (amount > 0) position.liquidity += uint128(amount);
-
+        position.liquidity = uint128(int128(position.liquidity) + amount);
         position.feeGrowthInside0Last = growth0current;
         position.feeGrowthInside1Last = growth1current;
     }
