@@ -26,6 +26,15 @@ contract ConcentratedLiquidityPool is IPool {
     event Collect(address indexed sender, uint256 amount0, uint256 amount1);
     event Sync(uint256 reserveShares0, uint256 reserveShares1);
 
+    // References for tickSpacing:
+    // 100 tickSpacing -> 2% between ticks
+    bytes32 public constant override poolIdentifier = "Trident:ConcentratedLiquidity";
+    uint24 internal constant MAX_FEE = 10000; /// @dev 100%.
+
+    uint128 internal immutable MAX_TICK_LIQUIDITY;
+    uint24 public immutable tickSpacing;
+    uint24 public immutable swapFee; /// @dev 1000 corresponds to 0.1% fee.
+
     address public immutable barFeeTo;
     IBentoBoxMinimal public immutable bento;
     IMasterDeployer public immutable masterDeployer;
@@ -49,18 +58,6 @@ contract ConcentratedLiquidityPool is IPool {
 
     uint160 public price; /// @dev Sqrt of price aka. √(y/x), multiplied by 2^96.
     int24 public nearestTick; /// @dev Tick that is just below the current price.
-
-    /// @dev References for tickSpacing:
-    // - univ3 1% -> 200 tickSpacing
-    // - univ3 0.3% pool -> 60 tickSpacing -> 0.6% between ticks
-    // - univ3 0.05% pool -> 10 tickSpacing -> 0.1% between ticks
-    // - 100 tickSpacing -> 1% between ticks => 2% between ticks on starting position (*stable pairs are different)
-    uint24 public immutable tickSpacing;
-
-    uint24 internal constant MAX_FEE = 10000; /// @dev 100%.
-    uint24 public immutable swapFee; /// @dev 1000 corresponds to 0.1% fee.
-
-    bytes32 public constant override poolIdentifier = "Trident:ConcentratedLiquidity";
 
     uint256 internal unlocked;
     modifier lock() {
@@ -122,6 +119,8 @@ contract ConcentratedLiquidityPool is IPool {
         swapFee = _swapFee;
         price = _price;
         tickSpacing = _tickSpacing;
+        /// @dev Prevents global liquidity overflow in the case all ticks are initialised
+        MAX_TICK_LIQUIDITY = Ticks.getMaxLiquidity(_tickSpacing);
         ticks[TickMath.MIN_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
         ticks[TickMath.MAX_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
         nearestTick = TickMath.MIN_TICK;
@@ -150,12 +149,9 @@ contract ConcentratedLiquidityPool is IPool {
             mintParams.amount0Desired
         );
 
-        /// @dev This is safe because overflow is checked in position minter contract.
-        unchecked {
-            if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += uint128(_liquidity);
-        }
-
         {
+            require(_liquidity <= MAX_TICK_LIQUIDITY, "LIQUIDITY_OVERFLOW");
+
             (uint256 amount0fees, uint256 amount1fees) = _updatePosition(
                 mintParams.positionOwner,
                 mintParams.lower,
@@ -170,6 +166,10 @@ contract ConcentratedLiquidityPool is IPool {
                 _transfer(token1, amount1fees, mintParams.positionOwner, false);
                 reserve1 -= uint128(amount1fees);
             }
+        }
+
+        unchecked {
+            if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += uint128(_liquidity);
         }
 
         _insertTick(
@@ -518,6 +518,9 @@ contract ConcentratedLiquidityPool is IPool {
         );
 
         position.liquidity = uint128(int128(position.liquidity) + amount);
+
+        require(position.liquidity < MAX_TICK_LIQUIDITY, "MAX_TICK_LIQUIDITY");
+
         position.feeGrowthInside0Last = growth0current;
         position.feeGrowthInside1Last = growth1current;
     }

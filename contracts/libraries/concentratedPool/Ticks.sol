@@ -16,6 +16,10 @@ library Ticks {
         uint160 secondsPerLiquidityOutside;
     }
 
+    function getMaxLiquidity(uint24 _tickSpacing) internal pure returns (uint128) {
+        return type(uint128).max / uint128(uint24(TickMath.MAX_TICK) / uint24(_tickSpacing));
+    }
+
     function cross(
         mapping(int24 => Tick) storage ticks,
         int24 nextTickToCross,
