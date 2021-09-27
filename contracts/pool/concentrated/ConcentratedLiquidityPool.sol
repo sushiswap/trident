@@ -162,8 +162,14 @@ contract ConcentratedLiquidityPool is IPool {
                 mintParams.upper,
                 int128(uint128(_liquidity))
             );
-            if (amount0fees > 0) _transfer(token0, amount0fees, mintParams.positionOwner, false);
-            if (amount1fees > 0) _transfer(token1, amount1fees, mintParams.positionOwner, false);
+            if (amount0fees > 0) {
+                _transfer(token0, amount0fees, mintParams.positionOwner, false);
+                reserve0 -= uint128(amount0fees);
+            }
+            if (amount1fees > 0) {
+                _transfer(token1, amount1fees, mintParams.positionOwner, false);
+                reserve1 -= uint128(amount1fees);
+            }
         }
 
         _insertTick(
@@ -263,6 +269,9 @@ contract ConcentratedLiquidityPool is IPool {
 
         _transfer(token0, amount0fees, recipient, false);
         _transfer(token1, amount1fees, recipient, false);
+
+        reserve0 -= uint128(amount0fees);
+        reserve1 -= uint128(amount1fees);
 
         emit Collect(msg.sender, amount0fees, amount1fees);
     }
@@ -423,6 +432,8 @@ contract ConcentratedLiquidityPool is IPool {
     function collectProtocolFee() public lock {
         _transfer(token0, token0ProtocolFee - 1, barFeeTo, false);
         _transfer(token1, token1ProtocolFee - 1, barFeeTo, false);
+        reserve0 -= uint128(token0ProtocolFee - 1);
+        reserve1 -= uint128(token1ProtocolFee - 1);
         token0ProtocolFee = 1;
         token1ProtocolFee = 1;
     }
