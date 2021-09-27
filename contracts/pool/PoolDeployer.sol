@@ -2,9 +2,11 @@
 
 pragma solidity >=0.8.0;
 
+import "../interfaces/IPoolDeployer.sol";
+
 /// @notice Trident pool deployer for whitelisted template factories.
 /// @author Mudit Gupta.
-abstract contract PoolDeployer {
+abstract contract PoolDeployer is IPoolDeployer {
     address public immutable masterDeployer;
 
     mapping(address => mapping(address => address[])) public pools;
@@ -19,6 +21,8 @@ abstract contract PoolDeployer {
         require(_masterDeployer != address(0), "ZERO_ADDRESS");
         masterDeployer = _masterDeployer;
     }
+
+    function deployPool(bytes memory data) external virtual override returns (address pool, address[] memory tokens) {}
 
     function _registerPool(
         address pool,

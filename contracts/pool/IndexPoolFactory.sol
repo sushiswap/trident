@@ -10,8 +10,8 @@ import "./PoolDeployer.sol";
 contract IndexPoolFactory is PoolDeployer {
     constructor(address _masterDeployer) PoolDeployer(_masterDeployer) {}
 
-    function deployPool(bytes memory _deployData) external returns (address pool) {
-        (address[] memory tokens, , ) = abi.decode(_deployData, (address[], uint256[], uint256));
+    function deployPool(bytes memory _deployData) external override returns (address pool, address[] memory tokens) {
+        (tokens, , ) = abi.decode(_deployData, (address[], uint256[], uint256));
 
         // @dev Salt is not actually needed since `_deployData` is part of creationCode and already contains the salt.
         bytes32 salt = keccak256(_deployData);

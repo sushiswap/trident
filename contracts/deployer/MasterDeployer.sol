@@ -2,13 +2,13 @@
 
 pragma solidity >=0.8.0;
 
-import "../interfaces/IPoolFactory.sol";
+import "../interfaces/IPoolDeployer.sol";
 import "../utils/TridentOwnable.sol";
 
 /// @notice Trident pool deployer contract with template factory whitelist.
 /// @author Mudit Gupta.
 contract MasterDeployer is TridentOwnable {
-    event DeployPool(address indexed _factory, address indexed pool);
+    event DeployPool(address indexed _factory, address indexed pool, address[] tokens);
     event AddToWhitelist(address indexed _factory);
     event RemoveFromWhitelist(address indexed _factory);
     event BarFeeUpdated(uint256 indexed _barFee);
@@ -40,11 +40,11 @@ contract MasterDeployer is TridentOwnable {
         bento = _bento;
     }
 
-    function deployPool(address _factory, bytes calldata _deployData) external returns (address pool) {
+    function deployPool(address _factory, bytes calldata _deployData) external returns (address pool, address[] memory tokens) {
         require(whitelistedFactories[_factory], "FACTORY_NOT_WHITELISTED");
-        pool = IPoolFactory(_factory).deployPool(_deployData);
+        (pool, tokens) = IPoolDeployer(_factory).deployPool(_deployData);
         pools[pool] = true;
-        emit DeployPool(_factory, pool);
+        emit DeployPool(_factory, pool, tokens);
     }
 
     function addToWhitelist(address _factory) external onlyOwner {

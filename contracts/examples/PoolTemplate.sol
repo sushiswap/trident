@@ -7,9 +7,10 @@ pragma solidity ^0.8.2;
  */
 contract PoolTemplate {
     uint256 public immutable configValue;
-    address public immutable anotherConfigValue;
+    address public immutable token0;
+    address public immutable token1;
 
     constructor(bytes memory _data) {
-        (configValue, anotherConfigValue) = abi.decode(_data, (uint256, address));
+        (token0, token1, configValue) = abi.decode(_data, (address, address, uint256));
     }
 }

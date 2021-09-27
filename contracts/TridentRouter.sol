@@ -315,7 +315,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         }
     }
 
-    function deployPool(address _factory, bytes calldata _deployData) external returns (address) {
+    function deployPool(address _factory, bytes calldata _deployData) external returns (address, address[] memory) {
         return masterDeployer.deployPool(_factory, _deployData);
     }
 

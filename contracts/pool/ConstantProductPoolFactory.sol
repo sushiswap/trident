@@ -10,13 +10,13 @@ import "./PoolDeployer.sol";
 contract ConstantProductPoolFactory is PoolDeployer {
     constructor(address _masterDeployer) PoolDeployer(_masterDeployer) {}
 
-    function deployPool(bytes memory _deployData) external returns (address pool) {
+    function deployPool(bytes memory _deployData) external override returns (address pool, address[] memory tokens) {
         (address tokenA, address tokenB, uint256 swapFee, bool twapSupport) = abi.decode(_deployData, (address, address, uint256, bool));
         if (tokenA > tokenB) {
             (tokenA, tokenB) = (tokenB, tokenA);
             _deployData = abi.encode(tokenA, tokenB, swapFee, twapSupport);
         }
-        address[] memory tokens = new address[](2);
+        tokens = new address[](2);
         tokens[0] = tokenA;
         tokens[1] = tokenB;
 

@@ -39,7 +39,8 @@ contract Migrator {
         IPool pair = IPool(factory.configAddress(keccak256(deployData)));
 
         if (address(pair) == (address(0))) {
-            pair = IPool(factory.deployPool(deployData));
+            (address _pair, ) = factory.deployPool(deployData);
+            pair = IPool(_pair);
         }
 
         require(IERC20(address(pair)).totalSupply() == 0, "pair must have no existing supply");

@@ -10,13 +10,13 @@ import "./PoolDeployer.sol";
 contract HybridPoolFactory is PoolDeployer {
     constructor(address _masterDeployer) PoolDeployer(_masterDeployer) {}
 
-    function deployPool(bytes memory _deployData) external returns (address pool) {
+    function deployPool(bytes memory _deployData) external override returns (address pool, address[] memory tokens) {
         (address tokenA, address tokenB, uint256 swapFee, uint256 a) = abi.decode(_deployData, (address, address, uint256, uint256));
         if (tokenA > tokenB) {
             (tokenA, tokenB) = (tokenB, tokenA);
             _deployData = abi.encode(tokenA, tokenB, swapFee, a);
         }
-        address[] memory tokens = new address[](2);
+        tokens = new address[](2);
         tokens[0] = tokenA;
         tokens[1] = tokenB;
 
