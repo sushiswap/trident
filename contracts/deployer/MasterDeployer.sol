@@ -15,7 +15,7 @@ contract MasterDeployer is TridentOwnable {
     event MigratorUpdated(address indexed _migrator);
 
     uint256 public barFee;
-    address public migrator;
+    address public migrator; // wut
 
     address public immutable barFeeTo;
     address public immutable bento;
