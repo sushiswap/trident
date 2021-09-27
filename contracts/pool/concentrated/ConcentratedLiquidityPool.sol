@@ -120,7 +120,7 @@ contract ConcentratedLiquidityPool is IPool {
         price = _price;
         tickSpacing = _tickSpacing;
         /// @dev Prevents global liquidity overflow in the case all ticks are initialised
-        MAX_TICK_LIQUIDITY = type(uint128).max / uint128(uint24(TickMath.MAX_TICK) / uint24(_tickSpacing));
+        MAX_TICK_LIQUIDITY = Ticks.getMaxLiquidity(_tickSpacing);
         ticks[TickMath.MIN_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
         ticks[TickMath.MAX_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
         nearestTick = TickMath.MIN_TICK;
@@ -150,7 +150,7 @@ contract ConcentratedLiquidityPool is IPool {
         );
 
         {
-            require(_liquidity < 2**127, "LIQUIDITY_OVERFLOW");
+            require(_liquidity <= MAX_TICK_LIQUIDITY, "LIQUIDITY_OVERFLOW");
 
             (uint256 amount0fees, uint256 amount1fees) = _updatePosition(
                 mintParams.positionOwner,
