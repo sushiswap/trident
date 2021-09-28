@@ -244,7 +244,7 @@ abstract contract TridentNFT {
     function _burn(uint256 tokenId) internal {
         address owner = ownerOf[tokenId];
         require(owner != address(0), "NOT_MINTED");
-        /// @dev This is safe from underflow because balance of any owner is greater than 0.
+        /// @dev This is safe from underflow - balance of any 'owner' is greater than 0.
         unchecked {
             balanceOf[owner]--;
         }
