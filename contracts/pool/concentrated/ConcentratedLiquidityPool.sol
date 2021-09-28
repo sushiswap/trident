@@ -29,11 +29,11 @@ contract ConcentratedLiquidityPool is IPool {
     // References for tickSpacing:
     // 100 tickSpacing -> 2% between ticks
     bytes32 public constant override poolIdentifier = "Trident:ConcentratedLiquidity";
-    uint24 internal constant MAX_FEE = 10000; /// @dev 100%.
+    uint24 internal constant MAX_FEE = 100000; /// @dev Max fee supported is 10%.
 
     uint128 internal immutable MAX_TICK_LIQUIDITY;
     uint24 public immutable tickSpacing;
-    uint24 public immutable swapFee; /// @dev 1000 corresponds to 0.1% fee.
+    uint24 public immutable swapFee; /// @dev 1000 corresponds to 0.1% fee. Fee is measured in pips.
 
     address public immutable barFeeTo;
     IBentoBoxMinimal public immutable bento;
