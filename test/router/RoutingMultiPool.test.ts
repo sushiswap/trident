@@ -4,10 +4,12 @@ import seedrandom from "seedrandom";
 import * as testHelper from "./helpers";
 import { areCloseValues, getIntegerRandomValue } from "../utilities";
 import { RouteType } from "./helpers/constants";
+import { closeValues } from "@sushiswap/tines";
 
 describe("MultiPool Routing Tests", function () {
   beforeEach(async function () {
-    [this.signer, this.tridentRouterAddress] = await testHelper.init();
+    [this.signer, this.tridentRouterAddress, this.bento] =
+      await testHelper.init();
     this.gasPrice = 1 * 200 * 1e-9;
     this.rnd = seedrandom("2");
   });
@@ -47,18 +49,25 @@ describe("MultiPool Routing Tests", function () {
       toToken.address
     );
 
-    console.log();
-    console.log(">>>>>>>> <<<<<<<<");
-    console.log(`Expected output: ${route.amountOut.toString()}`);
-    console.log(`Actual output: ${amountOutPoolBN.toString()}`);
-    console.log(">>>>>>>> <<<<<<<<");
+    const tridentT1Balance = await this.bento.balanceOf(
+      topology.tokens[1].address,
+      this.tridentRouterAddress
+    );
+    const tridentT2Balance = await this.bento.balanceOf(
+      topology.tokens[2].address,
+      this.tridentRouterAddress
+    );
+    const tridentT3Balance = await this.bento.balanceOf(
+      topology.tokens[3].address,
+      this.tridentRouterAddress
+    );
+
+    expect(tridentT1Balance).equal(0);
+    expect(tridentT2Balance).equal(0);
+    expect(tridentT3Balance).equal(0);
 
     expect(
-      areCloseValues(
-        route.amountOut,
-        parseInt(amountOutPoolBN.toString()),
-        1e-14
-      )
+      closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-14)
     ).to.equal(true, "predicted amount did not equal actual swapped amount");
   });
 
@@ -99,11 +108,7 @@ describe("MultiPool Routing Tests", function () {
     );
 
     expect(
-      areCloseValues(
-        route.amountOut,
-        parseInt(amountOutPoolBN.toString()),
-        1e-14
-      )
+      closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-14)
     ).to.equal(true, "predicted amount did not equal actual swapped amount");
   });
 
@@ -144,11 +149,7 @@ describe("MultiPool Routing Tests", function () {
     );
 
     expect(
-      areCloseValues(
-        route.amountOut,
-        parseInt(amountOutPoolBN.toString()),
-        1e-14
-      )
+      closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-14)
     ).to.equal(true, "predicted amount did not equal actual swapped amount");
   });
 
@@ -187,11 +188,7 @@ describe("MultiPool Routing Tests", function () {
     );
 
     expect(
-      areCloseValues(
-        route.amountOut,
-        parseInt(amountOutPoolBN.toString()),
-        1e-14
-      )
+      closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-14)
     ).to.equal(true, "predicted amount did not equal actual swapped amount");
   });
 
@@ -230,11 +227,7 @@ describe("MultiPool Routing Tests", function () {
     );
 
     expect(
-      areCloseValues(
-        route.amountOut,
-        parseInt(amountOutPoolBN.toString()),
-        1e-14
-      )
+      closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-14)
     ).to.equal(true, "predicted amount did not equal actual swapped amount");
   });
 
@@ -273,11 +266,7 @@ describe("MultiPool Routing Tests", function () {
     );
 
     expect(
-      areCloseValues(
-        route.amountOut,
-        parseInt(amountOutPoolBN.toString()),
-        1e-14
-      )
+      closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-14)
     ).to.equal(true, "predicted amount did not equal actual swapped amount");
   });
 });

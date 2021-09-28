@@ -24,11 +24,11 @@ let alice: SignerWithAddress,
 
 const tokenSupply = getBigNumber(Math.pow(10, 37));
 
-export async function init(): Promise<[SignerWithAddress, string]> {
+export async function init(): Promise<[SignerWithAddress, string, Contract]> {
   await createAccounts();
   await deployContracts();
 
-  return [alice, router.address];
+  return [alice, router.address, bento];
 } 
 
 export async function getSinglePool(rnd: () => number): Promise<Topology> {
