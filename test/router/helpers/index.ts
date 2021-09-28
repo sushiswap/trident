@@ -1,5 +1,5 @@
 import { ethers } from "hardhat";
-import { getBigNumber,RToken, MultiRoute, findMultiRouting, }  from "@sushiswap/tines"
+import { getBigNumber,RToken, MultiRoute, findMultiRouting, RPool, }  from "@sushiswap/tines"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { BigNumber, Contract, ContractFactory } from "ethers";
 
@@ -24,12 +24,12 @@ let alice: SignerWithAddress,
 
 const tokenSupply = getBigNumber(Math.pow(10, 37));
 
-export async function init(): Promise<SignerWithAddress> {
+export async function init(): Promise<[SignerWithAddress, string, Contract]> {
   await createAccounts();
   await deployContracts();
 
-  return alice;
-}
+  return [alice, router.address, bento];
+} 
 
 export async function getSinglePool(rnd: () => number): Promise<Topology> {
   return await getTopoplogy(2, 1, rnd);
@@ -63,7 +63,7 @@ export function createRoute(fromToken: RToken, toToken: RToken, baseToken: RToke
     topology.pools,
     baseToken,
     gasPrice,
-    32
+    100
   );
   return route;
 } 
@@ -95,11 +95,62 @@ export async function executeTridentRoute(tridentRouteParams: TridentRoute, toTo
   return outputBalanceAfter.sub(outputBalanceBefore);
 }
 
-async function getTopoplogy(
-  tokenCount: number,
-  poolVariants: number,
-  rnd: () => number
-): Promise<Topology> {
+export async function getFivePoolBridge(rnd: () => number): Promise<Topology> { 
+
+  let topology: Topology = {
+    tokens: [],
+    prices: [],
+    pools: [],
+  };
+
+  const poolDeployment: PoolDeploymentContracts = {
+    hybridPoolFactory: HybridPoolContractFactory,
+    hybridPoolContract: hybridPool,
+    constPoolFactory: ConstantPoolContractFactory,
+    constantPoolContract: constantProductPool,
+    masterDeployerContract: masterDeployer,
+    bentoContract: bento,
+    account: alice,
+  };
+
+  let prices: number[] = [];
+  let tokens: RToken[] = [];
+  let tokenContracts: Contract[] = []; 
+
+  for (var i = 0; i < 5; ++i) {
+    tokens.push({ name: `Token${i}`, address: "" + i });
+    prices.push(1);
+  }
+
+  for (let i = 0; i < tokens.length; i++) {
+    const tokenContract = await ERC20Factory.deploy(tokens[0].name, tokens[0].name, tokenSupply);
+    await tokenContract.deployed();
+    tokenContracts.push(tokenContract);
+    tokens[i].address = tokenContract.address;
+  }
+
+  await approveAndFund(tokenContracts);
+
+  const testPool0_1 = await getCPPool(tokens[0], tokens[1], prices[1]/prices[0], poolDeployment, rnd,  1_500_0);
+  const testPool0_2 = await getCPPool(tokens[0], tokens[2], prices[2]/prices[0], poolDeployment, rnd,  1_000_0);
+  const testPool1_2 = await getCPPool(tokens[1], tokens[2], prices[2]/prices[1], poolDeployment, rnd,  1_000_000_000);
+  const testPool1_3 = await getCPPool(tokens[1], tokens[3], prices[3]/prices[1], poolDeployment, rnd,  1_000_0);
+  const testPool2_3 = await getCPPool(tokens[2], tokens[3], prices[3]/prices[2], poolDeployment, rnd,  1_500_0);
+
+  topology.pools.push(testPool0_1);
+  topology.pools.push(testPool0_2);
+  topology.pools.push(testPool1_2);
+  topology.pools.push(testPool1_3);
+  topology.pools.push(testPool2_3);
+
+  return {
+    tokens: tokens,
+    prices: prices,
+    pools: topology.pools
+  }
+}
+
+async function getTopoplogy(tokenCount: number, poolVariants: number, rnd: () => number): Promise<Topology> {
   const tokenContracts: Contract[] = [];
 
   let topology: Topology = {
@@ -151,13 +202,7 @@ async function getTopoplogy(
 
       if (poolType % 2 == 0) {
         topology.pools.push(
-          await getHybridPool(
-            token0,
-            token1,
-            price0 / price1,
-            poolDeployment,
-            rnd
-          )
+          await getHybridPool(token0, token1, price0 / price1, poolDeployment, rnd)
         );
       } else {
         topology.pools.push(
@@ -235,13 +280,8 @@ async function approveAndFund(contracts: Contract[]) {
     const tokenContract = contracts[index];
 
     await tokenContract.approve(bento.address, tokenSupply);
-    await bento.deposit(
-      tokenContract.address,
-      alice.address,
-      alice.address,
-      tokenSupply,
-      0
-    );
+    
+    await bento.deposit(tokenContract.address, alice.address, alice.address, tokenSupply, 0);
   }
 } 
 

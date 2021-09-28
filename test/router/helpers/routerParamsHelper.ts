@@ -6,7 +6,7 @@ import { RouteType } from "./constants";
 import { ComplexPathParams, ExactInputParams, ExactInputSingleParams, InitialPath, Output, Path, PercentagePath, TridentRoute } from "./helperInterfaces";
 
 
-export function getTridentRouterParams(multiRoute: MultiRoute, senderAddress: string): ExactInputParams | ExactInputSingleParams | ComplexPathParams {
+export function getTridentRouterParams(multiRoute: MultiRoute, senderAddress: string, tridentRouterAddress: string = ""): ExactInputParams | ExactInputSingleParams | ComplexPathParams {
     const routeType = getRouteType(multiRoute);
     let routerParams;
   
@@ -16,12 +16,12 @@ export function getTridentRouterParams(multiRoute: MultiRoute, senderAddress: st
         break;
   
       case RouteType.SinglePath:
-        routerParams = getExactInputParams(multiRoute, senderAddress, multiRoute.fromToken.address, multiRoute.toToken.address);
+        routerParams = getExactInputParams(multiRoute, senderAddress);
         break;
   
       case RouteType.ComplexPath:
       default:
-        routerParams = getComplexPathParams(multiRoute, senderAddress, multiRoute.fromToken.address, multiRoute.toToken.address);
+        routerParams = getComplexPathParams(multiRoute, senderAddress, tridentRouterAddress);
         break;
     }
     
@@ -46,17 +46,31 @@ function getRouteType(multiRoute: MultiRoute) {
     return "unknown";
 }
 
-function getRecipentAddress(multiRoute: MultiRoute, legIndex: number, fromTokenAddress: string, senderAddress: string): string {
-    const isLastLeg = legIndex === multiRoute.legs.length - 1;
-  
-    if (isLastLeg || multiRoute.legs[legIndex + 1].token.address === fromTokenAddress) 
+function isLastLeg(legIndex: number, multiRoute: MultiRoute): boolean{
+  return legIndex === multiRoute.legs.length - 1;
+}
+
+function isParallelLeg(legIndex: number, multiRoute: MultiRoute): boolean{
+  return multiRoute.legs[legIndex].absolutePortion > 0 && multiRoute.legs[legIndex].absolutePortion < 1;
+}
+
+function getRecipentAddress(multiRoute: MultiRoute, legIndex: number, senderAddress: string, tridentRouterAddress: string = ""): string {
+    
+    if (isLastLeg(legIndex, multiRoute))
     {
       return senderAddress;
-    } else 
+    }
+    else if(isParallelLeg(legIndex, multiRoute)) 
+    {
+      return tridentRouterAddress;
+    } 
+    else 
     {
       return multiRoute.legs[legIndex + 1].address;
     }
 }
+
+
 
 function getExactInputSingleParams(multiRoute: MultiRoute, senderAddress: string) :ExactInputSingleParams {
     return {
@@ -72,19 +86,18 @@ function getExactInputSingleParams(multiRoute: MultiRoute, senderAddress: string
     }; 
 }
 
-function getExactInputParams(multiRoute: MultiRoute, senderAddress: string, fromToken: string, toToken: string) :ExactInputParams {
+function getExactInputParams(multiRoute: MultiRoute, senderAddress: string) :ExactInputParams {
     const routeLegs = multiRoute.legs.length;
     let paths: Path[] = [];
 
     for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
         const recipentAddress = getRecipentAddress(
           multiRoute,
-          legIndex,
-          fromToken,
+          legIndex, 
           senderAddress
         );
     
-        if (multiRoute.legs[legIndex].token.address === fromToken) {
+        if (multiRoute.legs[legIndex].token.address === multiRoute.fromToken.address) {
           const path: Path = { 
             pool: multiRoute.legs[legIndex].address,  
             data: ethers.utils.defaultAbiCoder.encode(
@@ -118,13 +131,13 @@ function getExactInputParams(multiRoute: MultiRoute, senderAddress: string, from
     return inputParams;
 }
 
-export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: string, fromToken: string, toToken: string ): ComplexPathParams {
+function getComplexPathParams(multiRoute: MultiRoute, senderAddress: string, tridentRouterAddress: string): ComplexPathParams {
     let initialPaths: InitialPath[] = [];
     let percentagePaths: PercentagePath[] = [];
     let outputs: Output[] = [];
   
     const output: Output = {
-      token: toToken,
+      token: multiRoute.toToken.address,
       to: senderAddress,
       unwrapBento: false,
       minAmount: getBigNumber(0),
@@ -136,17 +149,16 @@ export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: stri
     for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
       const recipentAddress = getRecipentAddress(
         multiRoute,
-        legIndex,
-        fromToken,
-        senderAddress
+        legIndex, 
+        senderAddress,
+        tridentRouterAddress
       );
   
-      if (multiRoute.legs[legIndex].token.address === fromToken) {
+      if (multiRoute.legs[legIndex].token.address === multiRoute.fromToken.address) {
         const initialPath: InitialPath = {
           tokenIn: multiRoute.legs[legIndex].token.address,
           pool: multiRoute.legs[legIndex].address,
-          amount: getBigNumber(multiRoute.amountIn * multiRoute.legs[legIndex].absolutePortion
-          ),
+          amount: getBigNumber(multiRoute.amountIn * multiRoute.legs[legIndex].absolutePortion),
           native: false,
           data: ethers.utils.defaultAbiCoder.encode(
             ["address", "address", "bool"],
@@ -154,14 +166,14 @@ export function getComplexPathParams(multiRoute: MultiRoute, senderAddress: stri
           ),
         };
         initialPaths.push(initialPath);
-      } else {
+      } else { 
         const percentagePath: PercentagePath = {
           tokenIn: multiRoute.legs[legIndex].token.address,
           pool: multiRoute.legs[legIndex].address,
-          balancePercentage: multiRoute.legs[legIndex].swapPortion * 1_000_000,
+          balancePercentage: getBigNumber(multiRoute.legs[legIndex].swapPortion * 10**8),
           data: ethers.utils.defaultAbiCoder.encode(
             ["address", "address", "bool"],
-            [multiRoute.legs[legIndex].token.address, recipentAddress, false]
+            [multiRoute.legs[legIndex].token.address, recipentAddress, false] 
           ),
         };
         percentagePaths.push(percentagePath);

@@ -33,7 +33,7 @@ export interface InitialPath {
 export interface PercentagePath {
   tokenIn: string;
   pool: string;
-  balancePercentage: number;
+  balancePercentage: BigNumber;
   data: string;
 }
 

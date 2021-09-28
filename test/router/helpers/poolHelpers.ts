@@ -6,13 +6,22 @@ import { PoolDeploymentContracts } from "./helperInterfaces";
 import { choice, getRandom } from "./randomHelper";
 import { MAX_POOL_IMBALANCE, MAX_POOL_RESERVE, MIN_POOL_IMBALANCE, MIN_POOL_RESERVE } from "./constants";
  
-export async function getCPPool(t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts, rnd: () => number) {
+export async function getCPPool(t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts, rnd: () => number, reserve: number = 0) {
 
   const fee = getPoolFee(rnd) * 10_000;  
   const imbalance = getPoolImbalance(rnd);
 
-  const reserve1 = getPoolReserve(rnd);
-  const reserve0 = reserve1 * price * imbalance;  
+  let reserve1;
+  let reserve0;  
+
+  if(reserve === 0){
+    reserve1 = getPoolReserve(rnd);
+    reserve0 = reserve1 * price * imbalance; 
+  }
+  else{
+    reserve0 = reserve;
+    reserve1 = Math.round(reserve / price);
+  }
 
   const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint256", "bool"],
@@ -36,16 +45,25 @@ export async function getCPPool(t0: RToken, t1: RToken, price: number, deploymen
     getBigNumber(reserve0),
     getBigNumber(reserve1),
   )
-}
+} 
 
-export async function getHybridPool(t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts, rnd: () => number) {
+export async function getHybridPool(t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts, rnd: () => number, reserve: number = 0) {
 
   const fee = getPoolFee(rnd) * 10_000;
   const A = 7000;  
   const imbalance = getPoolImbalance(rnd); 
 
-  const reserve1 = getPoolReserve(rnd);
-  const reserve0 = reserve1 * price * imbalance; 
+  let reserve1; 
+  let reserve0;
+
+  if(reserve === 0){
+    reserve1 = getPoolReserve(rnd);
+    reserve0 = reserve1 * price * imbalance; 
+  }
+  else{
+    reserve0 = reserve;
+    reserve1 = Math.round(reserve / price);
+  }
  
   const deployData = ethers.utils.defaultAbiCoder.encode(
     ["address", "address", "uint256", "uint256"],
