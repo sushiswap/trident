@@ -523,7 +523,8 @@ contract ConcentratedLiquidityPool is IPool {
             0x100000000000000000000000000000000
         );
 
-        position.liquidity = uint128(int128(position.liquidity) + amount);
+        if (amount < 0) position.liquidity -= uint128(amount);
+        if (amount > 0) position.liquidity += uint128(amount);
 
         require(position.liquidity < MAX_TICK_LIQUIDITY, "MAX_TICK_LIQUIDITY");
 
