@@ -8,11 +8,7 @@ import "../PoolDeployer.sol";
 /// @notice Contract for deploying Trident exchange Concentrated Liquidity Pool with configurations.
 /// @author Mudit Gupta.
 contract ConcentratedLiquidityPoolFactory is PoolDeployer {
-    address immutable positionManager;
-
-    constructor(address _masterDeployer, address _positionManager) PoolDeployer(_masterDeployer) {
-        positionManager = _positionManager;
-    }
+    constructor(address _masterDeployer) PoolDeployer(_masterDeployer) {}
 
     function deployPool(bytes memory _deployData) external returns (address pool) {
         (address tokenA, address tokenB, uint24 swapFee, uint160 price, uint24 tickSpacing) = abi.decode(
@@ -29,7 +25,7 @@ contract ConcentratedLiquidityPoolFactory is PoolDeployer {
 
         // @dev Salt is not actually needed since `_deployData` is part of creationCode and already contains the salt.
         bytes32 salt = keccak256(_deployData);
-        pool = address(new ConcentratedLiquidityPool{salt: salt}(_deployData, IMasterDeployer(masterDeployer), positionManager));
+        pool = address(new ConcentratedLiquidityPool{salt: salt}(_deployData, IMasterDeployer(masterDeployer)));
         _registerPool(pool, tokens, salt);
     }
 }
