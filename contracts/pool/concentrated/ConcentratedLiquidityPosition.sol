@@ -59,8 +59,13 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
     ) external {
         require(msg.sender == ownerOf[tokenId], "NOT_ID_OWNER");
         Position storage position = positions[tokenId];
+
+        if (position.liquidity < amount) amount = position.liquidity;
+
         bytes memory burnData = abi.encode(position.lower, position.upper, amount, recipient, unwrapBento);
+
         position.pool.burn(burnData);
+
         if (amount < position.liquidity) {
             position.liquidity -= amount;
         } else {

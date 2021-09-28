@@ -349,12 +349,12 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         const smallerPositionFeesDx = smallerPositionFees2.dx.add(smallerPositionFees1.dx);
         const biggerPositionFees = await collectFees({ pool, tokenId: tokenIdB, recipient: defaultAddress, unwrapBento: false });
         const outsidePositionFees = await collectFees({ pool, tokenId: tokenIdC, recipient: defaultAddress, unwrapBento: false });
-        expect(smallerPositionFeesDy.div(100).toString()).to.be.eq(
-          biggerPositionFees.dy.div(100).div(2).toString(),
+        expect(smallerPositionFeesDy.div(1000).toString()).to.be.eq(
+          biggerPositionFees.dy.div(1000).div(2).toString(),
           "fees 0 weren't proportionally split"
-        ); // divide by 100 (remove 2 decimal places) to ignore 1 raw rounding errors
-        expect(smallerPositionFeesDx.div(100).toString()).to.be.eq(
-          biggerPositionFees.dx.div(100).div(2).toString(),
+        ); // divide by 1000 (remove 3 decimal places) to help ignore 1 raw rounding errors
+        expect(smallerPositionFeesDx.div(1000).toString()).to.be.eq(
+          biggerPositionFees.dx.div(1000).div(2).toString(),
           "fees 1 weren't proportionally split"
         );
         expect(outsidePositionFees.dy.toString()).to.be.eq("0", "fees were acredited to a position not in range");
