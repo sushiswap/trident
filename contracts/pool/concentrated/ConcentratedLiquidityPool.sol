@@ -38,7 +38,7 @@ contract ConcentratedLiquidityPool is IPool {
     address public immutable barFeeTo;
     IBentoBoxMinimal public immutable bento;
     IMasterDeployer public immutable masterDeployer;
-    address public immutable poolManager;
+
     address public immutable token0;
     address public immutable token1;
 
@@ -101,11 +101,7 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     /// @dev Only set immutable variables here - state changes made here will not be used.
-    constructor(
-        bytes memory _deployData,
-        IMasterDeployer _masterDeployer,
-        address _poolManager
-    ) {
+    constructor(bytes memory _deployData, IMasterDeployer _masterDeployer) {
         (address _token0, address _token1, uint24 _swapFee, uint160 _price, uint24 _tickSpacing) = abi.decode(
             _deployData,
             (address, address, uint24, uint160, uint24)
@@ -128,7 +124,6 @@ contract ConcentratedLiquidityPool is IPool {
         barFeeTo = _masterDeployer.barFeeTo();
         barFee = _masterDeployer.barFee();
         masterDeployer = _masterDeployer;
-        poolManager = _poolManager;
         unlocked = 1;
     }
 
@@ -205,7 +200,7 @@ contract ConcentratedLiquidityPool is IPool {
 
             (uint256 feeGrowth0, uint256 feeGrowth1) = rangeFeeGrowth(mintParams.lower, mintParams.upper);
 
-            IPositionManager(poolManager).positionMintCallback(
+            IPositionManager(mintParams.positionOwner).positionMintCallback(
                 mintParams.recipient,
                 mintParams.lower,
                 mintParams.upper,
@@ -214,7 +209,7 @@ contract ConcentratedLiquidityPool is IPool {
                 feeGrowth1
             );
 
-            emit Mint(msg.sender, amount0Actual, amount1Actual, mintParams.recipient);
+            emit Mint(mintParams.positionOwner, amount0Actual, amount1Actual, mintParams.recipient);
         }
     }
 
