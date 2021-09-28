@@ -15,10 +15,13 @@ contract ConcentratedLiquidityPoolFactory is PoolDeployer {
     }
 
     function deployPool(bytes memory _deployData) external returns (address pool) {
-        (address tokenA, address tokenB, uint24 swapFee, uint160 price) = abi.decode(_deployData, (address, address, uint24, uint160));
+        (address tokenA, address tokenB, uint24 swapFee, uint160 price, uint24 tickSpacing) = abi.decode(
+            _deployData,
+            (address, address, uint24, uint160, uint24)
+        );
         if (tokenA > tokenB) {
             (tokenA, tokenB) = (tokenB, tokenA);
-            _deployData = abi.encode(tokenA, tokenB, swapFee, price);
+            _deployData = abi.encode(tokenA, tokenB, swapFee, price, tickSpacing);
         }
         address[] memory tokens = new address[](2);
         tokens[0] = tokenA;
@@ -26,7 +29,7 @@ contract ConcentratedLiquidityPoolFactory is PoolDeployer {
 
         // @dev Salt is not actually needed since `_deployData` is part of creationCode and already contains the salt.
         bytes32 salt = keccak256(_deployData);
-        pool = address(new ConcentratedLiquidityPool{salt: salt}(_deployData, masterDeployer, positionManager));
+        pool = address(new ConcentratedLiquidityPool{salt: salt}(_deployData, IMasterDeployer(masterDeployer), positionManager));
         _registerPool(pool, tokens, salt);
     }
 }

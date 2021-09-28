@@ -87,8 +87,8 @@ describe.skip("Concentrated liquidity pool", function () {
     let sqrtPrice = BigNumber.from("1807174424252647735792984898");
 
     let deployData0 = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint24", "uint160"],
-      [dai.address, weth.address, 1000, sqrtPrice]
+      ["address", "address", "uint24", "uint160", "uint24"],
+      [dai.address, weth.address, 1000, sqrtPrice, 10]
     );
 
     // deploy pool0
@@ -98,8 +98,8 @@ describe.skip("Concentrated liquidity pool", function () {
     sqrtPrice = BigNumber.from("50").mul("0x1000000000000000000000000");
 
     let deployData1 = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint24", "uint160"],
-      [weth.address, usd.address, 1000, sqrtPrice]
+      ["address", "address", "uint24", "uint160", "int24"],
+      [weth.address, usd.address, 1000, sqrtPrice, 10]
     );
 
     // deploy pool1

@@ -3,7 +3,9 @@
 pragma solidity >=0.8.0;
 
 import "./TickMath.sol";
+import "hardhat/console.sol";
 
+/// @notice Tick management library for ranged liquidity.
 library Ticks {
     struct Tick {
         int24 previousTick;
@@ -12,6 +14,10 @@ library Ticks {
         uint256 feeGrowthOutside0; // Per unit of liquidity.
         uint256 feeGrowthOutside1;
         uint160 secondsPerLiquidityOutside;
+    }
+
+    function getMaxLiquidity(uint24 _tickSpacing) internal pure returns (uint128) {
+        return type(uint128).max / uint128(uint24(TickMath.MAX_TICK) / uint24(_tickSpacing));
     }
 
     function cross(
