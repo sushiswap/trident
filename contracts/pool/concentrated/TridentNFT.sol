@@ -4,7 +4,7 @@ pragma solidity >=0.8.0;
 
 /// @notice Trident Concentrated Liquidity Pool ERC-721-like implementation with ERC-20/EIP-2612-like extensions,
 /// as well as MetaData, and partially, Enumerable extensions.
-/// @author Adapted from RariCapital, https://github.com/Rari-Capital/solmate/blob/main/src/erc721/ERC721.sol, 
+/// @author Adapted from RariCapital, https://github.com/Rari-Capital/solmate/blob/main/src/erc721/ERC721.sol,
 /// License-Identifier: AGPL-3.0-only, and Shoyu, https://github.com/sushiswap/shoyu/blob/master/contracts/base/BaseNFT721.sol,
 /// License-Identifier: MIT.
 abstract contract TridentNFT {
@@ -29,7 +29,7 @@ abstract contract TridentNFT {
     bytes32 public constant PERMIT_TYPEHASH = keccak256("Permit(address spender,uint256 tokenId,uint256 nonce,uint256 deadline)");
     /// @notice The EIP-712 typehash for this contract's {permitAll} struct for {setApprovalForAll}.
     bytes32 public constant PERMIT_ALL_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 nonce,uint256 deadline)");
-    
+
     /// @notice Chain Id at this contract's deployment.
     uint256 internal immutable DOMAIN_SEPARATOR_CHAIN_ID;
     /// @notice EIP-712 typehash for this contract's domain at deployment.
@@ -43,7 +43,7 @@ abstract contract TridentNFT {
         DOMAIN_SEPARATOR_CHAIN_ID = block.chainid;
         _DOMAIN_SEPARATOR = _calculateDomainSeparator();
     }
-    
+
     function _calculateDomainSeparator() internal view returns (bytes32 domainSeperator) {
         domainSeperator = keccak256(
             abi.encode(
@@ -55,7 +55,7 @@ abstract contract TridentNFT {
             )
         );
     }
-    
+
     /// @notice EIP-712 typehash for this contract's domain.
     function DOMAIN_SEPARATOR() public view returns (bytes32 domainSeperator) {
         domainSeperator = block.chainid == DOMAIN_SEPARATOR_CHAIN_ID ? _DOMAIN_SEPARATOR : _calculateDomainSeparator();
@@ -175,7 +175,7 @@ abstract contract TridentNFT {
         address owner = ownerOf[tokenId];
         /// @dev This is reasonably safe from overflow - incrementing `nonces` beyond
         // 'type(uint256).max' is exceedingly unlikely compared to optimization benefits.
-        unchecked { 
+        unchecked {
             bytes32 digest = keccak256(
                 abi.encodePacked(
                     "\x19\x01",
@@ -192,7 +192,7 @@ abstract contract TridentNFT {
         getApproved[tokenId] = spender;
         emit Approval(owner, spender, tokenId);
     }
-    
+
     /// @notice Triggers an approval from 'owner' to `operator` that can spend or {approve} spends of 'owner''s `tokenId`s.
     /// @param owner The address to be approved.
     /// @param operator Address of the party that can pull `tokenId`s from 'owner''s account or approve others to do same.
@@ -211,7 +211,7 @@ abstract contract TridentNFT {
         require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
         /// @dev This is reasonably safe from overflow - incrementing `nonces` beyond
         // 'type(uint256).max' is exceedingly unlikely compared to optimization benefits.
-        unchecked { 
+        unchecked {
             bytes32 digest = keccak256(
                 abi.encodePacked(
                     "\x19\x01",
@@ -228,7 +228,7 @@ abstract contract TridentNFT {
         setApprovalForAll(operator, true);
         emit ApprovalForAll(owner, operator, true);
     }
-    
+
     function _mint(address recipient) internal {
         /// @dev This is reasonably safe from overflow - incrementing beyond
         // 'type(uint256).max' is exceedingly unlikely compared to optimization benefits.
@@ -243,11 +243,9 @@ abstract contract TridentNFT {
 
     function _burn(uint256 tokenId) internal {
         address owner = ownerOf[tokenId];
-        require(ownerOf[tokenId] != address(0), "NOT_MINTED");
-        /// @dev This is safe from underflow - users won't ever
-        // have a balance larger than `totalSupply`.
+        require(owner != address(0), "NOT_MINTED");
+        /// @dev This is safe from underflow - balance of any 'owner' is greater than 0.
         unchecked {
-            totalSupply--;
             balanceOf[owner]--;
         }
         delete ownerOf[tokenId];
