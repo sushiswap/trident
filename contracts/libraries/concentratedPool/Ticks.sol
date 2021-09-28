@@ -20,6 +20,38 @@ library Ticks {
         return type(uint128).max / uint128(uint24(TickMath.MAX_TICK) / uint24(_tickSpacing));
     }
 
+    function cross(
+        mapping(int24 => Tick) storage ticks,
+        int24 nextTickToCross,
+        uint160 secondsPerLiquidity,
+        uint256 currentLiquidity,
+        uint256 feeGrowthGlobal,
+        bool zeroForOne
+    ) internal returns (uint256, int24) {
+        ticks[nextTickToCross].secondsPerLiquidityOutside = secondsPerLiquidity - ticks[nextTickToCross].secondsPerLiquidityOutside;
+        if (zeroForOne) {
+            // Moving forward through the linked list
+            if (nextTickToCross % 2 == 0) {
+                currentLiquidity -= ticks[nextTickToCross].liquidity;
+            } else {
+                currentLiquidity += ticks[nextTickToCross].liquidity;
+            }
+            nextTickToCross = ticks[nextTickToCross].previousTick;
+            ticks[nextTickToCross].feeGrowthOutside0 = feeGrowthGlobal - ticks[nextTickToCross].feeGrowthOutside0;
+        } else {
+            // Moving backwards through the linked list
+            if (nextTickToCross % 2 == 0) {
+                currentLiquidity += ticks[nextTickToCross].liquidity;
+            } else {
+                currentLiquidity -= ticks[nextTickToCross].liquidity;
+            }
+            nextTickToCross = ticks[nextTickToCross].nextTick;
+            ticks[nextTickToCross].feeGrowthOutside1 = feeGrowthGlobal - ticks[nextTickToCross].feeGrowthOutside1;
+        }
+
+        return (currentLiquidity, nextTickToCross);
+    }
+
     function insert(
         mapping(int24 => Tick) storage ticks,
         uint256 feeGrowthGlobal0,
@@ -138,37 +170,5 @@ library Ticks {
         }
 
         return nearestTick;
-    }
-
-    function cross(
-        mapping(int24 => Tick) storage ticks,
-        int24 nextTickToCross,
-        uint160 secondsPerLiquidity,
-        uint256 currentLiquidity,
-        uint256 feeGrowthGlobal,
-        bool zeroForOne
-    ) internal returns (uint256, int24) {
-        ticks[nextTickToCross].secondsPerLiquidityOutside = secondsPerLiquidity - ticks[nextTickToCross].secondsPerLiquidityOutside;
-        if (zeroForOne) {
-            // Moving forward through the linked list
-            if (nextTickToCross % 2 == 0) {
-                currentLiquidity -= ticks[nextTickToCross].liquidity;
-            } else {
-                currentLiquidity += ticks[nextTickToCross].liquidity;
-            }
-            nextTickToCross = ticks[nextTickToCross].previousTick;
-            ticks[nextTickToCross].feeGrowthOutside0 = feeGrowthGlobal - ticks[nextTickToCross].feeGrowthOutside0;
-        } else {
-            // Moving backwards through the linked list
-            if (nextTickToCross % 2 == 0) {
-                currentLiquidity += ticks[nextTickToCross].liquidity;
-            } else {
-                currentLiquidity -= ticks[nextTickToCross].liquidity;
-            }
-            nextTickToCross = ticks[nextTickToCross].nextTick;
-            ticks[nextTickToCross].feeGrowthOutside1 = feeGrowthGlobal - ticks[nextTickToCross].feeGrowthOutside1;
-        }
-
-        return (currentLiquidity, nextTickToCross);
     }
 }
