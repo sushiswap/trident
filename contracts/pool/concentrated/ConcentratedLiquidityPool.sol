@@ -246,6 +246,11 @@ contract ConcentratedLiquidityPool is IPool {
         withdrawnAmounts[0] = TokenAmount({token: token0, amount: amount0});
         withdrawnAmounts[1] = TokenAmount({token: token1, amount: amount1});
 
+        unchecked {
+            reserve0 -= uint128(amount0fees);
+            reserve1 -= uint128(amount1fees);
+        }
+
         _transfer(token0, amount0, recipient, unwrapBento);
         _transfer(token1, amount1, recipient, unwrapBento);
 
