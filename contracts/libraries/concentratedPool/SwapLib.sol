@@ -14,7 +14,7 @@ library SwapLib {
         uint256 totalFeeAmount,
         uint256 amountOut,
         uint256 protocolFee,
-        uint256 feeGrowthGlobal
+        uint256 feeGrowth
     )
         internal
         pure
@@ -39,8 +39,8 @@ library SwapLib {
         // @dev Updating `feeAmount` based on the protocolFee.
         feeAmount -= feeDelta;
 
-        feeGrowthGlobal += FullMath.mulDiv(feeAmount, 0x100000000000000000000000000000000, currentLiquidity);
+        feeGrowth += FullMath.mulDiv(feeAmount, 0x100000000000000000000000000000000, currentLiquidity);
 
-        return (totalFeeAmount, amountOut, protocolFee, feeGrowthGlobal);
+        return (totalFeeAmount, amountOut, protocolFee, feeGrowth);
     }
 }
