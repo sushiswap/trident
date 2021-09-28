@@ -45,48 +45,4 @@ library Ticks {
 
         return (currentLiquidity, nextTickToCross);
     }
-
-    function remove(
-        mapping(int24 => Tick) storage ticks,
-        int24 nearestTick,
-        int24 lower,
-        int24 upper,
-        uint128 amount
-    ) internal returns (int24) {
-        Ticks.Tick storage current = ticks[lower];
-
-        if (lower != TickMath.MIN_TICK && current.liquidity == amount) {
-            // Delete lower tick.
-            Ticks.Tick storage previous = ticks[current.previousTick];
-            Ticks.Tick storage next = ticks[current.nextTick];
-
-            previous.nextTick = current.nextTick;
-            next.previousTick = current.previousTick;
-
-            if (nearestTick == lower) nearestTick = current.previousTick;
-
-            delete ticks[lower];
-        } else {
-            current.liquidity -= amount;
-        }
-
-        current = ticks[upper];
-
-        if (upper != TickMath.MAX_TICK && current.liquidity == amount) {
-            // Delete upper tick.
-            Ticks.Tick storage previous = ticks[current.previousTick];
-            Ticks.Tick storage next = ticks[current.nextTick];
-
-            previous.nextTick = current.nextTick;
-            next.previousTick = current.previousTick;
-
-            if (nearestTick == upper) nearestTick = current.previousTick;
-
-            delete ticks[upper];
-        } else {
-            current.liquidity -= amount;
-        }
-
-        return nearestTick;
-    }
 }
