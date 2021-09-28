@@ -10,6 +10,33 @@ import { Trident } from "./Trident";
 const TWO_POW_96 = BigNumber.from(2).pow(96);
 const TWO_POW_128 = BigNumber.from(2).pow(128);
 
+export async function collectProtocolFee(params: { pool: ConcentratedLiquidityPool }) {
+  const { pool } = params;
+  const oldToken0ProtocolFee = await pool.token0ProtocolFee();
+  const oldToken1ProtocolFee = await pool.token1ProtocolFee();
+  const oldReserve0 = await pool.reserve0();
+  const oldReserve1 = await pool.reserve1();
+
+  await pool.collectProtocolFee();
+
+  const token0ProtocolFee = await pool.token0ProtocolFee();
+  const token1ProtocolFee = await pool.token1ProtocolFee();
+  const reserve0 = await pool.reserve0();
+  const reserve1 = await pool.reserve1();
+
+  expect(token0ProtocolFee.toString()).to.be.eq("1", "didn't update the protocol fee 0");
+  expect(token1ProtocolFee.toString()).to.be.eq("1", "didn't update the protocol fee 0");
+  expect(reserve0.toString()).to.be.eq(
+    oldReserve0.sub(oldToken0ProtocolFee).add(BigNumber.from(1)),
+    "didn't update the reserve0 correctly"
+  );
+  expect(reserve1.toString()).to.be.eq(
+    oldReserve1.sub(oldToken1ProtocolFee).add(BigNumber.from(1)),
+    "didn't update the reserve1 correctly"
+  );
+  return { token0ProtocolFee: oldToken0ProtocolFee.sub(BigNumber.from(1)), token1ProtocolFee: oldToken1ProtocolFee.sub(BigNumber.from(1)) };
+}
+
 export async function collectFees(params: {
   pool: ConcentratedLiquidityPool;
   tokenId: number | BigNumber;
@@ -177,14 +204,8 @@ export async function swapViaRouter(params: {
     oldPoolBalances[1].add(zeroForOne ? output.mul(-1) : inAmount).toString(),
     "didn't transfer the correct token 1 amount"
   );
-  expect(newReserve0.toString()).to.be.eq(
-    oldReserve0.add(zeroForOne ? inAmount : output.add(totalFees).mul(-1)),
-    "Didn't update reserve0 correctly"
-  );
-  expect(newReserve1.toString()).to.be.eq(
-    oldReserve1.add(zeroForOne ? output.add(totalFees).mul(-1) : inAmount),
-    "Didn't update reserve1 correctly"
-  );
+  expect(newReserve0.toString()).to.be.eq(oldReserve0.add(zeroForOne ? inAmount : output.mul(-1)), "Didn't update reserve0 correctly");
+  expect(newReserve1.toString()).to.be.eq(oldReserve1.add(zeroForOne ? output.mul(-1) : inAmount), "Didn't update reserve1 correctly");
   expect((await pool.liquidity()).toString()).to.be.eq(currentLiquidity.toString(), "didn't set correct liquidity value");
   expect(await pool.nearestTick()).to.be.eq(nextNearest, "didn't update nearest tick pointer");
   expect(oldPrice.lt(newPrice) !== zeroForOne, "Price didn't move in the right direction");

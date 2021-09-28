@@ -407,7 +407,7 @@ contract ConcentratedLiquidityPool is IPool {
             liquidity = uint128(cache.currentLiquidity);
         }
 
-        _updateReserves(zeroForOne, uint128(inAmount), amountOut, cache.totalFeeAmount);
+        _updateReserves(zeroForOne, uint128(inAmount), amountOut);
 
         _updateFees(zeroForOne, cache.feeGrowthGlobal, uint128(cache.protocolFee));
 
@@ -429,13 +429,20 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     /// @dev Collects fees for Trident protocol.
-    function collectProtocolFee() public lock {
-        _transfer(token0, token0ProtocolFee - 1, barFeeTo, false);
-        _transfer(token1, token1ProtocolFee - 1, barFeeTo, false);
-        reserve0 -= uint128(token0ProtocolFee - 1);
-        reserve1 -= uint128(token1ProtocolFee - 1);
-        token0ProtocolFee = 1;
-        token1ProtocolFee = 1;
+    function collectProtocolFee() external lock returns (uint128 amount0, uint128 amount1) {
+        if (token0ProtocolFee > 1) {
+            amount0 = token0ProtocolFee - 1;
+            token0ProtocolFee = 1;
+            reserve0 -= amount0;
+            _transfer(token0, amount0, barFeeTo, false);
+        }
+
+        if (token1ProtocolFee > 1) {
+            amount1 = token1ProtocolFee - 1;
+            token1ProtocolFee = 1;
+            reserve1 -= amount1;
+            _transfer(token1, amount1, barFeeTo, false);
+        }
     }
 
     function _balance(address token) internal view returns (uint256 balance) {
@@ -464,21 +471,20 @@ contract ConcentratedLiquidityPool is IPool {
     function _updateReserves(
         bool zeroForOne,
         uint128 inAmount,
-        uint256 amountOut,
-        uint256 totalFeeAmount
+        uint256 amountOut
     ) internal {
         if (zeroForOne) {
             uint256 balance0 = _balance(token0);
             uint128 newBalance = reserve0 + inAmount;
             require(uint256(newBalance) <= balance0, "TOKEN0_MISSING");
             reserve0 = newBalance;
-            reserve1 -= (uint128(amountOut) + uint128(totalFeeAmount));
+            reserve1 -= uint128(amountOut);
         } else {
             uint256 balance1 = _balance(token1);
             uint128 newBalance = reserve1 + inAmount;
             require(uint256(newBalance) <= balance1, "TOKEN1_MISSING");
             reserve1 = newBalance;
-            reserve0 -= (uint128(amountOut) + uint128(totalFeeAmount));
+            reserve0 -= uint128(amountOut);
         }
     }
 
