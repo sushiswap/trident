@@ -170,7 +170,7 @@ function getComplexPathParams(multiRoute: MultiRoute, senderAddress: string, tri
         const percentagePath: PercentagePath = {
           tokenIn: multiRoute.legs[legIndex].token.address,
           pool: multiRoute.legs[legIndex].address,
-          balancePercentage: getBigNumber(multiRoute.legs[legIndex].absolutePortion * 10**8),
+          balancePercentage: getBigNumber(multiRoute.legs[legIndex].swapPortion * 10**8),
           data: ethers.utils.defaultAbiCoder.encode(
             ["address", "address", "bool"],
             [multiRoute.legs[legIndex].token.address, recipentAddress, false] 
