@@ -58,7 +58,7 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         bool unwrapBento
     ) external {
         require(msg.sender == ownerOf[tokenId], "NOT_ID_OWNER");
-        Position memory position = positions[tokenId];
+        Position storage position = positions[tokenId];
         bytes memory burnData = abi.encode(position.lower, position.upper, amount, recipient, unwrapBento);
         position.pool.burn(burnData);
         if (amount < position.liquidity) {
@@ -112,7 +112,7 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         _transfer(position.pool.token0(), address(this), recipient, token0amount, unwrapBento);
         _transfer(position.pool.token1(), address(this), recipient, token1amount, unwrapBento);
     }
-    
+
     function _getAssets(IConcentratedLiquidityPool pool) internal view returns (address token0, address token1) {
         address[] memory pair = pool.getAssets();
         token0 = pair[0];
