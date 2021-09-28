@@ -25,7 +25,6 @@ abstract contract PoolDeployer {
         address[] memory tokens,
         bytes32 salt
     ) internal onlyMaster {
-        require(configAddress[salt] == address(0), "POOL_ALREADY_DEPLOYED");
         // @dev Store the address of the deployed contract.
         configAddress[salt] = pool;
         // @dev Attacker used underflow, it was not very effective. poolimon!
