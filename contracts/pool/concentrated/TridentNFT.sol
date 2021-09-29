@@ -2,11 +2,11 @@
 
 pragma solidity >=0.8.0;
 
-/// @notice Trident Concentrated Liquidity Pool ERC-721-like implementation with ERC-20/EIP-2612-like extensions,
-/// as well as MetaData, and partially, Enumerable extensions.
+/// @notice Trident Concentrated Liquidity Pool ERC-721 implementation with ERC-20/EIP-2612-like extensions,
+// as well as partially, MetaData and Enumerable extensions.
 /// @author Adapted from RariCapital, https://github.com/Rari-Capital/solmate/blob/main/src/erc721/ERC721.sol,
-/// License-Identifier: AGPL-3.0-only, and Shoyu, https://github.com/sushiswap/shoyu/blob/master/contracts/base/BaseNFT721.sol,
-/// License-Identifier: MIT.
+// License-Identifier: AGPL-3.0-only, and Shoyu, https://github.com/sushiswap/shoyu/blob/master/contracts/base/BaseNFT721.sol,
+// License-Identifier: MIT.
 abstract contract TridentNFT {
     event Transfer(address indexed sender, address indexed recipient, uint256 indexed tokenId);
     event Approval(address indexed owner, address indexed spender, uint256 indexed tokenId);
@@ -25,9 +25,9 @@ abstract contract TridentNFT {
     /// @notice 'owner' -> 'operator' status mapping.
     mapping(address => mapping(address => bool)) public isApprovedForAll;
 
-    /// @notice The EIP-712 typehash for this contract's {permit} struct for {approve}.
+    /// @notice EIP-712 typehash for this contract's {permit} struct for {approve}.
     bytes32 public constant PERMIT_TYPEHASH = keccak256("Permit(address spender,uint256 tokenId,uint256 nonce,uint256 deadline)");
-    /// @notice The EIP-712 typehash for this contract's {permitAll} struct for {setApprovalForAll}.
+    /// @notice EIP-712 typehash for this contract's {permitAll} struct for {setApprovalForAll}.
     bytes32 public constant PERMIT_ALL_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 nonce,uint256 deadline)");
 
     /// @notice Chain Id at this contract's deployment.
@@ -126,7 +126,7 @@ abstract contract TridentNFT {
     }
 
     /// @notice Transfers `tokenId` from 'owner' to `recipient` with no data. Caller needs ownership or approval from 'owner',
-    /// and `recipient` must have compatible 'onERC721Received' function.
+    /// and `recipient` must have compatible {onERC721Received} function.
     /// @param recipient The address to move `tokenId` to.
     /// @param tokenId The Id to move.
     function safeTransferFrom(
@@ -138,7 +138,7 @@ abstract contract TridentNFT {
     }
 
     /// @notice Transfers `tokenId` from 'owner' to `recipient` with data. Caller needs ownership or approval from 'owner',
-    /// and `recipient` must have compatible 'onERC721Received' function.
+    /// and `recipient` must have compatible {onERC721Received} function.
     /// @param recipient The address to move `tokenId` to.
     /// @param tokenId The Id to move.
     function safeTransferFrom(
