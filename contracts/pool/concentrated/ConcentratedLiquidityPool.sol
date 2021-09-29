@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 pragma solidity >=0.8.0;
 
 import "../../interfaces/IBentoBoxMinimal.sol";
@@ -26,11 +27,11 @@ contract ConcentratedLiquidityPool is IPool {
     event Collect(address indexed sender, uint256 amount0, uint256 amount1);
     event Sync(uint256 reserveShares0, uint256 reserveShares1);
 
-    // References for tickSpacing:
-    // 100 tickSpacing -> 2% between ticks
+    /// @dev References for tickSpacing:
+    // 100 tickSpacing -> 2% between ticks.
     bytes32 public constant override poolIdentifier = "Trident:ConcentratedLiquidity";
 
-    uint24 internal constant MAX_FEE = 100000; /// @dev Maximum swap fee is 10%.
+    uint24 internal constant MAX_FEE = 100000; /// @dev Maximum `swapFee` is 10%.
 
     uint128 internal immutable MAX_TICK_LIQUIDITY;
     uint24 internal immutable tickSpacing;
@@ -56,7 +57,7 @@ contract ConcentratedLiquidityPool is IPool {
     uint128 internal token0ProtocolFee;
     uint128 internal token1ProtocolFee;
 
-    uint128 internal reserve0; /// @dev Bento share balance tracker.
+    uint128 internal reserve0; /// @dev `bento` share balance tracker.
     uint128 internal reserve1;
 
     uint160 internal price; /// @dev Sqrt of price aka. √(y/x), multiplied by 2^96.
@@ -99,10 +100,10 @@ contract ConcentratedLiquidityPool is IPool {
         uint256 amount1Desired;
         bool token0native;
         bool token1native;
-        /** @dev To mint an NFT the positionOwner should be set to the positionManager contract. */
+        /// @dev To mint an NFT the positionOwner should be set to the positionManager contract.
         address positionOwner;
-        /** @dev When minting through the positionManager contract positionRecipient should be the NFT recipient.
-            It can be set to address(0) if we are not minting through the positionManager contract. */
+        /// @dev When minting through the positionManager contract positionRecipient should be the NFT recipient.
+        //    It can be set to address(0) if we are not minting through the positionManager contract.
         address positionRecipient;
     }
 
@@ -117,12 +118,13 @@ contract ConcentratedLiquidityPool is IPool {
         require(_token0 != address(this), "INVALID_TOKEN0");
         require(_token1 != address(this), "INVALID_TOKEN1");
         require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
+        
         token0 = _token0;
         token1 = _token1;
         swapFee = _swapFee;
         price = _price;
         tickSpacing = _tickSpacing;
-        /// @dev Prevents global liquidity overflow in the case all ticks are initialised
+        /// @dev Prevents global liquidity overflow in the case all ticks are initialised.
         MAX_TICK_LIQUIDITY = Ticks.getMaxLiquidity(_tickSpacing);
         ticks[TickMath.MIN_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
         ticks[TickMath.MAX_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
@@ -136,7 +138,7 @@ contract ConcentratedLiquidityPool is IPool {
 
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
     // The router must ensure that sufficient LP tokens are minted by using the return value.
-    function mint(bytes calldata data) external override lock returns (uint256 _liquidity) {
+    function mint(bytes calldata data) public override lock returns (uint256 _liquidity) {
         MintParams memory mintParams = abi.decode(data, (MintParams));
 
         uint256 priceLower = uint256(TickMath.getSqrtRatioAtTick(mintParams.lower));
@@ -197,7 +199,6 @@ contract ConcentratedLiquidityPool is IPool {
 
         ITridentCallee(msg.sender).tridentMintCallback(abi.encode(callbackData));
 
-        /// @dev This is safe because overflow is checked in {getAmountsForLiquidity}.
         unchecked {
             if (amount0Actual != 0) {
                 require(amount0Actual + reserve0 <= _balance(token0), "TOKEN0_MISSING");
@@ -227,7 +228,7 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
-    function burn(bytes calldata data) external override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
+    function burn(bytes calldata data) public override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
         (int24 lower, int24 upper, uint128 amount, address recipient, bool unwrapBento) = abi.decode(
             data,
             (int24, int24, uint128, address, bool)
@@ -236,7 +237,7 @@ contract ConcentratedLiquidityPool is IPool {
         uint160 priceLower = TickMath.getSqrtRatioAtTick(lower);
         uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper);
         uint160 currentPrice = price;
-        /// @dev This is safe because user cannot have overflow amount of LP to burn.
+
         unchecked {
             if (priceLower < currentPrice && currentPrice < priceUpper) liquidity -= amount;
         }
@@ -249,7 +250,7 @@ contract ConcentratedLiquidityPool is IPool {
         );
 
         (uint256 amount0fees, uint256 amount1fees) = _updatePosition(msg.sender, lower, upper, -int128(amount));
-        /// @dev This is safe because overflow is checked in {updatePosition}.
+
         unchecked {
             amount0 += amount0fees;
             amount1 += amount1fees;
@@ -270,7 +271,7 @@ contract ConcentratedLiquidityPool is IPool {
         emit Burn(msg.sender, amount0, amount1, recipient);
     }
 
-    function burnSingle(bytes calldata) external override returns (uint256) {
+    function burnSingle(bytes calldata) public override returns (uint256) {
         revert();
     }
 
@@ -279,7 +280,7 @@ contract ConcentratedLiquidityPool is IPool {
         int24 upper,
         address recipient,
         bool unwrapBento
-    ) external lock returns (uint256 amount0fees, uint256 amount1fees) {
+    ) public lock returns (uint256 amount0fees, uint256 amount1fees) {
         (amount0fees, amount1fees) = _updatePosition(msg.sender, lower, upper, 0);
 
         _transferBothTokens(recipient, amount0fees, amount1fees, unwrapBento);
@@ -325,7 +326,7 @@ contract ConcentratedLiquidityPool is IPool {
             if (zeroForOne) {
                 // Trading token 0 (x) for token 1 (y).
                 // Price is decreasing.
-                // Maximum input amount within current tick range: Δx = Δ(1/√𝑃) · L
+                // Maximum input amount within current tick range: Δx = Δ(1/√𝑃) · L.
                 uint256 maxDx = DyDxMath.getDx(cache.currentLiquidity, nextTickPrice, cache.currentPrice, false);
 
                 if (cache.input <= maxDx) {
@@ -335,7 +336,7 @@ contract ConcentratedLiquidityPool is IPool {
                     // This is derrived from Δ(1/√𝑃) = Δx/L
                     // where Δ(1/√𝑃) is 1/√𝑃[old] - 1/√𝑃[new] and we solve for √𝑃[new].
                     // In case of an owerflow we can use: √𝑃[new] = L / (L / √𝑃 + Δx).
-                    // This is derrived by dividing the original fraction by √𝑃 on both sides
+                    // This is derrived by dividing the original fraction by √𝑃 on both sides.
                     uint256 newPrice = uint256(
                         FullMath.mulDivRoundingUp(liquidityPadded, cache.currentPrice, liquidityPadded + cache.currentPrice * cache.input)
                     );
@@ -356,13 +357,13 @@ contract ConcentratedLiquidityPool is IPool {
                     cache.input -= maxDx;
                 }
             } else {
-                // Price is increasing
+                // Price is increasing.
                 // Maximum swap amount within the current tick range: Δy = Δ√P · L.
                 uint256 maxDy = DyDxMath.getDy(cache.currentLiquidity, cache.currentPrice, nextTickPrice, false);
 
                 if (cache.input <= maxDy) {
-                    // We can swap within the current range
-                    // Calculate new price after swap: ΔP = Δy/L
+                    // We can swap within the current range.
+                    // Calculate new price after swap: ΔP = Δy/L.
                     uint256 newPrice = cache.currentPrice +
                         FullMath.mulDiv(cache.input, 0x1000000000000000000000000, cache.currentLiquidity);
                     /// @dev Calculate output of swap
@@ -398,7 +399,7 @@ contract ConcentratedLiquidityPool is IPool {
                     zeroForOne
                 );
                 if (cache.currentLiquidity == 0) {
-                    // We step into a zone that has liquidity; Or we reach the end of the linked list
+                    // We step into a zone that has liquidity - or we reach the end of the linked list.
                     cache.currentPrice = uint256(TickMath.getSqrtRatioAtTick(cache.nextTickToCross));
                     (cache.currentLiquidity, cache.nextTickToCross) = Ticks.cross(
                         ticks,
@@ -435,7 +436,7 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     /// @dev Reserved for IPool.
-    function flashSwap(bytes calldata) external override returns (uint256) {
+    function flashSwap(bytes calldata) public override returns (uint256) {
         revert();
     }
 
@@ -445,7 +446,7 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     /// @dev Collects fees for Trident protocol.
-    function collectProtocolFee() external lock returns (uint128 amount0, uint128 amount1) {
+    function collectProtocolFee() public lock returns (uint128 amount0, uint128 amount1) {
         if (token0ProtocolFee > 1) {
             amount0 = token0ProtocolFee - 1;
             token0ProtocolFee = 1;
@@ -460,6 +461,14 @@ contract ConcentratedLiquidityPool is IPool {
         }
     }
 
+    function _ensureTickSpacing(int24 lower, int24 upper) internal view {
+        require(lower % int24(tickSpacing) == 0, "INVALID_TICK");
+        require((lower / int24(tickSpacing)) % 2 == 0, "LOWER_EVEN");
+
+        require(upper % int24(tickSpacing) == 0, "INVALID_TICK");
+        require((upper / int24(tickSpacing)) % 2 != 0, "UPPER_ODD"); /// @dev Can be either -1 or 1.
+    }
+
     function _getAmountsForLiquidity(
         uint256 priceLower,
         uint256 priceUpper,
@@ -467,10 +476,10 @@ contract ConcentratedLiquidityPool is IPool {
         uint256 liquidityAmount
     ) internal pure returns (uint128 token0amount, uint128 token1amount) {
         if (priceUpper <= currentPrice) {
-            /// @dev Only supply token1 (token1 is Y).
+            /// @dev Only supply `token1` (`token1` is Y).
             token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, priceUpper, true));
         } else if (currentPrice <= priceLower) {
-            /// @dev Only supply token0 (token0 is X).
+            /// @dev Only supply `token0` (`token0` is X).
             token0amount = uint128(DyDxMath.getDx(liquidityAmount, priceLower, priceUpper, true));
         } else {
             /// @dev Supply both tokens.
@@ -595,7 +604,7 @@ contract ConcentratedLiquidityPool is IPool {
         Ticks.Tick storage lower = ticks[lowerTick];
         Ticks.Tick storage upper = ticks[upperTick];
 
-        // Calculate fee growth below & above.
+        /// @dev Calculate fee growth below & above.
         uint256 _feeGrowthGlobal0 = feeGrowthGlobal0;
         uint256 _feeGrowthGlobal1 = feeGrowthGlobal1;
         uint256 feeGrowthBelow0;
@@ -675,7 +684,7 @@ contract ConcentratedLiquidityPool is IPool {
     {
         _MAX_TICK_LIQUIDITY = MAX_TICK_LIQUIDITY;
         _tickSpacing = tickSpacing;
-        _swapFee = swapFee; // @dev 1000 corresponds to 0.1% fee.
+        _swapFee = swapFee; /// @dev 1000 corresponds to 0.1% fee.
         _barFeeTo = barFeeTo;
         _bento = bento;
         _masterDeployer = masterDeployer;
@@ -701,13 +710,5 @@ contract ConcentratedLiquidityPool is IPool {
     function getLiquidityAndLastObservation() public view returns (uint160 _secondsPerLiquidity, uint32 _lastObservation) {
         _secondsPerLiquidity = secondsPerLiquidity;
         _lastObservation = lastObservation;
-    }
-
-    function _ensureTickSpacing(int24 lower, int24 upper) internal view {
-        require(lower % int24(tickSpacing) == 0, "INVALID_TICK");
-        require((lower / int24(tickSpacing)) % 2 == 0, "LOWER_EVEN");
-
-        require(upper % int24(tickSpacing) == 0, "INVALID_TICK");
-        require((upper / int24(tickSpacing)) % 2 != 0, "UPPER_ODD"); // can be either -1 or 1
     }
 }
