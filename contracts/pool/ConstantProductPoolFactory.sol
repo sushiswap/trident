@@ -17,7 +17,7 @@ contract ConstantProductPoolFactory is PoolDeployer {
             (tokenA, tokenB) = (tokenB, tokenA);
         }
 
-        // Strips any extra data.
+        // @dev Strips any extra data.
         _deployData = abi.encode(tokenA, tokenB, swapFee, twapSupport);
 
         address[] memory tokens = new address[](2);
