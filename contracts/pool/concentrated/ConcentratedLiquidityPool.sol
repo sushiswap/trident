@@ -99,8 +99,11 @@ contract ConcentratedLiquidityPool is IPool {
         uint256 amount1Desired;
         bool token0native;
         bool token1native;
+        /** @dev To mint an NFT the positionOwner should be set to the positionManager contract. */
         address positionOwner;
-        address recipient;
+        /** @dev When minting through the positionManager contract positionRecipient should be the NFT recipient.
+            It can be set to address(0) if we are not minting through the positionManager contract. */
+        address positionRecipient;
     }
 
     /// @dev Only set immutable variables here - state changes made here will not be used.
@@ -209,16 +212,18 @@ contract ConcentratedLiquidityPool is IPool {
 
         (uint256 feeGrowth0, uint256 feeGrowth1) = rangeFeeGrowth(mintParams.lower, mintParams.upper);
 
-        IPositionManager(mintParams.positionOwner).positionMintCallback(
-            mintParams.recipient,
-            mintParams.lower,
-            mintParams.upper,
-            uint128(_liquidity),
-            feeGrowth0,
-            feeGrowth1
-        );
+        if (mintParams.positionRecipient != address(0)) {
+            IPositionManager(mintParams.positionOwner).positionMintCallback(
+                mintParams.positionRecipient,
+                mintParams.lower,
+                mintParams.upper,
+                uint128(_liquidity),
+                feeGrowth0,
+                feeGrowth1
+            );
+        }
 
-        emit Mint(mintParams.positionOwner, amount0Actual, amount1Actual, mintParams.recipient);
+        emit Mint(mintParams.positionOwner, amount0Actual, amount1Actual, mintParams.positionRecipient);
     }
 
     /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
