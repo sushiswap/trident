@@ -144,7 +144,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
     });
 
     it("Should add liquidity and swap (with crossing ticks)", async () => {
-      for (const pool of [trident.concentratedPools[0]]) {
+      for (const pool of trident.concentratedPools) {
         helper.reset();
 
         const tickSpacing = (await pool.getImmutables())._tickSpacing;
