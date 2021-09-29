@@ -23,7 +23,6 @@ contract MasterDeployer is TridentOwnable {
     uint256 internal constant MAX_FEE = 10000; // @dev 100%.
 
     mapping(address => bool) public pools;
-
     mapping(address => bool) public whitelistedFactories;
 
     constructor(
