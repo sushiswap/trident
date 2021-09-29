@@ -49,6 +49,10 @@ describe("MultiPool Routing Tests", function () {
       toToken.address
     );
 
+    const tridentT0Balance = await this.bento.balanceOf(
+      topology.tokens[0].address,
+      this.tridentRouterAddress
+    );
     const tridentT1Balance = await this.bento.balanceOf(
       topology.tokens[1].address,
       this.tridentRouterAddress
@@ -62,6 +66,7 @@ describe("MultiPool Routing Tests", function () {
       this.tridentRouterAddress
     );
 
+    expect(tridentT0Balance).equal(0);
     expect(tridentT1Balance).equal(0);
     expect(tridentT2Balance).equal(0);
     expect(tridentT3Balance).equal(0);

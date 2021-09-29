@@ -4,78 +4,37 @@ import { getBigNumber, MultiRoute } from "@sushiswap/tines";
 
 import { RouteType } from "./constants";
 import { ComplexPathParams, ExactInputParams, ExactInputSingleParams, InitialPath, Output, Path, PercentagePath, TridentRoute } from "./helperInterfaces";
+import { BigNumber } from "@ethersproject/bignumber";
 
 
-export function getTridentRouterParams(multiRoute: MultiRoute, senderAddress: string, tridentRouterAddress: string = ""): ExactInputParams | ExactInputSingleParams | ComplexPathParams {
+export function getTridentRouterParams(multiRoute: MultiRoute, senderAddress: string, tridentRouterAddress: string = "", slippagePercentage: number = 0.5): ExactInputParams | ExactInputSingleParams | ComplexPathParams {
     const routeType = getRouteType(multiRoute);
     let routerParams;
+
+    const slippage = 1 - (slippagePercentage/100);
   
     switch (routeType) {
       case RouteType.SinglePool:
-        routerParams = getExactInputSingleParams(multiRoute, senderAddress);
+        routerParams = getExactInputSingleParams(multiRoute, senderAddress, slippage);
         break;
   
       case RouteType.SinglePath:
-        routerParams = getExactInputParams(multiRoute, senderAddress);
+        routerParams = getExactInputParams(multiRoute, senderAddress, slippage);
         break;
   
       case RouteType.ComplexPath:
       default:
-        routerParams = getComplexPathParams(multiRoute, senderAddress, tridentRouterAddress);
+        routerParams = getComplexPathParams(multiRoute, senderAddress, tridentRouterAddress, slippage);
         break;
     }
     
     return routerParams;
 }
 
-function getRouteType(multiRoute: MultiRoute) { 
-    if(multiRoute.legs.length === 1){
-      return RouteType.SinglePool;
-    }
-  
-    const routeInputTokens = multiRoute.legs.map(function (leg) { return leg.token.address});
-  
-    if((new Set(routeInputTokens)).size === routeInputTokens.length){
-      return RouteType.SinglePath;
-    }
-  
-    if((new Set(routeInputTokens)).size !== routeInputTokens.length){
-      return RouteType.ComplexPath;
-    }
-  
-    return "unknown";
-}
-
-function isLastLeg(legIndex: number, multiRoute: MultiRoute): boolean{
-  return legIndex === multiRoute.legs.length - 1;
-}
-
-function isParallelLeg(legIndex: number, multiRoute: MultiRoute): boolean{
-  return multiRoute.legs[legIndex].absolutePortion > 0 && multiRoute.legs[legIndex].absolutePortion < 1;
-}
-
-function getRecipentAddress(multiRoute: MultiRoute, legIndex: number, senderAddress: string, tridentRouterAddress: string = ""): string {
-    
-    if (isLastLeg(legIndex, multiRoute))
-    {
-      return senderAddress;
-    }
-    else if(isParallelLeg(legIndex, multiRoute)) 
-    {
-      return tridentRouterAddress;
-    } 
-    else 
-    {
-      return multiRoute.legs[legIndex + 1].address;
-    }
-}
-
-
-
-function getExactInputSingleParams(multiRoute: MultiRoute, senderAddress: string) :ExactInputSingleParams {
+function getExactInputSingleParams(multiRoute: MultiRoute, senderAddress: string, slippage: number) :ExactInputSingleParams {
     return {
         amountIn: getBigNumber(multiRoute.amountIn * multiRoute.legs[0].absolutePortion),
-        amountOutMinimum: getBigNumber(0),
+        amountOutMinimum: getBigNumber(multiRoute.amountOut * slippage),
         tokenIn: multiRoute.legs[0].token.address,
         pool: multiRoute.legs[0].address,
         data: ethers.utils.defaultAbiCoder.encode(
@@ -86,12 +45,13 @@ function getExactInputSingleParams(multiRoute: MultiRoute, senderAddress: string
     }; 
 }
 
-function getExactInputParams(multiRoute: MultiRoute, senderAddress: string) :ExactInputParams {
+function getExactInputParams(multiRoute: MultiRoute, senderAddress: string, slippage: number) :ExactInputParams {
     const routeLegs = multiRoute.legs.length;
     let paths: Path[] = [];
 
     for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
         const recipentAddress = getRecipentAddress(
+          RouteType.SinglePath,
           multiRoute,
           legIndex, 
           senderAddress
@@ -123,7 +83,7 @@ function getExactInputParams(multiRoute: MultiRoute, senderAddress: string) :Exa
     let inputParams: ExactInputParams = {
       tokenIn: multiRoute.legs[0].token.address,
       amountIn: getBigNumber(multiRoute.amountIn),
-      amountOutMinimum: getBigNumber(0),
+      amountOutMinimum: getBigNumber(multiRoute.amountOut * slippage),
       path: paths,
       routeType: RouteType.SinglePath
     };
@@ -131,23 +91,25 @@ function getExactInputParams(multiRoute: MultiRoute, senderAddress: string) :Exa
     return inputParams;
 }
 
-function getComplexPathParams(multiRoute: MultiRoute, senderAddress: string, tridentRouterAddress: string): ComplexPathParams {
+function getComplexPathParams(multiRoute: MultiRoute, senderAddress: string, tridentRouterAddress: string, slippage: number): ComplexPathParams {
     let initialPaths: InitialPath[] = [];
     let percentagePaths: PercentagePath[] = [];
     let outputs: Output[] = [];
+
+    const routeLegs = multiRoute.legs.length;
+    const initialPathCount = multiRoute.legs.filter(leg => leg.token.address === multiRoute.fromToken.address).length;
   
     const output: Output = {
       token: multiRoute.toToken.address,
       to: senderAddress,
       unwrapBento: false,
-      minAmount: getBigNumber(0),
+      minAmount: getBigNumber(multiRoute.amountOut * slippage)
     };
     outputs.push(output);
-  
-    const routeLegs = multiRoute.legs.length;
-  
+    
     for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
       const recipentAddress = getRecipentAddress(
+        RouteType.ComplexPath,
         multiRoute,
         legIndex, 
         senderAddress,
@@ -157,8 +119,8 @@ function getComplexPathParams(multiRoute: MultiRoute, senderAddress: string, tri
       if (multiRoute.legs[legIndex].token.address === multiRoute.fromToken.address) {
         const initialPath: InitialPath = {
           tokenIn: multiRoute.legs[legIndex].token.address,
-          pool: multiRoute.legs[legIndex].address,
-          amount: getBigNumber(multiRoute.amountIn * multiRoute.legs[legIndex].absolutePortion),
+          pool: multiRoute.legs[legIndex].address, 
+          amount: getInitialPathAmount(legIndex, multiRoute, initialPaths, initialPathCount),
           native: false,
           data: ethers.utils.defaultAbiCoder.encode(
             ["address", "address", "bool"],
@@ -188,4 +150,72 @@ function getComplexPathParams(multiRoute: MultiRoute, senderAddress: string, tri
     };
   
     return complexParams;
+} 
+
+function isLastLeg(legIndex: number, multiRoute: MultiRoute): boolean{
+  return legIndex === multiRoute.legs.length - 1;
+} 
+  
+function getRecipentAddress(routeType: RouteType, multiRoute: MultiRoute, legIndex: number, senderAddress: string, tridentRouterAddress: string = ""): string {
+    let recipentAddress;
+
+    switch (routeType) {
+      case RouteType.SinglePool:
+        recipentAddress = senderAddress;
+        break;
+  
+      case RouteType.SinglePath:
+        if (isLastLeg(legIndex, multiRoute))
+        {
+          recipentAddress = senderAddress;
+        }
+        else 
+        {
+          recipentAddress = multiRoute.legs[legIndex + 1].address;
+        }
+        break;
+  
+      case RouteType.ComplexPath:
+      default:
+        recipentAddress = tridentRouterAddress;
+        break;
+    }
+    
+    return recipentAddress;
+}
+
+function getRouteType(multiRoute: MultiRoute) { 
+  if(multiRoute.legs.length === 1){
+    return RouteType.SinglePool;
   }
+
+  const routeInputTokens = multiRoute.legs.map(function (leg) { return leg.token.address});
+
+  if((new Set(routeInputTokens)).size === routeInputTokens.length){
+    return RouteType.SinglePath;
+  }
+
+  if((new Set(routeInputTokens)).size !== routeInputTokens.length){
+    return RouteType.ComplexPath;
+  }
+
+  return "unknown";
+} 
+
+function getInitialPathAmount(legIndex: number, multiRoute: MultiRoute, initialPaths: InitialPath[], initialPathCount: number): BigNumber {
+  let amount;
+
+  if(legIndex === initialPathCount - 1){
+    const sumIntialPathAmounts = initialPaths.map(p => p.amount).reduce(function(a, b)
+    {
+      return a.add(b);
+    });
+
+    amount = getBigNumber(multiRoute.amountIn).sub(sumIntialPathAmounts);
+  }
+  else{
+    amount = getBigNumber(multiRoute.amountIn * multiRoute.legs[legIndex].absolutePortion);
+  }
+
+  return amount;
+}
