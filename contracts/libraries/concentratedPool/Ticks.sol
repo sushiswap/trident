@@ -52,13 +52,85 @@ library Ticks {
         return (currentLiquidity, nextTickToCross);
     }
 
+    function insert(
+        mapping(int24 => Tick) storage ticks,
+        uint256 feeGrowthGlobal0,
+        uint256 feeGrowthGlobal1,
+        uint160 secondsPerLiquidity,
+        int24 lowerOld,
+        int24 lower,
+        int24 upperOld,
+        int24 upper,
+        uint128 amount,
+        int24 nearestTick,
+        uint160 currentPrice
+    ) public returns (int24) {
+        require(lower < upper, "WRONG_ORDER");
+        require(TickMath.MIN_TICK <= lower, "LOWER_RANGE");
+        require(upper <= TickMath.MAX_TICK, "UPPER_RANGE");
+
+        {
+            // stack overflow boo boo
+            uint128 currentLowerLiquidity = ticks[lower].liquidity;
+            if (currentLowerLiquidity != 0 || lower == TickMath.MIN_TICK) {
+                // We are adding liquidity to an existing tick.
+                ticks[lower].liquidity = currentLowerLiquidity + amount;
+            } else {
+                // We are inserting a new tick.
+                Ticks.Tick storage old = ticks[lowerOld];
+                int24 oldNextTick = old.nextTick;
+
+                require((old.liquidity != 0 || lowerOld == TickMath.MIN_TICK) && lowerOld < lower && lower < oldNextTick, "LOWER_ORDER");
+
+                if (lower <= nearestTick) {
+                    ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
+                } else {
+                    ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, 0, 0, 0);
+                }
+
+                old.nextTick = lower;
+                ticks[oldNextTick].previousTick = lower;
+            }
+        }
+
+        uint128 currentUpperLiquidity = ticks[upper].liquidity;
+        if (currentUpperLiquidity != 0 || upper == TickMath.MAX_TICK) {
+            // We are adding liquidity to an existing tick.
+            ticks[upper].liquidity = currentUpperLiquidity + amount;
+        } else {
+            // Inserting a new tick.
+            Ticks.Tick storage old = ticks[upperOld];
+            int24 oldNextTick = old.nextTick;
+
+            require(old.liquidity != 0 && oldNextTick > upper && upperOld < upper, "UPPER_ORDER");
+
+            if (upper <= nearestTick) {
+                ticks[upper] = Ticks.Tick(upperOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
+            } else {
+                ticks[upper] = Ticks.Tick(upperOld, oldNextTick, amount, 0, 0, 0);
+            }
+            old.nextTick = upper;
+            ticks[oldNextTick].previousTick = upper;
+        }
+
+        int24 actualNearestTick = TickMath.getTickAtSqrtRatio(currentPrice);
+
+        if (nearestTick < upper && upper <= actualNearestTick) {
+            nearestTick = upper;
+        } else if (nearestTick < lower && lower <= actualNearestTick) {
+            nearestTick = lower;
+        }
+
+        return nearestTick;
+    }
+
     function remove(
         mapping(int24 => Tick) storage ticks,
-        int24 nearestTick,
         int24 lower,
         int24 upper,
-        uint128 amount
-    ) internal returns (int24) {
+        uint128 amount,
+        int24 nearestTick
+    ) public returns (int24) {
         Ticks.Tick storage current = ticks[lower];
 
         if (lower != TickMath.MIN_TICK && current.liquidity == amount) {
@@ -73,7 +145,9 @@ library Ticks {
 
             delete ticks[lower];
         } else {
-            current.liquidity -= amount;
+            unchecked {
+                current.liquidity -= amount;
+            }
         }
 
         current = ticks[upper];
@@ -90,7 +164,9 @@ library Ticks {
 
             delete ticks[upper];
         } else {
-            current.liquidity -= amount;
+            unchecked {
+                current.liquidity -= amount;
+            }
         }
 
         return nearestTick;
