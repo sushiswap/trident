@@ -20,9 +20,7 @@ import { removeConsoleLog } from "hardhat-preprocessor";
 
 // const accounts = [process.env.DEPLOYER_KEY || "0x00"];
 const accounts = {
-  mnemonic:
-    process.env.MNEMONIC ||
-    "test test test test test test test test test test test junk",
+  mnemonic: process.env.MNEMONIC || "test test test test test test test test test test test junk",
 };
 
 const config: HardhatUserConfig = {
@@ -79,6 +77,14 @@ const config: HardhatUserConfig = {
       saveDeployments: true,
       tags: ["test", "local"],
       // Solidity-coverage overrides gasPrice to 1 which is not compatible with EIP1559
+      hardfork: process.env.CODE_COVERAGE ? "berlin" : "london",
+    },
+    mainnet: {
+      url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
+      live: true,
+      chainId: 1,
+      saveDeployments: true,
+      tags: ["mainnet"],
       hardfork: process.env.CODE_COVERAGE ? "berlin" : "london",
     },
     ropsten: {
@@ -268,10 +274,7 @@ const config: HardhatUserConfig = {
     tests: "test",
   },
   preprocess: {
-    eachLine: removeConsoleLog(
-      (bre) =>
-        bre.network.name !== "hardhat" && bre.network.name !== "localhost"
-    ),
+    eachLine: removeConsoleLog((bre) => bre.network.name !== "hardhat" && bre.network.name !== "localhost"),
   },
   solidity: {
     compilers: [

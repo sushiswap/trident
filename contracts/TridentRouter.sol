@@ -314,6 +314,10 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         }
     }
 
+    function deployPool(address _factory, bytes calldata _deployData) external returns (address) {
+        return masterDeployer.deployPool(_factory, _deployData);
+    }
+
     function _depositToBentoBox(
         address token,
         address recipient,
