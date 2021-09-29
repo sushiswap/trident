@@ -43,10 +43,10 @@ contract ConcentratedLiquidityPool is IPool {
     address internal immutable token0;
     address internal immutable token1;
 
-    uint32 internal lastObservation;
-    uint128 internal liquidity;
+    uint128 public liquidity;
 
-    uint160 public secondsPerLiquidity; /// @dev Multiplied by 2^128.
+    uint160 internal secondsPerLiquidity; /// @dev Multiplied by 2^128.
+    uint32 internal lastObservation;
 
     uint256 public feeGrowthGlobal0; /// @dev All fee growth counters are multiplied by 2^128.
     uint256 public feeGrowthGlobal1;
@@ -70,8 +70,8 @@ contract ConcentratedLiquidityPool is IPool {
         unlocked = 1;
     }
 
-    mapping(int24 => Ticks.Tick) internal ticks;
-    mapping(address => mapping(int24 => mapping(int24 => Position))) internal positions;
+    mapping(int24 => Ticks.Tick) public ticks;
+    mapping(address => mapping(int24 => mapping(int24 => Position))) public positions;
 
     struct Position {
         uint128 liquidity;
@@ -688,12 +688,12 @@ contract ConcentratedLiquidityPool is IPool {
         _reserve1 = reserve1;
     }
 
-    function getLiquidityAndLastObservation() public view returns (uint128 _liquidity, uint32 _lastObservation) {
-        _liquidity = liquidity;
+    function getLiquidityAndLastObservation() public view returns (uint160 _secondsPerLiquidity, uint32 _lastObservation) {
+        _secondsPerLiquidity = secondsPerLiquidity;
         _lastObservation = lastObservation;
     }
 
-    function _ensureTickSpacing(int24 lower, int24 upper) internal {
+    function _ensureTickSpacing(int24 lower, int24 upper) internal view {
         require(lower % int24(tickSpacing) == 0, "INVALID_TICK");
         require((lower / int24(tickSpacing)) % 2 == 0, "LOWER_EVEN");
 
