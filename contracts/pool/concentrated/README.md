@@ -29,12 +29,12 @@ We repeat this step untill we use up all of the swap input amount.
 
 Pool may be trading inside and outside of a given position. To calcualte fees belonging to a specific position we keep track of a couple of counters.
 
-We store a **feeGrowthGlobal** accumulator which increases on every swap step by the swap amount divided by the current liquidity `feeGrowthGlobal += feeAmount / currentLiquidity`.
-Every tick also keeps track of the **feeGrowthOutside** accumulator. This stores the fee growth that has happened on the side of the tick where trading isn't currently happening. It is updated each time a tick is crossed: `feeGrowthOutside = feeGrowthGlobal - feeGrowthOutside`.
+We store a **feeGrowthGlobal** accumulator which increases on every swap step by the swap fee amount divided by the current liquidity `feeGrowthGlobal += feeAmount / currentLiquidity`.
+Every tick also keeps track of it's own **feeGrowthOutside** accumulator. This stores the fee growth that has happened on the side of the tick where trading isn't currently happening. It is updated each time a tick is crossed: `feeGrowthOutside = feeGrowthGlobal - feeGrowthOutside`.
 
 Using the `feeGrowthGlobal` and `feeGrowthOutside` variables we can calculate the feeGrowth that has happened above or below any specific tick.
 
-Using the `feeGrowthAbove` of a range's upper tick and the `feeGrowthBelow` of the range's lower tick we can calculate the current fee growth of a position by subtracting both values from the current `feeGrowthGlobal`. When a position is opened a snapshot of this value is stored in the **feeGrowthInsideLast** variable. When a user wants to claim their fees a new `feeGrowthInsideLast` value is calculated. Multipliying the difference between the new and the old value with the position's liquidity gives us the fees belonging to the user.
+Using the `feeGrowthAbove` of a range's upper tick and the `feeGrowthBelow` of the range's lower tick we can calculate the current fee growth of a position by subtracting both values from the current `feeGrowthGlobal`. When a user adds a position a snapshot of this value is stored in the **feeGrowthInsideLast** variable. When the user wants to claim their fees a new `feeGrowthInsideLast` value is calculated. Multipliying the difference between the new and the old value with the position's liquidity gives us the fees belonging to the user.
 
 ## Pool Manager
 
