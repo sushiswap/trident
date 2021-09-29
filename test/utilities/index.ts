@@ -5,15 +5,12 @@ export const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000";
 
 export const MAX_FEE = 10000;
 
-// Defaults to e18 using amount * 10^18
+//Defaults to e18 using amount * 10^18
 export function getBigNumber(amount: BigNumberish, decimals = 18): BigNumber {
   return BigNumber.from(amount).mul(BigNumber.from(BASE_TEN).pow(decimals));
 }
 
-export function getIntegerRandomValue(
-  exp: number,
-  rnd: any
-): [number, BigNumber] {
+export function getIntegerRandomValue(exp: number, rnd: any): [number, BigNumber] {
   if (exp <= 15) {
     const value = Math.floor(rnd() * Math.pow(10, exp));
     return [value, BigNumber.from(value)];

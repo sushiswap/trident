@@ -13,4 +13,6 @@ interface IMasterDeployer {
     function migrator() external view returns (address);
 
     function pools(address pool) external view returns (bool);
+
+    function deployPool(address factory, bytes calldata deployData) external returns (address);
 }
