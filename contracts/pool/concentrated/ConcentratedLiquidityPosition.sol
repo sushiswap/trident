@@ -80,30 +80,29 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         require(msg.sender == ownerOf[tokenId], "NOT_ID_OWNER");
 
         Position storage position = positions[tokenId];
+        (uint256 feeGrowthInside0, uint256 feeGrowthInside1) = position.pool.rangeFeeGrowth(position.lower, position.upper);
+
+        token0amount = FullMath.mulDiv(
+            feeGrowthInside0 - position.feeGrowthInside0,
+            position.liquidity,
+            0x100000000000000000000000000000000
+        );
+        token1amount = FullMath.mulDiv(
+            feeGrowthInside1 - position.feeGrowthInside1,
+            position.liquidity,
+            0x100000000000000000000000000000000
+        );
 
         (address token0, address token1) = _getAssets(position.pool);
 
-        {
-            (uint256 feeGrowthInside0, uint256 feeGrowthInside1) = position.pool.rangeFeeGrowth(position.lower, position.upper);
-            token0amount = FullMath.mulDiv(
-                feeGrowthInside0 - position.feeGrowthInside0,
-                position.liquidity,
-                0x100000000000000000000000000000000
-            );
-            token1amount = FullMath.mulDiv(
-                feeGrowthInside1 - position.feeGrowthInside1,
-                position.liquidity,
-                0x100000000000000000000000000000000
-            );
-
-            position.feeGrowthInside0 = feeGrowthInside0;
-            position.feeGrowthInside1 = feeGrowthInside1;
-        }
+        position.feeGrowthInside0 = feeGrowthInside0;
+        position.feeGrowthInside1 = feeGrowthInside1;
 
         uint256 balance0 = bento.balanceOf(token0, address(this));
         uint256 balance1 = bento.balanceOf(token1, address(this));
+
         if (balance0 < token0amount || balance1 < token1amount) {
-            (uint256 amount0fees, uint256 amount1fees) = position.pool.collect(position.lower, position.upper, address(this), false);
+            (uint256 amount0fees, uint256 amount1fees) = position.pool.collect(abi.encode(position.lower, position.upper, address(this)));
 
             uint256 newBalance0 = amount0fees + balance0;
             uint256 newBalance1 = amount1fees + balance1;
@@ -112,8 +111,8 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
             if (token0amount > newBalance0) token0amount = newBalance0;
             if (token1amount > newBalance1) token1amount = newBalance1;
         }
-        _transfer(token0, address(this), recipient, token0amount, unwrapBento);
-        _transfer(token1, address(this), recipient, token1amount, unwrapBento);
+        _transfer(position.pool.token0(), address(this), recipient, token0amount, unwrapBento);
+        _transfer(position.pool.token1(), address(this), recipient, token1amount, unwrapBento);
     }
 
     function _getAssets(IConcentratedLiquidityPool pool) internal view returns (address token0, address token1) {

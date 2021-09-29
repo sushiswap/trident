@@ -13,21 +13,17 @@ const TWO_POW_128 = BigNumber.from(2).pow(128);
 
 export async function collectProtocolFee(params: { pool: ConcentratedLiquidityPool }) {
   const { pool } = params;
-  const oldTokenProtocolFee = await pool.getTokenProtocolFees();
-  const oldToken0ProtocolFee = oldTokenProtocolFee._token0ProtocolFee;
-  const oldToken1ProtocolFee = oldTokenProtocolFee._token1ProtocolFee;
-  const oldReserve = await pool.getReserves();
-  const oldReserve0 = oldReserve._reserve0;
-  const oldReserve1 = oldReserve._reserve1;
+  const oldToken0ProtocolFee = await pool.token0ProtocolFee();
+  const oldToken1ProtocolFee = await pool.token1ProtocolFee();
+  const oldReserve0 = await pool.reserve0();
+  const oldReserve1 = await pool.reserve1();
 
   await pool.collectProtocolFee();
 
-  const tokenProtocolFee = await pool.getTokenProtocolFees();
-  const token0ProtocolFee = tokenProtocolFee._token0ProtocolFee;
-  const token1ProtocolFee = tokenProtocolFee._token1ProtocolFee;
-  const reserve = await pool.getReserves();
-  const reserve0 = reserve._reserve0;
-  const reserve1 = reserve._reserve1;
+  const token0ProtocolFee = await pool.token0ProtocolFee();
+  const token1ProtocolFee = await pool.token1ProtocolFee();
+  const reserve0 = await pool.reserve0();
+  const reserve1 = await pool.reserve1();
 
   expect(token0ProtocolFee.toString()).to.be.eq("1", "didn't update the protocol fee 0");
   expect(token1ProtocolFee.toString()).to.be.eq("1", "didn't update the protocol fee 0");
@@ -55,8 +51,7 @@ export async function collectFees(params: {
   const token1feeGrowth = range.feeGrowthInside1.sub(position.feeGrowthInside1);
   const token0expected = token0feeGrowth.mul(position.liquidity).div(TWO_POW_128);
   const token1expected = token1feeGrowth.mul(position.liquidity).div(TWO_POW_128);
-  const immutables = await pool.getImmutables();
-  const tokens = [immutables._token0, immutables._token1];
+  const tokens = await Promise.all([pool.token0(), pool.token1()]);
   const oldUserBalances = await Trident.Instance.getTokenBalance(tokens, recipient, false);
 
   await Trident.Instance.concentratedPoolManager.collect(tokenId, recipient, unwrapBento);
@@ -90,10 +85,10 @@ export async function swapViaRouter(params: {
   unwrapBento: boolean;
 }): Promise<BigNumber> {
   const { pool, zeroForOne, inAmount, recipient, unwrapBento } = params;
-  const immutables = await pool.getImmutables();
-  const nearest = (await pool.getPriceAndNearestTicks())._nearestTick;
+  const nearest = await pool.nearestTick();
+
   let nextTickToCross = zeroForOne ? nearest : (await pool.ticks(nearest)).nextTick;
-  let currentPrice = (await pool.getPriceAndNearestTicks())._price;
+  let currentPrice = await pool.price();
   let currentLiquidity = await pool.liquidity();
   let input = inAmount;
   let output = BigNumber.from(0);
@@ -103,16 +98,12 @@ export async function swapViaRouter(params: {
   let protocolFeeIncrease = BigNumber.from(0);
 
   const oldPrice = currentPrice;
-  const tokens = [immutables._token0, immutables._token1];
-  const swapFee = immutables._swapFee;
-  const barFee = await pool.barFee();
+  const tokens = await Promise.all([pool.token0(), pool.token1()]);
+  const [swapFee, barFee] = await Promise.all([pool.swapFee(), pool.barFee()]);
   const feeGrowthGlobalOld = await (zeroForOne ? pool.feeGrowthGlobal1() : pool.feeGrowthGlobal0());
-  const _oldProtocolFees = await pool.getTokenProtocolFees();
-  const oldProtocolFees = zeroForOne ? _oldProtocolFees._token1ProtocolFee : _oldProtocolFees._token0ProtocolFee;
+  const oldProtocolFees = await (zeroForOne ? pool.token1ProtocolFee() : pool.token0ProtocolFee());
   const oldPoolBalances = await Trident.Instance.getTokenBalance(tokens, pool.address, false);
-  const reserve = await pool.getReserves();
-  const oldReserve0 = reserve._reserve0;
-  const oldReserve1 = reserve._reserve1;
+  const [oldReserve0, oldReserve1] = await Promise.all([pool.reserve0(), pool.reserve1()]);
 
   while (input.gt(0)) {
     const nextTickPrice = await getTickPrice(nextTickToCross);
@@ -196,11 +187,10 @@ export async function swapViaRouter(params: {
   await Trident.Instance.router.exactInputSingle(routerData);
 
   const feeGrowthGlobalnew = await (zeroForOne ? pool.feeGrowthGlobal1() : pool.feeGrowthGlobal0());
-  const _newProtocolFees = await pool.getTokenProtocolFees();
-  const protocolFeesNew = zeroForOne ? _newProtocolFees._token1ProtocolFee : _newProtocolFees._token0ProtocolFee;
-  const newPrice = (await pool.getPriceAndNearestTicks())._price;
+  const protocolFeesNew = await (zeroForOne ? pool.token1ProtocolFee() : pool.token0ProtocolFee());
+  const newPrice = await pool.price();
   const newPoolBalances = await Trident.Instance.getTokenBalance(tokens, pool.address, false);
-  const [newReserve0, newReserve1] = await pool.getReserves();
+  const [newReserve0, newReserve1] = await Promise.all([pool.reserve0(), pool.reserve1()]);
 
   let nextNearest = nearest;
   for (let i = 0; i < crossCount; i++) {
@@ -218,7 +208,7 @@ export async function swapViaRouter(params: {
   expect(newReserve0.toString()).to.be.eq(oldReserve0.add(zeroForOne ? inAmount : output.mul(-1)), "Didn't update reserve0 correctly");
   expect(newReserve1.toString()).to.be.eq(oldReserve1.add(zeroForOne ? output.mul(-1) : inAmount), "Didn't update reserve1 correctly");
   expect((await pool.liquidity()).toString()).to.be.eq(currentLiquidity.toString(), "didn't set correct liquidity value");
-  expect(await (await pool.getPriceAndNearestTicks())._nearestTick).to.be.eq(nextNearest, "didn't update nearest tick pointer");
+  expect(await pool.nearestTick()).to.be.eq(nextNearest, "didn't update nearest tick pointer");
   expect(oldPrice.lt(newPrice) !== zeroForOne, "Price didn't move in the right direction");
   expect(protocolFeesNew.toString()).to.be.eq(
     oldProtocolFees.add(protocolFeeIncrease).toString(),
@@ -238,11 +228,11 @@ export async function removeLiquidityViaManager(params: {
   unwrapBento: boolean;
 }): Promise<{ token0: BigNumber; token1: BigNumber }> {
   const { tokenId, liquidityAmount, recipient, unwrapBento } = params;
-  const owner = await Trident.Instance.concentratedPoolManager.ownerOf(tokenId);
+  const owner = (await Trident.Instance.concentratedPoolManager.ownerOf(tokenId));
   const userLiquidity = (await Trident.Instance.concentratedPoolManager.positions(tokenId)).liquidity;
-  const userBalance = await Trident.Instance.concentratedPoolManager.balanceOf(owner);
+  const userBalance = (await Trident.Instance.concentratedPoolManager.balanceOf(owner));
   await Trident.Instance.concentratedPoolManager.burn(tokenId, liquidityAmount, recipient, unwrapBento);
-  if (userLiquidity.eq(liquidityAmount)) {
+  if (userLiquidity.eq(liquidityAmount)) { 
     expect(await Trident.Instance.concentratedPoolManager.balanceOf(owner)).to.be.eq(userBalance.sub(1));
     expect(await Trident.Instance.concentratedPoolManager.ownerOf(tokenId)).to.be.eq(ADDRESS_ZERO);
   } else {
@@ -266,7 +256,7 @@ export async function addLiquidityViaRouter(params: {
   const { pool, amount0Desired, amount1Desired, native, lowerOld, lower, upperOld, upper, positionOwner, recipient } = params;
   const [currentPrice, priceLower, priceUpper] = await getPrices(pool, [lower, upper]);
   const liquidity = getLiquidityForAmount(priceLower, currentPrice, priceUpper, amount1Desired, amount0Desired);
-  const tokens = await Promise.all([(await pool.getImmutables())._token0, (await pool.getImmutables())._token1]);
+  const tokens = await Promise.all([pool.token0(), pool.token1()]);
   const oldUserBalances = await Trident.Instance.getTokenBalance(tokens, recipient, native);
   const oldPoolBalances = await Trident.Instance.getTokenBalance(tokens, pool.address, false);
   const oldLiquidity = await pool.liquidity();
@@ -291,10 +281,9 @@ export async function addLiquidityViaRouter(params: {
     recipient: recipient,
   });
   await Trident.Instance.router.addLiquidityLazy(pool.address, liquidity, mintData);
-  const immutables = await pool.getImmutables();
+
   const newLiquidity = await pool.liquidity();
-  const priceAndTick = await pool.getPriceAndNearestTicks();
-  const newPrice = priceAndTick._price;
+  const newPrice = await pool.price();
   const newTotalSupply = await Trident.Instance.concentratedPoolManager.totalSupply();
   const newUserBalances = await Trident.Instance.getTokenBalance(tokens, recipient, native);
   const newPoolBalances = await Trident.Instance.getTokenBalance(tokens, pool.address, false);
@@ -391,11 +380,9 @@ export async function _addLiquidityViaRouter(params: {
 }
 
 // use solidity here for convenience
-export async function getPrices(pool: ConcentratedLiquidityPool, ticks: Array<BigNumber | number>) {
+export function getPrices(pool: ConcentratedLiquidityPool, ticks: Array<BigNumber | number>) {
   const trident: Trident = Trident.Instance;
-  const price = (await pool.getPriceAndNearestTicks())._price;
-  const tickPrices = await Promise.all(ticks.map((tick) => trident.tickMath.getSqrtRatioAtTick(tick)));
-  return [price, ...tickPrices];
+  return Promise.all([pool.price(), ...ticks.map((tick) => trident.tickMath.getSqrtRatioAtTick(tick))]);
 }
 
 export function getTickPrice(tick) {
@@ -458,7 +445,7 @@ export function getMintData(params: {
 }
 
 export async function getTickAtCurrentPrice(pool: ConcentratedLiquidityPool) {
-  return getTickAtPrice((await pool.getPriceAndNearestTicks())._price);
+  return getTickAtPrice(await pool.price());
 }
 
 export function getTickAtPrice(price: BigNumber) {

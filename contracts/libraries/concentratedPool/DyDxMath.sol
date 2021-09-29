@@ -48,11 +48,7 @@ library DyDxMath {
             if (priceUpper <= currentPrice) {
                 liquidity = FullMath.mulDiv(dy, 0x1000000000000000000000000, priceUpper - priceLower);
             } else if (currentPrice <= priceLower) {
-                liquidity = FullMath.mulDiv(
-                    dx,
-                    FullMath.mulDiv(priceLower, priceUpper, 0x1000000000000000000000000),
-                    priceUpper - priceLower
-                );
+                liquidity = FullMath.mulDiv(dx, FullMath.mulDiv(priceLower, priceUpper, 0x1000000000000000000000000), priceUpper - priceLower);
             } else {
                 uint256 liquidity0 = FullMath.mulDiv(
                     dx,

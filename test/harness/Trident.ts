@@ -44,23 +44,19 @@ export class Trident {
     this.initialising = new Promise<Trident>(async (resolve) => {
       this.accounts = await ethers.getSigners();
 
-      const [ERC20, Bento, Deployer, TridentRouter, ConcentratedPoolManager, TickMath, TickLibrary] = await Promise.all(
-        getFactories([
-          "ERC20Mock",
-          "BentoBoxV1",
-          "MasterDeployer",
-          "TridentRouter",
-          "ConcentratedLiquidityPoolManager",
-          "TickMathTest",
-          "Ticks",
-        ])
-      );
-
-      const tickLibrary = await TickLibrary.deploy();
-      const clpLibs = {};
-      clpLibs["Ticks"] = tickLibrary.address;
-      const ConcentratedPoolFactory = await ethers.getContractFactory("ConcentratedLiquidityPoolFactory", { libraries: clpLibs });
-      const ConcentratedLiquidityPool = await ethers.getContractFactory("ConcentratedLiquidityPool", { libraries: clpLibs });
+      const [ERC20, Bento, Deployer, TridentRouter, ConcentratedLiquidityPool, ConcentratedPoolFactory, ConcentratedPoolManager, TickMath] =
+        await Promise.all(
+          getFactories([
+            "ERC20Mock",
+            "BentoBoxV1",
+            "MasterDeployer",
+            "TridentRouter",
+            "ConcentratedLiquidityPool",
+            "ConcentratedLiquidityPoolFactory",
+            "ConcentratedLiquidityPoolManager",
+            "TickMathTest",
+          ])
+        );
 
       await this.deployTokens(ERC20);
       await this.deployBento(Bento);
@@ -102,7 +98,7 @@ export class Trident {
     prices.push(TWO_POW_96.div(16)); // whats the min and max value we support here??
 
     // mid price feed
-    // prices.push(TWO_POW_96.mul(2));
+    prices.push(TWO_POW_96.mul(2));
 
     // high price feed
     prices.push(TWO_POW_96.mul(16));

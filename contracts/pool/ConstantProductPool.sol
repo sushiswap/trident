@@ -90,7 +90,6 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint256 computed = TridentMath.sqrt(balance0 * balance1);
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
-
         (uint256 fee0, uint256 fee1) = _nonOptimalMintFee(amount0, amount1, _reserve0, _reserve1);
         _reserve0 += uint112(fee0);
         _reserve1 += uint112(fee1);
