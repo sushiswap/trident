@@ -225,7 +225,7 @@ abstract contract TridentNFT {
                 "INVALID_PERMIT_SIGNATURE"
             );
         }
-        setApprovalForAll(operator, true);
+        isApprovedForAll[owner][operator] = true;
         emit ApprovalForAll(owner, operator, true);
     }
 
