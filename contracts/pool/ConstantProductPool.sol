@@ -269,7 +269,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint32 _blockTimestampLast
     ) internal {
         require(balance0 <= type(uint112).max && balance1 <= type(uint112).max, "OVERFLOW");
-        if (blockTimestampLast == 0) {
+        if (_blockTimestampLast == 0) {
             // @dev TWAP support is disabled for gas efficiency.
             reserve0 = uint112(balance0);
             reserve1 = uint112(balance1);
