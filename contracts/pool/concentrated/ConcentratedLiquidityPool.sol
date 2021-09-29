@@ -561,8 +561,13 @@ contract ConcentratedLiquidityPool is IPool {
         uint256 shares1,
         bool unwrapBento
     ) internal {
-        _transfer(token0, shares0, to, unwrapBento);
-        _transfer(token1, shares1, to, unwrapBento);
+        if (unwrapBento) {
+            bento.withdraw(token0, address(this), to, 0, shares0);
+            bento.withdraw(token1, address(this), to, 0, shares1);
+        } else {
+            bento.transfer(token0, address(this), to, shares0);
+            bento.transfer(token1, address(this), to, shares1);
+        }
     }
 
     /// @dev Generic formula for fee growth inside a range: (globalGrowth - growthBelow - growthAbove)
