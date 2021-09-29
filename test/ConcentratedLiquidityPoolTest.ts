@@ -351,14 +351,11 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         const smallerPositionFeesDx = smallerPositionFees2.dx.add(smallerPositionFees1.dx);
         const biggerPositionFees = await collectFees({ pool, tokenId: tokenIdB, recipient: defaultAddress, unwrapBento: false });
         const outsidePositionFees = await collectFees({ pool, tokenId: tokenIdC, recipient: defaultAddress, unwrapBento: false });
-        expect(smallerPositionFeesDy.div(100).toString()).to.be.eq(
-          biggerPositionFees.dy.div(100).div(2).toString(),
-          "fees 0 weren't proportionally split"
-        ); // divide by 100 (remove 2 decimal places) to ignore 1 raw rounding errors
-        expect(smallerPositionFeesDx.div(100).toString()).to.be.eq(
-          biggerPositionFees.dx.div(100).div(2).toString(),
-          "fees 1 weren't proportionally split"
-        );
+        const ratioY = smallerPositionFeesDy.mul(1e6).div(biggerPositionFees.dy.div(2));
+        const ratioX = smallerPositionFeesDx.mul(1e6).div(biggerPositionFees.dx.div(2));
+        // allow for small rounding errors that happen when users claim on different intervals
+        expect(ratioY.lt(1000100) && ratioY.lt(999900), "fees 1 weren't proportionally split");
+        expect(ratioX.lt(1000100) && ratioX.lt(999900), "fees 0 weren't proportionally split");
         expect(outsidePositionFees.dy.toString()).to.be.eq("0", "fees were acredited to a position not in range");
       }
     });
@@ -459,7 +456,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         };
 
         await addLiquidityViaRouter(addLiquidityParams);
-        
+
         addLiquidityParams.amount0Desired = addLiquidityParams.amount0Desired.mul(2);
         addLiquidityParams.amount1Desired = addLiquidityParams.amount1Desired.mul(2);
         addLiquidityParams = helper.setTicks(lower + 3 * step, upper + 3 * step, addLiquidityParams);
@@ -471,7 +468,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           tokenId: 1,
           liquidityAmount: userLiquidity.div(2),
           recipient: trident.accounts[0].address,
-          unwrapBento: true
+          unwrapBento: true,
         };
 
         // BURN LP NFT (partial)
@@ -508,7 +505,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           positionOwner: trident.concentratedPoolManager.address,
           recipient: trident.accounts[0].address,
         };
-       
+
         await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("INVALID_TICK");
         // LOWER_EVEN
         addLiquidityParams.lower = nearestEvenValidTick - step + tickSpacing;
@@ -531,19 +528,19 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
         await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("UPPER_ODD");
 
-        // WRONG ORDER 
+        // WRONG ORDER
         addLiquidityParams.lower = nearestEvenValidTick + 3 * step;
         addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
         await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("WRONG_ORDER");
-       
-        // LOWER_RANGE 
+
+        // LOWER_RANGE
         addLiquidityParams.lower = -Math.floor(887272 / tickSpacing) * tickSpacing - tickSpacing;
         addLiquidityParams.upper = nearestEvenValidTick + tickSpacing;
         addLiquidityParams.lowerOld = lower;
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("TICK_OUT_OF_BOUNDS"); 
+        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("TICK_OUT_OF_BOUNDS");
 
         // UPPER_RANGE
         addLiquidityParams.lower = nearestEvenValidTick;
