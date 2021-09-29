@@ -81,7 +81,7 @@ abstract contract TridentNFT {
     /// @notice Approves an 'operator' for `msg.sender` 'owner' that can spend or {approve} spends of 'owner''s `tokenId`s.
     /// @param operator Address of the party that can pull `tokenId`s from 'owner''s account or approve others to do same.
     /// @param approved The approval status of `operator`.
-    function setApprovalForAll(address operator, bool approved) public {
+    function setApprovalForAll(address operator, bool approved) external {
         isApprovedForAll[msg.sender][operator] = approved;
         emit ApprovalForAll(msg.sender, operator, approved);
     }
@@ -225,7 +225,7 @@ abstract contract TridentNFT {
                 "INVALID_PERMIT_SIGNATURE"
             );
         }
-        setApprovalForAll(operator, true);
+        isApprovedForAll[owner][operator] = true;
         emit ApprovalForAll(owner, operator, true);
     }
 
