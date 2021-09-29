@@ -50,12 +50,7 @@ function getExactInputParams(multiRoute: MultiRoute, senderAddress: string, slip
     let paths: Path[] = [];
 
     for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
-        const recipentAddress = getRecipentAddress(
-          RouteType.SinglePath,
-          multiRoute,
-          legIndex, 
-          senderAddress
-        );
+        const recipentAddress = isLastLeg(legIndex, multiRoute) ? senderAddress : multiRoute.legs[legIndex + 1].address;
     
         if (multiRoute.legs[legIndex].token.address === multiRoute.fromToken.address) {
           const path: Path = { 
@@ -107,14 +102,7 @@ function getComplexPathParams(multiRoute: MultiRoute, senderAddress: string, tri
     };
     outputs.push(output);
     
-    for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
-      const recipentAddress = getRecipentAddress(
-        RouteType.ComplexPath,
-        multiRoute,
-        legIndex, 
-        senderAddress,
-        tridentRouterAddress
-      );
+    for (let legIndex = 0; legIndex < routeLegs; ++legIndex) { 
   
       if (multiRoute.legs[legIndex].token.address === multiRoute.fromToken.address) {
         const initialPath: InitialPath = {
@@ -124,7 +112,7 @@ function getComplexPathParams(multiRoute: MultiRoute, senderAddress: string, tri
           native: false,
           data: ethers.utils.defaultAbiCoder.encode(
             ["address", "address", "bool"],
-            [multiRoute.legs[legIndex].token.address, recipentAddress, false]
+            [multiRoute.legs[legIndex].token.address, tridentRouterAddress, false]
           ),
         };
         initialPaths.push(initialPath);
@@ -135,7 +123,7 @@ function getComplexPathParams(multiRoute: MultiRoute, senderAddress: string, tri
           balancePercentage: getBigNumber(multiRoute.legs[legIndex].swapPortion * 10**8),
           data: ethers.utils.defaultAbiCoder.encode(
             ["address", "address", "bool"],
-            [multiRoute.legs[legIndex].token.address, recipentAddress, false] 
+            [multiRoute.legs[legIndex].token.address, tridentRouterAddress, false] 
           ),
         };
         percentagePaths.push(percentagePath);
@@ -155,34 +143,6 @@ function getComplexPathParams(multiRoute: MultiRoute, senderAddress: string, tri
 function isLastLeg(legIndex: number, multiRoute: MultiRoute): boolean{
   return legIndex === multiRoute.legs.length - 1;
 } 
-  
-function getRecipentAddress(routeType: RouteType, multiRoute: MultiRoute, legIndex: number, senderAddress: string, tridentRouterAddress: string = ""): string {
-    let recipentAddress;
-
-    switch (routeType) {
-      case RouteType.SinglePool:
-        recipentAddress = senderAddress;
-        break;
-  
-      case RouteType.SinglePath:
-        if (isLastLeg(legIndex, multiRoute))
-        {
-          recipentAddress = senderAddress;
-        }
-        else 
-        {
-          recipentAddress = multiRoute.legs[legIndex + 1].address;
-        }
-        break;
-  
-      case RouteType.ComplexPath:
-      default:
-        recipentAddress = tridentRouterAddress;
-        break;
-    }
-    
-    return recipentAddress;
-}
 
 function getRouteType(multiRoute: MultiRoute) { 
   if(multiRoute.legs.length === 1){

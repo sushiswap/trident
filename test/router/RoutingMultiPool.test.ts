@@ -4,7 +4,8 @@ import seedrandom from "seedrandom";
 import * as testHelper from "./helpers";
 import { areCloseValues, getIntegerRandomValue } from "../utilities";
 import { RouteType } from "./helpers/constants";
-import { closeValues } from "@sushiswap/tines";
+import { closeValues, RToken } from "@sushiswap/tines";
+import { Contract } from "@ethersproject/contracts";
 
 describe("MultiPool Routing Tests", function () {
   beforeEach(async function () {
@@ -13,6 +14,20 @@ describe("MultiPool Routing Tests", function () {
     this.gasPrice = 1 * 200 * 1e-9;
     this.rnd = seedrandom("2");
   });
+
+  async function checkTokenBalancesAreZero(
+    tokens: RToken[],
+    bentoContract: Contract,
+    tridentAddress: string
+  ) {
+    for (let index = 0; index < tokens.length; index++) {
+      const tokenBalance = await bentoContract.balanceOf(
+        tokens[index].address,
+        tridentAddress
+      );
+      expect(tokenBalance).equal(0);
+    }
+  }
 
   it("Should Test Normal Values with 5 pools & bridge", async function () {
     const topology = await testHelper.getFivePoolBridge(this.rnd);
@@ -49,27 +64,11 @@ describe("MultiPool Routing Tests", function () {
       toToken.address
     );
 
-    const tridentT0Balance = await this.bento.balanceOf(
-      topology.tokens[0].address,
+    await checkTokenBalancesAreZero(
+      topology.tokens,
+      this.bento,
       this.tridentRouterAddress
     );
-    const tridentT1Balance = await this.bento.balanceOf(
-      topology.tokens[1].address,
-      this.tridentRouterAddress
-    );
-    const tridentT2Balance = await this.bento.balanceOf(
-      topology.tokens[2].address,
-      this.tridentRouterAddress
-    );
-    const tridentT3Balance = await this.bento.balanceOf(
-      topology.tokens[3].address,
-      this.tridentRouterAddress
-    );
-
-    expect(tridentT0Balance).equal(0);
-    expect(tridentT1Balance).equal(0);
-    expect(tridentT2Balance).equal(0);
-    expect(tridentT3Balance).equal(0);
 
     expect(
       closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-14)
@@ -110,6 +109,12 @@ describe("MultiPool Routing Tests", function () {
     const amountOutPoolBN = await testHelper.executeTridentRoute(
       routerParams,
       toToken.address
+    );
+
+    await checkTokenBalancesAreZero(
+      topology.tokens,
+      this.bento,
+      this.tridentRouterAddress
     );
 
     expect(
@@ -153,6 +158,12 @@ describe("MultiPool Routing Tests", function () {
       toToken.address
     );
 
+    await checkTokenBalancesAreZero(
+      topology.tokens,
+      this.bento,
+      this.tridentRouterAddress
+    );
+
     expect(
       closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-14)
     ).to.equal(true, "predicted amount did not equal actual swapped amount");
@@ -190,6 +201,12 @@ describe("MultiPool Routing Tests", function () {
     const amountOutPoolBN = await testHelper.executeTridentRoute(
       routerParams,
       toToken.address
+    );
+
+    await checkTokenBalancesAreZero(
+      topology.tokens,
+      this.bento,
+      this.tridentRouterAddress
     );
 
     expect(
@@ -231,6 +248,12 @@ describe("MultiPool Routing Tests", function () {
       toToken.address
     );
 
+    await checkTokenBalancesAreZero(
+      topology.tokens,
+      this.bento,
+      this.tridentRouterAddress
+    );
+
     expect(
       closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-14)
     ).to.equal(true, "predicted amount did not equal actual swapped amount");
@@ -270,8 +293,51 @@ describe("MultiPool Routing Tests", function () {
       toToken.address
     );
 
+    await checkTokenBalancesAreZero(
+      topology.tokens,
+      this.bento,
+      this.tridentRouterAddress
+    );
+
     expect(
       closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-14)
     ).to.equal(true, "predicted amount did not equal actual swapped amount");
+  });
+
+  it("Should Test Normal Values With 2 Serial Pools will revert due to slippage", async function () {
+    const topology = await testHelper.getABCTopoplogy(this.rnd);
+
+    const fromToken = topology.tokens[0];
+    const toToken = topology.tokens[2];
+    const baseToken = topology.tokens[1];
+    const [amountIn] = getIntegerRandomValue(20, this.rnd);
+
+    const route = testHelper.createRoute(
+      fromToken,
+      toToken,
+      baseToken,
+      topology,
+      amountIn,
+      this.gasPrice
+    );
+
+    if (route == undefined) {
+      throw "Failed to get route";
+    }
+
+    route.amountOut = route.amountOut * (1 + 1 / 100);
+    route.totalAmountOut = route.totalAmountOut * (1 + 1 / 100);
+
+    const routerParams = testHelper.getTridentRouterParams(
+      route,
+      this.signer.address,
+      this.tridentRouterAddress
+    );
+
+    expect(routerParams.routeType).equal(RouteType.SinglePath);
+
+    await expect(
+      testHelper.executeTridentRoute(routerParams, toToken.address)
+    ).to.be.revertedWith("TOO_LITTLE_RECEIVED");
   });
 });
