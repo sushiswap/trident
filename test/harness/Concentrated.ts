@@ -3,6 +3,7 @@ import { getBigNumber } from "@sushiswap/sdk";
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { ConcentratedLiquidityPool, ConcentratedLiquidityPoolManager, TridentRouter } from "../../types";
+import { ADDRESS_ZERO } from "../utilities";
 import { swap } from "./ConstantProduct";
 import { divRoundingUp } from "./helpers";
 import { Trident } from "./Trident";
@@ -227,7 +228,16 @@ export async function removeLiquidityViaManager(params: {
   unwrapBento: boolean;
 }): Promise<{ token0: BigNumber; token1: BigNumber }> {
   const { tokenId, liquidityAmount, recipient, unwrapBento } = params;
+  const owner = await Trident.Instance.concentratedPoolManager.ownerOf(tokenId);
+  const userLiquidity = (await Trident.Instance.concentratedPoolManager.positions(tokenId)).liquidity;
+  const userBalance = await Trident.Instance.concentratedPoolManager.balanceOf(owner);
   await Trident.Instance.concentratedPoolManager.burn(tokenId, liquidityAmount, recipient, unwrapBento);
+  if (userLiquidity.eq(liquidityAmount)) {
+    expect(await Trident.Instance.concentratedPoolManager.balanceOf(owner)).to.be.eq(userBalance.sub(1));
+    expect(await Trident.Instance.concentratedPoolManager.ownerOf(tokenId)).to.be.eq(ADDRESS_ZERO);
+  } else {
+    expect(await Trident.Instance.concentratedPoolManager.balanceOf(owner)).to.be.eq(userBalance);
+  }
   return { token0: BigNumber.from(0), token1: BigNumber.from(1) };
 }
 
@@ -339,6 +349,34 @@ export async function addLiquidityViaRouter(params: {
     // TODO add function to calculate range fee growth here and ensure that positionManager saved the correct value
   }
   return { dy, dx, tokenId: oldTotalSupply };
+}
+
+export async function _addLiquidityViaRouter(params: {
+  pool: ConcentratedLiquidityPool;
+  amount0Desired: BigNumber;
+  amount1Desired: BigNumber;
+  native: boolean;
+  lowerOld: BigNumber | number;
+  lower: BigNumber | number;
+  upperOld: BigNumber | number;
+  upper: BigNumber | number;
+  positionOwner: string;
+  recipient: string;
+}) {
+  const { pool, amount0Desired, amount1Desired, native, lowerOld, lower, upperOld, upper, positionOwner, recipient } = params;
+  const mintData = getMintData({
+    lowerOld,
+    lower,
+    upperOld,
+    upper,
+    amount0Desired,
+    amount1Desired,
+    native0: native,
+    native1: native,
+    positionOwner,
+    recipient: recipient,
+  });
+  await Trident.Instance.router.addLiquidityLazy(pool.address, BigNumber.from(0), mintData);
 }
 
 // use solidity here for convenience

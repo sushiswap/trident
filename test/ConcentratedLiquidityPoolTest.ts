@@ -2,6 +2,8 @@ import { expect } from "chai";
 import { ethers, network } from "hardhat";
 import {
   addLiquidityViaRouter,
+  _addLiquidityViaRouter,
+  removeLiquidityViaManager,
   collectFees,
   collectProtocolFee,
   getDx,
@@ -349,14 +351,11 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         const smallerPositionFeesDx = smallerPositionFees2.dx.add(smallerPositionFees1.dx);
         const biggerPositionFees = await collectFees({ pool, tokenId: tokenIdB, recipient: defaultAddress, unwrapBento: false });
         const outsidePositionFees = await collectFees({ pool, tokenId: tokenIdC, recipient: defaultAddress, unwrapBento: false });
-        expect(smallerPositionFeesDy.div(100).toString()).to.be.eq(
-          biggerPositionFees.dy.div(100).div(2).toString(),
-          "fees 0 weren't proportionally split"
-        ); // divide by 100 (remove 2 decimal places) to ignore 1 raw rounding errors
-        expect(smallerPositionFeesDx.div(100).toString()).to.be.eq(
-          biggerPositionFees.dx.div(100).div(2).toString(),
-          "fees 1 weren't proportionally split"
-        );
+        const ratioY = smallerPositionFeesDy.mul(1e6).div(biggerPositionFees.dy.div(2));
+        const ratioX = smallerPositionFeesDx.mul(1e6).div(biggerPositionFees.dx.div(2));
+        // allow for small rounding errors that happen when users claim on different intervals
+        expect(ratioY.lt(1000100) && ratioY.lt(999900), "fees 1 weren't proportionally split");
+        expect(ratioX.lt(1000100) && ratioX.lt(999900), "fees 0 weren't proportionally split");
         expect(outsidePositionFees.dy.toString()).to.be.eq("0", "fees were acredited to a position not in range");
       }
     });
@@ -431,7 +430,55 @@ describe.only("Concentrated Liquidity Product Pool", function () {
       }
     });
 
-    it.skip("Should burn the position and receive tokens back", async () => {});
+    it("Should burn the position and receive tokens back", async () => {
+      for (const pool of [trident.concentratedPools[0]]) {
+        helper.reset();
+
+        const tickSpacing = await pool.tickSpacing();
+        const tickAtPrice = await getTickAtCurrentPrice(pool);
+        const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
+        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+
+        let lower = nearestEvenValidTick - step;
+        let upper = nearestEvenValidTick + step + tickSpacing;
+
+        let addLiquidityParams = {
+          pool: pool,
+          amount0Desired: getBigNumber(100),
+          amount1Desired: getBigNumber(100),
+          native: false,
+          lowerOld: helper.insert(lower),
+          lower,
+          upperOld: helper.insert(upper),
+          upper,
+          positionOwner: trident.concentratedPoolManager.address,
+          recipient: defaultAddress,
+        };
+
+        await addLiquidityViaRouter(addLiquidityParams);
+
+        addLiquidityParams.amount0Desired = addLiquidityParams.amount0Desired.mul(2);
+        addLiquidityParams.amount1Desired = addLiquidityParams.amount1Desired.mul(2);
+        addLiquidityParams = helper.setTicks(lower + 3 * step, upper + 3 * step, addLiquidityParams);
+        await addLiquidityViaRouter(addLiquidityParams);
+
+        const userLiquidity = (await Trident.Instance.concentratedPoolManager.positions(1)).liquidity;
+        const userLiquidityPartial = userLiquidity.sub(userLiquidity.div(3));
+
+        let removeLiquidityParams = {
+          tokenId: 1,
+          liquidityAmount: userLiquidityPartial,
+          recipient: trident.accounts[0].address,
+          unwrapBento: true,
+        };
+
+        // BURN LP NFT (partial)
+        await removeLiquidityViaManager(removeLiquidityParams);
+        // BURN LP NFT (full)
+        removeLiquidityParams.liquidityAmount = userLiquidity.sub(userLiquidityPartial);
+        await removeLiquidityViaManager(removeLiquidityParams);
+      }
+    });
 
     it.skip("Should create incentive", async () => {});
   });
@@ -460,8 +507,8 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           positionOwner: trident.concentratedPoolManager.address,
           recipient: trident.accounts[0].address,
         };
-        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("INVALID_TICK");
 
+        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("INVALID_TICK");
         // LOWER_EVEN
         addLiquidityParams.lower = nearestEvenValidTick - step + tickSpacing;
         addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing;
@@ -483,8 +530,40 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
         await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("UPPER_ODD");
 
-        // TODO: WRONG_ORDER, LOWER_RANGE, UPPER_RANGE
-        // TODO: invalid lower old & upper old ticks
+        // WRONG ORDER
+        addLiquidityParams.lower = nearestEvenValidTick + 3 * step;
+        addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing;
+        addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
+        addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
+        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("WRONG_ORDER");
+
+        // LOWER_RANGE
+        addLiquidityParams.lower = -Math.floor(887272 / tickSpacing) * tickSpacing - tickSpacing;
+        addLiquidityParams.upper = nearestEvenValidTick + tickSpacing;
+        addLiquidityParams.lowerOld = lower;
+        addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
+        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("TICK_OUT_OF_BOUNDS");
+
+        // UPPER_RANGE
+        addLiquidityParams.lower = nearestEvenValidTick;
+        addLiquidityParams.upper = Math.floor(887272 / tickSpacing) * tickSpacing + tickSpacing;
+        addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
+        addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
+        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("TICK_OUT_OF_BOUNDS");
+
+        // LOWER_ORDER - TO DO
+        //addLiquidityParams.lower = nearestEvenValidTick;
+        //addLiquidityParams.upper = Math.floor(887272 / tickSpacing) * tickSpacing + tickSpacing;
+        //addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
+        //addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
+        //await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("LOWER_ORDER");
+
+        // UPPER_ORDER - TO DO
+        //addLiquidityParams.lower = nearestEvenValidTick;
+        //addLiquidityParams.upper = Math.floor(887272 / tickSpacing) * tickSpacing + tickSpacing;
+        //addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
+        //addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
+        //await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("UPPER_ORDER");
       }
     });
   });

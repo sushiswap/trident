@@ -39,7 +39,7 @@ contract ConcentratedLiquidityPool is IPool {
     address internal immutable barFeeTo;
     IBentoBoxMinimal internal immutable bento;
     IMasterDeployer internal immutable masterDeployer;
-    address internal immutable poolManager;
+
     address internal immutable token0;
     address internal immutable token1;
 
@@ -104,11 +104,7 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     /// @dev Only set immutable variables here - state changes made here will not be used.
-    constructor(
-        bytes memory _deployData,
-        IMasterDeployer _masterDeployer,
-        address _poolManager
-    ) {
+    constructor(bytes memory _deployData, IMasterDeployer _masterDeployer) {
         (address _token0, address _token1, uint24 _swapFee, uint160 _price, uint24 _tickSpacing) = abi.decode(
             _deployData,
             (address, address, uint24, uint160, uint24)
@@ -132,7 +128,6 @@ contract ConcentratedLiquidityPool is IPool {
         barFeeTo = _masterDeployer.barFeeTo();
         barFee = _masterDeployer.barFee();
         masterDeployer = _masterDeployer;
-        poolManager = _poolManager;
         unlocked = 1;
     }
 
@@ -214,7 +209,7 @@ contract ConcentratedLiquidityPool is IPool {
 
         (uint256 feeGrowth0, uint256 feeGrowth1) = rangeFeeGrowth(mintParams.lower, mintParams.upper);
 
-        IPositionManager(poolManager).positionMintCallback(
+        IPositionManager(mintParams.positionOwner).positionMintCallback(
             mintParams.recipient,
             mintParams.lower,
             mintParams.upper,
@@ -223,7 +218,7 @@ contract ConcentratedLiquidityPool is IPool {
             feeGrowth1
         );
 
-        emit Mint(msg.sender, amount0Actual, amount1Actual, mintParams.recipient);
+        emit Mint(mintParams.positionOwner, amount0Actual, amount1Actual, mintParams.recipient);
     }
 
     /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
@@ -258,6 +253,11 @@ contract ConcentratedLiquidityPool is IPool {
         withdrawnAmounts = new TokenAmount[](2);
         withdrawnAmounts[0] = TokenAmount({token: token0, amount: amount0});
         withdrawnAmounts[1] = TokenAmount({token: token1, amount: amount1});
+
+        unchecked {
+            reserve0 -= uint128(amount0fees);
+            reserve1 -= uint128(amount1fees);
+        }
 
         _transferBothTokens(recipient, amount0, amount1, unwrapBento);
 
@@ -529,7 +529,8 @@ contract ConcentratedLiquidityPool is IPool {
             0x100000000000000000000000000000000
         );
 
-        position.liquidity = uint128(int128(position.liquidity) + amount);
+        if (amount < 0) position.liquidity -= uint128(-amount);
+        if (amount > 0) position.liquidity += uint128(amount);
 
         require(position.liquidity < MAX_TICK_LIQUIDITY, "MAX_TICK_LIQUIDITY");
 
@@ -658,7 +659,6 @@ contract ConcentratedLiquidityPool is IPool {
             address _barFeeTo,
             IBentoBoxMinimal _bento,
             IMasterDeployer _masterDeployer,
-            address _poolManager,
             address _token0,
             address _token1
         )
@@ -669,7 +669,6 @@ contract ConcentratedLiquidityPool is IPool {
         _barFeeTo = barFeeTo;
         _bento = bento;
         _masterDeployer = masterDeployer;
-        _poolManager = poolManager;
         _token0 = token0;
         _token1 = token1;
     }

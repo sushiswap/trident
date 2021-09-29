@@ -44,18 +44,24 @@ library DyDxMath {
         uint256 dy,
         uint256 dx
     ) internal pure returns (uint256 liquidity) {
-        if (priceUpper <= currentPrice) {
-            liquidity = FullMath.mulDiv(dy, 0x1000000000000000000000000, priceUpper - priceLower);
-        } else if (currentPrice <= priceLower) {
-            liquidity = FullMath.mulDiv(dx, FullMath.mulDiv(priceLower, priceUpper, 0x1000000000000000000000000), priceUpper - priceLower);
-        } else {
-            uint256 liquidity0 = FullMath.mulDiv(
-                dx,
-                FullMath.mulDiv(priceUpper, currentPrice, 0x1000000000000000000000000),
-                priceUpper - currentPrice
-            );
-            uint256 liquidity1 = FullMath.mulDiv(dy, 0x1000000000000000000000000, currentPrice - priceLower);
-            liquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
+        unchecked {
+            if (priceUpper <= currentPrice) {
+                liquidity = FullMath.mulDiv(dy, 0x1000000000000000000000000, priceUpper - priceLower);
+            } else if (currentPrice <= priceLower) {
+                liquidity = FullMath.mulDiv(
+                    dx,
+                    FullMath.mulDiv(priceLower, priceUpper, 0x1000000000000000000000000),
+                    priceUpper - priceLower
+                );
+            } else {
+                uint256 liquidity0 = FullMath.mulDiv(
+                    dx,
+                    FullMath.mulDiv(priceUpper, currentPrice, 0x1000000000000000000000000),
+                    priceUpper - currentPrice
+                );
+                uint256 liquidity1 = FullMath.mulDiv(dy, 0x1000000000000000000000000, currentPrice - priceLower);
+                liquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
+            }
         }
     }
 }
