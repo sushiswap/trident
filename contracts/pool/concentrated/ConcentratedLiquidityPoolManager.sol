@@ -4,6 +4,7 @@ pragma solidity >=0.8.0;
 
 import "../../interfaces/IConcentratedLiquidityPool.sol";
 import "./ConcentratedLiquidityPosition.sol";
+import "../../libraries/concentratedPool/Ticks.sol";
 
 /// @notice Trident Concentrated Liquidity Pool periphery contract that combines non-fungible position management and staking.
 contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
@@ -72,7 +73,7 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
         require(stake.secondsInsideLast == 0, "SUBSCRIBED");
         require(incentiveId <= incentiveCount[pool], "NOT_INCENTIVE");
         require(block.timestamp > incentive.startTime && block.timestamp < incentive.endTime, "TIMED_OUT");
-        stakes[positionId][incentiveId] = Stake(uint160(pool.rangeSecondsInside(position.lower, position.upper)), true);
+        stakes[positionId][incentiveId] = Stake(uint160(rangeSecondsInside(pool, position.lower, position.upper)), true);
         emit Subscribe(positionId, incentiveId);
     }
 
@@ -88,7 +89,7 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
         Incentive storage incentive = incentives[position.pool][positionId];
         Stake storage stake = stakes[positionId][incentiveId];
         require(stake.initialized, "UNINITIALIZED");
-        uint256 secondsPerLiquidityInside = pool.rangeSecondsInside(position.lower, position.upper) - stake.secondsInsideLast;
+        uint256 secondsPerLiquidityInside = rangeSecondsInside(pool, position.lower, position.upper) - stake.secondsInsideLast;
         uint256 secondsInside = secondsPerLiquidityInside * position.liquidity;
         uint256 maxTime = incentive.endTime < block.timestamp ? block.timestamp : incentive.endTime;
         uint256 secondsUnclaimed = (maxTime - incentive.startTime) << (128 - incentive.secondsClaimed);
@@ -106,10 +107,39 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
         Incentive memory incentive = incentives[pool][positionId];
         Stake memory stake = stakes[positionId][incentiveId];
         if (stake.initialized) {
-            secondsInside = (pool.rangeSecondsInside(position.lower, position.upper) - stake.secondsInsideLast) * position.liquidity;
+            secondsInside = (rangeSecondsInside(pool, position.lower, position.upper) - stake.secondsInsideLast) * position.liquidity;
             uint256 maxTime = incentive.endTime < block.timestamp ? block.timestamp : incentive.endTime;
             uint256 secondsUnclaimed = (maxTime - incentive.startTime) << (128 - incentive.secondsClaimed);
             rewards = (incentive.rewardsUnclaimed * secondsInside) / secondsUnclaimed;
         }
+    }
+
+    function rangeSecondsInside(
+        IConcentratedLiquidityPool pool,
+        int24 lowerTick,
+        int24 upperTick
+    ) public view returns (uint256 secondsInside) {
+        (, int24 currentTick) = pool.getPriceAndNearestTicks();
+
+        Ticks.Tick memory lower = pool.ticks(lowerTick);
+        Ticks.Tick memory upper = pool.ticks(upperTick);
+
+        (uint256 secondsGlobal, ) = pool.getSecondsPerLiquidityAndLastObservation();
+        uint256 secondsBelow;
+        uint256 secondsAbove;
+
+        if (lowerTick <= currentTick) {
+            secondsBelow = lower.secondsPerLiquidityOutside;
+        } else {
+            secondsBelow = secondsGlobal - lower.secondsPerLiquidityOutside;
+        }
+
+        if (currentTick < upperTick) {
+            secondsAbove = upper.secondsPerLiquidityOutside;
+        } else {
+            secondsAbove = secondsGlobal - upper.secondsPerLiquidityOutside;
+        }
+
+        secondsInside = secondsGlobal - secondsBelow - secondsAbove;
     }
 }

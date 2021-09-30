@@ -4,6 +4,7 @@ pragma solidity >=0.8.0;
 
 import "../../interfaces/IConcentratedLiquidityPool.sol";
 import "../../libraries/concentratedPool/TickMath.sol";
+import "../../libraries/concentratedPool/Ticks.sol";
 
 /// @notice Trident Concentrated Liquidity Pool periphery contract to read state.
 contract ConcentratedLiquidityPoolHelper {
@@ -15,7 +16,7 @@ contract ConcentratedLiquidityPoolHelper {
     function getTickState(IConcentratedLiquidityPool pool, uint24 tickCount) external view returns (SimpleTick[] memory) {
         SimpleTick[] memory ticks = new SimpleTick[](tickCount); // todo save tickCount in the core contract
 
-        IConcentratedLiquidityPool.Tick memory tick;
+        Ticks.Tick memory tick;
         uint24 i;
         int24 current = TickMath.MIN_TICK;
 

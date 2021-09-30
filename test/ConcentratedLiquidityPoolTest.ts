@@ -462,6 +462,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         const userLiquidityPartial = userLiquidity.sub(userLiquidity.div(3));
 
         let removeLiquidityParams = {
+          pool: pool,
           tokenId: Number(mint.tokenId.toString()),
           liquidityAmount: userLiquidityPartial,
           recipient: trident.accounts[0].address,
@@ -526,8 +527,8 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           inAmount: maxDy.div(3).mul(2),
           recipient: defaultAddress,
         });
-        const fistSplData = await pool.getLiquidityAndLastObservation();
-        let firstSplA = await pool.rangeSecondsInside(lowerA, upperA);
+        const fistSplData = await pool.getSecondsPerLiquidityAndLastObservation();
+        let firstSplA = await trident.concentratedPoolManager.rangeSecondsInside(pool.address, lowerA, upperA);
         expect((await fistSplData)._secondsPerLiquidity.toString()).to.be.eq(
           firstSplA.toString(),
           "didn't credit seconds per liquidity to active position"
@@ -540,9 +541,9 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           inAmount: maxDy.div(3).mul(2),
           recipient: defaultAddress,
         });
-        const secondSplData = await pool.getLiquidityAndLastObservation();
-        const secondSplA = await pool.rangeSecondsInside(lowerA, upperA);
-        const secondSplB = await pool.rangeSecondsInside(lowerB, upperB);
+        const secondSplData = await pool.getSecondsPerLiquidityAndLastObservation();
+        const secondSplA = await trident.concentratedPoolManager.rangeSecondsInside(pool.address, lowerA, upperA);
+        const secondSplB = await trident.concentratedPoolManager.rangeSecondsInside(pool.address, lowerB, upperB);
         expect(secondSplData._secondsPerLiquidity.toString()).to.be.eq(
           secondSplA.toString(),
           "didn't credit seconds per liquidity to active position"
@@ -557,8 +558,8 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           inAmount: maxDy,
           recipient: defaultAddress,
         });
-        const thirdSplA = await pool.rangeSecondsInside(lowerA, upperA);
-        const thirdSplB = await pool.rangeSecondsInside(lowerB, upperB);
+        const thirdSplA = await trident.concentratedPoolManager.rangeSecondsInside(pool.address, lowerA, upperA);
+        const thirdSplB = await trident.concentratedPoolManager.rangeSecondsInside(pool.address, lowerB, upperB);
         const splAseconds = thirdSplA.sub(secondSplA).mul(liquidityA);
         const splBseconds = thirdSplB.sub(secondSplB).mul(liquidityB);
         const totalSeconds = splAseconds.add(splBseconds).div(TWO_POW_128);
