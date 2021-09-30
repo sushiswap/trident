@@ -52,6 +52,20 @@ Users can chose for their liquidity position to be owned by the `ConcentratedLiq
 | ticks                       | (int24 => Tick) mapping for the linked list. Used to update current liquidity when crossing ticks.       |
 | positions                   | (address => (int24 => (int24 => Position))) mapping. Used to keep track of a user's liquidity position.  |
 
+## Staking
+
+Projects can provide incentives on any concentrated liquidity pair. Incentives are set from a specific start time to a specific end time with a flat reward amount. Liquidity providers are rewarded proportional to their liquidity, but only for the duration when their position was in trading range.
+
+We use the same approach as with calculating fees belonging to a position.
+
+The pool keeps track of a global `secondsPerLiquidity` accumulator which increases on every swap by the time between the last measurement, divided by current liquidity `secondsPerLiquidity += secondPassed / liquidity`.
+Each tick also keeps track of the `secondsPerLiquidityOutside` counter which stores the seconds per liquidity growth that has happened on the side of the tick where trading currently isn't happening. It is updated on every tick crossing in the same way as fee counters are.
+
+Using the global `secondsPerLiquidity` counter and the `secondsPerLiquidityOutside` of a tick we can calculate the current seconds per liquidity above or below any specific tick.
+By subtracting the "seconds per liquidity below" of the lower tick and the "seconds per liquidity above" of the upper tick from the global "seconds per liquidity counter" we get the seconds per liquidity accumulator for a position. When a user wants to stake a snapshot of this value is taken (`secondsInsideLast`).
+
+After some time passes we can calculate the rewards belonging to a position by computing the new `secondsInsideLast` value and calculating the difference from the old value. Multiplying this difference by the position's liquidity gives us an abstract amount in seconds, that will be less than or equal to the time a user has been staked for (e.g. staking duration is 1000 seconds, but the position's seconds value we calculate is 100). We can think of this value as the amount of time trading has relied solely on this position. By dividing the position's time by the total passed time we can compute the ratio of rewards that should be credited to the position (in the example it would be 10% of rewards).
+
 ## Formulas
 
 Calculating price impact:
