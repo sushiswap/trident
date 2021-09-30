@@ -10,7 +10,6 @@ import { Trident } from "./Trident";
 
 export const TWO_POW_96 = BigNumber.from(2).pow(96);
 export const TWO_POW_128 = BigNumber.from(2).pow(128);
-export const ZERO = BigNumber.from(0);
 
 export async function collectProtocolFee(params: { pool: ConcentratedLiquidityPool }) {
   const { pool } = params;
