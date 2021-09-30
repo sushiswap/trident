@@ -30,7 +30,7 @@ Constant product pools are the "classic" pools that users will be most familiar 
 
 **### [ConcentratedLiquidityPool](**./contracts/pool/concentrated/ConcentratedLiquidityPool.sol**)**
 
-Concentrated liquidity pools allow liquidity providers to specify a price range on which to provide liquidity on. Providing liquidity on a narrower price range has a multiplying effect on the added liquidity, meaning traders will experience lesser price impacts. This makes the Concentrated Liquidity pool more capital efficient than the classic pool with the tradeoff being liquidity providers suffer greater impermanent loss. Each concentrated liquidity pool supports two assets.
+Concentrated liquidity pools allow liquidity providers to specify a price range on which to provide liquidity on. Providing liquidity on a narrower price range has a multiplying effect on the added liquidity, meaning traders will experience lesser price impacts. This makes the Concentrated Liquidity pool more capital efficient than the classic pool with the tradeoff being liquidity providers can suffer greater impermanent loss. Each concentrated liquidity pool supports two assets.
 
 **### [HybridPool](**./contracts/pool/HybridPool.sol**)**
 
