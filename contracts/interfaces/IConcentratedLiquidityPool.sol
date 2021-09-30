@@ -48,5 +48,5 @@ interface IConcentratedLiquidityPool is IPool {
 
     function getReserves() external view returns (uint128 _reserve0, uint128 _reserve1);
 
-    function getSecondsPerLiquidityAndLastObservation() external view returns (uint160 _secondsPerLiquidity, uint32 _lastObservation);
+    function getSecondsGrowthAndLastObservation() external view returns (uint160 _secondGrowthGlobal, uint32 _lastObservation);
 }
