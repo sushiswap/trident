@@ -1,4 +1,6 @@
 import { BigNumber, BigNumberish } from "@ethersproject/bignumber";
+import { ContractTransaction } from "@ethersproject/contracts";
+import { Transaction } from "@ethersproject/transactions";
 import { getBigNumber } from "@sushiswap/sdk";
 import { expect } from "chai";
 import { ethers } from "hardhat";
@@ -88,7 +90,7 @@ export async function swapViaRouter(params: {
   inAmount: BigNumber;
   recipient: string;
   unwrapBento: boolean;
-}): Promise<BigNumber> {
+}): Promise<{ output: BigNumber; tx: ContractTransaction }> {
   const { pool, zeroForOne, inAmount, recipient, unwrapBento } = params;
   const immutables = await pool.getImmutables();
   const nearest = (await pool.getPriceAndNearestTicks())._nearestTick;
@@ -238,7 +240,7 @@ export async function swapViaRouter(params: {
     feeGrowthGlobalOld.add(feeGrowthGlobalIncrease).toString(),
     "Didn't update the global fee tracker"
   );
-  return output;
+  return { output, tx };
 }
 
 export async function removeLiquidityViaManager(params: {

@@ -33,7 +33,9 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
     constructor(address _wETH, address _masterDeployer) {
         wETH = _wETH;
         masterDeployer = IMasterDeployer(_masterDeployer);
-        bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
+        IBentoBoxMinimal _bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
+        _bento.registerProtocol();
+        bento = _bento;
     }
 
     function positionMintCallback(
