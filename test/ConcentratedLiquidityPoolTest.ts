@@ -11,9 +11,10 @@ import {
   getTickAtCurrentPrice,
   LinkedListHelper,
   swapViaRouter,
+  TWO_POW_128,
 } from "./harness/Concentrated";
 import { getBigNumber } from "./harness/helpers";
-import { Trident } from "./harness/Trident";
+import { Trident, TWO_POW_96 } from "./harness/Trident";
 
 describe.only("Concentrated Liquidity Product Pool", function () {
   let snapshotId: string;
@@ -92,7 +93,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
     });
 
     it("Should add liquidity and swap (without crossing)", async () => {
-      for (const pool of [trident.concentratedPools[0]]) {
+      for (const pool of trident.concentratedPools) {
         helper.reset();
 
         const tickSpacing = (await pool.getImmutables())._tickSpacing;
@@ -469,6 +470,99 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         await removeLiquidityViaManager(removeLiquidityParams);
         removeLiquidityParams.liquidityAmount = userLiquidity.sub(userLiquidityPartial);
         await removeLiquidityViaManager(removeLiquidityParams);
+      }
+    });
+
+    it("Should calcualte seconds inside correctly", async () => {
+      for (const pool of [trident.concentratedPools[0]]) {
+        helper.reset();
+
+        const tickSpacing = (await pool.getImmutables())._tickSpacing;
+        const tickAtPrice = await getTickAtCurrentPrice(pool);
+        const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
+        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+
+        let lowerA = nearestEvenValidTick - 10 * step;
+        let upperA = nearestEvenValidTick + 10 * step + tickSpacing;
+        let lowerB = nearestEvenValidTick + 3 * step;
+        let upperB = nearestEvenValidTick + 9 * step + tickSpacing;
+        let lowerC = nearestEvenValidTick + 6 * step;
+        let upperC = nearestEvenValidTick + 9 * step + tickSpacing;
+
+        let addLiquidityParams = {
+          pool: pool,
+          amount0Desired: getBigNumber(100),
+          amount1Desired: getBigNumber(100),
+          native: false,
+          lowerOld: helper.insert(lowerA),
+          lower: lowerA,
+          upperOld: helper.insert(upperA),
+          upper: upperA,
+          positionOwner: trident.concentratedPoolManager.address,
+          recipient: defaultAddress,
+        };
+        const mintA = await addLiquidityViaRouter(addLiquidityParams);
+        addLiquidityParams = helper.setTicks(lowerB, upperB, addLiquidityParams);
+        const mintB = await addLiquidityViaRouter(addLiquidityParams);
+        addLiquidityParams = helper.setTicks(lowerC, upperC, addLiquidityParams);
+        const mintC = await addLiquidityViaRouter(addLiquidityParams);
+        const liquidityA = mintA.liquidity;
+        const liquidityB = mintB.liquidity;
+        const liquidityC = mintC.liquidity;
+
+        // execute each swap after some time
+        //                  ▼ - - -> ▼ - - -> ▼ - - - -> ▼ - - -
+        // --------------------------------------|xxxxxxxxxxxxxxxx|-----
+        // --------------|----------------|xxxxxxxxxxxxxxxxxxxxxxx|-----
+        // --------------|xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx|-----
+
+        const currentPrice = (await pool.getPriceAndNearestTicks())._price;
+        const upperPrice = await Trident.Instance.tickMath.getSqrtRatioAtTick(lowerB);
+        const maxDy = await getDy(await pool.liquidity(), currentPrice, upperPrice, false);
+        let output = await swapViaRouter({
+          pool: pool,
+          unwrapBento: true,
+          zeroForOne: false,
+          inAmount: maxDy.div(3).mul(2),
+          recipient: defaultAddress,
+        });
+        const fistSplData = await pool.getLiquidityAndLastObservation();
+        let firstSplA = await pool.rangeSecondsInside(lowerA, upperA);
+        expect((await fistSplData)._secondsPerLiquidity.toString()).to.be.eq(
+          firstSplA.toString(),
+          "didn't credit seconds per liquidity to active position"
+        );
+        await network.provider.send("evm_setNextBlockTimestamp", [fistSplData._lastObservation + 10000]);
+        output = await swapViaRouter({
+          pool: pool,
+          unwrapBento: true,
+          zeroForOne: false,
+          inAmount: maxDy.div(3).mul(2),
+          recipient: defaultAddress,
+        });
+        const secondSplData = await pool.getLiquidityAndLastObservation();
+        const secondSplA = await pool.rangeSecondsInside(lowerA, upperA);
+        const secondSplB = await pool.rangeSecondsInside(lowerB, upperB);
+        expect(secondSplData._secondsPerLiquidity.toString()).to.be.eq(
+          secondSplA.toString(),
+          "didn't credit seconds per liquidity to active position"
+        );
+        expect(secondSplB.eq(0)).to.be.true;
+        const timeIncrease = 10000;
+        await network.provider.send("evm_setNextBlockTimestamp", [secondSplData._lastObservation + timeIncrease]);
+        output = await swapViaRouter({
+          pool: pool,
+          unwrapBento: true,
+          zeroForOne: false,
+          inAmount: maxDy,
+          recipient: defaultAddress,
+        });
+        const thirdSplA = await pool.rangeSecondsInside(lowerA, upperA);
+        const thirdSplB = await pool.rangeSecondsInside(lowerB, upperB);
+        const splAseconds = thirdSplA.sub(secondSplA).mul(liquidityA);
+        const splBseconds = thirdSplB.sub(secondSplB).mul(liquidityB);
+        const totalSeconds = splAseconds.add(splBseconds).div(TWO_POW_128);
+        expect(totalSeconds.lte(timeIncrease) && totalSeconds.gte(timeIncrease - 3)).to.be.true;
       }
     });
 

@@ -8,8 +8,8 @@ import { swap } from "./ConstantProduct";
 import { divRoundingUp } from "./helpers";
 import { Trident } from "./Trident";
 
-const TWO_POW_96 = BigNumber.from(2).pow(96);
-const TWO_POW_128 = BigNumber.from(2).pow(128);
+export const TWO_POW_96 = BigNumber.from(2).pow(96);
+export const TWO_POW_128 = BigNumber.from(2).pow(128);
 
 export async function collectProtocolFee(params: { pool: ConcentratedLiquidityPool }) {
   const { pool } = params;
@@ -92,6 +92,7 @@ export async function swapViaRouter(params: {
   const { pool, zeroForOne, inAmount, recipient, unwrapBento } = params;
   const immutables = await pool.getImmutables();
   const nearest = (await pool.getPriceAndNearestTicks())._nearestTick;
+  const oldSplData = await pool.getLiquidityAndLastObservation();
   let nextTickToCross = zeroForOne ? nearest : (await pool.ticks(nearest)).nextTick;
   let currentPrice = (await pool.getPriceAndNearestTicks())._price;
   let currentLiquidity = await pool.liquidity();
@@ -113,6 +114,7 @@ export async function swapViaRouter(params: {
   const reserve = await pool.getReserves();
   const oldReserve0 = reserve._reserve0;
   const oldReserve1 = reserve._reserve1;
+  const startingLiquidity = currentLiquidity;
 
   while (input.gt(0)) {
     const nextTickPrice = await getTickPrice(nextTickToCross);
@@ -193,8 +195,16 @@ export async function swapViaRouter(params: {
     data: swapData,
   };
 
-  await Trident.Instance.router.exactInputSingle(routerData);
-
+  const tx = await Trident.Instance.router.exactInputSingle(routerData);
+  const newSplData = await pool.getLiquidityAndLastObservation();
+  const block = await ethers.provider.getBlock(tx.blockNumber as number);
+  const timeDiff = block.timestamp - oldSplData._lastObservation;
+  const splIncrease = TWO_POW_128.mul(timeDiff).div(startingLiquidity);
+  expect(newSplData._secondsPerLiquidity.toString()).to.be.eq(
+    oldSplData._secondsPerLiquidity.add(splIncrease).toString(),
+    "Didn't correctly update global spl counter"
+  );
+  expect(newSplData._lastObservation).to.be.eq(block.timestamp);
   const feeGrowthGlobalnew = await (zeroForOne ? pool.feeGrowthGlobal1() : pool.feeGrowthGlobal0());
   const _newProtocolFees = await pool.getTokenProtocolFees();
   const protocolFeesNew = zeroForOne ? _newProtocolFees._token1ProtocolFee : _newProtocolFees._token0ProtocolFee;
@@ -262,7 +272,7 @@ export async function addLiquidityViaRouter(params: {
   upper: BigNumber | number;
   positionOwner: string;
   recipient: string;
-}): Promise<{ dy: BigNumber; dx: BigNumber; tokenId: BigNumber }> {
+}): Promise<{ dy: BigNumber; dx: BigNumber; tokenId: BigNumber; liquidity: BigNumber }> {
   const { pool, amount0Desired, amount1Desired, native, lowerOld, lower, upperOld, upper, positionOwner, recipient } = params;
   const [currentPrice, priceLower, priceUpper] = await getPrices(pool, [lower, upper]);
   const liquidity = getLiquidityForAmount(priceLower, currentPrice, priceUpper, amount1Desired, amount0Desired);
@@ -359,7 +369,7 @@ export async function addLiquidityViaRouter(params: {
     // TODO check pool reserve change is correct!
     // TODO add function to calculate range fee growth here and ensure that positionManager saved the correct value
   }
-  return { dy, dx, tokenId: oldTotalSupply };
+  return { dy, dx, tokenId: oldTotalSupply, liquidity };
 }
 
 export async function _addLiquidityViaRouter(params: {
