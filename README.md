@@ -38,7 +38,7 @@ Hybrid pools are designed for swapping like-kind assets. They are an implementat
 
 **### [IndexPool](**./contracts/pool/IndexPool.sol**)**
 
-Index pools are designed to hold from two to eight tokens, each with a different weight. Trading between two assets of the pool happens over the constant product formula (while accounting for asset weights as well). The advantage of these pools is liquidity providers can utilize them to create auto rebalancing indices (e.g. a DeFi blue-chip index) that best match their risk profile.
+Index pools are designed to hold from two to eight tokens, each with a different weight. Trading between two assets of the pool happens over a modified version of the constant product formula. The advantage of these pools is liquidity providers can utilize them to create auto rebalancing indices (e.g. a DeFi blue-chip index) that best match their risk profile.
 
 All of these pools will have configurable fees that will allow liquidity providers to strike a balance between offsetting their impermanent loss and having the pool stay market competitive.
 
