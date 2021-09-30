@@ -432,7 +432,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
       }
     });
 
-    it("Should burn the position and receive tokens back", async () => {
+    it.only("Should burn the position and receive tokens back", async () => {
       for (const pool of trident.concentratedPools) {
         helper.reset();
 
