@@ -5,6 +5,7 @@ pragma solidity >=0.8.0;
 import "../../interfaces/IConcentratedLiquidityPool.sol";
 import "./ConcentratedLiquidityPosition.sol";
 import "../../libraries/concentratedPool/Ticks.sol";
+import "hardhat/console.sol";
 
 /// @notice Trident Concentrated Liquidity Pool periphery contract that combines non-fungible position management and staking.
 contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
@@ -16,8 +17,8 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
     struct Incentive {
         address owner;
         address token;
-        uint256 rewardsUnclaimed;
         uint160 secondsClaimed; // @dev x128.
+        uint96 rewardsUnclaimed;
         uint32 startTime;
         uint32 endTime;
         uint32 expiry;
@@ -41,6 +42,7 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
         require(incentive.startTime < incentive.endTime, "START_PAST_END");
         require(incentive.endTime + 5 weeks < incentive.expiry, "END_PAST_BUFFER");
         require(incentive.rewardsUnclaimed != 0, "NO_REWARDS");
+        incentive.secondsClaimed = 0;
         incentives[pool][incentiveCount[pool]++] = incentive;
         _transfer(incentive.token, msg.sender, address(this), incentive.rewardsUnclaimed, false);
         emit AddIncentive(pool, incentive);
@@ -58,7 +60,7 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
         require(incentive.owner == msg.sender, "NOT_OWNER");
         require(incentive.expiry < block.timestamp, "EXPIRED");
         require(incentive.rewardsUnclaimed >= amount, "ALREADY_CLAIMED");
-        incentive.rewardsUnclaimed -= amount;
+        incentive.rewardsUnclaimed -= uint96(amount);
         _transfer(incentive.token, address(this), receiver, amount, unwrapBento);
         emit ReclaimIncentive(pool, incentiveId);
     }
@@ -67,7 +69,7 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
     function subscribe(uint256 positionId, uint256 incentiveId) public {
         Position memory position = positions[positionId];
         IConcentratedLiquidityPool pool = position.pool;
-        Incentive memory incentive = incentives[pool][positionId];
+        Incentive memory incentive = incentives[pool][incentiveId];
         Stake storage stake = stakes[positionId][incentiveId];
         require(position.liquidity != 0, "INACTIVE");
         require(stake.secondsInsideLast == 0, "SUBSCRIBED");
@@ -86,17 +88,17 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
         require(ownerOf[positionId] == msg.sender, "OWNER");
         Position memory position = positions[positionId];
         IConcentratedLiquidityPool pool = position.pool;
-        Incentive storage incentive = incentives[position.pool][positionId];
+        Incentive storage incentive = incentives[position.pool][incentiveId];
         Stake storage stake = stakes[positionId][incentiveId];
         require(stake.initialized, "UNINITIALIZED");
         uint256 secondsPerLiquidityInside = rangeSecondsInside(pool, position.lower, position.upper) - stake.secondsInsideLast;
-        uint256 secondsInside = secondsPerLiquidityInside * position.liquidity;
-        uint256 maxTime = incentive.endTime < block.timestamp ? block.timestamp : incentive.endTime;
-        uint256 secondsUnclaimed = (maxTime - incentive.startTime) << (128 - incentive.secondsClaimed);
-        uint256 rewards = (incentive.rewardsUnclaimed * secondsInside) / secondsUnclaimed;
-        incentive.rewardsUnclaimed -= rewards;
+        uint256 secondsInside = secondsPerLiquidityInside * position.liquidity; // x128
+        uint256 maxTime = block.timestamp < incentive.endTime ? incentive.endTime : block.timestamp;
+        uint256 secondsUnclaimed = ((maxTime - incentive.startTime) << 128) - incentive.secondsClaimed;
+        uint256 rewards = (incentive.rewardsUnclaimed * secondsInside) / secondsUnclaimed; // x128 cancels out
         incentive.secondsClaimed += uint160(secondsInside);
         stake.secondsInsideLast += uint160(secondsPerLiquidityInside);
+        incentive.rewardsUnclaimed -= uint96(rewards);
         _transfer(incentive.token, address(this), recipient, rewards, unwrapBento);
         emit ClaimReward(positionId, incentiveId, recipient);
     }
@@ -107,9 +109,10 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
         Incentive memory incentive = incentives[pool][positionId];
         Stake memory stake = stakes[positionId][incentiveId];
         if (stake.initialized) {
-            secondsInside = (rangeSecondsInside(pool, position.lower, position.upper) - stake.secondsInsideLast) * position.liquidity;
-            uint256 maxTime = incentive.endTime < block.timestamp ? block.timestamp : incentive.endTime;
-            uint256 secondsUnclaimed = (maxTime - incentive.startTime) << (128 - incentive.secondsClaimed);
+            uint256 secondsPerLiquidityInside = rangeSecondsInside(pool, position.lower, position.upper) - stake.secondsInsideLast;
+            secondsInside = secondsPerLiquidityInside * position.liquidity;
+            uint256 maxTime = block.timestamp < incentive.endTime ? incentive.endTime : block.timestamp;
+            uint256 secondsUnclaimed = ((maxTime - incentive.startTime) << 128) - incentive.secondsClaimed;
             rewards = (incentive.rewardsUnclaimed * secondsInside) / secondsUnclaimed;
         }
     }
