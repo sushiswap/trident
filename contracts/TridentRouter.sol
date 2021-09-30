@@ -63,7 +63,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         // If the user wants to unwrap `wETH`, the final destination should be this contract and
         // a batch call should be made to `unwrapWETH`.
         for (uint256 i; i < params.path.length; i++) {
-            // We don't necessarily need this check but saving users from themseleves.
+            // We don't necessarily need this check but saving users from themselves.
             isWhiteListed(params.path[i].pool);
             amountOut = IPool(params.path[i].pool).swap(params.path[i].data);
         }
