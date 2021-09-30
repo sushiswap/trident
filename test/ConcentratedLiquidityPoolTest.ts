@@ -120,7 +120,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
 
         await addLiquidityViaRouter(addLiquidityParams);
 
-        const lowerPrice = await Trident.Instance.tickMath.getSqrtRatioAtTick(lower);
+        const lowerPrice = await trident.tickMath.getSqrtRatioAtTick(lower);
         const currentPrice = (await pool.getPriceAndNearestTicks())._price;
         const maxDx = await getDx(await pool.liquidity(), lowerPrice, currentPrice, false);
 
@@ -182,7 +182,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         // ----|xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx|-----
 
         const currentPrice = (await pool.getPriceAndNearestTicks())._price;
-        const upperPrice = await Trident.Instance.tickMath.getSqrtRatioAtTick(upper);
+        const upperPrice = await trident.tickMath.getSqrtRatioAtTick(upper);
         const maxDy = await getDy(await pool.liquidity(), currentPrice, upperPrice, false);
 
         const output = await swapViaRouter({
@@ -240,7 +240,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         // ----|----|-------|xxxxxxxxxxxx|-------|xxxxxxxxxxx|-----
 
         const currentPrice = (await pool.getPriceAndNearestTicks())._price;
-        const upperPrice = await Trident.Instance.tickMath.getSqrtRatioAtTick(upper);
+        const upperPrice = await trident.tickMath.getSqrtRatioAtTick(upper);
         const maxDy = await getDy(await pool.liquidity(), currentPrice, upperPrice, false);
 
         const output = await swapViaRouter({
@@ -297,7 +297,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
 
         // swap within tick
         const currentPrice = (await pool.getPriceAndNearestTicks())._price;
-        const upperPrice = await Trident.Instance.tickMath.getSqrtRatioAtTick(upper);
+        const upperPrice = await trident.tickMath.getSqrtRatioAtTick(upper);
         const maxDy = await getDy(await pool.liquidity(), currentPrice, upperPrice, false);
 
         let output = await swapViaRouter({
@@ -369,11 +369,11 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         const token0 = immutables._token0;
         const token1 = immutables._token1;
         const barFeeTo = immutables._barFeeTo;
-        const oldBarFeeToBalanceToken0 = await Trident.Instance.bento.balanceOf(token0, barFeeTo);
+        const oldBarFeeToBalanceToken0 = await trident.bento.balanceOf(token0, barFeeTo);
         const tickAtPrice = await getTickAtCurrentPrice(pool);
         const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
         const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
-        const oldBarFeeToBalanceToken1 = await Trident.Instance.bento.balanceOf(token1, barFeeTo);
+        const oldBarFeeToBalanceToken1 = await trident.bento.balanceOf(token1, barFeeTo);
 
         // assume increasing tick value by one step brings us to a valid tick
         // satisfy "lower even" & "upper odd" conditions
@@ -395,7 +395,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
 
         await addLiquidityViaRouter(addLiquidityParams);
 
-        const lowerPrice = await Trident.Instance.tickMath.getSqrtRatioAtTick(lower);
+        const lowerPrice = await trident.tickMath.getSqrtRatioAtTick(lower);
         const currentPrice = (await pool.getPriceAndNearestTicks())._price;
         const maxDx = await getDx(await pool.liquidity(), lowerPrice, currentPrice, false);
 
@@ -417,8 +417,8 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         });
 
         const { token0ProtocolFee, token1ProtocolFee } = await collectProtocolFee({ pool: pool });
-        const barFeeToBalanceToken0 = await Trident.Instance.bento.balanceOf(token0, barFeeTo);
-        const barFeeToBalanceToken1 = await Trident.Instance.bento.balanceOf(token1, barFeeTo);
+        const barFeeToBalanceToken0 = await trident.bento.balanceOf(token0, barFeeTo);
+        const barFeeToBalanceToken1 = await trident.bento.balanceOf(token1, barFeeTo);
 
         expect(barFeeToBalanceToken0.toString()).to.be.eq(
           oldBarFeeToBalanceToken0.add(token0ProtocolFee),
@@ -432,7 +432,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
     });
 
     it("Should burn the position and receive tokens back", async () => {
-      for (const pool of [trident.concentratedPools[0]]) {
+      for (const pool of trident.concentratedPools) {
         helper.reset();
 
         const tickSpacing = (await pool.getImmutables())._tickSpacing;
@@ -456,26 +456,17 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           recipient: defaultAddress,
         };
 
-        await addLiquidityViaRouter(addLiquidityParams);
-
-        addLiquidityParams.amount0Desired = addLiquidityParams.amount0Desired.mul(2);
-        addLiquidityParams.amount1Desired = addLiquidityParams.amount1Desired.mul(2);
-        addLiquidityParams = helper.setTicks(lower + 3 * step, upper + 3 * step, addLiquidityParams);
-        await addLiquidityViaRouter(addLiquidityParams);
-
-        const userLiquidity = (await Trident.Instance.concentratedPoolManager.positions(1)).liquidity;
+        const mint = await addLiquidityViaRouter(addLiquidityParams);
+        const userLiquidity = (await trident.concentratedPoolManager.positions(mint.tokenId)).liquidity;
         const userLiquidityPartial = userLiquidity.sub(userLiquidity.div(3));
 
         let removeLiquidityParams = {
-          tokenId: 1,
+          tokenId: Number(mint.tokenId.toString()),
           liquidityAmount: userLiquidityPartial,
           recipient: trident.accounts[0].address,
           unwrapBento: true,
         };
-
-        // BURN LP NFT (partial)
         await removeLiquidityViaManager(removeLiquidityParams);
-        // BURN LP NFT (full)
         removeLiquidityParams.liquidityAmount = userLiquidity.sub(userLiquidityPartial);
         await removeLiquidityViaManager(removeLiquidityParams);
       }
