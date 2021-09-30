@@ -153,7 +153,7 @@ contract ConcentratedLiquidityPool is IPool {
             mintParams.amount0Desired
         );
 
-        {
+        unchecked {
             require(_liquidity <= MAX_TICK_LIQUIDITY, "LIQUIDITY_OVERFLOW");
 
             (uint256 amount0fees, uint256 amount1fees) = _updatePosition(
@@ -272,7 +272,7 @@ contract ConcentratedLiquidityPool is IPool {
         emit Burn(msg.sender, amount0, amount1, recipient);
     }
 
-    function burnSingle(bytes calldata) public override returns (uint256) {
+    function burnSingle(bytes calldata) public pure override returns (uint256) {
         revert();
     }
 
@@ -437,7 +437,7 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     /// @dev Reserved for IPool.
-    function flashSwap(bytes calldata) public override returns (uint256) {
+    function flashSwap(bytes calldata) public pure override returns (uint256) {
         revert();
     }
 
@@ -634,31 +634,6 @@ contract ConcentratedLiquidityPool is IPool {
         feeGrowthInside1 = _feeGrowthGlobal1 - feeGrowthBelow1 - feeGrowthAbove1;
     }
 
-    function rangeSecondsInside(int24 lowerTick, int24 upperTick) public view returns (uint256 secondsInside) {
-        int24 currentTick = nearestTick;
-
-        Ticks.Tick storage lower = ticks[lowerTick];
-        Ticks.Tick storage upper = ticks[upperTick];
-
-        uint256 secondsGlobal = secondsPerLiquidity;
-        uint256 secondsBelow;
-        uint256 secondsAbove;
-
-        if (lowerTick <= currentTick) {
-            secondsBelow = lower.secondsPerLiquidityOutside;
-        } else {
-            secondsBelow = secondsGlobal - lower.secondsPerLiquidityOutside;
-        }
-
-        if (currentTick < upperTick) {
-            secondsAbove = upper.secondsPerLiquidityOutside;
-        } else {
-            secondsAbove = secondsGlobal - upper.secondsPerLiquidityOutside;
-        }
-
-        secondsInside = secondsGlobal - secondsBelow - secondsAbove;
-    }
-
     function getAssets() public view override returns (address[] memory assets) {
         assets = new address[](2);
         assets[0] = token0;
@@ -709,7 +684,7 @@ contract ConcentratedLiquidityPool is IPool {
         _reserve1 = reserve1;
     }
 
-    function getLiquidityAndLastObservation() public view returns (uint160 _secondsPerLiquidity, uint32 _lastObservation) {
+    function getSecondsPerLiquidityAndLastObservation() public view returns (uint160 _secondsPerLiquidity, uint32 _lastObservation) {
         _secondsPerLiquidity = secondsPerLiquidity;
         _lastObservation = lastObservation;
     }

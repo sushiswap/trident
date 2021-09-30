@@ -526,7 +526,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           inAmount: maxDy.div(3).mul(2),
           recipient: defaultAddress,
         });
-        const fistSplData = await pool.getLiquidityAndLastObservation();
+        const fistSplData = await pool.getSecondsPerLiquidityAndLastObservation();
         let firstSplA = await pool.rangeSecondsInside(lowerA, upperA);
         expect((await fistSplData)._secondsPerLiquidity.toString()).to.be.eq(
           firstSplA.toString(),
@@ -540,7 +540,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           inAmount: maxDy.div(3).mul(2),
           recipient: defaultAddress,
         });
-        const secondSplData = await pool.getLiquidityAndLastObservation();
+        const secondSplData = await pool.getSecondsPerLiquidityAndLastObservation();
         const secondSplA = await pool.rangeSecondsInside(lowerA, upperA);
         const secondSplB = await pool.rangeSecondsInside(lowerB, upperB);
         expect(secondSplData._secondsPerLiquidity.toString()).to.be.eq(
