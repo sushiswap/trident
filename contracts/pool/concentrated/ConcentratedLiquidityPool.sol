@@ -118,7 +118,7 @@ contract ConcentratedLiquidityPool is IPool {
         require(_token0 != address(this), "INVALID_TOKEN0");
         require(_token1 != address(this), "INVALID_TOKEN1");
         require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
-        
+
         token0 = _token0;
         token1 = _token1;
         swapFee = _swapFee;
@@ -191,7 +191,7 @@ contract ConcentratedLiquidityPool is IPool {
             uint160(currentPrice)
         );
 
-        (uint128 amount0Actual, uint128 amount1Actual) = _getAmountsForLiquidity(priceLower, priceUpper, currentPrice, _liquidity);
+        (uint128 amount0Actual, uint128 amount1Actual) = _getAmountsForLiquidity(priceLower, priceUpper, currentPrice, _liquidity, true);
 
         ITridentRouter.TokenInput[] memory callbackData = new ITridentRouter.TokenInput[](2);
         callbackData[0] = ITridentRouter.TokenInput(token0, mintParams.token0native, amount0Actual);
@@ -246,7 +246,8 @@ contract ConcentratedLiquidityPool is IPool {
             uint256(priceLower),
             uint256(priceUpper),
             uint256(currentPrice),
-            uint256(amount)
+            uint256(amount),
+            false
         );
 
         (uint256 amount0fees, uint256 amount1fees) = _updatePosition(msg.sender, lower, upper, -int128(amount));
@@ -261,8 +262,8 @@ contract ConcentratedLiquidityPool is IPool {
         withdrawnAmounts[1] = TokenAmount({token: token1, amount: amount1});
 
         unchecked {
-            reserve0 -= uint128(amount0fees);
-            reserve1 -= uint128(amount1fees);
+            reserve0 -= uint128(amount0);
+            reserve1 -= uint128(amount1);
         }
 
         _transferBothTokens(recipient, amount0, amount1, unwrapBento);
@@ -473,18 +474,19 @@ contract ConcentratedLiquidityPool is IPool {
         uint256 priceLower,
         uint256 priceUpper,
         uint256 currentPrice,
-        uint256 liquidityAmount
+        uint256 liquidityAmount,
+        bool roundUp
     ) internal pure returns (uint128 token0amount, uint128 token1amount) {
         if (priceUpper <= currentPrice) {
             /// @dev Only supply `token1` (`token1` is Y).
-            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, priceUpper, true));
+            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, priceUpper, roundUp));
         } else if (currentPrice <= priceLower) {
             /// @dev Only supply `token0` (`token0` is X).
-            token0amount = uint128(DyDxMath.getDx(liquidityAmount, priceLower, priceUpper, true));
+            token0amount = uint128(DyDxMath.getDx(liquidityAmount, priceLower, priceUpper, roundUp));
         } else {
             /// @dev Supply both tokens.
-            token0amount = uint128(DyDxMath.getDx(liquidityAmount, currentPrice, priceUpper, true));
-            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, currentPrice, true));
+            token0amount = uint128(DyDxMath.getDx(liquidityAmount, currentPrice, priceUpper, roundUp));
+            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, currentPrice, roundUp));
         }
     }
 
