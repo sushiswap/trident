@@ -57,6 +57,7 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
         require(incentive.owner == msg.sender, "NOT_OWNER");
         require(incentive.expiry < block.timestamp, "EXPIRED");
         require(incentive.rewardsUnclaimed >= amount, "ALREADY_CLAIMED");
+        incentive.rewardsUnclaimed -= amount;
         _transfer(incentive.token, address(this), receiver, amount, unwrapBento);
         emit ReclaimIncentive(pool, incentiveId);
     }
