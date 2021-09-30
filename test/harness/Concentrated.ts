@@ -5,12 +5,11 @@ import { ethers } from "hardhat";
 import { ConcentratedLiquidityPool, ConcentratedLiquidityPoolManager, TridentRouter } from "../../types";
 import { ADDRESS_ZERO } from "../utilities";
 import { swap } from "./ConstantProduct";
-import { divRoundingUp } from "./helpers";
+import { divRoundingUp, expectAlmostEqual, ZERO } from "./helpers";
 import { Trident } from "./Trident";
 
 export const TWO_POW_96 = BigNumber.from(2).pow(96);
 export const TWO_POW_128 = BigNumber.from(2).pow(128);
-export const ZERO = BigNumber.from(0);
 
 export async function collectProtocolFee(params: { pool: ConcentratedLiquidityPool }) {
   const { pool } = params;
@@ -255,14 +254,16 @@ export async function removeLiquidityViaManager(params: {
     await Trident.Instance.concentratedPoolManager.positions(tokenId);
   const [oldCurrentPrice, oldPriceLower, oldPriceUpper] = await getPrices(pool, [oldLower, oldUpper]);
   const tokens = await Promise.all([(await pool.getImmutables())._token0, (await pool.getImmutables())._token1]);
-  const oldUserBalances = await Trident.Instance.getTokenBalance(tokens, recipient, !unwrapBento);
+  const oldUserBalances = await Trident.Instance.getTokenBalance(tokens, recipient, unwrapBento);
   const oldPoolBalances = await Trident.Instance.getTokenBalance(tokens, pool.address, false);
   const oldLiquidity = await pool.liquidity();
   const oldTotalSupply = await Trident.Instance.concentratedPoolManager.totalSupply();
   const liquidityDecrease = oldPriceLower.lt(oldCurrentPrice) && oldCurrentPrice.lt(oldPriceUpper) ? liquidityAmount : ZERO;
   const { dy, dx } = getAmountForLiquidity(oldPriceLower, oldCurrentPrice, oldPriceUpper, liquidityAmount);
   const [oldLowerPreviousTick, oldLowerNextTick, oldLowerLiquidity] = await pool.ticks(oldLower);
+  const [oldLowerSecondPreviousTick, oldLowerSecondNextTick, oldLowerSecondLiquidity] = await pool.ticks(oldLowerNextTick);
   const [oldUpperPreviousTick, oldUpperNextTick, oldUpperLiquidity] = await pool.ticks(oldUpper);
+  const [oldUpperSecondPreviousTick, oldUpperSecondNextTick, oldUpperSecondLiquidity] = await pool.ticks(oldUpperPreviousTick);
   const oldPositionState = await pool.positions(Trident.Instance.concentratedPoolManager.address, oldLower, oldUpper);
   const oldUserNFTBalance = await Trident.Instance.concentratedPoolManager.balanceOf(oldOwner);
   const oldZeroAddressBalance = await Trident.Instance.concentratedPoolManager.balanceOf(ADDRESS_ZERO);
@@ -273,17 +274,19 @@ export async function removeLiquidityViaManager(params: {
   const [newPoolAddress, newUserLiquidity, newLower, newUpper, newFeeGrowthInside0, newFeeGrowthInside1] =
     await Trident.Instance.concentratedPoolManager.positions(tokenId);
   const [newCurrentPrice, newPriceLower, newPriceUpper] = await getPrices(pool, [newLower, newUpper]);
-  const newUserBalances = await Trident.Instance.getTokenBalance(tokens, recipient, !unwrapBento);
+  const newUserBalances = await Trident.Instance.getTokenBalance(tokens, recipient, unwrapBento);
   const newPoolBalances = await Trident.Instance.getTokenBalance(tokens, pool.address, false);
   const newLiquidity = await pool.liquidity();
   const newTotalSupply = await Trident.Instance.concentratedPoolManager.totalSupply();
   const [newLowerPreviousTick, newLowerNextTick, newLowerLiquidity] = await pool.ticks(newLower);
+  const [newLowerSecondPreviousTick, newLowerSecondNextTick, newLowerSecondLiquidity] = await pool.ticks(newLowerNextTick);
   const [newUpperPreviousTick, newUpperNextTick, newUpperLiquidity] = await pool.ticks(newUpper);
+  const [newUpperSecondPreviousTick, newUpperSecondNextTick, newUpperSecondLiquidity] = await pool.ticks(newUpperPreviousTick);
   const newPositionState = await pool.positions(Trident.Instance.concentratedPoolManager.address, newLower, newUpper);
   const newZeroAddressBalance = await Trident.Instance.concentratedPoolManager.balanceOf(ADDRESS_ZERO);
   const newUserNFTBalance = await Trident.Instance.concentratedPoolManager.balanceOf(oldOwner);
 
-  if (liquidityDecrease.eq(ZERO)) {
+  if (liquidityAmount.gte(oldUserLiquidity)) {
     expect(newUserNFTBalance).to.be.eq(oldUserNFTBalance.sub(1));
     expect(newZeroAddressBalance).to.be.eq(oldZeroAddressBalance.add(1));
     expect(newOwner).to.be.eq(ADDRESS_ZERO);
@@ -292,6 +295,48 @@ export async function removeLiquidityViaManager(params: {
     expect(newZeroAddressBalance).to.be.eq(oldZeroAddressBalance);
     expect(newOwner).to.be.eq(oldOwner);
   }
+  expect(newCurrentPrice).to.be.eq(oldCurrentPrice, "price changed by mistake");
+  expect(newLiquidity).to.be.eq(oldLiquidity.sub(liquidityDecrease), "Liquidity didn't update correctly");
+  expect(newPositionState.liquidity.toString()).to.be.eq(
+    oldPositionState.liquidity.sub(liquidityAmount).toString(),
+    "didn't correctly update position's liquidity"
+  );
+  expect(newPositionState.feeGrowthInside0Last).to.be.eq(oldPositionState.feeGrowthInside0Last, "didn't reset position's fee0 growth");
+  expect(newPositionState.feeGrowthInside1Last).to.be.eq(oldPositionState.feeGrowthInside1Last, "didn't reset position's fee1 growth");
+
+  if (oldLowerLiquidity.gt(liquidityAmount)) {
+    // Tick has more liquidity than what's being removed, it shouldn't reset
+    expect(newLowerLiquidity).to.be.eq(oldLowerLiquidity.sub(liquidityAmount), "Didn't decrease lower tick liquidity by the right amount");
+    expect(newLowerPreviousTick).to.be.eq(oldLowerPreviousTick, "Previous tick mistekenly updated");
+    expect(newLowerNextTick).to.be.eq(oldLowerNextTick, "Previous tick mistekenly updated");
+    expect(newLowerSecondPreviousTick).to.be.eq(oldLowerSecondPreviousTick, "Previous tick mistekenly updated");
+    expect(newLowerSecondNextTick).to.be.eq(oldLowerSecondNextTick, "Previous tick mistekenly updated");
+  } else {
+    // All liquidity removed, reset tick
+    expect(newLowerLiquidity).to.be.eq(ZERO, "Didn't set correct liqiuidity value on new tick");
+    expect(newLowerNextTick).to.be.eq(0, "Tick not reset proper");
+    expect(newLowerPreviousTick).to.be.eq(0, "Tick not reset proper");
+    expect(newLowerSecondPreviousTick).to.be.eq(0, "Previous tick not updated");
+  }
+
+  if (oldUpperLiquidity.gt(liquidityAmount)) {
+    // Tick has more liquidity than what's being removed, it shouldn't reset
+    expect(newUpperLiquidity).to.be.eq(oldUpperLiquidity.sub(liquidityAmount), "Didn't decrease upper tick liquidity by the right amount");
+    expect(newUpperNextTick).to.be.eq(oldUpperNextTick, "Next tick pointer mistekenly updated");
+    expect(newUpperPreviousTick).to.be.eq(oldUpperPreviousTick, "Next tick pointer mistekenly updated");
+    expect(newUpperSecondNextTick).to.be.eq(oldUpperSecondNextTick, "Next tick pointer mistekenly updated");
+    expect(newUpperSecondPreviousTick).to.be.eq(oldUpperSecondPreviousTick, "Next tick pointer mistekenly updated");
+  } else {
+    // new tick
+    expect(newUpperLiquidity).to.be.eq(ZERO, "Didn't set correct liqiuidity value on new tick");
+    expect(newUpperNextTick).to.be.eq(0, "Tick not reset proper");
+    expect(newUpperPreviousTick).to.be.eq(0, "Tick not reset proper");
+    expect(newUpperSecondNextTick).to.be.eq(0, "Next tick pointer not updated");
+  }
+  expectAlmostEqual(newUserBalances[0], oldUserBalances[0].add(dx), "Didn't receive correct amount of token0");
+  expectAlmostEqual(newUserBalances[1], oldUserBalances[1].add(dy), "Didn't receive correct amount of token0");
+  expectAlmostEqual(newPoolBalances[0], oldPoolBalances[0].sub(dx), "Didn't pay correct amount of token0");
+  expectAlmostEqual(newPoolBalances[1], oldPoolBalances[1].sub(dy), "Didn't pay correct amount of token0");
   return { token0: BigNumber.from(0), token1: BigNumber.from(1) };
 }
 
