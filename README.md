@@ -26,7 +26,7 @@ Initially, Trident has been developed with four primary pool types for launch:
 
 **### [ConstantProductPool](**./contracts/pool/ConstantProductPool.sol**)**
 
-Constant product pools are the "classic" pools that users will be most familiar with, where trading happens between two assets over the x\*y=k constant product formula. In this pool liquidity providers own both of the pool's assets in a 50:50 ratio but the pool does supports a native zap in where liquidity can be added in any ratio of the two tokens. This pool is our most "gas optimized" pool, where swaps are up to 20% cheaper than swaps on the existing Sushi AMM.
+Constant product pools are the "classic" pools that users will be most familiar with, where trading happens between two assets over the x\*y=k constant product formula. In this pool liquidity providers own both of the pool's assets in a 50:50 ratio but the pool does supports a native zap in where liquidity can be added in any ratio of the two tokens. This pool is our most "gas optimized" pool, where swaps are up to 25% cheaper than swaps on the existing Sushi AMM.
 
 **### [ConcentratedLiquidityPool](**./contracts/pool/concentrated/ConcentratedLiquidityPool.sol**)**
 
