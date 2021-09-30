@@ -30,7 +30,7 @@ We repeat this step untill we use up all of the swap input amount.
 Pool may be trading inside and outside of a given position. To calcualte fees belonging to a specific position we keep track of a couple of counters.
 
 We store a **feeGrowthGlobal** accumulator which increases on every swap step by the swap fee amount divided by the current liquidity `feeGrowthGlobal += feeAmount / currentLiquidity`.
-Every tick also keeps track of it's own **feeGrowthOutside** accumulator. This stores the fee growth that has happened on the side of the tick where trading isn't currently happening. It is updated each time a tick is crossed: `feeGrowthOutside = feeGrowthGlobal - feeGrowthOutside`.
+Every tick also keeps track of it's own **feeGrowthOutside** accumulator. This stores the fee growth that has happened on the side of the tick where trading isn't currently happening. It is updated each time the tick is crossed: `feeGrowthOutside = feeGrowthGlobal - feeGrowthOutside`.
 
 Using the `feeGrowthGlobal` and `feeGrowthOutside` variables we can calculate the feeGrowth that has happened above or below any specific tick.
 
@@ -54,17 +54,17 @@ Users can chose for their liquidity position to be owned by the `ConcentratedLiq
 
 ## Staking
 
-Projects can provide incentives on any concentrated liquidity pair. Incentives are set from a specific start time to a specific end time with a flat reward amount. Liquidity providers are rewarded proportional to their liquidity, but only for the duration when their position was in trading range.
+Projects can provide incentives on any concentrated liquidity pair. Incentives are set from a specific start time to a specific end time with a flat reward amount. Liquidity providers are rewarded proportional to their liquidity, but only for the duration when price was trading within their range.
 
 We use the same approach as with calculating fees belonging to a position.
 
-The pool keeps track of a global `secondsPerLiquidity` accumulator which increases on every swap by the time between the last measurement, divided by current liquidity `secondsPerLiquidity += secondPassed / liquidity`.
-Each tick also keeps track of the `secondsPerLiquidityOutside` counter which stores the seconds per liquidity growth that has happened on the side of the tick where trading currently isn't happening. It is updated on every tick crossing in the same way as fee counters are.
+The pool keeps track of a `secondsGrowthGlobal` accumulator which increases on every swap by the time between the last increase, divided by current liquidity `secondsGrowthGlobal += secondPassed / liquidity`.
+Each tick also keeps track of the `secondsGrowthOutside` snapshot which stores the growth that has happened on the side of the tick where trading currently isn't happening. It is updated each time the tick is crossed: `secondsGrowthOutside = secondsGrowthGlobal - secondsGrowthOutside`.
 
-Using the global `secondsPerLiquidity` counter and the `secondsPerLiquidityOutside` of a tick we can calculate the current seconds per liquidity above or below any specific tick.
-By subtracting the "seconds per liquidity below" of the lower tick and the "seconds per liquidity above" of the upper tick from the global "seconds per liquidity counter" we get the seconds per liquidity accumulator for a position. When a user wants to stake a snapshot of this value is taken (`secondsInsideLast`).
+Using the `secondsGrowthGlobal` and the `secondsGrowthOutside` counter of a tick we can calculate the current growth that has happened above or below any specific tick.
+By subtracting the "growth below" of the lower tick and the "growth above" of the upper tick from `secondsGrowthGlobal` we get the growth for a position. When a user wants to stake a snapshot of this value is taken (`secondsGrowthInsideLast`).
 
-After some time passes we can calculate the rewards belonging to a position by computing the new `secondsInsideLast` value and calculating the difference from the old value. Multiplying this difference by the position's liquidity gives us an abstract amount in seconds, that will be less than or equal to the time a user has been staked for (e.g. staking duration is 1000 seconds, but the position's seconds value we calculate is 100). We can think of this value as the amount of time trading has relied solely on this position. By dividing the position's time by the total passed time we can compute the ratio of rewards that should be credited to the position (in the example it would be 10% of rewards).
+After some time passes we can calculate the rewards belonging to a position by computing the new `secondsGrowthInsideLast` value and calculating the difference from the old value. Multiplying this difference by the position's liquidity gives us an abstract amount in seconds, that will be less than or equal to the time a user has been staked for (e.g. staking duration is 1000 seconds, but the position's seconds value we calculate is 100). We can think of this value as the amount of time trading has relied solely on this position. By dividing the position's time by the total passed time we can compute the ratio of rewards that should be credited to the position (in the example it would be 10% of rewards).
 
 ## Formulas
 

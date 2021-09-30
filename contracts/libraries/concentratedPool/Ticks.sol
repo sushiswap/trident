@@ -13,7 +13,7 @@ library Ticks {
         uint128 liquidity;
         uint256 feeGrowthOutside0; // Per unit of liquidity.
         uint256 feeGrowthOutside1;
-        uint160 secondsPerLiquidityOutside;
+        uint160 secondsGrowthOutside;
     }
 
     function getMaxLiquidity(uint24 _tickSpacing) internal pure returns (uint128) {
@@ -23,12 +23,12 @@ library Ticks {
     function cross(
         mapping(int24 => Tick) storage ticks,
         int24 nextTickToCross,
-        uint160 secondsPerLiquidity,
+        uint160 secondsGrotwhGlobal,
         uint256 currentLiquidity,
         uint256 feeGrowthGlobal,
         bool zeroForOne
     ) internal returns (uint256, int24) {
-        ticks[nextTickToCross].secondsPerLiquidityOutside = secondsPerLiquidity - ticks[nextTickToCross].secondsPerLiquidityOutside;
+        ticks[nextTickToCross].secondsGrowthOutside = secondsGrotwhGlobal - ticks[nextTickToCross].secondsGrowthOutside;
         if (zeroForOne) {
             // Moving forward through the linked list
             if (nextTickToCross % 2 == 0) {
@@ -56,7 +56,7 @@ library Ticks {
         mapping(int24 => Tick) storage ticks,
         uint256 feeGrowthGlobal0,
         uint256 feeGrowthGlobal1,
-        uint160 secondsPerLiquidity,
+        uint160 secondsGrotwhGlobal,
         int24 lowerOld,
         int24 lower,
         int24 upperOld,
@@ -83,7 +83,7 @@ library Ticks {
                 require((old.liquidity != 0 || lowerOld == TickMath.MIN_TICK) && lowerOld < lower && lower < oldNextTick, "LOWER_ORDER");
 
                 if (lower <= nearestTick) {
-                    ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
+                    ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsGrotwhGlobal);
                 } else {
                     ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, 0, 0, 0);
                 }
@@ -105,7 +105,7 @@ library Ticks {
             require(old.liquidity != 0 && oldNextTick > upper && upperOld < upper, "UPPER_ORDER");
 
             if (upper <= nearestTick) {
-                ticks[upper] = Ticks.Tick(upperOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsPerLiquidity);
+                ticks[upper] = Ticks.Tick(upperOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsGrotwhGlobal);
             } else {
                 ticks[upper] = Ticks.Tick(upperOld, oldNextTick, amount, 0, 0, 0);
             }
