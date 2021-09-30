@@ -261,7 +261,9 @@ export async function removeLiquidityViaManager(params: {
   const liquidityDecrease = oldPriceLower.lt(oldCurrentPrice) && oldCurrentPrice.lt(oldPriceUpper) ? liquidityAmount : ZERO;
   const { dy, dx } = getAmountForLiquidity(oldPriceLower, oldCurrentPrice, oldPriceUpper, liquidityAmount);
   const [oldLowerPreviousTick, oldLowerNextTick, oldLowerLiquidity] = await pool.ticks(oldLower);
+  const [oldLowerSecondPreviousTick, oldLowerSecondNextTick, oldLowerSecondLiquidity] = await pool.ticks(oldLowerNextTick);
   const [oldUpperPreviousTick, oldUpperNextTick, oldUpperLiquidity] = await pool.ticks(oldUpper);
+  const [oldUpperSecondPreviousTick, oldUpperSecondNextTick, oldUpperSecondLiquidity] = await pool.ticks(oldUpperPreviousTick);
   const oldPositionState = await pool.positions(Trident.Instance.concentratedPoolManager.address, oldLower, oldUpper);
   const oldUserNFTBalance = await Trident.Instance.concentratedPoolManager.balanceOf(oldOwner);
   const oldZeroAddressBalance = await Trident.Instance.concentratedPoolManager.balanceOf(ADDRESS_ZERO);
@@ -277,7 +279,9 @@ export async function removeLiquidityViaManager(params: {
   const newLiquidity = await pool.liquidity();
   const newTotalSupply = await Trident.Instance.concentratedPoolManager.totalSupply();
   const [newLowerPreviousTick, newLowerNextTick, newLowerLiquidity] = await pool.ticks(newLower);
+  const [newLowerSecondPreviousTick, newLowerSecondNextTick, newLowerSecondLiquidity] = await pool.ticks(newLowerNextTick);
   const [newUpperPreviousTick, newUpperNextTick, newUpperLiquidity] = await pool.ticks(newUpper);
+  const [newUpperSecondPreviousTick, newUpperSecondNextTick, newUpperSecondLiquidity] = await pool.ticks(newUpperPreviousTick);
   const newPositionState = await pool.positions(Trident.Instance.concentratedPoolManager.address, newLower, newUpper);
   const newZeroAddressBalance = await Trident.Instance.concentratedPoolManager.balanceOf(ADDRESS_ZERO);
   const newUserNFTBalance = await Trident.Instance.concentratedPoolManager.balanceOf(oldOwner);
@@ -293,41 +297,42 @@ export async function removeLiquidityViaManager(params: {
   }
   expect(newCurrentPrice).to.be.eq(oldCurrentPrice, "price changed by mistake");
   expect(newLiquidity).to.be.eq(oldLiquidity.sub(liquidityDecrease), "Liquidity didn't update correctly");
-  // expect(newLowerOldPreviousTick).to.be.eq(oldLowerOldPreviousTick, "Mistakenly updated previous pointer of lowerOld");
-  // expect(newPositionState.liquidity.toString()).to.be.eq(
-  //   oldPositionState.liquidity.add(liquidity).toString(),
-  //   "didn't correctly update position's liquidity"
-  // );
-  // expect(newPositionState.feeGrowthInside0Last.toString()).to.be.eq("0", "didn't reset position's fee0 growth");
-  // expect(newPositionState.feeGrowthInside1Last.toString()).to.be.eq("0", "didn't reset position's fee1 growth");
+  expect(newPositionState.liquidity.toString()).to.be.eq(
+    oldPositionState.liquidity.sub(liquidityAmount).toString(),
+    "didn't correctly update position's liquidity"
+  );
+  expect(newPositionState.feeGrowthInside0Last).to.be.eq(oldPositionState.feeGrowthInside0Last, "didn't reset position's fee0 growth");
+  expect(newPositionState.feeGrowthInside1Last).to.be.eq(oldPositionState.feeGrowthInside1Last, "didn't reset position's fee1 growth");
 
-  // if (oldLowerLiquidity.gt(0)) {
-  //   // existing tick, lowerOld shouldn't get updated
-  //   expect(newLowerLiquidity.toString()).to.be.eq(
-  //     oldLowerLiquidity.add(liquidity).toString(),
-  //     "Didn't increase lower tick liquidity by the right amount"
-  //   );
-  //   expect(newLowerPreviousTick).to.be.eq(oldLowerPreviousTick, "Previous tick mistekenly updated");
-  // } else {
-  //   // new tick, lowerOld should get updated
-  //   expect(newLowerLiquidity.toString()).to.be.eq(liquidity.toString(), "Didn't set correct liqiuidity value on new tick");
-  //   expect(newLowerOldNextTick).to.be.eq(lower, "Old not pointing to new");
-  //   expect(newLowerPreviousTick).to.be.eq(lowerOld, "New tick now pointing to old");
-  // }
+  if (oldLowerLiquidity.gt(liquidityAmount)) {
+    // Tick has more liquidity than what's being removed, it shouldn't reset
+    expect(newLowerLiquidity).to.be.eq(oldLowerLiquidity.sub(liquidityAmount), "Didn't decrease lower tick liquidity by the right amount");
+    expect(newLowerPreviousTick).to.be.eq(oldLowerPreviousTick, "Previous tick mistekenly updated");
+    expect(newLowerNextTick).to.be.eq(oldLowerNextTick, "Previous tick mistekenly updated");
+    expect(newLowerSecondPreviousTick).to.be.eq(oldLowerSecondPreviousTick, "Previous tick mistekenly updated");
+    expect(newLowerSecondNextTick).to.be.eq(oldLowerSecondNextTick, "Previous tick mistekenly updated");
+  } else {
+    // All liquidity removed, reset tick
+    expect(newLowerLiquidity).to.be.eq(ZERO, "Didn't set correct liqiuidity value on new tick");
+    expect(newLowerNextTick).to.be.eq(0, "Tick not reset proper");
+    expect(newLowerPreviousTick).to.be.eq(0, "Tick not reset proper");
+    expect(newLowerSecondPreviousTick).to.be.eq(0, "Previous tick not updated");
+  }
 
-  // if (oldUpperLiquidity.gt(0)) {
-  //   // existing tick, upperOld shouldn't get updated
-  //   expect(newUpperLiquidity.toString()).to.be.eq(
-  //     oldUpperLiquidity.add(liquidity).toString(),
-  //     "Didn't increase upper tick liquidity by the right amount"
-  //   );
-  //   expect(newUpperNextTick).to.be.eq(oldUpperNextTick, "Next tick pointer mistekenly updated");
-  // } else {
-  //   // new tick
-  //   expect(newUpperLiquidity.toString()).to.be.eq(liquidity.toString(), "Didn't set correct liqiuidity value on new tick");
-  //   expect(newUpperOldNextTick).to.be.eq(upper, "Old tick not pointing to the new");
-  //   expect(newUpperPreviousTick).to.be.eq(upperOld, "New Tick not pointing to the old");
-  // }
+  if (oldUpperLiquidity.gt(liquidityAmount)) {
+    // Tick has more liquidity than what's being removed, it shouldn't reset
+    expect(newUpperLiquidity).to.be.eq(oldUpperLiquidity.sub(liquidityAmount), "Didn't decrease upper tick liquidity by the right amount");
+    expect(newUpperNextTick).to.be.eq(oldUpperNextTick, "Next tick pointer mistekenly updated");
+    expect(newUpperPreviousTick).to.be.eq(oldUpperPreviousTick, "Next tick pointer mistekenly updated");
+    expect(newUpperSecondNextTick).to.be.eq(oldUpperSecondNextTick, "Next tick pointer mistekenly updated");
+    expect(newUpperSecondPreviousTick).to.be.eq(oldUpperSecondPreviousTick, "Next tick pointer mistekenly updated");
+  } else {
+    // new tick
+    expect(newUpperLiquidity).to.be.eq(ZERO, "Didn't set correct liqiuidity value on new tick");
+    expect(newUpperNextTick).to.be.eq(0, "Tick not reset proper");
+    expect(newUpperPreviousTick).to.be.eq(0, "Tick not reset proper");
+    expect(newUpperSecondNextTick).to.be.eq(0, "Next tick pointer not updated");
+  }
   expectAlmostEqual(newUserBalances[0], oldUserBalances[0].add(dx), "Didn't receive correct amount of token0");
   expectAlmostEqual(newUserBalances[1], oldUserBalances[1].add(dy), "Didn't receive correct amount of token0");
   expectAlmostEqual(newPoolBalances[0], oldPoolBalances[0].sub(dx), "Didn't pay correct amount of token0");
