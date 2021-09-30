@@ -94,7 +94,7 @@ export async function swapViaRouter(params: {
   const { pool, zeroForOne, inAmount, recipient, unwrapBento } = params;
   const immutables = await pool.getImmutables();
   const nearest = (await pool.getPriceAndNearestTicks())._nearestTick;
-  const oldSplData = await pool.getSecondsPerLiquidityAndLastObservation();
+  const oldSplData = await pool.getSecondsGrowthAndLastObservation();
   let nextTickToCross = zeroForOne ? nearest : (await pool.ticks(nearest)).nextTick;
   let currentPrice = (await pool.getPriceAndNearestTicks())._price;
   let currentLiquidity = await pool.liquidity();
@@ -198,12 +198,12 @@ export async function swapViaRouter(params: {
   };
 
   const tx = await Trident.Instance.router.exactInputSingle(routerData);
-  const newSplData = await pool.getSecondsPerLiquidityAndLastObservation();
+  const newSplData = await pool.getSecondsGrowthAndLastObservation();
   const block = await ethers.provider.getBlock(tx.blockNumber as number);
   const timeDiff = block.timestamp - oldSplData._lastObservation;
   const splIncrease = TWO_POW_128.mul(timeDiff).div(startingLiquidity);
-  expect(newSplData._secondsPerLiquidity.toString()).to.be.eq(
-    oldSplData._secondsPerLiquidity.add(splIncrease).toString(),
+  expect(newSplData._secondsGrowthGlobal.toString()).to.be.eq(
+    oldSplData._secondsGrowthGlobal.add(splIncrease).toString(),
     "Didn't correctly update global spl counter"
   );
   expect(newSplData._lastObservation).to.be.eq(block.timestamp);

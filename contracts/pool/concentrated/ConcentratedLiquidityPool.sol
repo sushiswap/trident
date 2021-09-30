@@ -46,7 +46,7 @@ contract ConcentratedLiquidityPool is IPool {
 
     uint128 public liquidity;
 
-    uint160 internal secondsPerLiquidity; /// @dev Multiplied by 2^128.
+    uint160 internal secondsGrowthGlobal; /// @dev Multiplied by 2^128.
     uint32 internal lastObservation;
 
     uint256 public feeGrowthGlobal0; /// @dev All fee growth counters are multiplied by 2^128.
@@ -177,11 +177,12 @@ contract ConcentratedLiquidityPool is IPool {
         }
 
         _ensureTickSpacing(mintParams.lower, mintParams.upper);
+
         nearestTick = Ticks.insert(
             ticks,
             feeGrowthGlobal0,
             feeGrowthGlobal1,
-            secondsPerLiquidity,
+            secondsGrowthGlobal,
             mintParams.lowerOld,
             mintParams.lower,
             mintParams.upperOld,
@@ -310,12 +311,12 @@ contract ConcentratedLiquidityPool is IPool {
             nextTickToCross: zeroForOne ? nearestTick : ticks[nearestTick].nextTick
         });
 
-        {
+        unchecked {
             uint256 timestamp = block.timestamp;
-            uint256 diff = timestamp - uint256(lastObservation); /// @dev Underflow in 2106.
+            uint256 diff = timestamp - uint256(lastObservation); /// @dev Underflow in 2106. Don't do staking rewards in the year 2106.
             if (diff > 0 && liquidity > 0) {
                 lastObservation = uint32(timestamp);
-                secondsPerLiquidity += uint160((diff << 128) / liquidity);
+                secondsGrowthGlobal += uint160((diff << 128) / liquidity);
             }
         }
 
@@ -394,7 +395,7 @@ contract ConcentratedLiquidityPool is IPool {
                 (cache.currentLiquidity, cache.nextTickToCross) = Ticks.cross(
                     ticks,
                     cache.nextTickToCross,
-                    secondsPerLiquidity,
+                    secondsGrowthGlobal,
                     cache.currentLiquidity,
                     cache.feeGrowthGlobal,
                     zeroForOne
@@ -405,7 +406,7 @@ contract ConcentratedLiquidityPool is IPool {
                     (cache.currentLiquidity, cache.nextTickToCross) = Ticks.cross(
                         ticks,
                         cache.nextTickToCross,
-                        secondsPerLiquidity,
+                        secondsGrowthGlobal,
                         cache.currentLiquidity,
                         cache.feeGrowthGlobal,
                         zeroForOne
@@ -684,8 +685,8 @@ contract ConcentratedLiquidityPool is IPool {
         _reserve1 = reserve1;
     }
 
-    function getSecondsPerLiquidityAndLastObservation() public view returns (uint160 _secondsPerLiquidity, uint32 _lastObservation) {
-        _secondsPerLiquidity = secondsPerLiquidity;
+    function getSecondsGrowthAndLastObservation() public view returns (uint160 _secondsGrowthGlobal, uint32 _lastObservation) {
+        _secondsGrowthGlobal = secondsGrowthGlobal;
         _lastObservation = lastObservation;
     }
 }
