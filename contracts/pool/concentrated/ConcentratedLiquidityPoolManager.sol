@@ -25,7 +25,7 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
     }
 
     struct Stake {
-        uint160 secondsInsideLast; // @dev x128.
+        uint160 secondsGrowthInsideLast; // @dev x128.
         bool initialized;
     }
 
@@ -72,7 +72,7 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
         Incentive memory incentive = incentives[pool][incentiveId];
         Stake storage stake = stakes[positionId][incentiveId];
         require(position.liquidity != 0, "INACTIVE");
-        require(stake.secondsInsideLast == 0, "SUBSCRIBED");
+        require(stake.secondsGrowthInsideLast == 0, "SUBSCRIBED");
         require(incentiveId <= incentiveCount[pool], "NOT_INCENTIVE");
         require(block.timestamp > incentive.startTime && block.timestamp < incentive.endTime, "TIMED_OUT");
         stakes[positionId][incentiveId] = Stake(uint160(rangeSecondsInside(pool, position.lower, position.upper)), true);
@@ -91,13 +91,13 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
         Incentive storage incentive = incentives[position.pool][incentiveId];
         Stake storage stake = stakes[positionId][incentiveId];
         require(stake.initialized, "UNINITIALIZED");
-        uint256 secondsPerLiquidityInside = rangeSecondsInside(pool, position.lower, position.upper) - stake.secondsInsideLast;
-        uint256 secondsInside = secondsPerLiquidityInside * position.liquidity; // x128
+        uint256 secondsGrowth = rangeSecondsInside(pool, position.lower, position.upper) - stake.secondsGrowthInsideLast;
+        uint256 secondsInside = secondsGrowth * position.liquidity; // x128
         uint256 maxTime = block.timestamp < incentive.endTime ? incentive.endTime : block.timestamp;
         uint256 secondsUnclaimed = ((maxTime - incentive.startTime) << 128) - incentive.secondsClaimed;
         uint256 rewards = (incentive.rewardsUnclaimed * secondsInside) / secondsUnclaimed; // x128 cancels out
         incentive.secondsClaimed += uint160(secondsInside);
-        stake.secondsInsideLast += uint160(secondsPerLiquidityInside);
+        stake.secondsGrowthInsideLast += uint160(secondsGrowth);
         incentive.rewardsUnclaimed -= uint96(rewards);
         _transfer(incentive.token, address(this), recipient, rewards, unwrapBento);
         emit ClaimReward(positionId, incentiveId, recipient);
@@ -109,8 +109,8 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
         Incentive memory incentive = incentives[pool][positionId];
         Stake memory stake = stakes[positionId][incentiveId];
         if (stake.initialized) {
-            uint256 secondsPerLiquidityInside = rangeSecondsInside(pool, position.lower, position.upper) - stake.secondsInsideLast;
-            secondsInside = secondsPerLiquidityInside * position.liquidity;
+            uint256 secondsGrowth = rangeSecondsInside(pool, position.lower, position.upper) - stake.secondsGrowthInsideLast;
+            secondsInside = secondsGrowth * position.liquidity;
             uint256 maxTime = block.timestamp < incentive.endTime ? incentive.endTime : block.timestamp;
             uint256 secondsUnclaimed = ((maxTime - incentive.startTime) << 128) - incentive.secondsClaimed;
             rewards = (incentive.rewardsUnclaimed * secondsInside) / secondsUnclaimed;
@@ -127,22 +127,22 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
         Ticks.Tick memory lower = pool.ticks(lowerTick);
         Ticks.Tick memory upper = pool.ticks(upperTick);
 
-        (uint256 secondsGlobal, ) = pool.getSecondsPerLiquidityAndLastObservation();
+        (uint256 secondsGrowthGlobal, ) = pool.getSecondsGrowthAndLastObservation();
         uint256 secondsBelow;
         uint256 secondsAbove;
 
         if (lowerTick <= currentTick) {
-            secondsBelow = lower.secondsPerLiquidityOutside;
+            secondsBelow = lower.secondsGrowthOutside;
         } else {
-            secondsBelow = secondsGlobal - lower.secondsPerLiquidityOutside;
+            secondsBelow = secondsGrowthGlobal - lower.secondsGrowthOutside;
         }
 
         if (currentTick < upperTick) {
-            secondsAbove = upper.secondsPerLiquidityOutside;
+            secondsAbove = upper.secondsGrowthOutside;
         } else {
-            secondsAbove = secondsGlobal - upper.secondsPerLiquidityOutside;
+            secondsAbove = secondsGrowthGlobal - upper.secondsGrowthOutside;
         }
 
-        secondsInside = secondsGlobal - secondsBelow - secondsAbove;
+        secondsInside = secondsGrowthGlobal - secondsBelow - secondsAbove;
     }
 }
