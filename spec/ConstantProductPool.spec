@@ -371,7 +371,7 @@ rule noChangeToOthersBalances(method f) {
             other != bentoBox && other != barFeeTo() &&
             other != symbolicTridentCallee.tridentCalleeFrom();
 
-    // to prevent overflows in TridentERC20 (same assumption)
+    // to prevent overflows in TridentERC20 (safe assumption)
     require balanceOf(other) + balanceOf(e.msg.sender) + balanceOf(currentContract) <= totalSupply();
     require e.msg.sender != currentContract; // REVIEW
 

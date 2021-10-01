@@ -10,8 +10,6 @@ interface Receiver {
 }
 
 contract TridentRouterHarness is TridentRouter {
-    IERC20 public tokenA; // TODO: no need?
-
     constructor(
         IBentoBoxMinimal _bento,
         MasterDeployer _masterDeployer,
@@ -36,6 +34,7 @@ contract TridentRouterHarness is TridentRouter {
 
     function exactInputSingle(ExactInputSingleParams memory params) public payable override returns (uint256 amountOut) {}
 
+    // TODO: timing out on sanity
     function callExactInput(
         address tokenIn1,
         address pool1,
@@ -48,7 +47,7 @@ contract TridentRouterHarness is TridentRouter {
     ) public payable virtual returns (uint256 amount) {
         Path[] memory paths = new Path[](2);
 
-        // TODO: connect the pools using require?
+        // TODO: connect the pools using require? (Nurit - not at the moment)
         // Like pool1: tokenIn1, TokenOut1
         //      pool2: TokenIn2 (TokenOut1), _
         bytes memory data1 = abi.encode(tokenIn1, pool2, unwrapBento);
@@ -66,6 +65,9 @@ contract TridentRouterHarness is TridentRouter {
 
     // TODO: exactInputLazy
     // TODO: CompilerError: Stack too deep, try removing local variables.
+    // Shelly: --solc_args '["--optimize"]' \
+    // This puts our analysis at a greater risk for failing, so you’d need to be
+    // aware of that and check statsdata.json after the first run on a contract using this
     // function callExactInputLazy(
     //     address tokenIn1,
     //     address pool1,
@@ -89,15 +91,15 @@ contract TridentRouterHarness is TridentRouter {
     //     returns (uint256 amount) {
     //     Path[] memory paths = new Path[](2);
 
-    //     // TODO: if we are dealing with callbacks, need to link or do whatever is needed
-    //     // the callbacks defined in TridentRouter are useful to get the input tokens
-    //     // from the user
+    //     // TODO: if we are dealing with callbacks, need to link or do whatever is needed.
+    //     // The callbacks defined in TridentRouter are useful to get the input tokens
+    //     // from the user.
     //     bytes memory context1 = abi.encode(tridentCalleeToken1, tridentCalleeFrom1,
     //                                        tridentCalleeRecipient1, tridentCalleeShares1);
     //     bytes memory context2 = abi.encode(tridentCalleeToken2, tridentCalleeFrom2,
     //                                        tridentCalleeRecipient2, tridentCalleeShares2);
 
-    //     // TODO: connect the pools using require?
+    //     // TODO: connect the pools using require? (Nurit - not at the moment)
     //     // Like pool1: tokenIn1, TokenOut1
     //     //      pool2: TokenIn2 (TokenOut1), _
     //     bytes memory data1 = abi.encode(tokenIn1, pool2, unwrapBento, amountIn, context1);
@@ -129,6 +131,7 @@ contract TridentRouterHarness is TridentRouter {
 
     function exactInputSingleWithNativeToken(ExactInputSingleParams memory params) public payable override returns (uint256 amountOut) {}
 
+    // TODO: timing out on sanity
     function callExactInputWithNativeToken(
         address tokenIn1,
         address pool1,
@@ -141,7 +144,7 @@ contract TridentRouterHarness is TridentRouter {
     ) public payable virtual returns (uint256 amount) {
         Path[] memory paths = new Path[](2);
 
-        // TODO: connect the pools using require?
+        // TODO: connect the pools using require? (Nurit - not at the moment)
         // Like pool1: tokenIn1, TokenOut1
         //      pool2: TokenIn2 (TokenOut1), _
         bytes memory data1 = abi.encode(tokenIn1, pool2, unwrapBento);
@@ -158,6 +161,8 @@ contract TridentRouterHarness is TridentRouter {
     function exactInputWithNativeToken(ExactInputParams memory params) public payable override returns (uint256 amount) {}
 
     // TODO: need to add a call function for complexPath
+    // Nurit - very complex, last thing to do if we have time, otherwise
+    // state that this function was out of scope same for callExactInputLazy
     function complexPath(ComplexPathParams memory params) public payable override {}
 
     function callAddLiquidity(
@@ -258,6 +263,8 @@ contract TridentRouterHarness is TridentRouter {
 
     // TODO: do we need to stimulate this, so that we don't commit the same
     // error as we did in DutchAuction
+    // Nurit - we should comment that this is an unsound simplification however,
+    // the code does not trust the msg.value. Instead the current balance is checked.
     function batch(bytes[] calldata data) external payable override returns (bytes[] memory results) {}
 
     function tokenBalanceOf(address token, address user) public view returns (uint256) {

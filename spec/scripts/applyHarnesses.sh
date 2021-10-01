@@ -38,6 +38,10 @@ perl -0777 -i -pe 's/\) internal \{/\) internal virtual \{/g' contracts/utils/Tr
 ##################################################
 #                   TridentRouter                #
 ##################################################
+# cachedMsgSender and cachedPool: internal -> public
+perl -0777 -i -pe 's/address internal cachedMsgSender;/address public cachedMsgSender;/g' contracts/TridentRouter.sol
+perl -0777 -i -pe 's/address internal cachedPool;/address public cachedPool;/g' contracts/TridentRouter.sol
+
 # virtualizing receive
 perl -0777 -i -pe 's/receive\(\) external payable \{/receive\(\) external virtual payable \{/g' contracts/TridentRouter.sol
 
