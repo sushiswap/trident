@@ -49,21 +49,29 @@ export async function executeTridentRoute(tridentRouteParams: TridentRoute, toTo
 
   let outputBalanceBefore: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
 
-  switch (tridentRouteParams.routeType) {
-    case RouteType.SinglePool:
-      await (await router.connect(alice).exactInputSingle(tridentRouteParams)).wait();
-      break;
-    
-    case RouteType.SinglePath:
-      await (await router.connect(alice).exactInput(tridentRouteParams)).wait();
+  try {
+    switch (tridentRouteParams.routeType) {
+      case RouteType.SinglePool:
+        await (await router.connect(alice).exactInputSingle(tridentRouteParams)).wait();
         break;
-    
-    case RouteType.ComplexPath:
-    default:
-      await (await router.connect(alice).complexPath(tridentRouteParams)).wait();
-      break;
+      
+      case RouteType.SinglePath:
+        await (await router.connect(alice).exactInput(tridentRouteParams)).wait();
+          break;
+      
+      case RouteType.ComplexPath:
+      default:
+        await (await router.connect(alice).complexPath(tridentRouteParams)).wait();
+        break;
+    }
+  } catch (error) {
+    console.error('An error occurred executing trident route');
+    console.log('');
+    console.log(`Route Type: ${tridentRouteParams.routeType}`);
+
+    throw error;
   }
- 
+  
   let outputBalanceAfter: BigNumber = await bento.balanceOf(
     toTokenAddress,
     alice.address
@@ -72,7 +80,7 @@ export async function executeTridentRoute(tridentRouteParams: TridentRoute, toTo
   return outputBalanceAfter.sub(outputBalanceBefore);
 }
 
-export async function getRandomPools(rnd: () => number, tokenCount: number, variants: number): Promise<Topology> { 
+export async function getRandomPools(tokenCount: number, variants: number, rnd: () => number): Promise<Topology> { 
   return await getTopoplogy(tokenCount, variants, rnd); 
 } 
 
