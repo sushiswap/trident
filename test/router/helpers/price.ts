@@ -1,4 +1,4 @@
-import { getRandom } from "./randomHelper";
+import { getRandom } from "./random";
 
 const MIN_TOKEN_PRICE = 1e-6
 const MAX_TOKEN_PRICE = 1e6

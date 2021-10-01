@@ -3,7 +3,7 @@ import { ethers } from "hardhat";
 import { getBigNumber, MultiRoute } from "@sushiswap/tines";
 
 import { RouteType } from "./constants";
-import { ComplexPathParams, ExactInputParams, ExactInputSingleParams, InitialPath, Output, Path, PercentagePath, TridentRoute } from "./helperInterfaces";
+import { ComplexPathParams, ExactInputParams, ExactInputSingleParams, InitialPath, Output, Path, PercentagePath, TridentRoute } from "./interfaces";
 import { BigNumber } from "@ethersproject/bignumber";
 
 

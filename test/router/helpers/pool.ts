@@ -2,8 +2,8 @@ import { Contract } from "ethers";
 import { ethers } from "hardhat";
 import { HybridRPool, ConstantProductRPool, getBigNumber, RToken } from "@sushiswap/tines";
 
-import { PoolDeploymentContracts } from "./helperInterfaces";
-import { choice, getRandom } from "./randomHelper";
+import { PoolDeploymentContracts } from "./interfaces";
+import { choice, getRandom } from "./random";
 import { MAX_POOL_IMBALANCE, MAX_POOL_RESERVE, MIN_POOL_IMBALANCE, MIN_POOL_RESERVE } from "./constants";
  
 export async function getCPPool(t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts, rnd: () => number, reserve: number = 0) {
@@ -90,6 +90,17 @@ export async function getHybridPool(t0: RToken, t1: RToken, price: number, deplo
     getBigNumber(reserve1),
   )
 }
+
+export async function getRandomPool(t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts, rnd: () => number) { 
+  if (rnd() < 0.5)
+  { 
+    return await getCPPool(t0, t1, price, deploymentContracts, rnd);
+  }
+  else
+  {
+    return await getHybridPool(t0, t1, price, deploymentContracts, rnd);
+  }
+} 
 
 function getPoolFee(rnd: () => number) {
   const fees = [0.003, 0.001, 0.0005]

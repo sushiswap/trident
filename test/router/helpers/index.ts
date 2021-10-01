@@ -3,10 +3,10 @@ import { getBigNumber,RToken, MultiRoute, findMultiRouting, RPool, }  from "@sus
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { BigNumber, Contract, ContractFactory } from "ethers";
 
-import { Topology, PoolDeploymentContracts, TridentRoute, } from "./helperInterfaces";
-import { getCPPool, getHybridPool } from "./poolHelpers";
-import { getTokenPrice } from "./priceHelper";
-import { RouteType } from "./constants";
+import { Topology, PoolDeploymentContracts, TridentRoute, } from "./interfaces";
+import { getCPPool, getHybridPool, getRandomPool } from "./pool";
+import { getTokenPrice } from "./price";
+import { RouteType } from "./constants"; 
 
 let alice: SignerWithAddress,
   feeTo: SignerWithAddress,
@@ -20,7 +20,8 @@ let alice: SignerWithAddress,
   ConstPoolFactory: ContractFactory,
   HybridPoolContractFactory: ContractFactory,
   ConstantPoolContractFactory: ContractFactory,
-  ERC20Factory: ContractFactory;
+  ERC20Factory: ContractFactory,
+  poolDeployment: PoolDeploymentContracts;
 
 const tokenSupply = getBigNumber(Math.pow(10, 37));
 
@@ -29,30 +30,6 @@ export async function init(): Promise<[SignerWithAddress, string, Contract]> {
   await deployContracts();
 
   return [alice, router.address, bento];
-} 
-
-export async function getSinglePool(rnd: () => number): Promise<Topology> {
-  return await getTopoplogy(2, 1, rnd);
-}
-
-export async function getABCTopoplogy(rnd: () => number): Promise<Topology> {
-  return await getTopoplogy(3, 1, rnd);
-}
-
-export async function getABCDTopoplogy(rnd: () => number): Promise<Topology> {
-  return await getTopoplogy(4, 1, rnd);
-}
-
-export async function getAB2VariantTopoplogy(
-  rnd: () => number
-): Promise<Topology> {
-  return await getTopoplogy(2, 2, rnd);
-}
-
-export async function getAB3VariantTopoplogy(
-  rnd: () => number
-): Promise<Topology> {
-  return await getTopoplogy(2, 3, rnd);
 }
 
 export function createRoute(fromToken: RToken, toToken: RToken, baseToken: RToken, topology: Topology, amountIn: number, gasPrice: number ): MultiRoute | undefined {
@@ -95,23 +72,37 @@ export async function executeTridentRoute(tridentRouteParams: TridentRoute, toTo
   return outputBalanceAfter.sub(outputBalanceBefore);
 }
 
+export async function getRandomPools(rnd: () => number, tokenCount: number, variants: number): Promise<Topology> { 
+  return await getTopoplogy(tokenCount, variants, rnd); 
+} 
+
+export async function getSinglePool(rnd: () => number): Promise<Topology> {
+  return await getTopoplogy(2, 1, rnd);
+}
+
+export async function getTwoSerialPools(rnd: () => number): Promise<Topology> {
+  return await getTopoplogy(3, 1, rnd);
+}
+
+export async function getThreeSerialPools(rnd: () => number): Promise<Topology> {
+  return await getTopoplogy(4, 1, rnd);
+}
+
+export async function getTwoParallelPools(rnd: () => number): Promise<Topology> {
+  return await getTopoplogy(2, 2, rnd);
+}
+
+export async function getThreeParallelPools(rnd: () => number): Promise<Topology> {
+  return await getTopoplogy(2, 3, rnd);
+}
+ 
 export async function getFivePoolBridge(rnd: () => number): Promise<Topology> { 
 
   let topology: Topology = {
     tokens: [],
     prices: [],
     pools: [],
-  };
-
-  const poolDeployment: PoolDeploymentContracts = {
-    hybridPoolFactory: HybridPoolContractFactory,
-    hybridPoolContract: hybridPool,
-    constPoolFactory: ConstantPoolContractFactory,
-    constantPoolContract: constantProductPool,
-    masterDeployerContract: masterDeployer,
-    bentoContract: bento,
-    account: alice,
-  };
+  }; 
 
   let prices: number[] = [];
   let tokens: RToken[] = [];
@@ -157,17 +148,7 @@ async function getTopoplogy(tokenCount: number, poolVariants: number, rnd: () =>
     tokens: [],
     prices: [],
     pools: [],
-  };
-
-  const poolDeployment: PoolDeploymentContracts = {
-    hybridPoolFactory: HybridPoolContractFactory,
-    hybridPoolContract: hybridPool,
-    constPoolFactory: ConstantPoolContractFactory,
-    constantPoolContract: constantProductPool,
-    masterDeployerContract: masterDeployer,
-    bentoContract: bento,
-    account: alice,
-  };
+  }; 
 
   const poolCount = tokenCount - 1;
 
@@ -273,6 +254,16 @@ async function deployContracts() {
     "0x0000000000000000000000000000000000000000000000000000000000000000",
     "0x0000000000000000000000000000000000000000000000000000000000000000"
   );
+
+  poolDeployment = {
+    hybridPoolFactory: HybridPoolContractFactory,
+    hybridPoolContract: hybridPool,
+    constPoolFactory: ConstantPoolContractFactory,
+    constantPoolContract: constantProductPool,
+    masterDeployerContract: masterDeployer,
+    bentoContract: bento,
+    account: alice,
+  };
 }
 
 async function approveAndFund(contracts: Contract[]) {
@@ -285,4 +276,7 @@ async function approveAndFund(contracts: Contract[]) {
   }
 } 
 
-export * from './routerParamsHelper'; 
+export * from './routerParams'; 
+export * from './random';
+export * from './interfaces';
+export * from './constants';
