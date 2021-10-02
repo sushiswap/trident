@@ -567,7 +567,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
       }
     });
 
-    it.only("Should create incentive", async () => {
+    it("Should create incentive", async () => {
       helper.reset();
       const pool = trident.concentratedPools[0];
       const tickSpacing = (await pool.getImmutables())._tickSpacing;

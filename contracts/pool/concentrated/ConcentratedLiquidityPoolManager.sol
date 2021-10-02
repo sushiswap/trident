@@ -9,10 +9,10 @@ import "hardhat/console.sol";
 
 /// @notice Trident Concentrated Liquidity Pool periphery contract that combines non-fungible position management and staking.
 contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
-    event AddIncentive(IConcentratedLiquidityPool indexed pool, Incentive indexed incentive);
-    event ReclaimIncentive(IConcentratedLiquidityPool indexed pool, uint256 indexed incentiveId);
+    event AddIncentive(IConcentratedLiquidityPool indexed pool, uint256 indexed incentiveId, address indexed rewardToken);
     event Subscribe(uint256 indexed positionId, uint256 indexed incentiveId);
-    event ClaimReward(uint256 indexed positionId, uint256 indexed incentiveId, address indexed recipient);
+    event ClaimReward(uint256 indexed positionId, uint256 indexed incentiveId, address indexed recipient, uint96 amount);
+    event ReclaimIncentive(IConcentratedLiquidityPool indexed pool, uint256 indexed incentiveId, uint256 amount);
 
     struct Incentive {
         address owner;
@@ -40,20 +40,20 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
         require(current <= incentive.startTime, "ALREADY_STARTED");
         require(current <= incentive.endTime, "ALREADY_ENDED");
         require(incentive.startTime < incentive.endTime, "START_PAST_END");
-        require(incentive.endTime + 5 weeks < incentive.expiry, "END_PAST_BUFFER");
+        require(incentive.endTime + 90 days < incentive.expiry, "END_PAST_BUFFER");
         require(incentive.rewardsUnclaimed != 0, "NO_REWARDS");
         incentive.secondsClaimed = 0;
         incentives[pool][incentiveCount[pool]++] = incentive;
         _transfer(incentive.token, msg.sender, address(this), incentive.rewardsUnclaimed, false);
-        emit AddIncentive(pool, incentive);
+        emit AddIncentive(pool, incentiveCount[pool], incentive.token);
     }
 
     /// @dev Withdraws any unclaimed incentive rewards.
     function reclaimIncentive(
         IConcentratedLiquidityPool pool,
         uint256 incentiveId,
-        uint256 amount,
         address receiver,
+        uint96 amount,
         bool unwrapBento
     ) public {
         Incentive storage incentive = incentives[pool][incentiveId];
@@ -62,7 +62,7 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
         require(incentive.rewardsUnclaimed >= amount, "ALREADY_CLAIMED");
         incentive.rewardsUnclaimed -= uint96(amount);
         _transfer(incentive.token, address(this), receiver, amount, unwrapBento);
-        emit ReclaimIncentive(pool, incentiveId);
+        emit ReclaimIncentive(pool, incentiveId, amount);
     }
 
     /// @dev Subscribes a non-fungible position token to an incentive.
@@ -100,7 +100,7 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
         stake.secondsInsideLast += uint160(secondsPerLiquidityInside);
         incentive.rewardsUnclaimed -= uint96(rewards);
         _transfer(incentive.token, address(this), recipient, rewards, unwrapBento);
-        emit ClaimReward(positionId, incentiveId, recipient);
+        emit ClaimReward(positionId, incentiveId, recipient, uint96(rewards));
     }
 
     function getReward(uint256 positionId, uint256 incentiveId) public view returns (uint256 rewards, uint256 secondsInside) {
