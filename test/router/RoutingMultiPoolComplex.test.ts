@@ -8,6 +8,8 @@ import * as testHelper from "./helpers";
 import { getIntegerRandomValue } from "../utilities";
 import { getRandomPools, getRandom, Topology, RouteType } from "./helpers";
 
+const slippage = 1 - 0.5 / 100;
+
 async function checkTokenBalancesAreZero(
   tokens: RToken[],
   bentoContract: Contract,
@@ -22,7 +24,7 @@ async function checkTokenBalancesAreZero(
   }
 }
 
-describe("MultiPool Routing Tests - Random Topology", function () {
+describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function () {
   before(async function () {
     [this.signer, this.tridentRouterAddress, this.bento] =
       await testHelper.init();
@@ -47,90 +49,105 @@ describe("MultiPool Routing Tests - Random Topology", function () {
     ];
   }
 
-  //Random1 - 200 random swaps back to back
-  it("Should Test router with random pools 200 times", async function () {
-    const topology = await getRandomPools(20, 1, this.rnd);
+  it("Should Test router with 10 random pools and 200 swaps", async function () {
+    for (let index = 0; index < 35; index++) {
+      const tokenCount = getRandom(this.rnd, 2, 20);
+      const variants = getRandom(this.rnd, 1, 4);
+      const topology = await getRandomPools(tokenCount, 1, this.rnd);
 
-    for (let i = 0; i < 200; i++) {
-      const [fromToken, toToken, baseToken] = getRandomTokens(
-        this.rnd,
-        topology
-      );
-
-      const [amountIn] = getIntegerRandomValue(20, this.rnd);
-
-      const route = testHelper.createRoute(
-        fromToken,
-        toToken,
-        baseToken,
-        topology,
-        amountIn,
-        this.gasPrice
-      );
-
-      if (route == undefined) {
-        throw "Failed to get route";
-      }
-
-      if (route.status === RouteStatus.NoWay) {
-        expect(route.amountOut).equal(0);
-      } else {
-        const routerParams = testHelper.getTridentRouterParams(
-          route,
-          this.signer.address,
-          this.tridentRouterAddress
+      for (let i = 0; i < 1; i++) {
+        const [fromToken, toToken, baseToken] = getRandomTokens(
+          this.rnd,
+          topology
         );
 
-        expect(routerParams).to.not.be.undefined;
+        const [amountIn] = getIntegerRandomValue(20, this.rnd);
 
-        let actualAmountOutBN;
+        // console.log("");
+        // console.log(`Topology Iteration #${index}`);
+        // console.log(`Swap #${i}`);
+        // console.log(`Token Count #${tokenCount}`);
+        // console.log("Before route execution");
+        // let reserve0 = topology.pools[0].reserve0.toString();
+        // let reserve1 = topology.pools[0].reserve1.toString();
+        // console.log(`Reserve 0: ${reserve0}`);
+        // console.log(`Reserve 1: ${reserve1}`);
 
-        try {
-          actualAmountOutBN = await testHelper.executeTridentRoute(
-            routerParams,
-            toToken.address
+        const route = testHelper.createRoute(
+          fromToken,
+          toToken,
+          baseToken,
+          topology,
+          amountIn,
+          this.gasPrice
+        );
+
+        if (route == undefined) {
+          throw "Failed to get route";
+        }
+
+        if (route.status === RouteStatus.NoWay) {
+          expect(route.amountOut).equal(0);
+        } else {
+          const routerParams = testHelper.getTridentRouterParams(
+            route,
+            this.signer.address,
+            this.tridentRouterAddress
           );
-        } catch (error) {
-          console.log("");
-          console.log("Swap Failed");
-          console.log("");
 
-          console.log("Error:");
-          console.log(error);
+          expect(routerParams).to.not.be.undefined;
 
-          console.log(`Iteration: ${i}`);
-          console.log(`Route:`);
-          console.log(route);
-          throw error;
+          let actualAmountOutBN;
+
+          try {
+            actualAmountOutBN = await testHelper.executeTridentRoute(
+              routerParams,
+              toToken.address
+            );
+          } catch (error) {
+            console.log("");
+            console.log("Swap Failed");
+            console.log("");
+
+            console.log("Error:");
+            console.log(error);
+
+            console.log(`Iteration: ${i}`);
+            console.log(`Route:`);
+            console.log(route);
+            throw error;
+          }
+
+          try {
+            await checkTokenBalancesAreZero(
+              topology.tokens,
+              this.bento,
+              this.tridentRouterAddress
+            );
+          } catch (error) {
+            console.log("Failed token balances check");
+            throw error;
+          }
+
+          expect(
+            closeValues(
+              route.amountOut * slippage,
+              parseInt(actualAmountOutBN.toString()),
+              1e5
+            )
+          ).to.equal(
+            true,
+            "predicted amount did not equal actual swapped amount"
+          );
+
+          // console.log("After route execution");
+          // reserve0 = topology.pools[0].reserve0.toString();
+          // reserve1 = topology.pools[0].reserve1.toString();
+          // console.log(`Reserve 0: ${reserve0}`);
+          // console.log(`Reserve 1: ${reserve1}`);
+
+          await testHelper.refreshPools(topology);
         }
-        await checkTokenBalancesAreZero(
-          topology.tokens,
-          this.bento,
-          this.tridentRouterAddress
-        );
-
-        const swapValuesAreClose = closeValues(
-          route.amountOut,
-          parseInt(actualAmountOutBN.toString()),
-          1e-14
-        );
-
-        if (!swapValuesAreClose) {
-          console.log(`Iteration #${i}`);
-          console.log(`Expected output: ${route.amountOut.toString()}`);
-          console.log(`Actual output: ${actualAmountOutBN.toString()}`);
-          console.log(route);
-        }
-
-        expect(swapValuesAreClose).to.equal(
-          true,
-          "predicted amount did not equal actual swapped amount"
-        );
-
-        // expect(route.amountOut).lessThanOrEqual(
-        //   parseInt(actualAmountOutBN.toString(), 1e-14),
-        //   "predicted amount did not equal actual swapped amount"
-        // );
       }
     }
   });

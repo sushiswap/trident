@@ -1,5 +1,5 @@
 import { ethers } from "hardhat";
-import { getBigNumber,RToken, MultiRoute, findMultiRouting, RPool, }  from "@sushiswap/tines"
+import { getBigNumber,RToken, MultiRoute, findMultiRouting, RPool, ConstantProductRPool, HybridRPool, }  from "@sushiswap/tines"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { BigNumber, Contract, ContractFactory } from "ethers";
 
@@ -23,7 +23,9 @@ let alice: SignerWithAddress,
   ERC20Factory: ContractFactory,
   poolDeployment: PoolDeploymentContracts;
 
-const tokenSupply = getBigNumber(Math.pow(10, 37));
+const tokenSupply = getBigNumber(Math.pow(2, 110));
+const hybridPoolAbi = ["function getReserves() public view returns (uint256 _reserve0, uint256 _reserve1)"];
+const constantPoolAbi = ["function getReserves() public view returns (uint256 _reserve0, uint256 _reserve1, uint32 _blockTimestampLast)"];
 
 export async function init(): Promise<[SignerWithAddress, string, Contract]> {
   await createAccounts();
@@ -146,6 +148,36 @@ export async function getFivePoolBridge(rnd: () => number): Promise<Topology> {
     tokens: tokens,
     prices: prices,
     pools: topology.pools
+  }
+}
+
+export async function refreshPools(topology: Topology){
+  for (let index = 0; index < topology.pools.length; index++) {
+    const pool = topology.pools[index];
+
+    // const reserve0 = topology.pools[index].reserve0.toString();
+    // const reserve1 = topology.pools[index].reserve1.toString();
+    
+    // console.log('');
+    // console.log('Updating reserves')
+    // console.log(`Reserve 0 before update: ${reserve0}`);
+    // console.log(`Reserve 1 before update: ${reserve1}`);
+
+    if (pool instanceof ConstantProductRPool){
+      const poolContract = new Contract(pool.address, constantPoolAbi, alice);
+      [topology.pools[index].reserve0, topology.pools[index].reserve1] = await poolContract.getReserves(); 
+    }
+    else if (pool instanceof HybridRPool) {
+      const poolContract = new Contract(pool.address, hybridPoolAbi, alice);
+      [topology.pools[index].reserve0, topology.pools[index].reserve1] = await poolContract.getReserves(); 
+    }
+
+    // const reserve0After = topology.pools[index].reserve0.toString();
+    // const reserve1After = topology.pools[index].reserve1.toString();
+
+    // console.log(`Reserve 0 after update: ${reserve0After}`);
+    // console.log(`Reserve 1 after update: ${reserve1After}`);
+    
   }
 }
 
