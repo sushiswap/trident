@@ -38,7 +38,6 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
     function addIncentive(IConcentratedLiquidityPool pool, Incentive memory incentive) public {
         uint32 current = uint32(block.timestamp);
         require(current <= incentive.startTime, "ALREADY_STARTED");
-        require(current <= incentive.endTime, "ALREADY_ENDED");
         require(incentive.startTime < incentive.endTime, "START_PAST_END");
         require(incentive.endTime + 90 days < incentive.expiry, "END_PAST_BUFFER");
         require(incentive.rewardsUnclaimed != 0, "NO_REWARDS");
@@ -74,8 +73,7 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
         Stake storage stake = stakes[positionId][incentiveId];
         require(position.liquidity != 0, "INACTIVE");
         require(stake.secondsGrowthInsideLast == 0, "SUBSCRIBED");
-        require(incentiveId <= incentiveCount[pool], "NOT_INCENTIVE");
-        require(block.timestamp > incentive.startTime && block.timestamp < incentive.endTime, "TIMED_OUT");
+        require(block.timestamp > incentive.startTime && block.timestamp < incentive.endTime, "INACTIVE_INCENTIVE");
         stakes[positionId][incentiveId] = Stake(uint160(rangeSecondsInside(pool, position.lower, position.upper)), true);
         emit Subscribe(positionId, incentiveId);
     }
