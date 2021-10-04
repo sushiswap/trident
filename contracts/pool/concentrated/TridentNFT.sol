@@ -82,6 +82,7 @@ abstract contract TridentNFT {
     /// @param operator Address of the party that can pull `tokenId`s from 'owner''s account or approve others to do same.
     /// @param approved The approval status of `operator`.
     function setApprovalForAll(address operator, bool approved) external {
+        require(operator != address(0), "INVALID_OPERATOR");
         isApprovedForAll[msg.sender][operator] = approved;
         emit ApprovalForAll(msg.sender, operator, approved);
     }
@@ -166,10 +167,8 @@ abstract contract TridentNFT {
                 )
             );
             address recoveredAddress = ecrecover(digest, v, r, s);
-            require(
-                (recoveredAddress != address(0) && recoveredAddress == owner) || isApprovedForAll[owner][recoveredAddress],
-                "INVALID_PERMIT_SIGNATURE"
-            );
+            require(recoveredAddress != address(0), "INVALID_PERMIT_SIGNATURE");
+            require(recoveredAddress == owner || isApprovedForAll[owner][recoveredAddress], "INVALID_SIGNER");
         }
         getApproved[tokenId] = spender;
         emit Approval(owner, spender, tokenId);
