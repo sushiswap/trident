@@ -67,6 +67,7 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
 
     /// @dev Subscribes a non-fungible position token to an incentive.
     function subscribe(uint256 positionId, uint256 incentiveId) public {
+        require(ownerOf[positionId] == msg.sender, "OWNER");
         Position memory position = positions[positionId];
         IConcentratedLiquidityPool pool = position.pool;
         Incentive memory incentive = incentives[pool][incentiveId];
