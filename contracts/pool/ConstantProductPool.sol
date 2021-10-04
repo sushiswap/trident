@@ -23,7 +23,6 @@ contract ConstantProductPool is IPool, TridentERC20 {
     uint8 internal constant PRECISION = 112;
     uint256 internal constant MAX_FEE = 10000; // @dev 100%.
     uint256 internal constant MAX_FEE_SQUARE = 100000000;
-    uint256 internal constant E18 = uint256(10)**18;
     uint256 public immutable swapFee;
     uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
 
