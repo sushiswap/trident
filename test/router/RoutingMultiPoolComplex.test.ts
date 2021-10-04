@@ -50,10 +50,9 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
   }
 
   it("Should Test router with 10 random pools and 200 swaps", async function () {
-    for (let index = 0; index < 35; index++) {
-      const tokenCount = getRandom(this.rnd, 2, 20);
+    for (let index = 0; index < 1; index++) {
       const variants = getRandom(this.rnd, 1, 4);
-      const topology = await getRandomPools(tokenCount, 1, this.rnd);
+      const topology = await getRandomPools(20, 1, this.rnd);
 
       for (let i = 0; i < 1; i++) {
         const [fromToken, toToken, baseToken] = getRandomTokens(
@@ -129,11 +128,16 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
             throw error;
           }
 
+          console.log(topology);
+          console.log(route);
+          console.log(`Expected amount out: ${route.amountOut * slippage}`);
+          console.log(`Actual amount out: ${actualAmountOutBN.toString()}`);
+
           expect(
             closeValues(
               route.amountOut * slippage,
               parseInt(actualAmountOutBN.toString()),
-              1e5
+              1e-14
             )
           ).to.equal(
             true,
