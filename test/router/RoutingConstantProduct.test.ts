@@ -4,17 +4,10 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { BigNumber, Contract, ContractFactory } from "ethers";
 import seedrandom from "seedrandom";
-import { calcOutByIn, calcInByOut } from "@sushiswap/sdk";
 import { getBigNumber } from "../utilities";
 import { ConstantProductPool, ERC20Mock, BentoBoxV1, MasterDeployer, TridentRouter, ConstantProductPoolFactory } from "../../types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
-
-interface PoolInfo {
-  type: string;
-  reserve0: BigNumber;
-  reserve1: BigNumber;
-  fee: Number;
-}
+import { ConstantProductRPool } from "@sushiswap/tines";
 
 interface ExactInputSingleParams {
   amountIn: BigNumber;
@@ -73,7 +66,7 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
     router: TridentRouter,
     Pool: ContractFactory;
 
-  async function createConstantProductPool(fee: Number, res0exp: Number, res1exp: Number): [PoolInfo, Contract] {
+  async function createConstantProductPool(fee: Number, res0exp: Number, res1exp: Number): [ConstantProductRPool, Contract] {
     [alice, feeTo] = await ethers.getSigners();
 
     const ERC20 = await ethers.getContractFactory("ERC20Mock");
@@ -140,18 +133,20 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
     await bento.transfer(usdc.address, alice.address, pool.address, bnVal1);
     await pool.mint(ethers.utils.defaultAbiCoder.encode(["address"], [alice.address]));
 
-    const poolInfo: PoolInfo = {
-      type: "ConstantProduct",
-      reserve0: bnVal0,
-      reserve1: bnVal1,
+    const poolInfo = new ConstantProductRPool(
+      pool.address,
+      { name: "USDC", address: usdt.address },
+      { name: "USDT", address: usdt.address },
       fee,
-    };
+      bnVal0,
+      bnVal1
+    );
 
     return [poolInfo, pool];
   }
 
   let swapDirection = true;
-  async function checkSwap(pool: ConstantProductPool, poolRouterInfo: PoolInfo, swapAmountExp: Number) {
+  async function checkSwap(pool: ConstantProductPool, poolRouterInfo: ConstantProductRPool, swapAmountExp: Number) {
     const [jsValue, bnValue] = getIntegerRandomValue(swapAmountExp);
     const [t0, t1] = swapDirection ? [usdt, usdc] : [usdc, usdt];
 
@@ -163,17 +158,16 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
       data: encodedSwapData(t0.address, alice.address, false),
     };
 
-    poolRouterInfo.reserve0 = await bento.balanceOf(usdt.address, pool.address);
-    poolRouterInfo.reserve1 = await bento.balanceOf(usdc.address, pool.address);
+    poolRouterInfo.updateReserves(await bento.balanceOf(usdt.address, pool.address), await bento.balanceOf(usdc.address, pool.address));
 
     let balOutBefore: BigNumber = await bento.balanceOf(t1.address, alice.address);
     await router.connect(alice).exactInputSingle(params);
     let balOutAfter: BigNumber = await bento.balanceOf(t1.address, alice.address);
     const amountOutPool: BigNumber = balOutAfter.sub(balOutBefore);
 
-    const amountOutPrediction = calcOutByIn(poolRouterInfo, jsValue, swapDirection);
+    const amountOutPrediction = poolRouterInfo.calcOutByIn(jsValue, swapDirection)[0];
 
-    //console.log(Math.abs(amountOutPrediction/amountOutPool-1), amountOutPrediction, amountOutPool);
+    //console.log(Math.abs(amountOutPrediction/amountOutPool-1), amountOutPrediction, amountOutPool.toString());
     expect(areCloseValues(amountOutPrediction, amountOutPool, 1e-12)).equals(
       true,
       "predicted amount out did not equal swapped amount result"
@@ -183,8 +177,8 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
       swapDirection = !swapDirection;
       return;
     }
-    const amounInExpected = calcInByOut(poolRouterInfo, amountOutPrediction, swapDirection);
-    const amountOutPrediction2 = calcOutByIn(poolRouterInfo, amounInExpected, swapDirection);
+    const amounInExpected = poolRouterInfo.calcInByOut(amountOutPrediction, swapDirection)[0];
+    const amountOutPrediction2 = poolRouterInfo.calcOutByIn(amounInExpected, swapDirection)[0];
     // console.log(Math.abs(amounInExpected/jsValue-1), amounInExpected, jsValue);
     // console.log(Math.abs(amountOutPrediction/amountOutPrediction2-1), amountOutPrediction, amountOutPrediction2);
     expect(areCloseValues(amounInExpected, jsValue, 1e-12) || areCloseValues(amountOutPrediction, amountOutPrediction2, 1e-12)).equals(

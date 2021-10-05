@@ -24,8 +24,6 @@ describe("Concentrated Pool Routing", async () => {
       const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
       const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
-      // assume increasing tick value by one step brings us to a valid tick
-      // satisfy "lower even" & "upper odd" conditions
       let lower = nearestEvenValidTick - step;
       let upper = nearestEvenValidTick + step + tickSpacing;
 
