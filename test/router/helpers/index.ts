@@ -34,11 +34,11 @@ export async function init(): Promise<[SignerWithAddress, string, Contract]> {
   return [alice, router.address, bento];
 }
 
-export function createRoute(fromToken: RToken, toToken: RToken, baseToken: RToken, topology: Topology, amountIn: number, gasPrice: number ): MultiRoute | undefined {
+export function createRoute(fromToken: RToken, toToken: RToken, baseToken: RToken, topology: Topology, amountIn: number, gasPrice: number, slippage: number = 0.5): MultiRoute | undefined {
   const route = findMultiRouting(
     fromToken,
     toToken,
-    amountIn,
+    amountIn * slippage,
     topology.pools,
     baseToken,
     gasPrice,
