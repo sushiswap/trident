@@ -15,7 +15,6 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
     event Mint(address indexed pool, address indexed recipient, uint256 indexed positionId);
     event Burn(address indexed pool, address indexed owner, uint256 indexed positionId);
 
-    address public immutable wETH;
     IBentoBoxMinimal public immutable bento;
     IMasterDeployer public immutable masterDeployer;
 
@@ -30,8 +29,8 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         uint256 feeGrowthInside1;
     }
 
-    constructor(address _wETH, address _masterDeployer) {
-        wETH = _wETH;
+    constructor(address _masterDeployer) {
+        /// @dev Don't need to check _masterDeployer != address(0) as we make a call to it.
         masterDeployer = IMasterDeployer(_masterDeployer);
         IBentoBoxMinimal _bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
         _bento.registerProtocol();

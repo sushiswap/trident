@@ -33,12 +33,11 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
     mapping(IConcentratedLiquidityPool => mapping(uint256 => Incentive)) public incentives;
     mapping(uint256 => mapping(uint256 => Stake)) public stakes;
 
-    constructor(address wETH, address _masterDeployer) ConcentratedLiquidityPosition(wETH, _masterDeployer) {}
+    constructor(address _masterDeployer) ConcentratedLiquidityPosition(_masterDeployer) {}
 
     function addIncentive(IConcentratedLiquidityPool pool, Incentive memory incentive) public {
         uint32 current = uint32(block.timestamp);
         require(current <= incentive.startTime, "ALREADY_STARTED");
-        require(current <= incentive.endTime, "ALREADY_ENDED");
         require(incentive.startTime < incentive.endTime, "START_PAST_END");
         require(incentive.endTime + 90 days < incentive.expiry, "END_PAST_BUFFER");
         require(incentive.rewardsUnclaimed != 0, "NO_REWARDS");
@@ -67,14 +66,14 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
 
     /// @dev Subscribes a non-fungible position token to an incentive.
     function subscribe(uint256 positionId, uint256 incentiveId) public {
+        require(ownerOf[positionId] == msg.sender, "OWNER");
         Position memory position = positions[positionId];
         IConcentratedLiquidityPool pool = position.pool;
         Incentive memory incentive = incentives[pool][incentiveId];
         Stake storage stake = stakes[positionId][incentiveId];
         require(position.liquidity != 0, "INACTIVE");
         require(stake.secondsGrowthInsideLast == 0, "SUBSCRIBED");
-        require(incentiveId <= incentiveCount[pool], "NOT_INCENTIVE");
-        require(block.timestamp > incentive.startTime && block.timestamp < incentive.endTime, "TIMED_OUT");
+        require(block.timestamp > incentive.startTime && block.timestamp < incentive.endTime, "INACTIVE_INCENTIVE");
         stakes[positionId][incentiveId] = Stake(uint160(rangeSecondsInside(pool, position.lower, position.upper)), true);
         emit Subscribe(positionId, incentiveId);
     }
