@@ -88,7 +88,7 @@ invariant validityOfTokens()
     token0() != 0 && token1() != 0 && token0() != token1()
 
 // TODO: This should fail (passing right now)
-invariant tokensNotMirin()
+invariant tokensNotTrident()
     token0() != currentContract && token1() != currentContract
 
 // use 1 and 2 to prove reserveLessThanEqualToBalance
@@ -870,7 +870,7 @@ rule integrityOfBentoBoxTokenBalances(method f) {
 ////////////////////////////////////////////////////////////////////////////
 function validState(bool isBalanced) {
     requireInvariant validityOfTokens();
-    requireInvariant tokensNotMirin();
+    requireInvariant tokensNotTrident();
 
     if (isBalanced) {
         require reserve0() == bentoBox.balanceOf(token0(), currentContract) &&
