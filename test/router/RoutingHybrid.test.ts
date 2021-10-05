@@ -4,8 +4,8 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { BigNumber } from "ethers";
 import seedrandom from "seedrandom";
-import { calcOutByIn, calcInByOut } from "@sushiswap/sdk";
 import { getBigNumber } from "../utilities";
+import { HybridRPool } from "@sushiswap/tines";
 
 const testSeed = "7"; // Change it to change random generator values
 const rnd = seedrandom(testSeed); // random [0, 1)
@@ -118,26 +118,25 @@ describe("HybridPool Typescript == Solidity check", function () {
     await bento.transfer(usdc.address, alice.address, pool.address, bnVal1);
     await pool.mint(ethers.utils.defaultAbiCoder.encode(["address"], [alice.address]));
 
-    const poolInfo = {
-      type: "Hybrid",
-      reserve0: bnVal0,
-      reserve1: bnVal1,
+    const poolInfo = new HybridRPool(
+      pool.address,
+      { name: "USDC", address: usdt.address },
+      { name: "USDT", address: usdt.address },
       fee,
       A,
-      deployData,
-    };
+      bnVal0,
+      bnVal1
+    );
 
     return [poolInfo, pool];
   }
 
   let swapDirection = true;
-  async function checkSwap(pool, poolRouterInfo0, swapAmountExp) {
+  async function checkSwap(pool, poolRouterInfo, swapAmountExp) {
     const [jsValue, bnValue] = getIntegerRandomValue(swapAmountExp);
     const [t0, t1]: string[] = swapDirection ? [usdt.address, usdc.address] : [usdc.address, usdt.address];
 
-    const poolRouterInfo = { ...poolRouterInfo0 };
-    poolRouterInfo.reserve0 = await bento.balanceOf(usdt.address, pool.address);
-    poolRouterInfo.reserve1 = await bento.balanceOf(usdc.address, pool.address);
+    poolRouterInfo.updateReserves(await bento.balanceOf(usdt.address, pool.address), await bento.balanceOf(usdc.address, pool.address));
     if (poolRouterInfo.reserve0 < MINIMUM_LIQUIDITY || poolRouterInfo.reserve1 < MINIMUM_LIQUIDITY) {
       console.log("Low liquidity - skip test");
       return; // Too low liquidity
@@ -157,9 +156,9 @@ describe("HybridPool Typescript == Solidity check", function () {
     const amountOutPoolBN = balanceAfter.sub(balanceBefore);
     const amountOutPool = amountOutPoolBN.toString();
 
-    const amountOutPrediction = calcOutByIn(poolRouterInfo, jsValue, swapDirection);
+    const amountOutPrediction = poolRouterInfo.calcOutByIn(jsValue, swapDirection)[0];
 
-    //console.log('prediction', Math.abs(amountOutPrediction/amountOutPool-1), amountOutPrediction, amountOutPool);
+    //console.log('prediction', Math.abs(amountOutPrediction/amountOutPool-1), amountOutPrediction, amountOutPool.toString());
     expect(areCloseValues(amountOutPrediction, amountOutPoolBN, 1e-9)).equals(true, "swap amount not close enough to predicted amount");
     const reserveOut = swapDirection ? poolRouterInfo.reserve1 : poolRouterInfo.reserve0;
     if (reserveOut.sub(amountOutPoolBN).lt(MINIMUM_LIQUIDITY)) {
@@ -167,8 +166,8 @@ describe("HybridPool Typescript == Solidity check", function () {
       return;
     }
 
-    const amounInExpected = calcInByOut(poolRouterInfo, amountOutPrediction, swapDirection);
-    const amountOutPrediction2 = calcOutByIn(poolRouterInfo, amounInExpected, swapDirection);
+    const amounInExpected = poolRouterInfo.calcInByOut(amountOutPrediction, swapDirection)[0];
+    const amountOutPrediction2 = poolRouterInfo.calcOutByIn(amounInExpected, swapDirection)[0];
 
     // console.log('back1', Math.abs(amounInExpected/jsValue-1), amounInExpected, jsValue);
     // console.log('back2', Math.abs(amountOutPrediction/amountOutPrediction2-1), amountOutPrediction, amountOutPrediction2);
