@@ -460,6 +460,7 @@ contract FranchisedHybridPool is IPool, TridentFranchisedERC20 {
         if (tokenIn == token0) {
             finalAmountOut = _getAmountOut(amountIn, _reserve0, _reserve1, true);
         } else {
+            require(tokenIn == token1, "INVALID_INPUT_TOKEN");
             finalAmountOut = _getAmountOut(amountIn, _reserve0, _reserve1, false);
         }
     }
