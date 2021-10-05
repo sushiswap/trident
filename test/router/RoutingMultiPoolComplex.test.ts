@@ -8,8 +8,6 @@ import * as testHelper from "./helpers";
 import { getIntegerRandomValue } from "../utilities";
 import { getRandomPools, getRandom, Topology, RouteType } from "./helpers";
 
-const slippage = 1 - 0.5 / 100;
-
 async function checkTokenBalancesAreZero(
   tokens: RToken[],
   bentoContract: Contract,
@@ -20,7 +18,7 @@ async function checkTokenBalancesAreZero(
       tokens[index].address,
       tridentAddress
     );
-    expect(tokenBalance).equal(0);
+    expect(tokenBalance.toNumber()).equal(0);
   }
 }
 
@@ -51,8 +49,9 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
 
   it("Should Test router with 10 random pools and 200 swaps", async function () {
     for (let index = 0; index < 1; index++) {
-      const variants = getRandom(this.rnd, 1, 4);
-      const topology = await getRandomPools(20, 1, this.rnd);
+      const variants = Math.floor(Math.random() * (4 - 1 + 1)) + 1;
+      console.log(`Variants ${variants}`);
+      const topology = await getRandomPools(3, 1, this.rnd);
 
       for (let i = 0; i < 1; i++) {
         const [fromToken, toToken, baseToken] = getRandomTokens(
@@ -61,16 +60,6 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
         );
 
         const [amountIn] = getIntegerRandomValue(20, this.rnd);
-
-        // console.log("");
-        // console.log(`Topology Iteration #${index}`);
-        // console.log(`Swap #${i}`);
-        // console.log(`Token Count #${tokenCount}`);
-        // console.log("Before route execution");
-        // let reserve0 = topology.pools[0].reserve0.toString();
-        // let reserve1 = topology.pools[0].reserve1.toString();
-        // console.log(`Reserve 0: ${reserve0}`);
-        // console.log(`Reserve 1: ${reserve1}`);
 
         const route = testHelper.createRoute(
           fromToken,
@@ -128,14 +117,14 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
             throw error;
           }
 
-          console.log(topology);
-          console.log(route);
-          console.log(`Expected amount out: ${route.amountOut * slippage}`);
+          // console.log(topology);
+          // console.log(route);
+          console.log(`Expected amount out: ${route.amountOut}`);
           console.log(`Actual amount out: ${actualAmountOutBN.toString()}`);
 
           expect(
             closeValues(
-              route.amountOut * slippage,
+              route.amountOut,
               parseInt(actualAmountOutBN.toString()),
               1e-14
             )
@@ -143,12 +132,6 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
             true,
             "predicted amount did not equal actual swapped amount"
           );
-
-          // console.log("After route execution");
-          // reserve0 = topology.pools[0].reserve0.toString();
-          // reserve1 = topology.pools[0].reserve1.toString();
-          // console.log(`Reserve 0: ${reserve0}`);
-          // console.log(`Reserve 1: ${reserve1}`);
 
           await testHelper.refreshPools(topology);
         }
