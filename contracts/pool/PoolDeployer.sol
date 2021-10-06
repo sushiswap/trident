@@ -11,12 +11,17 @@ abstract contract PoolDeployer {
     mapping(bytes32 => address) public configAddress;
 
     modifier onlyMaster() {
-        require(msg.sender == masterDeployer, "UNAUTHORIZED_DEPLOYER");
+        if (msg.sender != masterDeployer) revert Unauthorized();
         _;
     }
+    
+    /// @dev Error list to optimize around deployer requirements.
+    error Unauthorized();
+    error ZeroAddress();
+    error InvalidOrder();
 
     constructor(address _masterDeployer) {
-        require(_masterDeployer != address(0), "ZERO_ADDRESS");
+        if (_masterDeployer == address(0)) revert ZeroAddress();
         masterDeployer = _masterDeployer;
     }
 
@@ -31,7 +36,7 @@ abstract contract PoolDeployer {
         // null token array would cause deployment to fail via out of bounds memory axis/gas limit.
         unchecked {
             for (uint256 i; i < tokens.length - 1; i++) {
-                require(tokens[i] < tokens[i + 1], "INVALID_TOKEN_ORDER");
+                if (tokens[i] > tokens[i + 1]) revert InvalidOrder();
                 for (uint256 j = i + 1; j < tokens.length; j++) {
                     pools[tokens[i]][tokens[j]].push(pool);
                     pools[tokens[j]][tokens[i]].push(pool);
