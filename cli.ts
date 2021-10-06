@@ -1,4 +1,4 @@
-import { BENTOBOX_ADDRESS, ChainId } from "@sushiswap/core-sdk";
+import { BENTOBOX_ADDRESS } from "@sushiswap/core-sdk";
 import { BigNumber, constants } from "ethers";
 import { task, types } from "hardhat/config";
 
@@ -43,10 +43,10 @@ task("constant-product-pool:deploy", "Constant Product Pool deploy")
   )
   .addOptionalParam("fee", "Fee tier", 30, types.int)
   .addOptionalParam("twap", "Twap enabled", true, types.boolean)
+  .addOptionalParam("verify", "Verify on Etherscan", true, types.boolean)
   .setAction(async function (
-    { tokenA, tokenB, fee, twap },
-    { ethers },
-    runSuper
+    { tokenA, tokenB, fee, twap, verify },
+    { ethers, run }
   ) {
     const masterDeployer = await ethers.getContract("MasterDeployer");
 
@@ -66,7 +66,21 @@ task("constant-product-pool:deploy", "Constant Product Pool deploy")
       )
     ).wait();
 
-    console.log(events);
+    const poolAddress = events[0].args.pool;
+
+    console.log(poolAddress, events);
+
+    if (!verify) return;
+
+    // we wait some time for the contract to be propagated in etherscan's backend
+    await new Promise((r) => {
+      console.log("... waiting a minute"), setTimeout(r, 80000);
+    });
+
+    await run("verify:verify", {
+      address: poolAddress,
+      constructorArguments: [deployData, masterDeployer.address],
+    });
   });
 
 task("constant-product-pool:address", "Constant Product Pool deploy")
