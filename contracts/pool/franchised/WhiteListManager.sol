@@ -2,33 +2,35 @@
 
 pragma solidity >=0.8.0;
 
-/// @notice Trident franchised pool whitelist manager.
 contract WhiteListManager {
     event WhiteListAccount(address indexed operator, address indexed account, bool approved);
-    event SetMerkleRoot(address indexed operator, bytes32 merkleRoot);
-    event JoinWithMerkle(address indexed operator, uint256 indexed index, address indexed account);
+    event SetMerkleRoot(address operator, bytes32 merkleRoot);
+    event JoinWithMerkle(address operator, uint256 indexed index, address indexed account);
 
     /// @notice EIP-712 related variables and functions.
-    bytes32 internal constant APPROVAL_SIGNATURE_HASH = keccak256("SetWhitelisting(address account,bool approved,uint256 deadline)");
-    bytes32 internal constant DOMAIN_SEPARATOR_SIGNATURE_HASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
-    bytes32 internal immutable _DOMAIN_SEPARATOR;
-    uint256 internal immutable DOMAIN_SEPARATOR_CHAIN_ID;
+    string private constant EIP191_PREFIX_FOR_EIP712_STRUCTURED_DATA = "\x19\x01";
+    bytes32 private constant APPROVAL_SIGNATURE_HASH = keccak256("SetWhitelisting(address account,bool approved,uint256 deadline)");
+    bytes32 private constant DOMAIN_SEPARATOR_SIGNATURE_HASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
+    bytes32 private immutable _DOMAIN_SEPARATOR;
+    uint256 private immutable DOMAIN_SEPARATOR_CHAIN_ID;
 
-    mapping(address => bytes32) public merkleRoot;
     mapping(address => mapping(address => bool)) public whitelistedAccounts;
+
+    /// @notice Merkle root variables.
+    mapping(address => bytes32) public merkleRoot;
+    /// @notice Packed array of booleans.
     mapping(address => mapping(uint256 => uint256)) internal whitelistedBitMap;
 
-    constructor() {
-        DOMAIN_SEPARATOR_CHAIN_ID = block.chainid;
-        _DOMAIN_SEPARATOR = _calculateDomainSeparator();
-    }
-    
-    function _calculateDomainSeparator() internal view returns (bytes32 domainSeperator) {
-        domainSeperator = keccak256(abi.encode(DOMAIN_SEPARATOR_SIGNATURE_HASH, keccak256("WhiteListManager"), block.chainid, address(this)));
+    function _calculateDomainSeparator(uint256 chainId) private view returns (bytes32 domainSeperator) {
+        domainSeperator = keccak256(abi.encode(DOMAIN_SEPARATOR_SIGNATURE_HASH, keccak256("WhiteListManager"), chainId, address(this)));
     }
 
     function DOMAIN_SEPARATOR() public view returns (bytes32 domainSeperator) {
-        domainSeperator = block.chainid == DOMAIN_SEPARATOR_CHAIN_ID ? _DOMAIN_SEPARATOR : _calculateDomainSeparator();
+        domainSeperator = block.chainid == DOMAIN_SEPARATOR_CHAIN_ID ? _DOMAIN_SEPARATOR : _calculateDomainSeparator(block.chainid);
+    }
+
+    constructor() {
+        _DOMAIN_SEPARATOR = _calculateDomainSeparator(DOMAIN_SEPARATOR_CHAIN_ID = block.chainid);
     }
 
     function whitelistAccount(address user, bool approved) external {
@@ -39,7 +41,7 @@ contract WhiteListManager {
         address operator,
         address account,
         bool approved
-    ) internal {
+    ) private {
         whitelistedAccounts[operator][account] = approved;
         emit WhiteListAccount(operator, account, approved);
     }
@@ -61,7 +63,7 @@ contract WhiteListManager {
         bytes32 r,
         bytes32 s
     ) external {
-        /// @dev Checks:
+        // @dev Checks:
         require(account != address(0), "ACCOUNT_NOT_SET");
         // - also, ecrecover returns address(0) on failure. So we check this, even if the modifier should prevent it:
         require(operator != address(0), "OPERATOR_NULL");
@@ -69,7 +71,7 @@ contract WhiteListManager {
 
         bytes32 digest = keccak256(
             abi.encodePacked(
-                "\x19\x01",
+                EIP191_PREFIX_FOR_EIP712_STRUCTURED_DATA,
                 DOMAIN_SEPARATOR(),
                 keccak256(abi.encode(APPROVAL_SIGNATURE_HASH, account, approved, deadline))
             )
@@ -103,14 +105,14 @@ contract WhiteListManager {
         for (uint256 i = 0; i < merkleProof.length; i++) {
             bytes32 proofElement = merkleProof[i];
             if (computedHash <= proofElement) {
-                /// @dev Hash(current computed hash + current element of the proof).
+                // @dev Hash(current computed hash + current element of the proof).
                 computedHash = keccak256(abi.encodePacked(computedHash, proofElement));
             } else {
-                /// @dev Hash(current element of the proof + current computed hash).
+                // @dev Hash(current element of the proof + current computed hash).
                 computedHash = keccak256(abi.encodePacked(proofElement, computedHash));
             }
         }
-        /// @dev Check if the computed hash (root) is equal to the provided root.
+        // @dev Check if the computed hash (root) is equal to the provided root.
         require(computedHash == merkleRoot[operator], "NOT_ROOTED");
         uint256 whitelistedWordIndex = index / 256;
         uint256 whitelistedBitIndex = index % 256;
@@ -120,7 +122,7 @@ contract WhiteListManager {
     }
 
     function setMerkleRoot(bytes32 _merkleRoot) external {
-        /// @dev Set the new merkle root.
+        // @dev Set the new merkle root.
         merkleRoot[msg.sender] = _merkleRoot;
         emit SetMerkleRoot(msg.sender, _merkleRoot);
     }
