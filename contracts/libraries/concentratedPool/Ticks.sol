@@ -87,7 +87,7 @@ library Ticks {
                 Ticks.Tick storage old = ticks[lowerOld];
                 int24 oldNextTick = old.nextTick;
 
-                if ((old.liquidity == 0 || lowerOld != TickMath.MIN_TICK) || lowerOld >= lower || lower >= oldNextTick) revert LowerOrder();
+                if ((old.liquidity == 0 && lowerOld != TickMath.MIN_TICK) || lowerOld >= lower || lower >= oldNextTick) revert LowerOrder();
                 
                 if (lower <= nearestTick) {
                     ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsGrowthGlobal);
