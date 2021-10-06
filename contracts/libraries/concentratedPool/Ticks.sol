@@ -15,9 +15,16 @@ library Ticks {
         uint256 feeGrowthOutside1;
         uint160 secondsGrowthOutside;
     }
+    
+    /// @dev Error list to optimize around tick requirements.
+    error WrongOrder();
+    error LowerRange();
+    error UpperRange();
+    error LowerOrder();
+    error UpperOrder();
 
     function getMaxLiquidity(uint24 _tickSpacing) internal pure returns (uint128) {
-        return type(uint128).max / uint128(uint24(TickMath.MAX_TICK) / (2 * uint24(_tickSpacing)));
+        return type(uint128).max / uint128(uint24(TickMath.MAX_TICK) / uint24(_tickSpacing));
     }
 
     function cross(
@@ -65,9 +72,9 @@ library Ticks {
         int24 nearestTick,
         uint160 currentPrice
     ) public returns (int24) {
-        require(lower < upper, "WRONG_ORDER");
-        require(TickMath.MIN_TICK <= lower, "LOWER_RANGE");
-        require(upper <= TickMath.MAX_TICK, "UPPER_RANGE");
+        if (lower > upper) revert WrongOrder();
+        if (lower < TickMath.MIN_TICK) revert LowerRange();
+        if (upper > TickMath.MAX_TICK) revert UpperRange();
 
         {
             /// @dev Stack overflow.
@@ -80,8 +87,8 @@ library Ticks {
                 Ticks.Tick storage old = ticks[lowerOld];
                 int24 oldNextTick = old.nextTick;
 
-                require((old.liquidity != 0 || lowerOld == TickMath.MIN_TICK) && lowerOld < lower && lower < oldNextTick, "LOWER_ORDER");
-
+                if ((old.liquidity == 0 || lowerOld != TickMath.MIN_TICK) || lowerOld >= lower || lower >= oldNextTick) revert LowerOrder();
+                
                 if (lower <= nearestTick) {
                     ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsGrowthGlobal);
                 } else {
@@ -102,7 +109,7 @@ library Ticks {
             Ticks.Tick storage old = ticks[upperOld];
             int24 oldNextTick = old.nextTick;
 
-            require(old.liquidity != 0 && oldNextTick > upper && upperOld < upper, "UPPER_ORDER");
+            if (old.liquidity == 0 || oldNextTick <= upper || upperOld >= upper) revert UpperOrder();
 
             if (upper <= nearestTick) {
                 ticks[upper] = Ticks.Tick(upperOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsGrowthGlobal);
