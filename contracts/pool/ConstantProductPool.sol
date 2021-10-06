@@ -12,7 +12,7 @@ import "./TridentERC20.sol";
 
 /// @notice Trident exchange pool template with constant product formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares.
-///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
+//      The curve is applied to shares as well. This pool does not care about the underlying amounts.
 contract ConstantProductPool is IPool, TridentERC20 {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
@@ -21,8 +21,8 @@ contract ConstantProductPool is IPool, TridentERC20 {
     uint256 internal constant MINIMUM_LIQUIDITY = 1000;
 
     uint8 internal constant PRECISION = 112;
-    uint256 internal constant MAX_FEE = 10000; // @dev 100%.
-    uint256 internal constant MAX_FEE_SQUARE = 100000000;
+    uint256 internal constant MAX_FEE = 100000; /// @dev Maximum `swapFee` is 10%.
+    uint256 internal constant MAX_FEE_SQUARE = 10000000000;
     uint256 public immutable swapFee;
     uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
 
@@ -54,7 +54,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
     constructor(bytes memory _deployData, address _masterDeployer) {
         (address _token0, address _token1, uint256 _swapFee, bool _twapSupport) = abi.decode(_deployData, (address, address, uint256, bool));
 
-        // @dev Factory ensures that the tokens are sorted.
+        /// @dev Factory ensures that the tokens are sorted.
         require(_token0 != address(0), "ZERO_ADDRESS");
         require(_token0 != _token1, "IDENTICAL_ADDRESSES");
         require(_token0 != address(this), "INVALID_TOKEN");
@@ -64,7 +64,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         token0 = _token0;
         token1 = _token1;
         swapFee = _swapFee;
-        // @dev This is safe from underflow - `swapFee` cannot exceed `MAX_FEE` per previous check.
+        /// @dev This is safe from underflow - `swapFee` cannot exceed `MAX_FEE` per previous check.
         unchecked {
             MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
         }
@@ -77,7 +77,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
     }
 
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
-    /// The router must ensure that sufficient LP tokens are minted by using the return value.
+    // The router must ensure that sufficient LP tokens are minted by using the return value.
     function mint(bytes calldata data) public override lock returns (uint256 liquidity) {
         address recipient = abi.decode(data, (address));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
@@ -125,7 +125,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         _burn(address(this), liquidity);
         _transfer(token0, amount0, recipient, unwrapBento);
         _transfer(token1, amount1, recipient, unwrapBento);
-        // @dev This is safe from underflow - amounts are lesser figures derived from balances.
+        /// @dev This is safe from underflow - amounts are lesser figures derived from balances.
         unchecked {
             balance0 -= amount0;
             balance1 -= amount1;
@@ -140,7 +140,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
     }
 
     /// @dev Burns LP tokens sent to this contract and swaps one of the output tokens for another
-    /// - i.e., the user gets a single token out by burning LP tokens.
+    // - i.e., the user gets a single token out by burning LP tokens.
     function burnSingle(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenOut, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
@@ -155,10 +155,10 @@ contract ConstantProductPool is IPool, TridentERC20 {
         _burn(address(this), liquidity);
         kLast = TridentMath.sqrt((uint256(_reserve0) - amount0) * (uint256(_reserve1) - amount1));
 
-        // Swap one token for another
+        /// @dev Swap one token for another.
         unchecked {
             if (tokenOut == token1) {
-                // @dev Swap `token0` for `token1`
+                /// @dev Swap `token0` for `token1`
                 // - calculate `amountOut` as if the user first withdrew balanced liquidity and then swapped `token0` for `token1`.
                 amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1);
                 _transfer(token1, amount1, recipient, unwrapBento);
@@ -166,7 +166,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
                 amountOut = amount1;
                 amount0 = 0;
             } else {
-                // @dev Swap `token1` for `token0`.
+                /// @dev Swap `token1` for `token0`.
                 require(tokenOut == token0, "INVALID_OUTPUT_TOKEN");
                 amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0);
                 _transfer(token0, amount0, recipient, unwrapBento);
@@ -269,7 +269,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
     ) internal {
         require(balance0 <= type(uint112).max && balance1 <= type(uint112).max, "OVERFLOW");
         if (_blockTimestampLast == 0) {
-            // @dev TWAP support is disabled for gas efficiency.
+            /// @dev TWAP support is disabled for gas efficiency.
             reserve0 = uint112(balance0);
             reserve1 = uint112(balance1);
         } else {
@@ -296,7 +296,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         if (_kLast != 0) {
             computed = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
             if (computed > _kLast) {
-                // @dev `barFee` % of increase in liquidity.
+                /// @dev `barFee` % of increase in liquidity.
                 // It's going to be slightly less than `barFee` % in reality due to the math.
                 uint256 liquidity = (_totalSupply * (computed - _kLast) * barFee) / computed / MAX_FEE;
                 if (liquidity != 0) {
@@ -372,5 +372,19 @@ contract ConstantProductPool is IPool, TridentERC20 {
         )
     {
         return _getReserves();
+    }
+    
+    function getReservesInAmounts()
+        public
+        view
+        returns (
+            uint256 _reserve0,
+            uint256 _reserve1,
+            uint32 _blockTimestampLast
+        )
+    {
+        (_reserve0, _reserve1, _blockTimestampLast) = _getReserves();
+        _reserve0 = bento.toAmount(token0, _reserve0, false);
+        _reserve1 = bento.toAmount(token1, _reserve1, false);
     }
 }
