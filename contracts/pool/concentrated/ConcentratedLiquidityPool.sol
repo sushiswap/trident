@@ -65,7 +65,7 @@ contract ConcentratedLiquidityPool is IPool {
 
     uint256 internal unlocked;
     modifier lock() {
-        require(unlocked == 1, "LOCKED");
+        if (unlocked == 2) revert Locked();
         unlocked = 2;
         _;
         unlocked = 1;
@@ -106,6 +106,19 @@ contract ConcentratedLiquidityPool is IPool {
         //    It can be set to address(0) if we are not minting through the positionManager contract.
         address positionRecipient;
     }
+    
+    /// @dev Error list to optimize around pool requirements.
+    error Locked();
+    error ZeroAddress();
+    error InvalidToken();
+    error InvalidSwapFee();
+    error LiquidityOverflow();
+    error Token0Missing();
+    error Token1Missing();
+    error InvalidTick();
+    error LowerEven();
+    error UpperOdd();
+    error MaxTickLiquidity();
 
     /// @dev Only set immutable variables here - state changes made here will not be used.
     constructor(bytes memory _deployData, IMasterDeployer _masterDeployer) {
@@ -113,12 +126,12 @@ contract ConcentratedLiquidityPool is IPool {
             _deployData,
             (address, address, uint24, uint160, uint24)
         );
-
-        require(_token0 != address(0), "ZERO_ADDRESS");
-        require(_token0 != address(this), "INVALID_TOKEN0");
-        require(_token1 != address(this), "INVALID_TOKEN1");
-        require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
-
+        
+        if (_token0 == address(0)) revert ZeroAddress();
+        if (_token0 == address(this)) revert InvalidToken();
+        if (_token1 == address(this)) revert InvalidToken();
+        if (_swapFee > MAX_FEE) revert InvalidSwapFee();
+        
         token0 = _token0;
         token1 = _token1;
         swapFee = _swapFee;
@@ -154,7 +167,7 @@ contract ConcentratedLiquidityPool is IPool {
         );
 
         unchecked {
-            require(_liquidity <= MAX_TICK_LIQUIDITY, "LIQUIDITY_OVERFLOW");
+            if (_liquidity > MAX_TICK_LIQUIDITY) revert LiquidityOverflow();
 
             (uint256 amount0fees, uint256 amount1fees) = _updatePosition(
                 mintParams.positionOwner,
@@ -202,12 +215,12 @@ contract ConcentratedLiquidityPool is IPool {
 
         unchecked {
             if (amount0Actual != 0) {
-                require(amount0Actual + reserve0 <= _balance(token0), "TOKEN0_MISSING");
+                if (amount0Actual + reserve0 > _balance(token0)) revert Token0Missing();
                 reserve0 += amount0Actual;
             }
 
             if (amount1Actual != 0) {
-                require(amount1Actual + reserve1 <= _balance(token1), "TOKEN1_MISSING");
+                if (amount1Actual + reserve1 > _balance(token1)) revert Token1Missing();
                 reserve1 += amount1Actual;
             }
         }
@@ -462,13 +475,12 @@ contract ConcentratedLiquidityPool is IPool {
             _transfer(token1, amount1, barFeeTo, false);
         }
     }
-
+    
     function _ensureTickSpacing(int24 lower, int24 upper) internal view {
-        require(lower % int24(tickSpacing) == 0, "INVALID_TICK");
-        require((lower / int24(tickSpacing)) % 2 == 0, "LOWER_EVEN");
-
-        require(upper % int24(tickSpacing) == 0, "INVALID_TICK");
-        require((upper / int24(tickSpacing)) % 2 != 0, "UPPER_ODD"); /// @dev Can be either -1 or 1.
+        if (lower % int24(tickSpacing) != 0) revert InvalidTick();
+        if (lower / int24(tickSpacing) % 2 != 0) revert LowerEven();
+        if (upper % int24(tickSpacing) != 0) revert InvalidTick();
+        if (upper / int24(tickSpacing) % 2 == 0) revert UpperOdd();
     }
 
     function _getAmountsForLiquidity(
@@ -499,13 +511,13 @@ contract ConcentratedLiquidityPool is IPool {
         if (zeroForOne) {
             uint256 balance0 = _balance(token0);
             uint128 newBalance = reserve0 + inAmount;
-            require(uint256(newBalance) <= balance0, "TOKEN0_MISSING");
+            if (uint256(newBalance) > balance0) revert Token0Missing();
             reserve0 = newBalance;
             reserve1 -= uint128(amountOut);
         } else {
             uint256 balance1 = _balance(token1);
             uint128 newBalance = reserve1 + inAmount;
-            require(uint256(newBalance) <= balance1, "TOKEN1_MISSING");
+            if (uint256(newBalance) > balance1) revert Token1Missing();
             reserve1 = newBalance;
             reserve0 -= uint128(amountOut);
         }
@@ -549,7 +561,7 @@ contract ConcentratedLiquidityPool is IPool {
         if (amount < 0) position.liquidity -= uint128(-amount);
         if (amount > 0) position.liquidity += uint128(amount);
 
-        require(position.liquidity < MAX_TICK_LIQUIDITY, "MAX_TICK_LIQUIDITY");
+        if (position.liquidity > MAX_TICK_LIQUIDITY) revert MaxTickLiquidity();
 
         position.feeGrowthInside0Last = growth0current;
         position.feeGrowthInside1Last = growth1current;
