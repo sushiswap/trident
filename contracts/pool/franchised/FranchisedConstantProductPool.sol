@@ -81,7 +81,7 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
     }
 
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
-    /// The router must ensure that sufficient LP tokens are minted by using the return value.
+    // The router must ensure that sufficient LP tokens are minted by using the return value.
     function mint(bytes calldata data) public override lock returns (uint256 liquidity) {
         address recipient = abi.decode(data, (address));
         _checkWhiteList(recipient);
@@ -146,7 +146,7 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
     }
 
     /// @dev Burns LP tokens sent to this contract and swaps one of the output tokens for another
-    /// - i.e., the user gets a single token out by burning LP tokens.
+    // - i.e., the user gets a single token out by burning LP tokens.
     function burnSingle(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenOut, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         _checkWhiteList(recipient);
@@ -382,5 +382,19 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
         )
     {
         return _getReserves();
+    }
+    
+    function getReservesInAmounts()
+        public
+        view
+        returns (
+            uint256 _reserve0,
+            uint256 _reserve1,
+            uint32 _blockTimestampLast
+        )
+    {
+        (_reserve0, _reserve1, _blockTimestampLast) = _getReserves();
+        _reserve0 = bento.toAmount(token0, _reserve0, false);
+        _reserve1 = bento.toAmount(token1, _reserve1, false);
     }
 }
