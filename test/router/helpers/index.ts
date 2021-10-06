@@ -165,11 +165,13 @@ export async function refreshPools(topology: Topology){
 
     if (pool instanceof ConstantProductRPool){
       const poolContract = new Contract(pool.address, constantPoolAbi, alice);
-      [topology.pools[index].reserve0, topology.pools[index].reserve1] = await poolContract.getReserves(); 
+      const [reserve0, reserve1] = await poolContract.getReserves(); 
+      (pool as ConstantProductRPool).updateReserves(reserve0, reserve1)
     }
     else if (pool instanceof HybridRPool) {
       const poolContract = new Contract(pool.address, hybridPoolAbi, alice);
-      [topology.pools[index].reserve0, topology.pools[index].reserve1] = await poolContract.getReserves(); 
+      const [reserve0, reserve1] = await poolContract.getReserves(); 
+      (pool as HybridRPool).updateReserves(reserve0, reserve1)
     }
 
     // const reserve0After = topology.pools[index].reserve0.toString();

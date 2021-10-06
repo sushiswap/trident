@@ -50,7 +50,7 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
   it("Should Test router with 10 random pools and 200 swaps", async function () {
     for (let index = 0; index < 1; index++) {
       const variants = Math.floor(Math.random() * (4 - 1 + 1)) + 1;
-      console.log(`Variants ${variants}`);
+      //console.log(`Variants ${variants}`);
       const topology = await getRandomPools(3, 1, this.rnd);
 
       for (let i = 0; i < 1; i++) {
@@ -119,8 +119,8 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
 
           // console.log(topology);
           // console.log(route);
-          console.log(`Expected amount out: ${route.amountOut}`);
-          console.log(`Actual amount out: ${actualAmountOutBN.toString()}`);
+          // console.log(`Expected amount out: ${route.amountOut}`);
+          // console.log(`Actual amount out: ${actualAmountOutBN.toString()}`);
 
           expect(
             closeValues(
