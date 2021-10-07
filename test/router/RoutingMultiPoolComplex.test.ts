@@ -47,9 +47,9 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
     ];
   }
 
-  it("Should Test router with 10 random pools and 200 swaps", async function () {
+  it("Random topology output prediction precision is ok", async function () {
     for (let index = 0; index < 1; index++) {
-      const topology = await testHelper.getComplexTopoplogy(this.rnd);
+      const topology = await testHelper.getRandomCPTopology(5, 0.3, this.rnd);
 
       for (let i = 0; i < 1; i++) {
         const [fromToken, toToken, baseToken] = getRandomTokens(
@@ -116,7 +116,8 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
           }
 
           // console.log(topology);
-          // console.log(`Test: ${index}, route legs: ${route.legs.length}, from: ${fromToken.name}, to: ${toToken.name}`);
+          // console.log(`Test: ${index}, pools: ${topology.pools.length}, route legs: ${route.legs.length}, `
+          //   + `from: ${fromToken.name}, to: ${toToken.name}`);
           // console.log(`Expected amount out: ${route.amountOut}`);
           // console.log(`Actual amount out: ${actualAmountOutBN.toString()}`);
           // console.log(`Precision: ${Math.abs(route.amountOut/parseInt(actualAmountOutBN.toString()) - 1)}`);
@@ -125,7 +126,7 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
             closeValues(
               route.amountOut,
               parseInt(actualAmountOutBN.toString()),
-              1e-10
+              route.legs.length * 1e-9
             )
           ).to.equal(
             true,

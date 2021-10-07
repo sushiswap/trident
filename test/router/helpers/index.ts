@@ -252,6 +252,61 @@ export async function getComplexTopoplogy(rnd: () => number): Promise<Topology> 
   return topology;
 }
 
+export async function getRandomCPTopology(tokenCount: number, density: number, rnd: () => number): Promise<Topology> {
+  const tokens: RToken[] = []
+  const prices: number[] = []
+  const pools: RPool[] = []
+
+  for (var i = 0; i < tokenCount; ++i) {
+    tokens.push({ name: `Token${i}`, address: "" + i }); 
+    prices.push(getTokenPrice(rnd)); 
+  }
+
+  const tokenContracts: Contract[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const tokenContract = await ERC20Factory.deploy(
+      tokens[0].name,
+      tokens[0].name,
+      tokenSupply
+    );
+    await tokenContract.deployed();
+    tokenContracts.push(tokenContract);
+    tokens[i].address = tokenContract.address;
+  }
+  await approveAndFund(tokenContracts);
+
+  for (i = 0; i < tokenCount; ++i) {
+    for (var j = i + 1; j < tokenCount; ++j) {
+      const r = rnd()
+      if (r < density) {
+        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd))
+      }
+      if (r < density * density) {
+        // second pool
+        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd))
+      }
+      if (r < density * density * density) {
+        // third pool
+        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd))
+      }
+      if (r < Math.pow(density, 4)) {
+        // forth pool
+        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd))
+      }
+      if (r < Math.pow(density, 5)) {
+        // fifth pool
+        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd))
+      }
+    }
+  }
+
+  return {
+    tokens,
+    prices,
+    pools
+  };
+}
+
 async function getTopoplogy(tokenCount: number, poolVariants: number, rnd: () => number): Promise<Topology> {
   const tokenContracts: Contract[] = [];
 
