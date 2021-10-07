@@ -11,7 +11,7 @@ export async function getCPPool(t0: RToken, t1: RToken, price: number, deploymen
   const fee = getPoolFee(rnd) * 10_000;  
   const imbalance = getPoolImbalance(rnd);
 
-  console.log(`Building pool ${t0.name}/${t1.name}`)
+  // console.log(`Building pool ${t0.name}/${t1.name}`)
   let reserve1;
   let reserve0;  
 

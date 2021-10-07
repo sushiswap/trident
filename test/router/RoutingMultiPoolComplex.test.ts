@@ -91,16 +91,16 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
               toToken.address
             );
           } catch (error) {
-            console.log("");
-            console.log("Swap Failed");
-            console.log("");
+            // console.log("");
+            // console.log("Swap Failed");
+            // console.log("");
 
-            console.log("Error:");
-            console.log(error);
+            // console.log("Error:");
+            // console.log(error);
 
-            console.log(`Iteration: ${i}`);
-            console.log(`Route:`);
-            console.log(route);
+            // console.log(`Iteration: ${i}`);
+            // console.log(`Route:`);
+            // console.log(route);
             throw error;
           }
 

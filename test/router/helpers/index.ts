@@ -91,10 +91,10 @@ export async function refreshPools(topology: Topology){
     const reserve0 = topology.pools[index].reserve0.toString();
     const reserve1 = topology.pools[index].reserve1.toString();
     
-    console.log('');
-    console.log('Updating reserves')
-    console.log(`Reserve 0 before update: ${reserve0}`);
-    console.log(`Reserve 1 before update: ${reserve1}`);
+    // console.log('');
+    // console.log('Updating reserves')
+    // console.log(`Reserve 0 before update: ${reserve0}`);
+    // console.log(`Reserve 1 before update: ${reserve1}`);
 
     if (pool instanceof ConstantProductRPool){
       const poolContract = new Contract(pool.address, constantPoolAbi, alice);
@@ -110,8 +110,8 @@ export async function refreshPools(topology: Topology){
     const reserve0After = topology.pools[index].reserve0.toString();
     const reserve1After = topology.pools[index].reserve1.toString();
 
-    console.log(`Reserve 0 after update: ${reserve0After}`);
-    console.log(`Reserve 1 after update: ${reserve1After}`);
+    // console.log(`Reserve 0 after update: ${reserve0After}`);
+    // console.log(`Reserve 1 after update: ${reserve1After}`);
     
   }
 }
@@ -202,7 +202,13 @@ export async function getComplexTopoplogy(rnd: () => number): Promise<Topology> 
   let priceType = 0;
   for (var i = 0; i < tokenCount; ++i) {
     topology.tokens.push({ name: `Token${i}`, address: "" + i }); 
-      topology.prices.push(getTokenPrice(rnd)); 
+       
+      if (priceType % 2 == 0) {
+        topology.prices.push(1); 
+      } else {
+        topology.prices.push(getTokenPrice(rnd)); 
+      }
+      priceType ++;
   }
 
   for (let i = 0; i < topology.tokens.length; i++) {
@@ -232,7 +238,15 @@ export async function getComplexTopoplogy(rnd: () => number): Promise<Topology> 
       const price0 = topology.prices[i];
       const price1 = topology.prices[j];
       
-      topology.pools.push(await getCPPool(token0, token1, price0 / price1, poolDeployment, rnd));
+      if (poolType % 2 == 0) {
+        topology.pools.push(
+          await getHybridPool(token0, token1, 1, poolDeployment, rnd)
+        );
+      } else {
+        topology.pools.push(
+          await getCPPool(token0, token1, price0 / price1, poolDeployment, rnd)
+        );
+      }
       
       poolType++;
     }
