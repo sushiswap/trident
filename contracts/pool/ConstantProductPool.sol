@@ -237,7 +237,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
     /// @dev Updates `barFee` for Trident protocol.
     function updateBarFee() public {
-        barFee = IMasterDeployer(masterDeployer).barFee();
+        barFee = masterDeployer.barFee();
     }
 
     function _getReserves()
