@@ -786,10 +786,10 @@
   dependencies:
     antlr4ts "^0.5.0-alpha.4"
 
-"@sushiswap/core-sdk@^0.1.2":
-  version "0.1.2"
-  resolved "https://registry.yarnpkg.com/@sushiswap/core-sdk/-/core-sdk-0.1.2.tgz#d6ae5d252bb603b2664f119988da50d96d0fff01"
-  integrity sha512-z7ks+cVG8nH5jiHMtZp4HzdDcnSLEm/Pd+aNav1ZjfgKrsVNNSAs6a6tjoEvK7GRj6XhM4RFyV772y4mIAkxjQ==
+"@sushiswap/core-sdk@^1.0.0-canary.2":
+  version "1.0.0-canary.2"
+  resolved "https://registry.yarnpkg.com/@sushiswap/core-sdk/-/core-sdk-1.0.0-canary.2.tgz#35b4f66dd8e7a394cc84a2d2467dfc7defc4a1f3"
+  integrity sha512-aQarA7i/YN4z2jVweWQHyns6boCzWunRwrxI8yOnE4/y8BYEw9PzMGphNbAhP+PRa3obeg5VQP5/uPDDTbrTXQ==
   dependencies:
     big.js "^6.1.0"
     decimal.js-light "^2.5.0"
