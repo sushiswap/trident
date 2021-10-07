@@ -102,8 +102,8 @@ invariant reserveLessThanEqualToBalance()
 
 // Mudit: bidirectional implication
 invariant integrityOfTotalSupply()
-        (totalSupply() == 0 <=> reserve0() == 0 ) && 
-        (totalSupply() == 0 <=> reserve1() == 0 )  {
+        (totalSupply() == 0 <=> reserve0() == 0) && 
+        (totalSupply() == 0 <=> reserve1() == 0)  {
         // (reserve0() == 0 => totalSupply() == 0)  && ( reserve1() == 0 => totalSupply() == 0 )  {
         preserved {
 			requireInvariant validityOfTokens();
@@ -113,14 +113,14 @@ invariant integrityOfTotalSupply()
             //require to != currentContract;
             require balanceOf(0) == 1000;
             require e.msg.sender != 0;
-            require totalSupply() == 0 || balanceOf(currentContract) + balanceOf(0) <= totalSupply() ;
+            require totalSupply() == 0 || balanceOf(currentContract) + balanceOf(0) <= totalSupply();
         }
 
         preserved burnSingleWrapper(address tokenOut, address to, bool b) with (env e) {
             //require to != currentContract;
             require balanceOf(0) == 1000;
             require e.msg.sender != 0;
-            require totalSupply() == 0 || balanceOf(currentContract) + balanceOf(0) <= totalSupply() ;
+            require totalSupply() == 0 || balanceOf(currentContract) + balanceOf(0) <= totalSupply();
         }
 
         preserved swapWrapper(address tokenIn, address recipient, bool unwrapBento) with (env e) {
@@ -150,17 +150,13 @@ rule sanity(method f) {
 }
 
 rule pathSanityForToken0(method f) {
-    address token0;
-
-    callFunction(f, token0);
+    callFunction(f, token0());
 
     assert(false);
 }
 
 rule pathSanityForToken1(method f) {
-    address token1;
-    
-    callFunction(f, token1);
+    callFunction(f, token1());
 
     assert(false);
 }
