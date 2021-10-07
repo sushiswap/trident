@@ -11,6 +11,7 @@ export async function getCPPool(t0: RToken, t1: RToken, price: number, deploymen
   const fee = getPoolFee(rnd) * 10_000;  
   const imbalance = getPoolImbalance(rnd);
 
+  console.log(`Building pool ${t0.name}/${t1.name}`)
   let reserve1;
   let reserve0;  
 
@@ -91,15 +92,9 @@ export async function getHybridPool(t0: RToken, t1: RToken, price: number, deplo
   )
 }
 
-export async function getRandomPool(t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts, rnd: () => number) { 
-  if (rnd() < 0.5)
-  { 
-    return await getCPPool(t0, t1, price, deploymentContracts, rnd);
-  }
-  else
-  {
-    return await getHybridPool(t0, t1, price, deploymentContracts, rnd);
-  }
+export async function getRandomPool(t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts, rnd: () => number) {
+  if (price !== 1) return await getCPPool(t0, t1, price, deploymentContracts, rnd);
+  return await getHybridPool(t0, t1, 1, deploymentContracts, rnd);
 } 
 
 function getPoolFee(rnd: () => number) {

@@ -49,9 +49,7 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
 
   it("Should Test router with 10 random pools and 200 swaps", async function () {
     for (let index = 0; index < 1; index++) {
-      const variants = Math.floor(Math.random() * (4 - 1 + 1)) + 1;
-      //console.log(`Variants ${variants}`);
-      const topology = await getRandomPools(3, 1, this.rnd);
+      const topology = await testHelper.getComplexTopoplogy(this.rnd);
 
       for (let i = 0; i < 1; i++) {
         const [fromToken, toToken, baseToken] = getRandomTokens(

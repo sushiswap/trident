@@ -34,7 +34,9 @@ export async function init(): Promise<[SignerWithAddress, string, Contract]> {
   return [alice, router.address, bento];
 }
 
-export function createRoute(fromToken: RToken, toToken: RToken, baseToken: RToken, topology: Topology, amountIn: number, gasPrice: number, slippage: number = 0.5): MultiRoute | undefined {
+export function createRoute(fromToken: RToken, toToken: RToken, baseToken: RToken, topology: Topology, amountIn: number, gasPrice: number, slippagePercentage: number = 0.5): MultiRoute | undefined {
+  const slippage = 1 - (slippagePercentage/100);
+  
   const route = findMultiRouting(
     fromToken,
     toToken,
@@ -80,6 +82,38 @@ export async function executeTridentRoute(tridentRouteParams: TridentRoute, toTo
   );
 
   return outputBalanceAfter.sub(outputBalanceBefore);
+}
+
+export async function refreshPools(topology: Topology){
+  for (let index = 0; index < topology.pools.length; index++) {
+    const pool = topology.pools[index];
+
+    const reserve0 = topology.pools[index].reserve0.toString();
+    const reserve1 = topology.pools[index].reserve1.toString();
+    
+    console.log('');
+    console.log('Updating reserves')
+    console.log(`Reserve 0 before update: ${reserve0}`);
+    console.log(`Reserve 1 before update: ${reserve1}`);
+
+    if (pool instanceof ConstantProductRPool){
+      const poolContract = new Contract(pool.address, constantPoolAbi, alice);
+      const [reserve0, reserve1] = await poolContract.getReserves(); 
+      (pool as ConstantProductRPool).updateReserves(reserve0, reserve1)
+    }
+    else if (pool instanceof HybridRPool) {
+      const poolContract = new Contract(pool.address, hybridPoolAbi, alice);
+      const [reserve0, reserve1] = await poolContract.getReserves(); 
+      (pool as HybridRPool).updateReserves(reserve0, reserve1)
+    }
+
+    const reserve0After = topology.pools[index].reserve0.toString();
+    const reserve1After = topology.pools[index].reserve1.toString();
+
+    console.log(`Reserve 0 after update: ${reserve0After}`);
+    console.log(`Reserve 1 after update: ${reserve1After}`);
+    
+  }
 }
 
 export async function getRandomPools(tokenCount: number, variants: number, rnd: () => number): Promise<Topology> { 
@@ -151,36 +185,60 @@ export async function getFivePoolBridge(rnd: () => number): Promise<Topology> {
   }
 }
 
-export async function refreshPools(topology: Topology){
-  for (let index = 0; index < topology.pools.length; index++) {
-    const pool = topology.pools[index];
+export async function getComplexTopoplogy(rnd: () => number): Promise<Topology> {
+  const tokenContracts: Contract[] = [];
+  const tokenCount = 15;
+  const poolVariants = 2;
 
-    // const reserve0 = topology.pools[index].reserve0.toString();
-    // const reserve1 = topology.pools[index].reserve1.toString();
-    
-    // console.log('');
-    // console.log('Updating reserves')
-    // console.log(`Reserve 0 before update: ${reserve0}`);
-    // console.log(`Reserve 1 before update: ${reserve1}`);
+  let topology: Topology = {
+    tokens: [],
+    prices: [],
+    pools: [],
+  }; 
+  
 
-    if (pool instanceof ConstantProductRPool){
-      const poolContract = new Contract(pool.address, constantPoolAbi, alice);
-      const [reserve0, reserve1] = await poolContract.getReserves(); 
-      (pool as ConstantProductRPool).updateReserves(reserve0, reserve1)
-    }
-    else if (pool instanceof HybridRPool) {
-      const poolContract = new Contract(pool.address, hybridPoolAbi, alice);
-      const [reserve0, reserve1] = await poolContract.getReserves(); 
-      (pool as HybridRPool).updateReserves(reserve0, reserve1)
-    }
+  const poolCount = tokenCount - 1;
 
-    // const reserve0After = topology.pools[index].reserve0.toString();
-    // const reserve1After = topology.pools[index].reserve1.toString();
-
-    // console.log(`Reserve 0 after update: ${reserve0After}`);
-    // console.log(`Reserve 1 after update: ${reserve1After}`);
-    
+  let priceType = 0;
+  for (var i = 0; i < tokenCount; ++i) {
+    topology.tokens.push({ name: `Token${i}`, address: "" + i }); 
+      topology.prices.push(getTokenPrice(rnd)); 
   }
+
+  for (let i = 0; i < topology.tokens.length; i++) {
+    const tokenContract = await ERC20Factory.deploy(
+      topology.tokens[0].name,
+      topology.tokens[0].name,
+      tokenSupply
+    );
+    await tokenContract.deployed();
+    tokenContracts.push(tokenContract);
+    topology.tokens[i].address = tokenContract.address;
+  }
+
+  await approveAndFund(tokenContracts);
+
+  let poolType = 0;
+  for (i = 0; i < poolCount; i++) {
+    for (let j = 1; j < poolVariants; j++) { 
+
+      const token0 = topology.tokens[i];
+      const token1 = topology.tokens[j];
+
+      if(token0 === token1){
+        continue;
+      }
+
+      const price0 = topology.prices[i];
+      const price1 = topology.prices[j];
+      
+      topology.pools.push(await getCPPool(token0, token1, price0 / price1, poolDeployment, rnd));
+      
+      poolType++;
+    }
+  }
+
+  return topology;
 }
 
 async function getTopoplogy(tokenCount: number, poolVariants: number, rnd: () => number): Promise<Topology> {
