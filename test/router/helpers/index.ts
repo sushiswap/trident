@@ -279,23 +279,23 @@ export async function getRandomCPTopology(tokenCount: number, density: number, r
     for (var j = i + 1; j < tokenCount; ++j) {
       const r = rnd()
       if (r < density) {
-        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd))
+        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd, 0.003))
       }
       if (r < density * density) {
         // second pool
-        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd))
+        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd, 0.0005))
       }
       if (r < density * density * density) {
         // third pool
-        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd))
+        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd, 0.002))
       }
       if (r < Math.pow(density, 4)) {
         // forth pool
-        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd))
+        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd, 0.0015))
       }
       if (r < Math.pow(density, 5)) {
         // fifth pool
-        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd))
+        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd, 0.001))
       }
     }
   }

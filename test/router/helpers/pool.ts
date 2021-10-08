@@ -6,9 +6,9 @@ import { PoolDeploymentContracts } from "./interfaces";
 import { choice, getRandom } from "./random";
 import { MAX_POOL_IMBALANCE, MAX_POOL_RESERVE, MIN_POOL_IMBALANCE, MIN_POOL_RESERVE } from "./constants";
  
-export async function getCPPool(t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts, rnd: () => number, reserve: number = 0) {
+export async function getCPPool(t0: RToken, t1: RToken, price: number, deploymentContracts: PoolDeploymentContracts, rnd: () => number, fee:number = 0.003, reserve: number = 0) {
 
-  const fee = getPoolFee(rnd) * 10_000;  
+  const feeContract = Math.round(fee * 10_000);  
   const imbalance = getPoolImbalance(rnd);
 
   // console.log(`Building pool ${t0.name}/${t1.name}`)
@@ -26,7 +26,7 @@ export async function getCPPool(t0: RToken, t1: RToken, price: number, deploymen
 
   const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint256", "bool"],
-      [t0.address, t1.address, fee, true]);
+      [t0.address, t1.address, feeContract, true]);
 
   const constantProductPool: Contract = await deploymentContracts.constPoolFactory.attach(
   (
@@ -42,7 +42,7 @@ export async function getCPPool(t0: RToken, t1: RToken, price: number, deploymen
     constantProductPool.address,
     t0,
     t1,
-    fee / 10_000,
+    fee,
     getBigNumber(reserve0),
     getBigNumber(reserve1),
   )
