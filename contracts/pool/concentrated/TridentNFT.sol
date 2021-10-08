@@ -65,7 +65,7 @@ abstract contract TridentNFT {
     /// @param interfaceId XOR of all function selectors in the reference interface.
     /// @return supported Returns 'true' if `interfaceId` is flagged as implemented.
     function supportsInterface(bytes4 interfaceId) external pure returns (bool supported) {
-        supported = interfaceId == 0x80ac58cd || interfaceId == 0x5b5e139f;
+        supported = interfaceId == 0x80ac58cd || interfaceId == 0x5b5e139f || interfaceId == 0x01ffc9a7;
     }
 
     /// @notice Approves `tokenId` from `msg.sender` 'owner' or 'operator' to be spent by `spender`.
@@ -109,7 +109,7 @@ abstract contract TridentNFT {
     }
 
     /// @notice Transfers `tokenId` from 'owner' to `recipient` with no data. Caller needs ownership or approval from 'owner',
-    /// and `recipient` must have compatible {onERC721Received} function.
+    // and `recipient` must have compatible {onERC721Received} function.
     /// @param recipient The address to move `tokenId` to.
     /// @param tokenId The Id to move.
     function safeTransferFrom(
@@ -121,7 +121,7 @@ abstract contract TridentNFT {
     }
 
     /// @notice Transfers `tokenId` from 'owner' to `recipient` with data. Caller needs ownership or approval from 'owner',
-    /// and `recipient` must have compatible {onERC721Received} function.
+    // and `recipient` must have compatible {onERC721Received} function.
     /// @param recipient The address to move `tokenId` to.
     /// @param tokenId The Id to move.
     function safeTransferFrom(
@@ -223,7 +223,7 @@ abstract contract TridentNFT {
     }
 
     function _burn(uint256 tokenId) internal {
-        // @dev We tranfer the NFT to address(0) rather than burning to keep Total Supply static.
+        /// @dev We tranfer the NFT to 'address(0)' rather than burning to keep `totalSupply` static.
         address owner = ownerOf[tokenId];
         require(owner != address(0), "NOT_MINTED");
         _transfer(owner, address(0), tokenId);
@@ -236,7 +236,7 @@ abstract contract TridentNFT {
     ) internal {
         /// @dev This is safe from under/overflow -
         // ownership is checked against decrement,
-        // and sum of all user balances can't reasonably exceed type(uint256).max (see {_mint}).
+        // and sum of all user balances can't reasonably exceed 'type(uint256).max' (see {_mint}).
         unchecked {
             balanceOf[from]--;
             balanceOf[to]++;
