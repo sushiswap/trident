@@ -6,10 +6,6 @@ pragma solidity >=0.8.0;
 /// prices between 2**-128 and 2**128 - 1.
 /// @author Adapted from https://github.com/Uniswap/uniswap-v3-core/blob/main/contracts/libraries/TickMath.sol.
 library TickMath {
-    /// @dev Error list to optimize around math requirements.
-    error OutofBounds();
-    error R();
-    
     /// @dev The minimum tick that may be passed to #getSqrtRatioAtTick computed from log base 1.0001 of 2**-128.
     int24 internal constant MIN_TICK = -887272;
     /// @dev The maximum tick that may be passed to #getSqrtRatioAtTick computed from log base 1.0001 of 2**128 - 1.
@@ -26,7 +22,7 @@ library TickMath {
     /// at the given tick.
     function getSqrtRatioAtTick(int24 tick) internal pure returns (uint160 sqrtPriceX96) {
         uint256 absTick = tick < 0 ? uint256(-int256(tick)) : uint256(int256(tick));
-        if (absTick > uint256(uint24(MAX_TICK))) revert OutofBounds();
+        require(absTick <= uint256(uint24(MAX_TICK)), "TICK_OUT_OF_BOUNDS");
         unchecked {
             uint256 ratio = absTick & 0x1 != 0 ? 0xfffcb933bd6fad37aa2d162d1a594001 : 0x100000000000000000000000000000000;
             if (absTick & 0x2 != 0) ratio = (ratio * 0xfff97272373d413259a46990580e213a) >> 128;
@@ -63,8 +59,8 @@ library TickMath {
     /// @param sqrtPriceX96 The sqrt ratio for which to compute the tick as a Q64.96.
     /// @return tick The greatest tick for which the ratio is less than or equal to the input ratio.
     function getTickAtSqrtRatio(uint160 sqrtPriceX96) internal pure returns (int24 tick) {
-        /// @dev Second inequality must be < because the price can never reach the price at the max tick.
-        if (sqrtPriceX96 < MIN_SQRT_RATIO || sqrtPriceX96 > MAX_SQRT_RATIO) revert R();
+        // @dev Second inequality must be < because the price can never reach the price at the max tick.
+        require(sqrtPriceX96 >= MIN_SQRT_RATIO && sqrtPriceX96 < MAX_SQRT_RATIO, "R");
         uint256 ratio = uint256(sqrtPriceX96) << 32;
 
         uint256 r = ratio;
