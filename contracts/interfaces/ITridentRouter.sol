@@ -24,6 +24,8 @@ interface ITridentRouter {
         Path[] path;
     }
 
+    /// @dev If native is true - amount is the native ERC-20 token amount
+    /// @dev If native is false - amount is the BentoBox share amount
     struct TokenInput {
         address token;
         bool native;
