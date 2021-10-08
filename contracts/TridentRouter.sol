@@ -319,39 +319,24 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         return masterDeployer.deployPool(_factory, _deployData);
     }
 
+    /// @notice Deposit from the user's wallet into BentoBox.
+    /// @dev Amount is the native token amount. We let BentoBox do the conversion into shares.
     function _depositToBentoBox(
         address token,
         address recipient,
         uint256 amount
     ) internal {
-        if (token == wETH && address(this).balance != 0) {
-            uint256 underlyingAmount = bento.toAmount(wETH, amount, true);
-            if (address(this).balance >= underlyingAmount) {
-                // @dev Deposit ETH into `recipient` `bento` account.
-                bento.deposit{value: underlyingAmount}(address(0), address(this), recipient, 0, amount);
-                return;
-            }
-        }
-        // @dev Deposit ERC-20 token into `recipient` `bento` account.
-        bento.deposit(token, msg.sender, recipient, 0, amount);
+        bento.deposit{value: token == USE_ETHEREUM ? amount : 0}(token, msg.sender, recipient, amount, 0);
     }
 
+    /// @notice Same effect as _depositToBentoBox() but with a sender parameter.
     function _depositFromUserToBentoBox(
         address token,
         address sender,
         address recipient,
         uint256 amount
     ) internal {
-        if (token == wETH && address(this).balance != 0) {
-            uint256 underlyingAmount = bento.toAmount(wETH, amount, true);
-            if (address(this).balance >= underlyingAmount) {
-                // @dev Deposit ETH into `recipient` `bento` account.
-                bento.deposit{value: underlyingAmount}(address(0), address(this), recipient, 0, amount);
-                return;
-            }
-        }
-        // @dev Deposit ERC-20 token into `recipient` `bento` account.
-        bento.deposit(token, sender, recipient, 0, amount);
+        bento.deposit{value: token == USE_ETHEREUM ? amount : 0}(token, sender, recipient, amount, 0);
     }
 
     function isWhiteListed(address pool) internal {
