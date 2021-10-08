@@ -326,13 +326,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         address recipient,
         uint256 amount
     ) internal {
-        if (token == wETH && address(this).balance >= amount) {
-            // Deposit ETH into `recipient` `bento` account.
-            bento.deposit{value: amount}(address(0), address(this), recipient, amount, 0);
-            return;
-        }
-        // Deposit ERC-20 token into `recipient` `bento` account.
-        bento.deposit(token, msg.sender, recipient, amount, 0);
+        bento.deposit{value: token == USE_ETHEREUM ? amount : 0}(token, msg.sender, recipient, amount, 0);
     }
 
     /// @notice Same effect as _depositToBentoBox() but with a sender parameter.
@@ -342,13 +336,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         address recipient,
         uint256 amount
     ) internal {
-        if (token == wETH && address(this).balance >= amount) {
-            // Deposit ETH into `recipient` `bento` account.
-            bento.deposit{value: amount}(address(0), address(this), recipient, amount, 0);
-            return;
-        }
-        // Deposit ERC-20 token into `recipient` `bento` account.
-        bento.deposit(token, sender, recipient, amount, 0);
+        bento.deposit{value: token == USE_ETHEREUM ? amount : 0}(token, sender, recipient, amount, 0);
     }
 
     function isWhiteListed(address pool) internal {
