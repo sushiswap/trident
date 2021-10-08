@@ -9,6 +9,7 @@ import "../interfaces/ITridentCallee.sol";
 import "../libraries/MathUtils.sol";
 import "./TridentERC20.sol";
 import "../libraries/RebaseLibrary.sol";
+import "hardhat/console.sol";
 
 /// @notice Trident exchange pool template with hybrid like-kind formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares. However, the stableswap invariant is applied to the underlying amounts.
@@ -275,8 +276,9 @@ contract HybridPool is IPool, TridentERC20 {
     }
 
     function _updateReserves() internal {
-        (uint256 _reserve0, uint256 _reserve1) = _balance();
-        require(_reserve0 < type(uint128).max && _reserve1 < type(uint128).max, "OVERFLOW");
+        uint256 _reserve0 = bento.balanceOf(token0, address(this));
+        uint256 _reserve1 = bento.balanceOf(token1, address(this));
+        require(_reserve0 <= type(uint128).max && _reserve1 <= type(uint128).max, "OVERFLOW");
         reserve0 = uint128(_reserve0);
         reserve1 = uint128(_reserve1);
         emit Sync(_reserve0, _reserve1);
@@ -338,23 +340,27 @@ contract HybridPool is IPool, TridentERC20 {
         }
     }
 
-    function _computeLiquidityFromAdjustedBalances(uint256 xp0, uint256 xp1) internal view returns (uint256 computed) {
+    function _computeLiquidityFromAdjustedBalances(uint256 xp0, uint256 xp1) internal view returns (uint256) {
         uint256 s = xp0 + xp1;
 
         if (s == 0) {
-            computed = 0;
+            return 0;
         }
         uint256 prevD;
         uint256 D = s;
+        //console.log("Loop start");
         for (uint256 i = 0; i < MAX_LOOP_LIMIT; i++) {
-            uint256 dP = (((D * D) / xp0) * D) / xp1 / 4;
+            uint256 dp = (((D * D) / xp0) * D) / (xp1 * 4);
             prevD = D;
-            D = (((N_A * s) / A_PRECISION + 2 * dP) * D) / ((N_A / A_PRECISION - 1) * D + 3 * dP);
+            D = (((N_A * s) / A_PRECISION + dp * 2) * D) / (((N_A - A_PRECISION) * D) / A_PRECISION + 3 * dp);
             if (D.within1(prevD)) {
-                break;
+                return D;
             }
+            //console.log(D > prevD, D > prevD ? D - prevD : prevD - D);
         }
-        computed = D;
+        console.log("Error");
+        //revert("DID_NOT_CONVERGE");
+        return D;
     }
 
     /// @notice Calculate the new balances of the tokens given the indexes of the token
@@ -366,7 +372,7 @@ contract HybridPool is IPool, TridentERC20 {
     /// @return y The amount of TO token that should remain in the pool.
     function _getY(uint256 x, uint256 D) internal view returns (uint256 y) {
         uint256 c = (D * D) / (x * 2);
-        c = (c * D) / ((N_A * 2) / A_PRECISION);
+        c = (c * D * A_PRECISION) / (N_A * 2);
         uint256 b = x + ((D * A_PRECISION) / N_A);
         uint256 yPrev;
         y = D;
@@ -375,9 +381,10 @@ contract HybridPool is IPool, TridentERC20 {
             yPrev = y;
             y = (y * y + c) / (y * 2 + b - D);
             if (y.within1(yPrev)) {
-                break;
+                return y;
             }
         }
+        //revert("DID_NOT_CONVERGE");
     }
 
     function _mintFee(uint256 _reserve0, uint256 _reserve1) internal returns (uint256 _totalSupply, uint256 d) {

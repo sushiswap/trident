@@ -73,7 +73,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
         masterDeployer = IMasterDeployer(_masterDeployer);
         unlocked = 1;
-        if (_twapSupport) blockTimestampLast = 1;
+        if (_twapSupport) blockTimestampLast = uint32(block.timestamp);
     }
 
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.

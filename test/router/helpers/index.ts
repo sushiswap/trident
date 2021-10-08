@@ -29,7 +29,7 @@ export async function init(): Promise<[SignerWithAddress, string, Contract]> {
   await deployContracts();
 
   return [alice, router.address, bento];
-} 
+}
 
 export async function getSinglePool(rnd: () => number): Promise<Topology> {
   return await getTopoplogy(2, 1, rnd);
@@ -66,7 +66,7 @@ export function createRoute(fromToken: RToken, toToken: RToken, baseToken: RToke
     100
   );
   return route;
-} 
+}
 
 export async function executeTridentRoute(tridentRouteParams: TridentRoute, toTokenAddress: string) {
 
@@ -76,17 +76,17 @@ export async function executeTridentRoute(tridentRouteParams: TridentRoute, toTo
     case RouteType.SinglePool:
       await (await router.connect(alice).exactInputSingle(tridentRouteParams)).wait();
       break;
-    
+
     case RouteType.SinglePath:
       await (await router.connect(alice).exactInput(tridentRouteParams)).wait();
         break;
-    
+
     case RouteType.ComplexPath:
     default:
       await (await router.connect(alice).complexPath(tridentRouteParams)).wait();
       break;
   }
- 
+
   let outputBalanceAfter: BigNumber = await bento.balanceOf(
     toTokenAddress,
     alice.address
@@ -95,7 +95,7 @@ export async function executeTridentRoute(tridentRouteParams: TridentRoute, toTo
   return outputBalanceAfter.sub(outputBalanceBefore);
 }
 
-export async function getFivePoolBridge(rnd: () => number): Promise<Topology> { 
+export async function getFivePoolBridge(rnd: () => number): Promise<Topology> {
 
   let topology: Topology = {
     tokens: [],
@@ -115,7 +115,7 @@ export async function getFivePoolBridge(rnd: () => number): Promise<Topology> {
 
   let prices: number[] = [];
   let tokens: RToken[] = [];
-  let tokenContracts: Contract[] = []; 
+  let tokenContracts: Contract[] = [];
 
   for (var i = 0; i < 5; ++i) {
     tokens.push({ name: `Token${i}`, address: "" + i });
@@ -280,9 +280,9 @@ async function approveAndFund(contracts: Contract[]) {
     const tokenContract = contracts[index];
 
     await tokenContract.approve(bento.address, tokenSupply);
-    
+
     await bento.deposit(tokenContract.address, alice.address, alice.address, tokenSupply, 0);
   }
-} 
+}
 
-export * from './routerParamsHelper'; 
+export * from './routerParamsHelper';
