@@ -163,11 +163,11 @@ export async function getFivePoolBridge(rnd: () => number): Promise<Topology> {
 
   await approveAndFund(tokenContracts);
 
-  const testPool0_1 = await getCPPool(tokens[0], tokens[1], prices[1]/prices[0], poolDeployment, rnd,  1_500_0);
-  const testPool0_2 = await getCPPool(tokens[0], tokens[2], prices[2]/prices[0], poolDeployment, rnd,  1_000_0);
-  const testPool1_2 = await getCPPool(tokens[1], tokens[2], prices[2]/prices[1], poolDeployment, rnd,  1_000_000_000);
-  const testPool1_3 = await getCPPool(tokens[1], tokens[3], prices[3]/prices[1], poolDeployment, rnd,  1_000_0);
-  const testPool2_3 = await getCPPool(tokens[2], tokens[3], prices[3]/prices[2], poolDeployment, rnd,  1_500_0);
+  const testPool0_1 = await getCPPool(tokens[0], tokens[1], prices[1]/prices[0], poolDeployment, rnd, 0.003, 1_500_0);
+  const testPool0_2 = await getCPPool(tokens[0], tokens[2], prices[2]/prices[0], poolDeployment, rnd, 0.003, 1_000_0);
+  const testPool1_2 = await getCPPool(tokens[1], tokens[2], prices[2]/prices[1], poolDeployment, rnd, 0.003, 1_000_000_000);
+  const testPool1_3 = await getCPPool(tokens[1], tokens[3], prices[3]/prices[1], poolDeployment, rnd, 0.003, 1_000_0);
+  const testPool2_3 = await getCPPool(tokens[2], tokens[3], prices[3]/prices[2], poolDeployment, rnd, 0.003, 1_500_0);
 
   topology.pools.push(testPool0_1);
   topology.pools.push(testPool0_2);
