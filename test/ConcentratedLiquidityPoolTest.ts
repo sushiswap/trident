@@ -726,48 +726,48 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           recipient: trident.accounts[0].address,
         };
 
-        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.reverted;
+        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("INVALID_TICK");
         // LOWER_EVEN
         addLiquidityParams.lower = nearestEvenValidTick - step + tickSpacing;
         addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.reverted;
+        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("LOWER_EVEN");
 
         // INVALID_TICK (UPPER)
         addLiquidityParams.lower = nearestEvenValidTick - step;
         addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing + 1;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.reverted;
+        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("INVALID_TICK");
 
         // UPPER_ODD
         addLiquidityParams.lower = nearestEvenValidTick - step;
         addLiquidityParams.upper = nearestEvenValidTick + step;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.reverted;
+        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("UPPER_ODD");
 
         // WRONG ORDER
         addLiquidityParams.lower = nearestEvenValidTick + 3 * step;
         addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.reverted;
+        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("WRONG_ORDER");
 
         // LOWER_RANGE
         addLiquidityParams.lower = -Math.floor(887272 / tickSpacing) * tickSpacing - tickSpacing;
         addLiquidityParams.upper = nearestEvenValidTick + tickSpacing;
         addLiquidityParams.lowerOld = lower;
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.reverted;
+        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("TICK_OUT_OF_BOUNDS");
 
         // UPPER_RANGE
         addLiquidityParams.lower = nearestEvenValidTick;
         addLiquidityParams.upper = Math.floor(887272 / tickSpacing) * tickSpacing + tickSpacing;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.reverted;
+        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("TICK_OUT_OF_BOUNDS");
 
         // LOWER_ORDER - TO DO
         //addLiquidityParams.lower = nearestEvenValidTick;
