@@ -52,12 +52,12 @@ contract HybridPool is IPool, TridentERC20 {
 
     bytes32 public constant override poolIdentifier = "Trident:HybridPool";
 
-    uint256 internal unlocked;
+    uint256 internal locked;
     modifier lock() {
-        require(unlocked == 1, "LOCKED");
-        unlocked = 2;
+        require(locked == 0, "LOCKED");
+        locked = 1;
         _;
-        unlocked = 1;
+        locked = 0;
     }
 
     constructor(bytes memory _deployData, address _masterDeployer) {
@@ -80,7 +80,6 @@ contract HybridPool is IPool, TridentERC20 {
         N_A = 2 * a;
         token0PrecisionMultiplier = uint256(10)**(decimals - TridentERC20(_token0).decimals());
         token1PrecisionMultiplier = uint256(10)**(decimals - TridentERC20(_token1).decimals());
-        unlocked = 1;
     }
 
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.

@@ -44,12 +44,12 @@ contract IndexPool is IPool, TridentERC20 {
 
     bytes32 public constant override poolIdentifier = "Trident:Index";
 
-    uint256 internal unlocked;
+    uint256 internal locked;
     modifier lock() {
-        require(unlocked == 1, "LOCKED");
-        unlocked = 2;
+        require(locked == 0, "LOCKED");
+        locked = 1;
         _;
-        unlocked = 1;
+        locked = 0;
     }
 
     mapping(address => Record) public records;
@@ -82,7 +82,6 @@ contract IndexPool is IPool, TridentERC20 {
         barFeeTo = IMasterDeployer(_masterDeployer).barFeeTo();
         bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
         masterDeployer = IMasterDeployer(_masterDeployer);
-        unlocked = 1;
     }
 
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
