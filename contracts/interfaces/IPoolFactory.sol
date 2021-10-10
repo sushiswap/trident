@@ -6,5 +6,5 @@ pragma solidity >=0.8.0;
 interface IPoolFactory {
     function deployPool(bytes calldata _deployData) external returns (address pool);
 
-    function configAddress(bytes memory data) external returns (address pool);
+    function configAddress(bytes32 data) external returns (address pool);
 }

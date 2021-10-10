@@ -78,7 +78,7 @@ contract Migrator {
 
         bytes memory deployData = abi.encode(token0, token1, 30, false);
 
-        IConstantProductPool pool = IConstantProductPool(constantProductPoolFactory.configAddress(deployData));
+        IConstantProductPool pool = IConstantProductPool(constantProductPoolFactory.configAddress(keccak256(deployData)));
 
         // We deploy the pool if it doesn't exist yet.
         if (address(pool) == address(0)) {
