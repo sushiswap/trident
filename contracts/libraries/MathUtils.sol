@@ -9,22 +9,12 @@ library MathUtils {
     /// is less than 1 or equal to each other.
     /// @param a uint256 to compare with.
     /// @param b uint256 to compare with.
-    /// @return wn 'True' if the difference between a and b is less than 1 or equal,
-    /// otherwise return 'false'.
-    function within1(uint256 a, uint256 b) internal pure returns (bool wn) {
-        wn = difference(a, b) <= 1;
-    }
-
-    /// @notice Calculates absolute difference between a and b.
-    /// @param a uint256 to compare with.
-    /// @param b uint256 to compare with.
-    /// @return diff Difference between a and b.
-    function difference(uint256 a, uint256 b) internal pure returns (uint256 diff) {
+    function within1(uint256 a, uint256 b) internal pure returns (bool) {
         unchecked {
             if (a > b) {
-                diff = a - b;
+                return a - b <= 1;
             }
-            diff = b - a;
+            return b - a <= 1;
         }
     }
 }

@@ -5,9 +5,9 @@ pragma solidity >=0.8.0;
 /// @notice Trident pool ERC-20 with EIP-2612 extension.
 /// @author Adapted from RariCapital, https://github.com/Rari-Capital/solmate/blob/main/src/erc20/ERC20.sol,
 /// License-Identifier: AGPL-3.0-only.
-contract TridentERC20 {
-    event Approval(address indexed owner, address indexed spender, uint256 amount);
+abstract contract TridentERC20 {
     event Transfer(address indexed sender, address indexed recipient, uint256 amount);
+    event Approval(address indexed owner, address indexed spender, uint256 amount);
 
     string public constant name = "Sushi LP Token";
     string public constant symbol = "SLP";
@@ -19,33 +19,40 @@ contract TridentERC20 {
     /// @notice owner -> spender -> allowance mapping.
     mapping(address => mapping(address => uint256)) public allowance;
 
-    /// @notice The EIP-712 typehash for the permit struct used by this contract.
-    bytes32 public constant PERMIT_TYPEHASH =
-        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
-    /// @notice The EIP-712 typehash for this contract's domain.
-    bytes32 public immutable DOMAIN_SEPARATOR;
+    /// @notice Chain Id at this contract's deployment.
+    uint256 internal immutable DOMAIN_SEPARATOR_CHAIN_ID;
+    /// @notice EIP-712 typehash for this contract's domain at deployment.
+    bytes32 internal immutable _DOMAIN_SEPARATOR;
+    /// @notice EIP-712 typehash for this contract's {permit} struct.
+    bytes32 public constant PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
     /// @notice owner -> nonce mapping used in {permit}.
     mapping(address => uint256) public nonces;
 
     constructor() {
-        uint256 chainId;
-        assembly {
-            chainId := chainid()
-        }
-        DOMAIN_SEPARATOR = keccak256(
+        DOMAIN_SEPARATOR_CHAIN_ID = block.chainid;
+        _DOMAIN_SEPARATOR = _calculateDomainSeparator();
+    }
+
+    function _calculateDomainSeparator() internal view returns (bytes32 domainSeperator) {
+        domainSeperator = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
                 keccak256(bytes(name)),
                 keccak256(bytes("1")),
-                chainId,
+                block.chainid,
                 address(this)
             )
         );
     }
 
+    /// @notice EIP-712 typehash for this contract's domain.
+    function DOMAIN_SEPARATOR() public view returns (bytes32 domainSeperator) {
+        domainSeperator = block.chainid == DOMAIN_SEPARATOR_CHAIN_ID ? _DOMAIN_SEPARATOR : _calculateDomainSeparator();
+    }
+
     /// @notice Approves `amount` from `msg.sender` to be spent by `spender`.
-    /// @param spender Address of the party that can draw tokens from `msg.sender`'s account.
-    /// @param amount The maximum collective `amount` that `spender` can draw.
+    /// @param spender Address of the party that can pull tokens from `msg.sender`'s account.
+    /// @param amount The maximum collective `amount` that `spender` can pull.
     /// @return (bool) Returns 'true' if succeeded.
     function approve(address spender, uint256 amount) external returns (bool) {
         allowance[msg.sender][spender] = amount;
@@ -69,7 +76,7 @@ contract TridentERC20 {
     }
 
     /// @notice Transfers `amount` tokens from `sender` to `recipient`. Caller needs approval from `from`.
-    /// @param sender Address to draw tokens `from`.
+    /// @param sender Address to pull tokens `from`.
     /// @param recipient The address to move tokens to.
     /// @param amount The token `amount` to move.
     /// @return (bool) Returns 'true' if succeeded.
@@ -109,20 +116,12 @@ contract TridentERC20 {
         bytes32 s
     ) external {
         require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
-        // @dev This is reasonably safe from overflow - incrementing
-        // beyond 'type(uint256).max' is exceedingly unlikely.
-        unchecked {
-            bytes32 digest = keccak256(
-                abi.encodePacked(
-                    "\x19\x01",
-                    DOMAIN_SEPARATOR,
-                    keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, amount, nonces[owner]++, deadline))
-                )
-            );
+        bytes32 digest = keccak256(
+            abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, amount, nonces[owner]++, deadline)))
+        );
         address recoveredAddress = ecrecover(digest, v, r, s);
         require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_PERMIT_SIGNATURE");
         allowance[recoveredAddress][spender] = amount;
-        }
         emit Approval(owner, spender, amount);
     }
 

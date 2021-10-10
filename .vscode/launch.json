@@ -9,6 +9,23 @@
       "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/hardhat",
       "args": ["node"],
       "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug current test",
+      "stopOnEntry": false,
+      "protocol": "inspector",
+      "sourceMaps": true,
+      "skipFiles": [
+        "<node_internals>/**/*.js",
+        "${workspaceRoot}/node_modules/**/*.js"
+      ],
+      "program": "${workspaceFolder}/node_modules/mocha/bin/_mocha",
+      "args": ["${file}"],
+      "outFiles": ["${workspaceRoot}/out/**/*.js"],
+      "cwd": "${workspaceRoot}",
+      "internalConsoleOptions": "openOnSessionStart"
     }
   ]
 }

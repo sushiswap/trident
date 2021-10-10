@@ -18,7 +18,6 @@ interface IPool {
     function flashSwap(bytes calldata data) external returns (uint256 finalAmountOut);
 
     /// @notice Mints liquidity tokens.
-    /// @dev The input tokens must've already been sent to the pool.
     /// @param data ABI-encoded params that the pool requires.
     /// @return liquidity The amount of liquidity tokens that were minted for the user.
     function mint(bytes calldata data) external returns (uint256 liquidity);
@@ -48,14 +47,8 @@ interface IPool {
     function getAmountOut(bytes calldata data) external view returns (uint256 finalAmountOut);
 
     /// @dev This event must be emitted on all swaps.
-    event Swap(
-        address indexed recipient,
-        address indexed tokenIn,
-        address indexed tokenOut,
-        uint256 amountIn,
-        uint256 amountOut
-    );
-    
+    event Swap(address indexed recipient, address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut);
+
     /// @dev This struct frames output tokens for burns.
     struct TokenAmount {
         address token;

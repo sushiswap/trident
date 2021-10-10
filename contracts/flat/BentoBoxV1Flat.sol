@@ -482,8 +482,7 @@ contract MasterContractManager is BoringOwnable, BoringFactory {
     /// @notice user nonces for masterContract approvals
     mapping(address => uint256) public nonces;
 
-    bytes32 private constant DOMAIN_SEPARATOR_SIGNATURE_HASH =
-        keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
+    bytes32 private constant DOMAIN_SEPARATOR_SIGNATURE_HASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
     // See https://eips.ethereum.org/EIPS/eip-191
     string private constant EIP191_PREFIX_FOR_EIP712_STRUCTURED_DATA = "\x19\x01";
     bytes32 private constant APPROVAL_SIGNATURE_HASH =
@@ -576,9 +575,7 @@ contract MasterContractManager is BoringOwnable, BoringFactory {
                     keccak256(
                         abi.encode(
                             APPROVAL_SIGNATURE_HASH,
-                            approved
-                                ? keccak256("Give FULL access to funds in (and approved to) BentoBox?")
-                                : keccak256("Revoke access to BentoBox?"),
+                            approved ? keccak256("Give FULL access to funds in (and approved to) BentoBox?") : keccak256("Revoke access to BentoBox?"),
                             user,
                             masterContract,
                             approved,
@@ -623,11 +620,7 @@ contract BaseBoringBatchable {
     // F2: Calls in the batch may be payable, delegatecall operates in the same context, so each call in the batch has access to msg.value
     // C3: The length of the loop is fully under user control, so can't be exploited
     // C7: Delegatecall is only used on the same contract, so it's safe
-    function batch(bytes[] calldata calls, bool revertOnFail)
-        external
-        payable
-        returns (bool[] memory successes, bytes[] memory results)
-    {
+    function batch(bytes[] calldata calls, bool revertOnFail) external payable returns (bool[] memory successes, bytes[] memory results) {
         successes = new bool[](calls.length);
         results = new bytes[](calls.length);
         for (uint256 i = 0; i < calls.length; i++) {
@@ -681,13 +674,7 @@ contract BentoBoxV1 is MasterContractManager, BoringBatchable {
     event LogWithdraw(IERC20 indexed token, address indexed from, address indexed to, uint256 amount, uint256 share);
     event LogTransfer(IERC20 indexed token, address indexed from, address indexed to, uint256 share);
 
-    event LogFlashLoan(
-        address indexed borrower,
-        IERC20 indexed token,
-        uint256 amount,
-        uint256 feeAmount,
-        address indexed receiver
-    );
+    event LogFlashLoan(address indexed borrower, IERC20 indexed token, uint256 amount, uint256 feeAmount, address indexed receiver);
 
     event LogStrategyTargetPercentage(IERC20 indexed token, uint256 targetPercentage);
     event LogStrategyQueued(IERC20 indexed token, IStrategy indexed strategy);
@@ -718,7 +705,7 @@ contract BentoBoxV1 is MasterContractManager, BoringBatchable {
     IERC20 private constant USE_ETHEREUM = IERC20(0);
     uint256 private constant FLASH_LOAN_FEE = 50; // 0.05%
     uint256 private constant FLASH_LOAN_FEE_PRECISION = 1e5;
-    uint256 private constant STRATEGY_DELAY = 2 weeks;
+    uint256 private constant STRATEGY_DELAY = 0 weeks;
     uint256 private constant MAX_TARGET_PERCENTAGE = 95; // 95%
     uint256 private constant MINIMUM_SHARE_BALANCE = 1000; // To prevent the ratio going off
 
@@ -811,7 +798,7 @@ contract BentoBoxV1 is MasterContractManager, BoringBatchable {
     /// @param amount Token amount in native representation to deposit.
     /// @param share Token amount represented in shares to deposit. Takes precedence over `amount`.
     /// @return amountOut The amount deposited.
-    /// @return shareOut The deposited amount repesented in shares.
+    /// @return shareOut The deposited amount represented in shares.
     function deposit(
         IERC20 token_,
         address from,
@@ -843,10 +830,7 @@ contract BentoBoxV1 is MasterContractManager, BoringBatchable {
         // In case of skimming, check that only the skimmable amount is taken.
         // For ETH, the full balance is available, so no need to check.
         // During flashloans the _tokenBalanceOf is lower than 'reality', so skimming deposits will mostly fail during a flashloan.
-        require(
-            from != address(this) || token_ == USE_ETHEREUM || amount <= _tokenBalanceOf(token).sub(total.elastic),
-            "BentoBox: Skim too much"
-        );
+        require(from != address(this) || token_ == USE_ETHEREUM || amount <= _tokenBalanceOf(token).sub(total.elastic), "BentoBox: Skim too much");
 
         balanceOf[token][to] = balanceOf[token][to].add(share);
         total.base = total.base.add(share.to128());
