@@ -1,6 +1,6 @@
 {
   "name": "@sushiswap/trident",
-  "version": "1.0.0-canary.15",
+  "version": "1.0.0-canary.16",
   "files": [
     "artifacts",
     "contracts",
@@ -42,7 +42,7 @@
     "lint": "yarn prettier && solhint -c .solhint.json contracts/**/*.sol",
     "prepare": "husky install",
     "prepublishOnly": "hardhat export --export-all exports/all.json",
-    "bump": "yarn version --prerelease --preid=canary && npm publish --tag canary"
+    "publish:canary": "yarn version --prerelease --preid=canary && npm publish --access public --tag canary"
   },
   "lint-staged": {
     "*.ts": [
@@ -61,9 +61,9 @@
     "@nomiclabs/hardhat-solhint": "^2.0.0",
     "@nomiclabs/hardhat-waffle": "^2.0.0",
     "@openzeppelin/contracts": "^4.2.0",
-    "@sushiswap/core-sdk": "^1.0.0-canary.2",
+    "@sushiswap/core-sdk": "1.0.0-canary.3",
     "@sushiswap/prettier-config": "^0.1.0",
-    "@sushiswap/sdk": "5.0.0-canary.87",
+    "@sushiswap/sdk": "5.0.0-canary.95",
     "@sushiswap/tines": "^0.1.2",
     "@tenderly/hardhat-tenderly": "^1.0.0",
     "@typechain/ethers-v5": "^7.0.0",
