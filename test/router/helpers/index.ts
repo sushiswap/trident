@@ -65,11 +65,7 @@ export async function executeTridentRoute(tridentRouteParams: TridentRoute, toTo
         await (await router.connect(alice).complexPath(tridentRouteParams)).wait();
         break;
     }
-  } catch (error) {
-    console.error('An error occurred executing trident route');
-    console.log('');
-    console.log(`Route Type: ${tridentRouteParams.routeType}`);
-
+  } catch (error) {  
     throw error;
   }
   
@@ -83,15 +79,7 @@ export async function executeTridentRoute(tridentRouteParams: TridentRoute, toTo
 
 export async function refreshPools(topology: Topology){
   for (let index = 0; index < topology.pools.length; index++) {
-    const pool = topology.pools[index];
-
-    const reserve0 = topology.pools[index].reserve0.toString();
-    const reserve1 = topology.pools[index].reserve1.toString();
-    
-    // console.log('');
-    // console.log('Updating reserves')
-    // console.log(`Reserve 0 before update: ${reserve0}`);
-    // console.log(`Reserve 1 before update: ${reserve1}`);
+    const pool = topology.pools[index]; 
 
     if (pool instanceof ConstantProductRPool){
       const poolContract = new Contract(pool.address, constantPoolAbi, alice);
@@ -103,13 +91,6 @@ export async function refreshPools(topology: Topology){
       const [reserve0, reserve1] = await poolContract.getReserves(); 
       (pool as HybridRPool).updateReserves(reserve0, reserve1)
     }
-
-    const reserve0After = topology.pools[index].reserve0.toString();
-    const reserve1After = topology.pools[index].reserve1.toString();
-
-    // console.log(`Reserve 0 after update: ${reserve0After}`);
-    // console.log(`Reserve 1 after update: ${reserve1After}`);
-    
   }
 }
 
