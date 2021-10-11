@@ -1,10 +1,20 @@
 import { ethers, network } from "hardhat";
 import { expect } from "chai";
 
-describe.only("Migration", function () {
-  let chef, migrator, usdcWethLp, usdc, weth, masterDeployer, factory, Pool;
+describe("Migration", function () {
+  let chef,
+    migrator,
+    usdcWethLp,
+    usdc,
+    weth,
+    masterDeployer,
+    factory,
+    Pool,
+    snapshotId;
 
   before(async () => {
+    snapshotId = await ethers.provider.send("evm_snapshot", []);
+
     await network.provider.request({
       method: "hardhat_reset",
       params: [
@@ -98,6 +108,14 @@ describe.only("Migration", function () {
     await expect(chef.migrate(1)).to.be.revertedWith(
       "Transaction reverted: function selector was not recognized and there's no fallback function"
     );
+  });
+
+  after(async () => {
+    await network.provider.request({
+      method: "hardhat_reset",
+      params: [], // disable forking
+    });
+    await network.provider.send("evm_revert", [snapshotId]);
   });
 });
 
