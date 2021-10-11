@@ -786,10 +786,10 @@
   dependencies:
     antlr4ts "^0.5.0-alpha.4"
 
-"@sushiswap/core-sdk@^1.0.0-canary.2":
-  version "1.0.0-canary.2"
-  resolved "https://registry.yarnpkg.com/@sushiswap/core-sdk/-/core-sdk-1.0.0-canary.2.tgz#35b4f66dd8e7a394cc84a2d2467dfc7defc4a1f3"
-  integrity sha512-aQarA7i/YN4z2jVweWQHyns6boCzWunRwrxI8yOnE4/y8BYEw9PzMGphNbAhP+PRa3obeg5VQP5/uPDDTbrTXQ==
+"@sushiswap/core-sdk@^0.1.2":
+  version "0.1.2"
+  resolved "https://registry.yarnpkg.com/@sushiswap/core-sdk/-/core-sdk-0.1.2.tgz#d6ae5d252bb603b2664f119988da50d96d0fff01"
+  integrity sha512-z7ks+cVG8nH5jiHMtZp4HzdDcnSLEm/Pd+aNav1ZjfgKrsVNNSAs6a6tjoEvK7GRj6XhM4RFyV772y4mIAkxjQ==
   dependencies:
     big.js "^6.1.0"
     decimal.js-light "^2.5.0"
@@ -816,10 +816,10 @@
     tiny-warning "^1.0.3"
     toformat "^2.0.0"
 
-"@sushiswap/tines@^0.1.2":
-  version "0.1.2"
-  resolved "https://registry.yarnpkg.com/@sushiswap/tines/-/tines-0.1.2.tgz#bb6416203de7ad56e34858352c95351036867a75"
-  integrity sha512-QVFzpu9Ao6Nah41YuXpw9vuLIK+fmZdrq2XfpHbjU2KqX/mVgmrb98vMV8eYwNKfUNOHPW4ibatD/4UFFW8okw==
+"@sushiswap/tines@^0.1.8":
+  version "0.1.8"
+  resolved "https://registry.yarnpkg.com/@sushiswap/tines/-/tines-0.1.8.tgz#f6f7e027432c8fc106d2de82040ccf595036264c"
+  integrity sha512-/ikMJ4NOU4kfZvcpfmYpTdaP5+v3Uziwl8PX8fIe33P4Desvr0nofYSxQaywLZHuyNGek16EG0/N8+0iRR/3PQ==
 
 "@szmarczak/http-timer@^1.1.2":
   version "1.1.2"

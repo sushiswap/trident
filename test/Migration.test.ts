@@ -2,16 +2,7 @@ import { ethers, network } from "hardhat";
 import { expect } from "chai";
 
 describe("Migration", function () {
-  let chef,
-    migrator,
-    usdcWethLp,
-    usdc,
-    weth,
-    masterDeployer,
-    factory,
-    Pool,
-    snapshotId,
-    ERC20;
+  let chef, migrator, usdcWethLp, usdc, weth, masterDeployer, factory, Pool, snapshotId, ERC20;
 
   before(async () => {
     snapshotId = await ethers.provider.send("evm_snapshot", []);
@@ -33,46 +24,26 @@ describe("Migration", function () {
     const chefOwner = await ethers.getSigner(_owner);
     const BentoBox = await ethers.getContractFactory("BentoBoxV1");
     const MasterDeployer = await ethers.getContractFactory("MasterDeployer");
-    const Factory = await ethers.getContractFactory(
-      "ConstantProductPoolFactory"
-    );
+    const Factory = await ethers.getContractFactory("ConstantProductPoolFactory");
     const Migrator = await ethers.getContractFactory("Migrator");
     Pool = await ethers.getContractFactory("ConstantProductPool");
     ERC20 = await ethers.getContractFactory("ERC20Mock");
 
-    await network.provider.send("hardhat_setBalance", [
-      _owner,
-      "0x100000000000000000000",
-    ]);
+    await network.provider.send("hardhat_setBalance", [_owner, "0x100000000000000000000"]);
     await network.provider.request({
       method: "hardhat_impersonateAccount",
       params: [_owner],
     });
 
-    chef = await ethers.getContractAt(
-      mcABI,
-      "0xc2EdaD668740f1aA35E4D8f227fB8E17dcA888Cd",
-      chefOwner
-    );
+    chef = await ethers.getContractAt(mcABI, "0xc2EdaD668740f1aA35E4D8f227fB8E17dcA888Cd", chefOwner);
     usdc = await ERC20.attach("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
     weth = await ERC20.attach("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-    usdcWethLp = await ERC20.attach(
-      "0x397FF1542f962076d0BFE58eA045FfA2d347ACa0"
-    ); // pid 1
+    usdcWethLp = await ERC20.attach("0x397FF1542f962076d0BFE58eA045FfA2d347ACa0"); // pid 1
 
     const bentoBox = await BentoBox.deploy(weth.address);
-    masterDeployer = await MasterDeployer.deploy(
-      0,
-      alice.address,
-      bentoBox.address
-    );
+    masterDeployer = await MasterDeployer.deploy(0, alice.address, bentoBox.address);
     factory = await Factory.deploy(masterDeployer.address);
-    migrator = await Migrator.deploy(
-      bentoBox.address,
-      masterDeployer.address,
-      factory.address,
-      chef.address
-    );
+    migrator = await Migrator.deploy(bentoBox.address, masterDeployer.address, factory.address, chef.address);
 
     await masterDeployer.addToWhitelist(factory.address);
     await chef.setMigrator(migrator.address);
@@ -89,10 +60,7 @@ describe("Migration", function () {
     const oldWethBalance = await weth.balanceOf(usdcWethLp.address);
     const oldLpToken = (await chef.poolInfo(1)).lpToken;
     const mcBalance = await usdcWethLp.balanceOf(chef.address);
-    expect(oldLpToken).to.be.eq(
-      usdcWethLp.address,
-      "We don't have the corect LP address"
-    );
+    expect(oldLpToken).to.be.eq(usdcWethLp.address, "We don't have the corect LP address");
 
     await chef.migrate(1);
 
@@ -115,20 +83,14 @@ describe("Migration", function () {
     await expect(chef.migrate(1)).to.be.revertedWith("ONLY_ONCE");
 
     const _intermediaryToken = (await chef.poolInfo(1)).lpToken;
-    expect(_intermediaryToken).to.not.be.eq(
-      oldLpToken,
-      "we dodn't swap out tokens in masterchef"
-    );
+    expect(_intermediaryToken).to.not.be.eq(oldLpToken, "we dodn't swap out tokens in masterchef");
 
     const intermediaryToken = await ERC20.attach(_intermediaryToken);
     const intermediaryTokenBalance = await pool.balanceOf(_intermediaryToken);
     expect(intermediaryTokenBalance.gt(0)).to.be.true;
 
     const newMcBalance = await intermediaryToken.balanceOf(chef.address);
-    expect(newMcBalance.toString()).to.be.eq(
-      newMcBalance.toString(),
-      "MC didn't receive the correct amount of the intermediary token"
-    );
+    expect(newMcBalance.toString()).to.be.eq(newMcBalance.toString(), "MC didn't receive the correct amount of the intermediary token");
   });
 
   after(async () => {
@@ -152,9 +114,7 @@ const mcABI = [
   {
     inputs: [],
     name: "migrator",
-    outputs: [
-      { internalType: "contract IMigratorChef", name: "", type: "address" },
-    ],
+    outputs: [{ internalType: "contract IMigratorChef", name: "", type: "address" }],
     stateMutability: "view",
     type: "function",
   },

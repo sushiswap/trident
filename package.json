@@ -35,6 +35,7 @@
     "arbitrum:deploy": "hardhat --network arbitrum deploy",
     "arbitrum:export": "hardhat --network arbitrum export --export exports/arbitrum.json",
     "test": "cross-env TS_NODE_TRANSPILE_ONLY=1 hardhat test",
+    "test-debug": "mocha --inspect-brk ",
     "test:trace": "yarn test --logs",
     "test:coverage": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" CODE_COVERAGE=true hardhat coverage",
     "test:gas": "cross-env REPORT_GAS=true yarn test",
@@ -64,7 +65,7 @@
     "@sushiswap/core-sdk": "^1.0.0-canary.2",
     "@sushiswap/prettier-config": "^0.1.0",
     "@sushiswap/sdk": "5.0.0-canary.87",
-    "@sushiswap/tines": "^0.1.2",
+    "@sushiswap/tines": "^0.1.8",
     "@tenderly/hardhat-tenderly": "^1.0.0",
     "@typechain/ethers-v5": "^7.0.0",
     "@typechain/hardhat": "^2.0.0",
@@ -91,6 +92,7 @@
     "hardhat-watcher": "^2.0.0",
     "husky": "^7.0.0",
     "lint-staged": "^11.0.1",
+    "mocha": "^7.1.2",
     "prettier": "^2.3.2",
     "prettier-plugin-solidity": "^1.0.0-beta.17",
     "seedrandom": "^3.0.5",
@@ -101,5 +103,8 @@
     "ts-node": "^10.0.0",
     "typechain": "^5.0.0",
     "typescript": "^4.0.0"
+  },
+  "dependencies": {
+    "@sushiswap/core-sdk": "^0.1.2"
   }
 }

@@ -58,10 +58,8 @@ contract FranchisedHybridPool is IPool, TridentFranchisedERC20 {
     }
 
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (address _token0, address _token1, uint256 _swapFee, uint256 a, address _whiteListManager, address _operator, bool _level2) = abi.decode(
-            _deployData,
-            (address, address, uint256, uint256, address, address, bool)
-        );
+        (address _token0, address _token1, uint256 _swapFee, uint256 a, address _whiteListManager, address _operator, bool _level2) = abi
+            .decode(_deployData, (address, address, uint256, uint256, address, address, bool));
 
         // @dev Factory ensures that the tokens are sorted.
         require(_token0 != address(0), "ZERO_ADDRESS");
@@ -334,7 +332,9 @@ contract FranchisedHybridPool is IPool, TridentFranchisedERC20 {
             require(success, "WITHDRAW_FAILED");
         } else {
             // @dev transfer(address,address,address,uint256).
-            (bool success, ) = bento.call(abi.encodeWithSelector(IBentoBoxMinimal.transfer.selector, token, address(this), to, _toShare(token, amount)));
+            (bool success, ) = bento.call(
+                abi.encodeWithSelector(IBentoBoxMinimal.transfer.selector, token, address(this), to, _toShare(token, amount))
+            );
             require(success, "TRANSFER_FAILED");
         }
     }

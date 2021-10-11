@@ -4,8 +4,8 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { BigNumber } from "ethers";
 import seedrandom from "seedrandom";
-import { calcOutByIn, calcInByOut } from "@sushiswap/sdk";
 import { getBigNumber } from "../utilities";
+import { HybridRPool } from "@sushiswap/tines";
 
 const testSeed = "7"; // Change it to change random generator values
 const rnd = seedrandom(testSeed); // random [0, 1)
@@ -49,16 +49,7 @@ function areCloseValues(v1, v2, threshould) {
 }
 
 describe("HybridPool Typescript == Solidity check", function () {
-  let alice,
-    feeTo,
-    usdt,
-    usdc,
-    weth,
-    bento,
-    masterDeployer,
-    tridentPoolFactory,
-    router,
-    Pool;
+  let alice, feeTo, usdt, usdc, weth, bento, masterDeployer, tridentPoolFactory, router, Pool;
 
   async function createHybridPool(A, fee, res0exp, res1exp) {
     [alice, feeTo] = await ethers.getSigners();
@@ -70,23 +61,11 @@ describe("HybridPool Typescript == Solidity check", function () {
     const SwapRouter = await ethers.getContractFactory("TridentRouter");
     Pool = await ethers.getContractFactory("HybridPool");
 
-    weth = await ERC20.deploy(
-      "WETH",
-      "WETH",
-      getBigNumber("1000000000000000000")
-    );
+    weth = await ERC20.deploy("WETH", "WETH", getBigNumber("1000000000000000000"));
     await weth.deployed();
-    usdt = await ERC20.deploy(
-      "USDT",
-      "USDT",
-      getBigNumber("1000000000000000000")
-    );
+    usdt = await ERC20.deploy("USDT", "USDT", getBigNumber("1000000000000000000"));
     await usdt.deployed();
-    usdc = await ERC20.deploy(
-      "USDC",
-      "USDC",
-      getBigNumber("1000000000000000000")
-    );
+    usdc = await ERC20.deploy("USDC", "USDC", getBigNumber("1000000000000000000"));
     await usdc.deployed();
 
     bento = await Bento.deploy(weth.address);
@@ -97,11 +76,7 @@ describe("HybridPool Typescript == Solidity check", function () {
 
     tridentPoolFactory = await PoolFactory.deploy(masterDeployer.address);
     await tridentPoolFactory.deployed();
-    router = await SwapRouter.deploy(
-      bento.address,
-      masterDeployer.address,
-      weth.address
-    );
+    router = await SwapRouter.deploy(bento.address, masterDeployer.address, weth.address);
     await router.deployed();
 
     // Whitelist pool factory in master deployer
@@ -113,20 +88,8 @@ describe("HybridPool Typescript == Solidity check", function () {
     await usdc.approve(bento.address, getBigNumber("1000000000000000000"));
     await usdt.approve(bento.address, getBigNumber("1000000000000000000"));
     // Make BentoBox token deposits
-    await bento.deposit(
-      usdc.address,
-      alice.address,
-      alice.address,
-      getBigNumber("1000000000000000000"),
-      0
-    );
-    await bento.deposit(
-      usdt.address,
-      alice.address,
-      alice.address,
-      getBigNumber("1000000000000000000"),
-      0
-    );
+    await bento.deposit(usdc.address, alice.address, alice.address, getBigNumber("1000000000000000000"), 0);
+    await bento.deposit(usdt.address, alice.address, alice.address, getBigNumber("1000000000000000000"), 0);
     // Approve Router to spend 'alice' BentoBox tokens
     await bento.setMasterContractApproval(
       alice.address,
@@ -138,64 +101,43 @@ describe("HybridPool Typescript == Solidity check", function () {
     );
 
     const [address0, address1] =
-      usdt.address.toUpperCase() < usdc.address.toUpperCase()
-        ? [usdt.address, usdc.address]
-        : [usdc.address, usdt.address];
+      usdt.address.toUpperCase() < usdc.address.toUpperCase() ? [usdt.address, usdc.address] : [usdc.address, usdt.address];
     const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint256", "uint256"],
       [address0, address1, Math.round(fee * 10_000), A]
     );
     const pool = await Pool.attach(
       (
-        await (
-          await masterDeployer.deployPool(
-            tridentPoolFactory.address,
-            deployData
-          )
-        ).wait()
+        await (await masterDeployer.deployPool(tridentPoolFactory.address, deployData)).wait()
       ).events[0].args[1]
     );
 
-    const [jsVal0, bnVal0] = getIntegerRandomValueWithMin(
-      res0exp,
-      MINIMUM_LIQUIDITY
-    );
-    const [jsVal1, bnVal1] =
-      res1exp == undefined
-        ? [jsVal0, bnVal0]
-        : getIntegerRandomValueWithMin(res1exp, MINIMUM_LIQUIDITY);
+    const [jsVal0, bnVal0] = getIntegerRandomValueWithMin(res0exp, MINIMUM_LIQUIDITY);
+    const [jsVal1, bnVal1] = res1exp == undefined ? [jsVal0, bnVal0] : getIntegerRandomValueWithMin(res1exp, MINIMUM_LIQUIDITY);
     await bento.transfer(usdt.address, alice.address, pool.address, bnVal0);
     await bento.transfer(usdc.address, alice.address, pool.address, bnVal1);
-    await pool.mint(
-      ethers.utils.defaultAbiCoder.encode(["address"], [alice.address])
-    );
+    await pool.mint(ethers.utils.defaultAbiCoder.encode(["address"], [alice.address]));
 
-    const poolInfo = {
-      type: "Hybrid",
-      reserve0: bnVal0,
-      reserve1: bnVal1,
+    const poolInfo = new HybridRPool(
+      pool.address,
+      { name: "USDC", address: usdt.address },
+      { name: "USDT", address: usdt.address },
       fee,
       A,
-      deployData,
-    };
+      bnVal0,
+      bnVal1
+    );
 
     return [poolInfo, pool];
   }
 
   let swapDirection = true;
-  async function checkSwap(pool, poolRouterInfo0, swapAmountExp) {
+  async function checkSwap(pool, poolRouterInfo, swapAmountExp) {
     const [jsValue, bnValue] = getIntegerRandomValue(swapAmountExp);
-    const [t0, t1]: string[] = swapDirection
-      ? [usdt.address, usdc.address]
-      : [usdc.address, usdt.address];
+    const [t0, t1]: string[] = swapDirection ? [usdt.address, usdc.address] : [usdc.address, usdt.address];
 
-    const poolRouterInfo = { ...poolRouterInfo0 };
-    poolRouterInfo.reserve0 = await bento.balanceOf(usdt.address, pool.address);
-    poolRouterInfo.reserve1 = await bento.balanceOf(usdc.address, pool.address);
-    if (
-      poolRouterInfo.reserve0 < MINIMUM_LIQUIDITY ||
-      poolRouterInfo.reserve1 < MINIMUM_LIQUIDITY
-    ) {
+    poolRouterInfo.updateReserves(await bento.balanceOf(usdt.address, pool.address), await bento.balanceOf(usdc.address, pool.address));
+    if (poolRouterInfo.reserve0 < MINIMUM_LIQUIDITY || poolRouterInfo.reserve1 < MINIMUM_LIQUIDITY) {
       console.log("Low liquidity - skip test");
       return; // Too low liquidity
     }
@@ -206,10 +148,7 @@ describe("HybridPool Typescript == Solidity check", function () {
       amountOutMinimum: 0,
       pool: pool.address,
       tokenIn: t0,
-      data: ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "bool"],
-        [t0, alice.address, false]
-      ),
+      data: ethers.utils.defaultAbiCoder.encode(["address", "address", "bool"], [t0, alice.address, false]),
     };
     const tx = await router.connect(alice).exactInputSingle(params);
     let balanceAfter: BigNumber = await bento.balanceOf(t1, alice.address);
@@ -217,54 +156,32 @@ describe("HybridPool Typescript == Solidity check", function () {
     const amountOutPoolBN = balanceAfter.sub(balanceBefore);
     const amountOutPool = amountOutPoolBN.toString();
 
-    const amountOutPrediction = calcOutByIn(
-      poolRouterInfo,
-      jsValue,
-      swapDirection
-    );
+    const amountOutPrediction = poolRouterInfo.calcOutByIn(jsValue, swapDirection)[0];
 
-    //console.log('prediction', Math.abs(amountOutPrediction/amountOutPool-1), amountOutPrediction, amountOutPool);
-    expect(areCloseValues(amountOutPrediction, amountOutPoolBN, 1e-9)).equals(
-      true,
-      "swap amount not close enough to predicted amount"
-    );
-    const reserveOut = swapDirection
-      ? poolRouterInfo.reserve1
-      : poolRouterInfo.reserve0;
+    //console.log('prediction', Math.abs(amountOutPrediction/amountOutPool-1), amountOutPrediction, amountOutPool.toString());
+    expect(areCloseValues(amountOutPrediction, amountOutPoolBN, 1e-9)).equals(true, "swap amount not close enough to predicted amount");
+    const reserveOut = swapDirection ? poolRouterInfo.reserve1 : poolRouterInfo.reserve0;
     if (reserveOut.sub(amountOutPoolBN).lt(MINIMUM_LIQUIDITY)) {
       swapDirection = !swapDirection;
       return;
     }
 
-    const amounInExpected = calcInByOut(
-      poolRouterInfo,
-      amountOutPrediction,
-      swapDirection
-    );
-    const amountOutPrediction2 = calcOutByIn(
-      poolRouterInfo,
-      amounInExpected,
-      swapDirection
-    );
+    const amounInExpected = poolRouterInfo.calcInByOut(amountOutPrediction, swapDirection)[0];
+    const amountOutPrediction2 = poolRouterInfo.calcOutByIn(amounInExpected, swapDirection)[0];
 
     // console.log('back1', Math.abs(amounInExpected/jsValue-1), amounInExpected, jsValue);
     // console.log('back2', Math.abs(amountOutPrediction/amountOutPrediction2-1), amountOutPrediction, amountOutPrediction2);
-    expect(
-      areCloseValues(amounInExpected, jsValue, 1e-12) ||
-        areCloseValues(amountOutPrediction, amountOutPrediction2, 1e-12)
-    ).equals(true, "values not close enough");
+    expect(areCloseValues(amounInExpected, jsValue, 1e-12) || areCloseValues(amountOutPrediction, amountOutPrediction2, 1e-12)).equals(
+      true,
+      "values not close enough"
+    );
     swapDirection = !swapDirection;
   }
 
   describe("Check regular liquidity values", function () {
     for (let mintNum = 0; mintNum < 3; ++mintNum) {
       it(`Test ${mintNum + 1}`, async function () {
-        const [poolRouterInfo, pool] = await createHybridPool(
-          200_000,
-          0.003,
-          19,
-          19
-        );
+        const [poolRouterInfo, pool] = await createHybridPool(200_000, 0.003, 19, 19);
 
         // test regular values
         for (let swapNum = 0; swapNum < 3; ++swapNum) {
@@ -286,12 +203,7 @@ describe("HybridPool Typescript == Solidity check", function () {
   describe("Check supersmall liquidity values", function () {
     for (let mintNum = 0; mintNum < 3; ++mintNum) {
       it(`Test ${mintNum + 1}`, async function () {
-        const [poolRouterInfo, pool] = await createHybridPool(
-          200_000,
-          0.003,
-          4,
-          4
-        );
+        const [poolRouterInfo, pool] = await createHybridPool(200_000, 0.003, 4, 4);
 
         // test small values
         for (let swapNum = 0; swapNum < 5; ++swapNum) {
@@ -305,12 +217,7 @@ describe("HybridPool Typescript == Solidity check", function () {
   describe("Check superbig liquidity values", function () {
     for (let mintNum = 0; mintNum < 3; ++mintNum) {
       it(`Test ${mintNum + 1}`, async function () {
-        const [poolRouterInfo, pool] = await createHybridPool(
-          200_000,
-          0.003,
-          33,
-          33
-        );
+        const [poolRouterInfo, pool] = await createHybridPool(200_000, 0.003, 33, 33);
 
         // test regular values
         for (let swapNum = 0; swapNum < 3; ++swapNum) {
@@ -332,12 +239,7 @@ describe("HybridPool Typescript == Solidity check", function () {
     for (let mintNum = 0; mintNum < 3; ++mintNum) {
       const fee = (mintNum + 1) / 1000;
       it(`fee = ${fee}`, async function () {
-        const [poolRouterInfo, pool] = await createHybridPool(
-          200_000,
-          fee,
-          19,
-          19
-        );
+        const [poolRouterInfo, pool] = await createHybridPool(200_000, fee, 19, 19);
 
         // test regular values
         for (let swapNum = 0; swapNum < 3; ++swapNum) {

@@ -51,7 +51,10 @@ contract ConstantProductPool is IPool, TridentERC20 {
     }
 
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (address _token0, address _token1, uint256 _swapFee, bool _twapSupport) = abi.decode(_deployData, (address, address, uint256, bool));
+        (address _token0, address _token1, uint256 _swapFee, bool _twapSupport) = abi.decode(
+            _deployData,
+            (address, address, uint256, bool)
+        );
 
         // @dev Factory ensures that the tokens are sorted.
         require(_token0 != address(0), "ZERO_ADDRESS");
@@ -85,6 +88,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint256 computed = TridentMath.sqrt(balance0 * balance1);
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
+
         (uint256 fee0, uint256 fee1) = _nonOptimalMintFee(amount0, amount1, _reserve0, _reserve1);
         _reserve0 += uint112(fee0);
         _reserve1 += uint112(fee1);
