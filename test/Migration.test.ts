@@ -1,8 +1,7 @@
 import { ethers, network } from "hardhat";
 import { expect } from "chai";
-import { ERC20Mock } from "../types";
 
-describe.only("Migration", function () {
+describe("Migration", function () {
   let chef,
     migrator,
     usdcWethLp,
