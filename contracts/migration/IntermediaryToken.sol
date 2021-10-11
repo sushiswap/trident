@@ -3,7 +3,7 @@
 pragma solidity >=0.8.0;
 
 import "../pool/TridentERC20.sol";
-import {IERC20} from "./Migrator.sol";
+import "../interfaces/IERC20.sol";
 
 /// @notice Intermediary token users who are staked in MasterChef will receive after migration.
 /// Can be redeemed for the LP token of the new pool.
@@ -21,17 +21,21 @@ contract IntermediaryToken is TridentERC20 {
     }
 
     /// @dev Since we might be rewarding the intermediary token for some time we allow users to mint it.
-    function deposit(uint256 amount) public {
+    function deposit(uint256 amount) public returns (uint256 minted) {
         uint256 availableLpTokens = lpToken.balanceOf(address(this));
-        uint256 toMint = (totalSupply * amount) / availableLpTokens;
-        _mint(msg.sender, toMint);
-        lpToken.transferFrom(msg.sender, address(this), amount);
+        if (availableLpTokens != 0) {
+            minted = (totalSupply * amount) / availableLpTokens;
+        } else {
+            minted = amount;
+        }
+        _mint(msg.sender, minted);
+        require(lpToken.transferFrom(msg.sender, address(this), amount), "TRANSFER_FROM_FAILED");
     }
 
-    function redeem(uint256 amount) public {
+    function redeem(uint256 amount) public returns (uint256 claimed) {
         uint256 availableLpTokens = lpToken.balanceOf(address(this));
-        uint256 claimAmount = (availableLpTokens * amount) / totalSupply;
+        claimed = (availableLpTokens * amount) / totalSupply;
         _burn(msg.sender, amount);
-        lpToken.transfer(msg.sender, claimAmount);
+        require(lpToken.transfer(msg.sender, claimed), "TRANSFER_FAILED");
     }
 }
