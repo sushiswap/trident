@@ -13,7 +13,7 @@ import "./TridentFranchisedERC20.sol";
 /// @dev The reserves are stored as bento shares.
 ///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
 contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
-    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
+    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient, uint256 liquidity);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Sync(uint256 reserve0, uint256 reserve1);
 
@@ -114,7 +114,8 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
         _mint(recipient, liquidity);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         kLast = TridentMath.sqrt(balance0 * balance1);
-        emit Mint(msg.sender, amount0, amount1, recipient);
+        uint256 liquidityForEvent = liquidity;
+        emit Mint(msg.sender, amount0, amount1, recipient, liquidityForEvent);
     }
 
     /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.

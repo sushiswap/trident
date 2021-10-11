@@ -187,12 +187,22 @@ export async function addLiquidity(
       swapFee
     );
 
-  await router.addLiquidity(
+  var addLiquidityPromise = router.addLiquidity(
     liquidityInput,
     pool.address,
     computedLiquidity,
     aliceEncoded
   );
+
+  await expect(addLiquidityPromise)
+    .to.emit(pool, "Mint")
+    .withArgs(
+      router.address,
+      amount0,
+      amount1,
+      accounts[0].address,
+      computedLiquidity
+    );
 
   const finalBalances = await getBalances(
     pool,
@@ -373,6 +383,7 @@ export async function burnLiquidity(
     barFee
   );
 
+  var burnLiquidityPromise;
   if (withdrawType == 0) {
     // Withdraw in token0 only
     amount0 = amount0.add(
@@ -388,7 +399,12 @@ export async function burnLiquidity(
       ["address", "address", "bool"],
       [token0.address, accounts[0].address, unwrapBento]
     );
-    await router.burnLiquiditySingle(pool.address, amount, burnData, amount0);
+    burnLiquidityPromise = router.burnLiquiditySingle(
+      pool.address,
+      amount,
+      burnData,
+      amount0
+    );
   } else if (withdrawType == 1) {
     // Withdraw in token1 only
     amount1 = amount1.add(
@@ -404,7 +420,12 @@ export async function burnLiquidity(
       ["address", "address", "bool"],
       [token1.address, accounts[0].address, unwrapBento]
     );
-    await router.burnLiquiditySingle(pool.address, amount, burnData, amount1);
+    burnLiquidityPromise = router.burnLiquiditySingle(
+      pool.address,
+      amount,
+      burnData,
+      amount1
+    );
   } else {
     // Withdraw evenly
     const minWithdrawals = [
@@ -421,8 +442,17 @@ export async function burnLiquidity(
       ["address", "bool"],
       [accounts[0].address, unwrapBento]
     );
-    await router.burnLiquidity(pool.address, amount, burnData, minWithdrawals);
+    burnLiquidityPromise = router.burnLiquidity(
+      pool.address,
+      amount,
+      burnData,
+      minWithdrawals
+    );
   }
+
+  await expect(burnLiquidityPromise)
+    .to.emit(pool, "Burn")
+    .withArgs(router.address, amount0, amount1, accounts[0].address, amount);
 
   const finalBalances = await getBalances(
     pool,

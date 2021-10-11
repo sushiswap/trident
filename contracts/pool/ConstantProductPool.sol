@@ -14,8 +14,8 @@ import "./TridentERC20.sol";
 /// @dev The reserves are stored as bento shares.
 ///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
 contract ConstantProductPool is IPool, TridentERC20 {
-    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
-    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
+    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient, uint256 liquidity);
+    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient, uint256 liquidity);
     event Sync(uint256 reserve0, uint256 reserve1);
 
     uint256 internal constant MINIMUM_LIQUIDITY = 1000;
@@ -107,7 +107,8 @@ contract ConstantProductPool is IPool, TridentERC20 {
         _mint(recipient, liquidity);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         kLast = computed;
-        emit Mint(msg.sender, amount0, amount1, recipient);
+        uint256 liquidityForEvent = liquidity;
+        emit Mint(msg.sender, amount0, amount1, recipient, liquidityForEvent);
     }
 
     /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
@@ -136,7 +137,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         withdrawnAmounts = new TokenAmount[](2);
         withdrawnAmounts[0] = TokenAmount({token: address(token0), amount: amount0});
         withdrawnAmounts[1] = TokenAmount({token: address(token1), amount: amount1});
-        emit Burn(msg.sender, amount0, amount1, recipient);
+        emit Burn(msg.sender, amount0, amount1, recipient, liquidity);
     }
 
     /// @dev Burns LP tokens sent to this contract and swaps one of the output tokens for another
@@ -176,7 +177,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
             }
         }
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        emit Burn(msg.sender, amount0, amount1, recipient);
+        emit Burn(msg.sender, amount0, amount1, recipient, liquidity);
     }
 
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
