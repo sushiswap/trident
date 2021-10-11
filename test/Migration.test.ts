@@ -1,7 +1,8 @@
 import { ethers, network } from "hardhat";
 import { expect } from "chai";
+import { ERC20Mock } from "../types";
 
-describe("Migration", function () {
+describe.only("Migration", function () {
   let chef,
     migrator,
     usdcWethLp,
@@ -10,7 +11,8 @@ describe("Migration", function () {
     masterDeployer,
     factory,
     Pool,
-    snapshotId;
+    snapshotId,
+    ERC20;
 
   before(async () => {
     snapshotId = await ethers.provider.send("evm_snapshot", []);
@@ -30,7 +32,6 @@ describe("Migration", function () {
     const [alice] = await ethers.getSigners();
     const _owner = "0x9a8541ddf3a932a9a922b607e9cf7301f1d47bd1";
     const chefOwner = await ethers.getSigner(_owner);
-    const ERC20 = await ethers.getContractFactory("ERC20Mock");
     const BentoBox = await ethers.getContractFactory("BentoBoxV1");
     const MasterDeployer = await ethers.getContractFactory("MasterDeployer");
     const Factory = await ethers.getContractFactory(
@@ -38,6 +39,7 @@ describe("Migration", function () {
     );
     const Migrator = await ethers.getContractFactory("Migrator");
     Pool = await ethers.getContractFactory("ConstantProductPool");
+    ERC20 = await ethers.getContractFactory("ERC20Mock");
 
     await network.provider.send("hardhat_setBalance", [
       _owner,
@@ -86,6 +88,12 @@ describe("Migration", function () {
     const oldTotalSupply = await usdcWethLp.totalSupply();
     const oldUsdcBalance = await usdc.balanceOf(usdcWethLp.address);
     const oldWethBalance = await weth.balanceOf(usdcWethLp.address);
+    const oldLpToken = (await chef.poolInfo(1)).lpToken;
+    const mcBalance = await usdcWethLp.balanceOf(chef.address);
+    expect(oldLpToken).to.be.eq(
+      usdcWethLp.address,
+      "We don't have the corect LP address"
+    );
 
     await chef.migrate(1);
 
@@ -107,6 +115,22 @@ describe("Migration", function () {
     // we must not allow two calls for the same pool
     await expect(chef.migrate(1)).to.be.revertedWith(
       "Transaction reverted: function selector was not recognized and there's no fallback function"
+    );
+
+    const _intermediaryToken = (await chef.poolInfo(1)).lpToken;
+    expect(_intermediaryToken).to.not.be.eq(
+      oldLpToken,
+      "we dodn't swap out tokens in masterchef"
+    );
+
+    const intermediaryToken = await ERC20.attach(_intermediaryToken);
+    const intermediaryTokenBalance = await pool.balanceOf(_intermediaryToken);
+    expect(intermediaryTokenBalance.gt(0)).to.be.true;
+
+    const newMcBalance = await intermediaryToken.balanceOf(chef.address);
+    expect(newMcBalance.toString()).to.be.eq(
+      newMcBalance.toString(),
+      "MC didn't receive the correct amount of the intermediary token"
     );
   });
 
@@ -147,6 +171,40 @@ const mcABI = [
     name: "setMigrator",
     outputs: [],
     stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    name: "poolInfo",
+    outputs: [
+      {
+        internalType: "contract IERC20",
+        name: "lpToken",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "allocPoint",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "lastRewardBlock",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "accSushiPerShare",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
 ];
