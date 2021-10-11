@@ -113,9 +113,7 @@ describe.only("Migration", function () {
     expect(oldWethBalance.gt(newWethBalance)).to.be.true;
 
     // we must not allow two calls for the same pool
-    await expect(chef.migrate(1)).to.be.revertedWith(
-      "Transaction reverted: function selector was not recognized and there's no fallback function"
-    );
+    await expect(chef.migrate(1)).to.be.revertedWith("ONLY_ONCE");
 
     const _intermediaryToken = (await chef.poolInfo(1)).lpToken;
     expect(_intermediaryToken).to.not.be.eq(
@@ -137,8 +135,9 @@ describe.only("Migration", function () {
   after(async () => {
     await network.provider.request({
       method: "hardhat_reset",
-      params: [], // disable forking
+      params: [],
     });
+    // disable forking and reset to not affect the wholes repo's test suite
     await network.provider.send("evm_revert", [snapshotId]);
   });
 });

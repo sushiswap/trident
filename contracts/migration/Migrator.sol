@@ -9,6 +9,7 @@ import "../interfaces/IPoolFactory.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/IERC20.sol";
 import "../interfaces/IConstantProductPool.sol";
+import "hardhat/console.sol";
 
 /// @dev Legacy SushiSwap AMM interface
 interface IOldPool is IERC20 {
@@ -28,6 +29,10 @@ interface IOldPool is IERC20 {
     Used by MasterChef / MasterChefV2 / MiniChef. */
 contract Migrator {
     event Migrate(address indexed oldPool, address indexed newPool, address indexed intermediaryToken);
+
+    /// @dev Intermediary token to new LP token mapping.
+    /// @dev Used to prevent subsequent calls to masterchef's migrate function with the same PID.
+    mapping(address => address) public migrated;
 
     IBentoBoxMinimal public immutable bento;
     IMasterDeployer public immutable masterDeployer;
@@ -53,6 +58,7 @@ contract Migrator {
     /// token to receive their share of the LP tokens of the new Trident constant product pool.
     function migrate(IOldPool oldPool) external returns (address) {
         require(msg.sender == address(masterChef), "ONLY_CHEF");
+        require(migrated[address(oldPool)] == address(0), "ONLY_ONCE");
 
         address token0 = oldPool.token0();
         address token1 = oldPool.token1();
@@ -94,6 +100,8 @@ contract Migrator {
 
         // The new Trident pool mints liquidity to the intermediary token.
         pool.mint(abi.encode(intermediaryToken));
+
+        migrated[intermediaryToken] = address(pool);
 
         emit Migrate(address(oldPool), address(pool), intermediaryToken);
 
