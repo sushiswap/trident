@@ -9,7 +9,6 @@ import "../interfaces/IPoolFactory.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/IERC20.sol";
 import "../interfaces/IConstantProductPool.sol";
-import "hardhat/console.sol";
 
 /// @dev Legacy SushiSwap AMM interface
 interface IOldPool is IERC20 {
