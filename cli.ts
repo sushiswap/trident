@@ -1,4 +1,4 @@
-import { BENTOBOX_ADDRESS, ChainId } from "@sushiswap/core-sdk";
+import { BENTOBOX_ADDRESS } from "@sushiswap/core-sdk";
 import { BigNumber, constants } from "ethers";
 import { task, types } from "hardhat/config";
 
@@ -43,7 +43,8 @@ task("constant-product-pool:deploy", "Constant Product Pool deploy")
   )
   .addOptionalParam("fee", "Fee tier", 30, types.int)
   .addOptionalParam("twap", "Twap enabled", true, types.boolean)
-  .setAction(async function ({ tokenA, tokenB, fee, twap }, { ethers }, runSuper) {
+  .addOptionalParam("verify", "Verify on Etherscan", true, types.boolean)
+  .setAction(async function ({ tokenA, tokenB, fee, twap, verify }, { ethers, run }) {
     const masterDeployer = await ethers.getContract("MasterDeployer");
 
     const constantProductPoolFactory = await ethers.getContract("ConstantProductPoolFactory");
@@ -55,7 +56,21 @@ task("constant-product-pool:deploy", "Constant Product Pool deploy")
 
     const { events } = await (await masterDeployer.deployPool(constantProductPoolFactory.address, deployData)).wait();
 
-    console.log(events);
+    const poolAddress = events[0].args.pool;
+
+    console.log(poolAddress, events);
+
+    if (!verify) return;
+
+    // we wait some time for the contract to be propagated in etherscan's backend
+    await new Promise((r) => {
+      console.log("... waiting a minute"), setTimeout(r, 80000);
+    });
+
+    await run("verify:verify", {
+      address: poolAddress,
+      constructorArguments: [deployData, masterDeployer.address],
+    });
   });
 
 task("constant-product-pool:address", "Constant Product Pool deploy")
@@ -185,6 +200,11 @@ task("router:add-liquidity", "Router add liquidity")
     });
 
     console.log("Approved both tokens");
+
+    await (await bentoBox.connect(dev).deposit(liquidityInput[0].token, dev.address, dev.address, 0, liquidityInput[0].amount)).wait();
+    await (await bentoBox.connect(dev).deposit(liquidityInput[1].token, dev.address, dev.address, 0, liquidityInput[1].amount)).wait();
+
+    console.log("Deposited");
 
     await (await bentoBox.connect(dev).deposit(liquidityInput[0].token, dev.address, dev.address, 0, liquidityInput[0].amount)).wait();
     await (await bentoBox.connect(dev).deposit(liquidityInput[1].token, dev.address, dev.address, 0, liquidityInput[1].amount)).wait();

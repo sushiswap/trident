@@ -135,8 +135,8 @@ const config: HardhatUserConfig = {
       saveDeployments: true,
       gasPrice: 22000000000,
     },
-    matic: {
-      url: "https://rpc-mainnet.maticvigil.com",
+    polygon: {
+      url: `https://polygon-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
       accounts,
       chainId: 137,
       live: true,
