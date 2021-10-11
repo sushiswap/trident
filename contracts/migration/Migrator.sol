@@ -7,21 +7,10 @@ import "../interfaces/IMasterDeployer.sol";
 import "../interfaces/IBentoBoxMinimal.sol";
 import "../interfaces/IPoolFactory.sol";
 import "../interfaces/IPool.sol";
+import "../interfaces/IERC20.sol";
+import "../interfaces/IConstantProductPool.sol";
 
-interface IERC20 {
-    function balanceOf(address account) external view returns (uint256);
-
-    function totalSupply() external view returns (uint256);
-
-    function transferFrom(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) external returns (bool);
-
-    function transfer(address recipient, uint256 amount) external returns (bool);
-}
-
+/// @dev Legacy SushiSwap AMM interface
 interface IOldPool is IERC20 {
     function token0() external view returns (address);
 
@@ -32,19 +21,11 @@ interface IOldPool is IERC20 {
     function mint(bytes calldata data) external returns (uint256 liquidity);
 }
 
-interface IConstantProductPool is IPool, IERC20 {
-    function getNativeReserves()
-        external
-        view
-        returns (
-            uint256 _nativeReserve0,
-            uint256 _nativeReserve1,
-            uint32
-        );
-}
-
 /// @notice Trident pool migrator contract for legacy SushiSwap.
-// Used by MasterChef / MasterChefV2 / MiniChef.
+/** Sushiswap's master chef contracts which distribute rewards to LP token holders have the option to migrate liquidity.
+    We can set this contract as the migrator on the master chef contracts to migrate LP positions from the legacy to the new Trident
+    constant product pools. After the migrator is set anyone can call the migrate() function (once per pool) on the master chef contract.
+    Used by MasterChef / MasterChefV2 / MiniChef. */
 contract Migrator {
     event Migrate(address indexed oldPool, address indexed newPool, address indexed intermediaryToken);
 
