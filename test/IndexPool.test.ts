@@ -27,13 +27,7 @@ const poolSwapFee: number | BigNumber = getBigNumber("1", 13);
 
 // -------------         -------------
 
-function encodeSwapData(
-  tokenIn: string,
-  tokenOut: string,
-  recipient: string,
-  unwrapBento: boolean,
-  amountIn: BigNumber | number
-): string {
+function encodeSwapData(tokenIn: string, tokenOut: string, recipient: string, unwrapBento: boolean, amountIn: BigNumber | number): string {
   return ethers.utils.defaultAbiCoder.encode(
     ["address", "address", "address", "bool", "uint256"],
     [tokenIn, tokenOut, recipient, unwrapBento, amountIn]
@@ -76,11 +70,7 @@ describe("IndexPool test", function () {
 
     tridentPoolFactory = await PoolFactory.deploy(masterDeployer.address);
     await tridentPoolFactory.deployed();
-    router = await SwapRouter.deploy(
-      bento.address,
-      masterDeployer.address,
-      weth.address
-    );
+    router = await SwapRouter.deploy(bento.address, masterDeployer.address, weth.address);
     await router.deployed();
 
     // Whitelist pool factory in master deployer
@@ -92,20 +82,8 @@ describe("IndexPool test", function () {
     await usdc.approve(bento.address, ERCDeployAmount);
     await usdt.approve(bento.address, ERCDeployAmount);
     // Make BentoBox token deposits
-    await bento.deposit(
-      usdc.address,
-      alice.address,
-      alice.address,
-      ERCDeployAmount,
-      0
-    );
-    await bento.deposit(
-      usdt.address,
-      alice.address,
-      alice.address,
-      ERCDeployAmount,
-      0
-    );
+    await bento.deposit(usdc.address, alice.address, alice.address, ERCDeployAmount, 0);
+    await bento.deposit(usdt.address, alice.address, alice.address, ERCDeployAmount, 0);
     // Approve Router to spend 'alice' BentoBox tokens
     await bento.setMasterContractApproval(
       alice.address,
@@ -117,40 +95,18 @@ describe("IndexPool test", function () {
     );
 
     const tokens: string[] =
-      usdt.address.toUpperCase() < usdc.address.toUpperCase()
-        ? [usdt.address, usdc.address]
-        : [usdc.address, usdt.address];
+      usdt.address.toUpperCase() < usdc.address.toUpperCase() ? [usdt.address, usdc.address] : [usdc.address, usdt.address];
 
     // address[], uint256[], uint256
-    const deployData = ethers.utils.defaultAbiCoder.encode(
-      ["address[]", "uint256[]", "uint256"],
-      [tokens, tokenWeights, poolSwapFee]
-    );
+    const deployData = ethers.utils.defaultAbiCoder.encode(["address[]", "uint256[]", "uint256"], [tokens, tokenWeights, poolSwapFee]);
 
-    let tx = await (
-      await masterDeployer.deployPool(tridentPoolFactory.address, deployData)
-    ).wait();
+    let tx = await (await masterDeployer.deployPool(tridentPoolFactory.address, deployData)).wait();
     const pool: Contract = await Pool.attach(tx.events[1].args.pool);
 
-    await bento.transfer(
-      usdt.address,
-      alice.address,
-      pool.address,
-      aliceUSDTBalance
-    );
-    await bento.transfer(
-      usdc.address,
-      alice.address,
-      pool.address,
-      aliceUSDCBalance
-    );
+    await bento.transfer(usdt.address, alice.address, pool.address, aliceUSDTBalance);
+    await bento.transfer(usdc.address, alice.address, pool.address, aliceUSDCBalance);
 
-    await pool.mint(
-      ethers.utils.defaultAbiCoder.encode(
-        ["address", "uint256"],
-        [alice.address, poolMintAmount]
-      )
-    );
+    await pool.mint(ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [alice.address, poolMintAmount]));
 
     return pool;
   }

@@ -4,7 +4,6 @@ pragma solidity >=0.8.0;
 
 import "../interfaces/IBentoBoxMinimal.sol";
 import "../interfaces/IMasterDeployer.sol";
-import "../workInProgress/IMigrator.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/ITridentCallee.sol";
 import "../libraries/TridentMath.sol";
@@ -23,7 +22,6 @@ contract ConstantProductPool is IPool, TridentERC20 {
     uint8 internal constant PRECISION = 112;
     uint256 internal constant MAX_FEE = 10000; // @dev 100%.
     uint256 internal constant MAX_FEE_SQUARE = 100000000;
-    uint256 internal constant E18 = uint256(10)**18;
     uint256 public immutable swapFee;
     uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
 
@@ -53,7 +51,10 @@ contract ConstantProductPool is IPool, TridentERC20 {
     }
 
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (address _token0, address _token1, uint256 _swapFee, bool _twapSupport) = abi.decode(_deployData, (address, address, uint256, bool));
+        (address _token0, address _token1, uint256 _swapFee, bool _twapSupport) = abi.decode(
+            _deployData,
+            (address, address, uint256, bool)
+        );
 
         // @dev Factory ensures that the tokens are sorted.
         require(_token0 != address(0), "ZERO_ADDRESS");
@@ -87,6 +88,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint256 computed = TridentMath.sqrt(balance0 * balance1);
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
+
         (uint256 fee0, uint256 fee1) = _nonOptimalMintFee(amount0, amount1, _reserve0, _reserve1);
         _reserve0 += uint112(fee0);
         _reserve1 += uint112(fee1);
@@ -363,6 +365,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         }
     }
 
+    /// @dev returned values are in terms of BentoBox "shares".
     function getReserves()
         public
         view
@@ -373,5 +376,21 @@ contract ConstantProductPool is IPool, TridentERC20 {
         )
     {
         return _getReserves();
+    }
+
+    /// @dev returned values are the native ERC20 token amounts.
+    function getNativeReserves()
+        public
+        view
+        returns (
+            uint256 _nativeReserve0,
+            uint256 _nativeReserve1,
+            uint32 _blockTimestampLast
+        )
+    {
+        (uint112 _reserve0, uint112 _reserve1, uint32 __blockTimestampLast) = _getReserves();
+        _nativeReserve0 = bento.toAmount(token0, _reserve0, false);
+        _nativeReserve1 = bento.toAmount(token1, _reserve1, false);
+        _blockTimestampLast = __blockTimestampLast;
     }
 }

@@ -20,9 +20,7 @@ import { removeConsoleLog } from "hardhat-preprocessor";
 
 // const accounts = [process.env.DEPLOYER_KEY || "0x00"];
 const accounts = {
-  mnemonic:
-    process.env.MNEMONIC ||
-    "test test test test test test test test test test test junk",
+  mnemonic: process.env.MNEMONIC || "test test test test test test test test test test test junk",
 };
 
 const config: HardhatUserConfig = {
@@ -137,8 +135,8 @@ const config: HardhatUserConfig = {
       saveDeployments: true,
       gasPrice: 22000000000,
     },
-    matic: {
-      url: "https://rpc-mainnet.maticvigil.com",
+    polygon: {
+      url: `https://polygon-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
       accounts,
       chainId: 137,
       live: true,
@@ -276,10 +274,7 @@ const config: HardhatUserConfig = {
     tests: "test",
   },
   preprocess: {
-    eachLine: removeConsoleLog(
-      (bre) =>
-        bre.network.name !== "hardhat" && bre.network.name !== "localhost"
-    ),
+    eachLine: removeConsoleLog((bre) => bre.network.name !== "hardhat" && bre.network.name !== "localhost"),
   },
   solidity: {
     compilers: [

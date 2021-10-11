@@ -8,8 +8,6 @@ import "./interfaces/ITridentRouter.sol";
 import "./utils/TridentHelper.sol";
 import "./deployer/MasterDeployer.sol";
 
-//import "hardhat/console.sol";
-
 /// @notice Router contract that helps in swapping across Trident pools.
 contract TridentRouter is ITridentRouter, TridentHelper {
     /// @notice BentoBox token vault.
@@ -63,7 +61,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         // If the user wants to unwrap `wETH`, the final destination should be this contract and
         // a batch call should be made to `unwrapWETH`.
         for (uint256 i; i < params.path.length; i++) {
-            // We don't necessarily need this check but saving users from themseleves.
+            // We don't necessarily need this check but saving users from themselves.
             isWhiteListed(params.path[i].pool);
             amountOut = IPool(params.path[i].pool).swap(params.path[i].data);
         }
@@ -319,39 +317,24 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         return masterDeployer.deployPool(_factory, _deployData);
     }
 
+    /// @notice Deposit from the user's wallet into BentoBox.
+    /// @dev Amount is the native token amount. We let BentoBox do the conversion into shares.
     function _depositToBentoBox(
         address token,
         address recipient,
         uint256 amount
     ) internal {
-        if (token == wETH && address(this).balance != 0) {
-            uint256 underlyingAmount = bento.toAmount(wETH, amount, true);
-            if (address(this).balance >= underlyingAmount) {
-                // @dev Deposit ETH into `recipient` `bento` account.
-                bento.deposit{value: underlyingAmount}(address(0), address(this), recipient, 0, amount);
-                return;
-            }
-        }
-        // @dev Deposit ERC-20 token into `recipient` `bento` account.
-        bento.deposit(token, msg.sender, recipient, 0, amount);
+        bento.deposit{value: token == USE_ETHEREUM ? amount : 0}(token, msg.sender, recipient, amount, 0);
     }
 
+    /// @notice Same effect as _depositToBentoBox() but with a sender parameter.
     function _depositFromUserToBentoBox(
         address token,
         address sender,
         address recipient,
         uint256 amount
     ) internal {
-        if (token == wETH && address(this).balance != 0) {
-            uint256 underlyingAmount = bento.toAmount(wETH, amount, true);
-            if (address(this).balance >= underlyingAmount) {
-                // @dev Deposit ETH into `recipient` `bento` account.
-                bento.deposit{value: underlyingAmount}(address(0), address(this), recipient, 0, amount);
-                return;
-            }
-        }
-        // @dev Deposit ERC-20 token into `recipient` `bento` account.
-        bento.deposit(token, sender, recipient, 0, amount);
+        bento.deposit{value: token == USE_ETHEREUM ? amount : 0}(token, sender, recipient, amount, 0);
     }
 
     function isWhiteListed(address pool) internal {

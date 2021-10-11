@@ -8,6 +8,8 @@ import "../TridentRouter.sol";
 contract TridentHelper {
     /// @notice ERC-20 token for wrapped ETH (v9).
     address internal immutable wETH;
+    /// @notice The user should use 0x0 if they want to deposit ETH
+    address constant USE_ETHEREUM = address(0);
 
     constructor(address _wETH) {
         wETH = _wETH;

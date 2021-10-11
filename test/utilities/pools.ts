@@ -21,16 +21,8 @@ export async function createHybridPool(
   bento: Contract,
   alice: SignerWithAddress
 ): Promise<[Contract, sdk.RHybridPool]> {
-  const [reserve0, reserve0BN] = getIntegerRandomValueWithMin(
-    reservesExponents[0],
-    minLiquidity,
-    rnd
-  );
-  const [reserve1, reserve1BN] = getIntegerRandomValueWithMin(
-    reservesExponents[1],
-    minLiquidity,
-    rnd
-  );
+  const [reserve0, reserve0BN] = getIntegerRandomValueWithMin(reservesExponents[0], minLiquidity, rnd);
+  const [reserve1, reserve1BN] = getIntegerRandomValueWithMin(reservesExponents[1], minLiquidity, rnd);
 
   const fee = Math.round(swapFee * 10_000);
   const deployData = ethers.utils.defaultAbiCoder.encode(
@@ -40,28 +32,14 @@ export async function createHybridPool(
 
   const hybridPool: Contract = await PoolFactory.attach(
     (
-      await (
-        await masterDeployer.deployPool(tridentPoolFactory.address, deployData)
-      ).wait()
+      await (await masterDeployer.deployPool(tridentPoolFactory.address, deployData)).wait()
     ).events[0].args[1]
   );
 
-  await bento.transfer(
-    tokenA.address,
-    alice.address,
-    hybridPool.address,
-    reserve0BN
-  );
-  await bento.transfer(
-    tokenB.address,
-    alice.address,
-    hybridPool.address,
-    reserve1BN
-  );
+  await bento.transfer(tokenA.address, alice.address, hybridPool.address, reserve0BN);
+  await bento.transfer(tokenB.address, alice.address, hybridPool.address, reserve1BN);
 
-  await hybridPool.mint(
-    ethers.utils.defaultAbiCoder.encode(["address"], [alice.address])
-  );
+  await hybridPool.mint(ethers.utils.defaultAbiCoder.encode(["address"], [alice.address]));
 
   const hybridPoolInfo = new sdk.RHybridPool({
     A,
@@ -88,16 +66,8 @@ export async function createConstantProductPool(
   bento: Contract,
   alice: SignerWithAddress
 ): Promise<[Contract, sdk.RConstantProductPool]> {
-  const [reserve0, reserve0BN] = getIntegerRandomValueWithMin(
-    reservesExponents[0],
-    minLiquidity,
-    rnd
-  );
-  const [reserve1, reserve1BN] = getIntegerRandomValueWithMin(
-    reservesExponents[1],
-    minLiquidity,
-    rnd
-  );
+  const [reserve0, reserve0BN] = getIntegerRandomValueWithMin(reservesExponents[0], minLiquidity, rnd);
+  const [reserve1, reserve1BN] = getIntegerRandomValueWithMin(reservesExponents[1], minLiquidity, rnd);
 
   const fee = Math.round(swapFee * 10_000);
   const deployData = ethers.utils.defaultAbiCoder.encode(
@@ -107,28 +77,14 @@ export async function createConstantProductPool(
 
   const constantProductPool: Contract = await PoolFactory.attach(
     (
-      await (
-        await masterDeployer.deployPool(tridentPoolFactory.address, deployData)
-      ).wait()
+      await (await masterDeployer.deployPool(tridentPoolFactory.address, deployData)).wait()
     ).events[0].args[1]
   );
 
-  await bento.transfer(
-    tokenA.address,
-    alice.address,
-    constantProductPool.address,
-    reserve0BN
-  );
-  await bento.transfer(
-    tokenB.address,
-    alice.address,
-    constantProductPool.address,
-    reserve1BN
-  );
+  await bento.transfer(tokenA.address, alice.address, constantProductPool.address, reserve0BN);
+  await bento.transfer(tokenB.address, alice.address, constantProductPool.address, reserve1BN);
 
-  await constantProductPool.mint(
-    ethers.utils.defaultAbiCoder.encode(["address"], [alice.address])
-  );
+  await constantProductPool.mint(ethers.utils.defaultAbiCoder.encode(["address"], [alice.address]));
 
   const cpPoolInfo: sdk.RConstantProductPool = new sdk.RConstantProductPool({
     reserve0: reserve0BN,

@@ -816,10 +816,10 @@
     tiny-warning "^1.0.3"
     toformat "^2.0.0"
 
-"@sushiswap/tines@^0.1.6":
-  version "0.1.6"
-  resolved "https://registry.yarnpkg.com/@sushiswap/tines/-/tines-0.1.6.tgz#894e958655da3238d7a815acbed65293200b6cb3"
-  integrity sha512-XphS9wgFnyBUr60JdxhaDnQ24cjIPG+LU4nTmgKsPxciz0zK7cXxzWXsucOFo5+b/wsOlcaV66UB9bsURWMPug==
+"@sushiswap/tines@^0.1.8":
+  version "0.1.8"
+  resolved "https://registry.yarnpkg.com/@sushiswap/tines/-/tines-0.1.8.tgz#f6f7e027432c8fc106d2de82040ccf595036264c"
+  integrity sha512-/ikMJ4NOU4kfZvcpfmYpTdaP5+v3Uziwl8PX8fIe33P4Desvr0nofYSxQaywLZHuyNGek16EG0/N8+0iRR/3PQ==
 
 "@szmarczak/http-timer@^1.1.2":
   version "1.1.2"
