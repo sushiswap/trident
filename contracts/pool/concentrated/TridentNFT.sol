@@ -136,7 +136,7 @@ abstract contract TridentNFT {
     ) public {
         transferFrom(address(0), recipient, tokenId);
         if (recipient.code.length != 0) {
-            // @dev `onERC721Received(address,address,uint,bytes)`.
+            // `onERC721Received(address,address,uint,bytes)`.
             (, bytes memory returned) = recipient.staticcall(abi.encodeWithSelector(0x150b7a02, msg.sender, address(0), tokenId, data));
             bytes4 selector = abi.decode(returned, (bytes4));
             require(selector == 0x150b7a02, "NOT_ERC721_RECEIVER");
@@ -160,7 +160,7 @@ abstract contract TridentNFT {
     ) external {
         require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
         address owner = ownerOf[tokenId];
-        // @dev This is reasonably safe from overflow - incrementing `nonces` beyond
+        // This is reasonably safe from overflow - incrementing `nonces` beyond
         // 'type(uint256).max' is exceedingly unlikely compared to optimization benefits.
         unchecked {
             bytes32 digest = keccak256(
@@ -194,7 +194,7 @@ abstract contract TridentNFT {
         bytes32 s
     ) external {
         require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
-        // @dev This is reasonably safe from overflow - incrementing `nonces` beyond
+        // This is reasonably safe from overflow - incrementing `nonces` beyond
         // 'type(uint256).max' is exceedingly unlikely compared to optimization benefits.
         unchecked {
             bytes32 digest = keccak256(
@@ -215,7 +215,7 @@ abstract contract TridentNFT {
     }
 
     function _mint(address recipient) internal {
-        // @dev This is reasonably safe from overflow - incrementing beyond
+        // This is reasonably safe from overflow - incrementing beyond
         // 'type(uint256).max' is exceedingly unlikely compared to optimization benefits.
         unchecked {
             uint256 tokenId = totalSupply++;
@@ -227,7 +227,7 @@ abstract contract TridentNFT {
     }
 
     function _burn(uint256 tokenId) internal {
-        // @dev We tranfer the NFT to address(0) rather than burning to keep Total Supply static.
+        // We tranfer the NFT to address(0) rather than burning to keep Total Supply static.
         address owner = ownerOf[tokenId];
         require(owner != address(0), "NOT_MINTED");
         _transfer(owner, address(0), tokenId);
@@ -238,7 +238,7 @@ abstract contract TridentNFT {
         address to,
         uint256 tokenId
     ) internal {
-        // @dev This is safe from under/overflow -
+        // This is safe from under/overflow -
         // ownership is checked against decrement,
         // and sum of all user balances can't reasonably exceed 'type(uint256).max' (see {_mint}).
         unchecked {
