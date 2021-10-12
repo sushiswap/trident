@@ -16,7 +16,7 @@ import {
 import { getBigNumber } from "./harness/helpers";
 import { Trident, TWO_POW_96 } from "./harness/Trident";
 
-describe("Concentrated Liquidity Product Pool", function () {
+describe.only("Concentrated Liquidity Product Pool", function () {
   let snapshotId: string;
   let trident: Trident;
   let defaultAddress: string;
@@ -634,9 +634,9 @@ describe("Concentrated Liquidity Product Pool", function () {
       let incentive = await trident.concentratedPoolManager.incentives(pool.address, 0);
       await network.provider.send("evm_setNextBlockTimestamp", [block.timestamp + 2]);
       expect(incentive.secondsClaimed.toString()).to.be.eq("0", "didn't reset seconds claimed");
-      await trident.concentratedPoolManager.subscribe(mintA.tokenId, 0);
-      await trident.concentratedPoolManager.subscribe(mintB.tokenId, 0);
-      await trident.concentratedPoolManager.subscribe(mintC.tokenId, 0);
+      await trident.concentratedPoolManager.subscribe(mintA.tokenId, [0]);
+      await trident.concentratedPoolManager.subscribe(mintB.tokenId, [0]);
+      await trident.concentratedPoolManager.subscribe(mintC.tokenId, [0]);
       await network.provider.send("evm_setNextBlockTimestamp", [block.timestamp + incentiveLength / 4]);
       swapTx = await swapViaRouter({
         pool: pool,
