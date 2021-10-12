@@ -1,12 +1,12 @@
 import { ethers } from "hardhat";
-import { getBigNumber,RToken, MultiRoute, findMultiRouting, RPool, }  from "@sushiswap/tines"
+import { getBigNumber,RToken, MultiRoute, findMultiRouting, RPool, ConstantProductRPool, HybridRPool, }  from "@sushiswap/tines"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { BigNumber, Contract, ContractFactory } from "ethers";
 
-import { Topology, PoolDeploymentContracts, TridentRoute, } from "./helperInterfaces";
-import { getCPPool, getHybridPool } from "./poolHelpers";
-import { getTokenPrice } from "./priceHelper";
-import { RouteType } from "./constants";
+import { Topology, PoolDeploymentContracts, TridentRoute, } from "./interfaces";
+import { getCPPool, getHybridPool, getRandomPool } from "./pool";
+import { getTokenPrice } from "./price";
+import { RouteType } from "./constants"; 
 
 let alice: SignerWithAddress,
   feeTo: SignerWithAddress,
@@ -20,50 +20,28 @@ let alice: SignerWithAddress,
   ConstPoolFactory: ContractFactory,
   HybridPoolContractFactory: ContractFactory,
   ConstantPoolContractFactory: ContractFactory,
-  ERC20Factory: ContractFactory;
+  ERC20Factory: ContractFactory,
+  poolDeployment: PoolDeploymentContracts;
 
-const tokenSupply = getBigNumber(Math.pow(10, 37));
+const tokenSupply = getBigNumber(Math.pow(2, 110));
+const hybridPoolAbi = ["function getReserves() public view returns (uint256 _reserve0, uint256 _reserve1)"];
+const constantPoolAbi = ["function getReserves() public view returns (uint256 _reserve0, uint256 _reserve1, uint32 _blockTimestampLast)"];
 
 export async function init(): Promise<[SignerWithAddress, string, Contract]> {
   await createAccounts();
   await deployContracts();
 
   return [alice, router.address, bento];
-} 
-
-export async function getSinglePool(rnd: () => number): Promise<Topology> {
-  return await getTopoplogy(2, 1, rnd);
 }
 
-export async function getABCTopoplogy(rnd: () => number): Promise<Topology> {
-  return await getTopoplogy(3, 1, rnd);
-}
-
-export async function getABCDTopoplogy(rnd: () => number): Promise<Topology> {
-  return await getTopoplogy(4, 1, rnd);
-}
-
-export async function getAB2VariantTopoplogy(
-  rnd: () => number
-): Promise<Topology> {
-  return await getTopoplogy(2, 2, rnd);
-}
-
-export async function getAB3VariantTopoplogy(
-  rnd: () => number
-): Promise<Topology> {
-  return await getTopoplogy(2, 3, rnd);
-}
-
-export function createRoute(fromToken: RToken, toToken: RToken, baseToken: RToken, topology: Topology, amountIn: number, gasPrice: number ): MultiRoute | undefined {
+export function createRoute(fromToken: RToken, toToken: RToken, baseToken: RToken, topology: Topology, amountIn: number, gasPrice: number): MultiRoute | undefined {
   const route = findMultiRouting(
     fromToken,
     toToken,
     amountIn,
     topology.pools,
     baseToken,
-    gasPrice,
-    100
+    gasPrice
   );
   return route;
 } 
@@ -72,21 +50,25 @@ export async function executeTridentRoute(tridentRouteParams: TridentRoute, toTo
 
   let outputBalanceBefore: BigNumber = await bento.balanceOf(toTokenAddress, alice.address);
 
-  switch (tridentRouteParams.routeType) {
-    case RouteType.SinglePool:
-      await (await router.connect(alice).exactInputSingle(tridentRouteParams)).wait();
-      break;
-    
-    case RouteType.SinglePath:
-      await (await router.connect(alice).exactInput(tridentRouteParams)).wait();
+  try {
+    switch (tridentRouteParams.routeType) {
+      case RouteType.SinglePool:
+        await (await router.connect(alice).exactInputSingle(tridentRouteParams)).wait();
         break;
-    
-    case RouteType.ComplexPath:
-    default:
-      await (await router.connect(alice).complexPath(tridentRouteParams)).wait();
-      break;
+      
+      case RouteType.SinglePath:
+        await (await router.connect(alice).exactInput(tridentRouteParams)).wait();
+          break;
+      
+      case RouteType.ComplexPath:
+      default:
+        await (await router.connect(alice).complexPath(tridentRouteParams)).wait();
+        break;
+    }
+  } catch (error) {  
+    throw error;
   }
- 
+  
   let outputBalanceAfter: BigNumber = await bento.balanceOf(
     toTokenAddress,
     alice.address
@@ -95,23 +77,54 @@ export async function executeTridentRoute(tridentRouteParams: TridentRoute, toTo
   return outputBalanceAfter.sub(outputBalanceBefore);
 }
 
+export async function refreshPools(topology: Topology){
+  for (let index = 0; index < topology.pools.length; index++) {
+    const pool = topology.pools[index]; 
+
+    if (pool instanceof ConstantProductRPool){
+      const poolContract = new Contract(pool.address, constantPoolAbi, alice);
+      const [reserve0, reserve1] = await poolContract.getReserves(); 
+      (pool as ConstantProductRPool).updateReserves(reserve0, reserve1)
+    }
+    else if (pool instanceof HybridRPool) {
+      const poolContract = new Contract(pool.address, hybridPoolAbi, alice);
+      const [reserve0, reserve1] = await poolContract.getReserves(); 
+      (pool as HybridRPool).updateReserves(reserve0, reserve1)
+    }
+  }
+}
+
+export async function getRandomPools(tokenCount: number, variants: number, rnd: () => number): Promise<Topology> { 
+  return await getTopoplogy(tokenCount, variants, rnd); 
+} 
+
+export async function getSinglePool(rnd: () => number): Promise<Topology> {
+  return await getTopoplogy(2, 1, rnd);
+}
+
+export async function getTwoSerialPools(rnd: () => number): Promise<Topology> {
+  return await getTopoplogy(3, 1, rnd);
+}
+
+export async function getThreeSerialPools(rnd: () => number): Promise<Topology> {
+  return await getTopoplogy(4, 1, rnd);
+}
+
+export async function getTwoParallelPools(rnd: () => number): Promise<Topology> {
+  return await getTopoplogy(2, 2, rnd);
+}
+
+export async function getThreeParallelPools(rnd: () => number): Promise<Topology> {
+  return await getTopoplogy(2, 3, rnd);
+}
+ 
 export async function getFivePoolBridge(rnd: () => number): Promise<Topology> { 
 
   let topology: Topology = {
     tokens: [],
     prices: [],
     pools: [],
-  };
-
-  const poolDeployment: PoolDeploymentContracts = {
-    hybridPoolFactory: HybridPoolContractFactory,
-    hybridPoolContract: hybridPool,
-    constPoolFactory: ConstantPoolContractFactory,
-    constantPoolContract: constantProductPool,
-    masterDeployerContract: masterDeployer,
-    bentoContract: bento,
-    account: alice,
-  };
+  }; 
 
   let prices: number[] = [];
   let tokens: RToken[] = [];
@@ -131,11 +144,11 @@ export async function getFivePoolBridge(rnd: () => number): Promise<Topology> {
 
   await approveAndFund(tokenContracts);
 
-  const testPool0_1 = await getCPPool(tokens[0], tokens[1], prices[1]/prices[0], poolDeployment, rnd,  1_500_0);
-  const testPool0_2 = await getCPPool(tokens[0], tokens[2], prices[2]/prices[0], poolDeployment, rnd,  1_000_0);
-  const testPool1_2 = await getCPPool(tokens[1], tokens[2], prices[2]/prices[1], poolDeployment, rnd,  1_000_000_000);
-  const testPool1_3 = await getCPPool(tokens[1], tokens[3], prices[3]/prices[1], poolDeployment, rnd,  1_000_0);
-  const testPool2_3 = await getCPPool(tokens[2], tokens[3], prices[3]/prices[2], poolDeployment, rnd,  1_500_0);
+  const testPool0_1 = await getCPPool(tokens[0], tokens[1], prices[1]/prices[0], poolDeployment, rnd, 0.003, 1_500_0);
+  const testPool0_2 = await getCPPool(tokens[0], tokens[2], prices[2]/prices[0], poolDeployment, rnd, 0.003, 1_000_0);
+  const testPool1_2 = await getCPPool(tokens[1], tokens[2], prices[2]/prices[1], poolDeployment, rnd, 0.003, 1_000_000_000);
+  const testPool1_3 = await getCPPool(tokens[1], tokens[3], prices[3]/prices[1], poolDeployment, rnd, 0.003, 1_000_0);
+  const testPool2_3 = await getCPPool(tokens[2], tokens[3], prices[3]/prices[2], poolDeployment, rnd, 0.003, 1_500_0);
 
   topology.pools.push(testPool0_1);
   topology.pools.push(testPool0_2);
@@ -150,6 +163,131 @@ export async function getFivePoolBridge(rnd: () => number): Promise<Topology> {
   }
 }
 
+export async function getComplexTopoplogy(rnd: () => number): Promise<Topology> {
+  const tokenContracts: Contract[] = [];
+  const tokenCount = 15;
+  const poolVariants = 2;
+
+  let topology: Topology = {
+    tokens: [],
+    prices: [],
+    pools: [],
+  }; 
+  
+
+  const poolCount = tokenCount - 1;
+
+  let priceType = 0;
+  for (var i = 0; i < tokenCount; ++i) {
+    topology.tokens.push({ name: `Token${i}`, address: "" + i }); 
+       
+      if (priceType % 2 == 0) {
+        topology.prices.push(1); 
+      } else {
+        topology.prices.push(getTokenPrice(rnd)); 
+      }
+      priceType ++;
+  }
+
+  for (let i = 0; i < topology.tokens.length; i++) {
+    const tokenContract = await ERC20Factory.deploy(
+      topology.tokens[0].name,
+      topology.tokens[0].name,
+      tokenSupply
+    );
+    await tokenContract.deployed();
+    tokenContracts.push(tokenContract);
+    topology.tokens[i].address = tokenContract.address;
+  }
+
+  await approveAndFund(tokenContracts);
+
+  let poolType = 0;
+  for (i = 0; i < poolCount; i++) {
+    for (let j = 1; j < poolVariants; j++) { 
+
+      const token0 = topology.tokens[i];
+      const token1 = topology.tokens[j];
+
+      if(token0 === token1){
+        continue;
+      }
+
+      const price0 = topology.prices[i];
+      const price1 = topology.prices[j];
+      
+      if (poolType % 2 == 0) {
+        topology.pools.push(
+          await getHybridPool(token0, token1, 1, poolDeployment, rnd)
+        );
+      } else {
+        topology.pools.push(
+          await getCPPool(token0, token1, price0 / price1, poolDeployment, rnd)
+        );
+      }
+      
+      poolType++;
+    }
+  }
+
+  return topology;
+}
+
+export async function getRandomCPTopology(tokenCount: number, density: number, rnd: () => number): Promise<Topology> {
+  const tokens: RToken[] = []
+  const prices: number[] = []
+  const pools: RPool[] = []
+
+  for (var i = 0; i < tokenCount; ++i) {
+    tokens.push({ name: `Token${i}`, address: "" + i }); 
+    prices.push(getTokenPrice(rnd)); 
+  }
+
+  const tokenContracts: Contract[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const tokenContract = await ERC20Factory.deploy(
+      tokens[0].name,
+      tokens[0].name,
+      tokenSupply
+    );
+    await tokenContract.deployed();
+    tokenContracts.push(tokenContract);
+    tokens[i].address = tokenContract.address;
+  }
+  await approveAndFund(tokenContracts);
+
+  for (i = 0; i < tokenCount; ++i) {
+    for (var j = i + 1; j < tokenCount; ++j) {
+      const r = rnd()
+      if (r < density) {
+        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd, 0.003))
+      }
+      if (r < density * density) {
+        // second pool
+        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd, 0.0005))
+      }
+      if (r < density * density * density) {
+        // third pool
+        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd, 0.002))
+      }
+      if (r < Math.pow(density, 4)) {
+        // forth pool
+        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd, 0.0015))
+      }
+      if (r < Math.pow(density, 5)) {
+        // fifth pool
+        pools.push(await getCPPool(tokens[i], tokens[j], prices[i] / prices[j], poolDeployment, rnd, 0.001))
+      }
+    }
+  }
+
+  return {
+    tokens,
+    prices,
+    pools
+  };
+}
+
 async function getTopoplogy(tokenCount: number, poolVariants: number, rnd: () => number): Promise<Topology> {
   const tokenContracts: Contract[] = [];
 
@@ -157,17 +295,7 @@ async function getTopoplogy(tokenCount: number, poolVariants: number, rnd: () =>
     tokens: [],
     prices: [],
     pools: [],
-  };
-
-  const poolDeployment: PoolDeploymentContracts = {
-    hybridPoolFactory: HybridPoolContractFactory,
-    hybridPoolContract: hybridPool,
-    constPoolFactory: ConstantPoolContractFactory,
-    constantPoolContract: constantProductPool,
-    masterDeployerContract: masterDeployer,
-    bentoContract: bento,
-    account: alice,
-  };
+  }; 
 
   const poolCount = tokenCount - 1;
 
@@ -273,6 +401,16 @@ async function deployContracts() {
     "0x0000000000000000000000000000000000000000000000000000000000000000",
     "0x0000000000000000000000000000000000000000000000000000000000000000"
   );
+
+  poolDeployment = {
+    hybridPoolFactory: HybridPoolContractFactory,
+    hybridPoolContract: hybridPool,
+    constPoolFactory: ConstantPoolContractFactory,
+    constantPoolContract: constantProductPool,
+    masterDeployerContract: masterDeployer,
+    bentoContract: bento,
+    account: alice,
+  };
 }
 
 async function approveAndFund(contracts: Contract[]) {
@@ -285,4 +423,7 @@ async function approveAndFund(contracts: Contract[]) {
   }
 } 
 
-export * from './routerParamsHelper'; 
+export * from './routerParams'; 
+export * from './random';
+export * from './interfaces';
+export * from './constants';
