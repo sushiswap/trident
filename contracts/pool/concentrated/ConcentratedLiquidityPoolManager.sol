@@ -73,7 +73,7 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
         Stake storage stake = stakes[positionId][incentiveId];
         require(position.liquidity != 0, "INACTIVE");
         require(stake.secondsGrowthInsideLast == 0, "SUBSCRIBED");
-        require(block.timestamp > incentive.startTime && block.timestamp < incentive.endTime, "INACTIVE_INCENTIVE");
+        require(block.timestamp >= incentive.startTime && block.timestamp < incentive.endTime, "INACTIVE_INCENTIVE");
         stakes[positionId][incentiveId] = Stake(uint160(rangeSecondsInside(pool, position.lower, position.upper)), true);
         emit Subscribe(positionId, incentiveId);
     }
