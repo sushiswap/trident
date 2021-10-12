@@ -645,15 +645,28 @@ describe("Router", function () {
 
       let finalLiquidity = await pool.balanceOf(alice.address);
 
-      await expect(burnLiquidityPromise)
-        .to.emit(pool, "Burn")
-        .withArgs(
-          router.address,
-          expectedWethWithdrawal,
-          0,
-          alice.address,
-          liquidity
-        );
+      if (weth.address < usdc.address) {
+        await expect(burnLiquidityPromise)
+          .to.emit(pool, "Burn")
+          .withArgs(
+            router.address,
+            expectedWethWithdrawal,
+            0,
+            alice.address,
+            liquidity
+          );
+      } else {
+        await expect(burnLiquidityPromise)
+          .to.emit(pool, "Burn")
+          .withArgs(
+            router.address,
+            0,
+            expectedWethWithdrawal,
+            alice.address,
+            liquidity
+          );
+      }
+
       let finalWethBalance = await weth.balanceOf(alice.address);
       expect(finalLiquidity).eq(initialLiquidity.sub(liquidity));
       expect(finalWethBalance.sub(initialWethBalance)).eq(

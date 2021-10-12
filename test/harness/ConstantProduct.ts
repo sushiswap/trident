@@ -450,9 +450,15 @@ export async function burnLiquidity(
     );
   }
 
-  await expect(burnLiquidityPromise)
-    .to.emit(pool, "Burn")
-    .withArgs(router.address, amount0, amount1, accounts[0].address, amount);
+  if (token0.address < token1.address) {
+    await expect(burnLiquidityPromise)
+      .to.emit(pool, "Burn")
+      .withArgs(router.address, amount0, amount1, accounts[0].address, amount);
+  } else {
+    await expect(burnLiquidityPromise)
+      .to.emit(pool, "Burn")
+      .withArgs(router.address, amount1, amount0, accounts[0].address, amount);
+  }
 
   const finalBalances = await getBalances(
     pool,
