@@ -2,12 +2,7 @@ import { BENTOBOX_ADDRESS, ChainId, WNATIVE } from "@sushiswap/core-sdk";
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-const deployFunction: DeployFunction = async function ({
-  ethers,
-  deployments,
-  getNamedAccounts,
-  getChainId,
-}: HardhatRuntimeEnvironment) {
+const deployFunction: DeployFunction = async function ({ ethers, deployments, getNamedAccounts, getChainId }: HardhatRuntimeEnvironment) {
   console.log("Running TridentRouter deploy script");
   const { deploy } = deployments;
 

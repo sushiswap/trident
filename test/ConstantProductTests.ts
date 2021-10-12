@@ -1,11 +1,6 @@
 // @ts-nocheck
 
-import {
-  initialize,
-  addLiquidity,
-  swap,
-  burnLiquidity,
-} from "./harness/ConstantProduct";
+import { initialize, addLiquidity, swap, burnLiquidity } from "./harness/ConstantProduct";
 import { getBigNumber, randBetween, ZERO } from "./harness/helpers";
 
 describe("Constant Product Pool", function () {
@@ -37,13 +32,7 @@ describe("Constant Product Pool", function () {
         // 010 -> false, true, false.
         for (let j = 0; j < 8; j++) {
           const binaryJ = j.toString(2).padStart(3, "0");
-          await swap(
-            i,
-            getBigNumber(randBetween(1, 100)),
-            binaryJ[0] == 1,
-            binaryJ[1] == 1,
-            binaryJ[2] == 1
-          );
+          await swap(i, getBigNumber(randBetween(1, 100)), binaryJ[0] == 1, binaryJ[1] == 1, binaryJ[2] == 1);
         }
       }
     });
@@ -69,8 +58,7 @@ async function addLiquidityInMultipleWays() {
   // The first loop selects the liquidity amounts to add - [0, x], [x, 0], [x, x], [x, y]
   for (let i = 0; i < 4; i++) {
     const amount0 = i == 0 ? ZERO : getBigNumber(randBetween(10, 100));
-    const amount1 =
-      i == 1 ? ZERO : i == 2 ? amount0 : getBigNumber(randBetween(10, 100));
+    const amount1 = i == 1 ? ZERO : i == 2 ? amount0 : getBigNumber(randBetween(10, 100));
 
     // We need to generate all permutations of [bool, bool]. This loop goes from 0 to 3 and then
     // we use the binary representation of `j` to get the actual values. 0 in binary = false, 1 = true.

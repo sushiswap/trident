@@ -24,7 +24,8 @@ abstract contract TridentERC20 {
     /// @notice EIP-712 typehash for this contract's domain at deployment.
     bytes32 internal immutable _DOMAIN_SEPARATOR;
     /// @notice EIP-712 typehash for this contract's {permit} struct.
-    bytes32 public constant PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+    bytes32 public constant PERMIT_TYPEHASH =
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
     /// @notice owner -> nonce mapping used in {permit}.
     mapping(address => uint256) public nonces;
 
@@ -117,7 +118,11 @@ abstract contract TridentERC20 {
     ) external {
         require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
         bytes32 digest = keccak256(
-            abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, amount, nonces[owner]++, deadline)))
+            abi.encodePacked(
+                "\x19\x01",
+                DOMAIN_SEPARATOR(),
+                keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, amount, nonces[owner]++, deadline))
+            )
         );
         address recoveredAddress = ecrecover(digest, v, r, s);
         require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_PERMIT_SIGNATURE");
