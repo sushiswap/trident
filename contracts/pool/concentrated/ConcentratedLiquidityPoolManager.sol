@@ -17,11 +17,11 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
     struct Incentive {
         address owner;
         address token;
-        uint160 secondsClaimed; // @dev x128.
-        uint96 rewardsUnclaimed;
         uint32 startTime;
         uint32 endTime;
         uint32 expiry;
+        uint160 secondsClaimed; // @dev x128.
+        uint96 rewardsUnclaimed;
     }
 
     struct Stake {
