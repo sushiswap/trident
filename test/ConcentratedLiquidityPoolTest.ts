@@ -16,7 +16,7 @@ import {
 import { getBigNumber } from "./harness/helpers";
 import { Trident, TWO_POW_96 } from "./harness/Trident";
 
-describe("Concentrated Liquidity Product Pool", function () {
+describe.only("Concentrated Liquidity Product Pool", function () {
   let snapshotId: string;
   let trident: Trident;
   let defaultAddress: string;
@@ -466,7 +466,7 @@ describe("Concentrated Liquidity Product Pool", function () {
           tokenId: Number(mint.tokenId.toString()),
           liquidityAmount: userLiquidityPartial,
           recipient: trident.accounts[0].address,
-          unwrapBento: true,
+          unwrapBento: false,
         };
         await removeLiquidityViaManager(removeLiquidityParams);
         removeLiquidityParams.liquidityAmount = userLiquidity.sub(userLiquidityPartial);

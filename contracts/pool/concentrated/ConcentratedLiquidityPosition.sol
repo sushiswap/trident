@@ -7,6 +7,7 @@ import "../../interfaces/IConcentratedLiquidityPool.sol";
 import "../../interfaces/IMasterDeployer.sol";
 import "../../interfaces/ITridentRouter.sol";
 import "../../libraries/concentratedPool/FullMath.sol";
+import "../../libraries/concentratedPool/TickMath.sol";
 import "./TridentNFT.sol";
 import "hardhat/console.sol";
 
@@ -57,21 +58,34 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         uint128 amount,
         address recipient,
         bool unwrapBento
-    ) external {
+    ) external returns (uint256 token0Amount, uint256 token1Amount) {
         require(msg.sender == ownerOf[tokenId], "NOT_ID_OWNER");
         Position storage position = positions[tokenId];
+
         if (position.liquidity < amount) amount = position.liquidity;
 
-        // (uint256 amount0, uint256 amount1) = position.pool.getAm
-
-        position.pool.burn(abi.encode(position.lower, position.upper, amount, recipient, unwrapBento));
-
         if (amount < position.liquidity) {
+            (uint256 currentPrice, ) = position.pool.getPriceAndNearestTicks();
+            uint160 priceLower = TickMath.getSqrtRatioAtTick(position.lower);
+            uint160 priceUpper = TickMath.getSqrtRatioAtTick(position.upper);
+
+            (token0Amount, token1Amount) = position.pool.getAmountsForLiquidity(priceLower, priceUpper, currentPrice, amount, false);
+
+            IPool.TokenAmount[] memory withdrawAmounts = position.pool.burn(
+                abi.encode(position.lower, position.upper, amount, address(this), false)
+            );
+
             position.liquidity -= amount;
+
+            _transfer(withdrawAmounts[0].token, address(this), recipient, token0Amount, unwrapBento);
+            _transfer(withdrawAmounts[1].token, address(this), recipient, token1Amount, unwrapBento);
         } else {
+            collect(tokenId, recipient, unwrapBento);
+            position.pool.burn(abi.encode(position.lower, position.upper, amount, recipient, unwrapBento));
             delete positions[tokenId];
             _burn(tokenId);
         }
+
         emit Burn(address(position.pool), msg.sender, tokenId);
     }
 
@@ -79,7 +93,7 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         uint256 tokenId,
         address recipient,
         bool unwrapBento
-    ) external returns (uint256 token0amount, uint256 token1amount) {
+    ) public returns (uint256 token0amount, uint256 token1amount) {
         require(msg.sender == ownerOf[tokenId], "NOT_ID_OWNER");
 
         Position storage position = positions[tokenId];
