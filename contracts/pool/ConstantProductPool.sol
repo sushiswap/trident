@@ -50,13 +50,13 @@ contract ConstantProductPool is IPool, TridentERC20 {
         unlocked = 1;
     }
 
-    constructor(bytes memory _deployData, address _masterDeployer) {
+    constructor(bytes memory _deployData, IMasterDeployer _masterDeployer) {
         (address _token0, address _token1, uint256 _swapFee, bool _twapSupport) = abi.decode(
             _deployData,
             (address, address, uint256, bool)
         );
 
-        // @dev Factory ensures that the tokens are sorted.
+        // Factory ensures that the tokens are sorted.
         require(_token0 != address(0), "ZERO_ADDRESS");
         require(_token0 != _token1, "IDENTICAL_ADDRESSES");
         require(_token0 != address(this), "INVALID_TOKEN");
@@ -66,14 +66,14 @@ contract ConstantProductPool is IPool, TridentERC20 {
         token0 = _token0;
         token1 = _token1;
         swapFee = _swapFee;
-        // @dev This is safe from underflow - `swapFee` cannot exceed `MAX_FEE` per previous check.
+        // This is safe from underflow - `swapFee` cannot exceed `MAX_FEE` per previous check.
         unchecked {
             MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
         }
-        barFee = IMasterDeployer(_masterDeployer).barFee();
-        barFeeTo = IMasterDeployer(_masterDeployer).barFeeTo();
-        bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
-        masterDeployer = IMasterDeployer(_masterDeployer);
+        barFee = _masterDeployer.barFee();
+        barFeeTo = _masterDeployer.barFeeTo();
+        bento = IBentoBoxMinimal(_masterDeployer.bento());
+        masterDeployer = _masterDeployer;
         unlocked = 1;
         if (_twapSupport) blockTimestampLast = 1;
     }
@@ -128,7 +128,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         _burn(address(this), liquidity);
         _transfer(token0, amount0, recipient, unwrapBento);
         _transfer(token1, amount1, recipient, unwrapBento);
-        // @dev This is safe from underflow - amounts are lesser figures derived from balances.
+        // This is safe from underflow - amounts are lesser figures derived from balances.
         unchecked {
             balance0 -= amount0;
             balance1 -= amount1;
@@ -161,7 +161,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         // Swap one token for another
         unchecked {
             if (tokenOut == token1) {
-                // @dev Swap `token0` for `token1`
+                // Swap `token0` for `token1`
                 // - calculate `amountOut` as if the user first withdrew balanced liquidity and then swapped `token0` for `token1`.
                 amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1);
                 _transfer(token1, amount1, recipient, unwrapBento);
@@ -169,7 +169,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
                 amountOut = amount1;
                 amount0 = 0;
             } else {
-                // @dev Swap `token1` for `token0`.
+                // Swap `token1` for `token0`.
                 require(tokenOut == token0, "INVALID_OUTPUT_TOKEN");
                 amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0);
                 _transfer(token0, amount0, recipient, unwrapBento);
@@ -241,7 +241,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
     /// @dev Updates `barFee` for Trident protocol.
     function updateBarFee() public {
-        barFee = IMasterDeployer(masterDeployer).barFee();
+        barFee = masterDeployer.barFee();
     }
 
     function _getReserves()
@@ -272,7 +272,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
     ) internal {
         require(balance0 <= type(uint112).max && balance1 <= type(uint112).max, "OVERFLOW");
         if (_blockTimestampLast == 0) {
-            // @dev TWAP support is disabled for gas efficiency.
+            // TWAP support is disabled for gas efficiency.
             reserve0 = uint112(balance0);
             reserve1 = uint112(balance1);
         } else {
@@ -299,7 +299,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         if (_kLast != 0) {
             computed = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
             if (computed > _kLast) {
-                // @dev `barFee` % of increase in liquidity.
+                // `barFee` % of increase in liquidity.
                 // It's going to be slightly less than `barFee` % in reality due to the math.
                 uint256 liquidity = (_totalSupply * (computed - _kLast) * barFee) / computed / MAX_FEE;
                 if (liquidity != 0) {
@@ -378,7 +378,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         return _getReserves();
     }
 
-    /// @dev returned values are the native ERC20 token amounts.
+    /// @dev Returned values are the native ERC20 token amounts.
     function getNativeReserves()
         public
         view
