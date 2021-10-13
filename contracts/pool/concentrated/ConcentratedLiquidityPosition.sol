@@ -67,7 +67,7 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         uint128 amount,
         address recipient,
         bool unwrapBento
-    ) external returns (uint256 token0Amount, uint256 token1Amount) {
+    ) external {
         require(msg.sender == ownerOf[tokenId], "NOT_ID_OWNER");
         Position storage position = positions[tokenId];
 
@@ -78,7 +78,13 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
             uint160 priceLower = TickMath.getSqrtRatioAtTick(position.lower);
             uint160 priceUpper = TickMath.getSqrtRatioAtTick(position.upper);
 
-            (token0Amount, token1Amount) = position.pool.getAmountsForLiquidity(priceLower, priceUpper, currentPrice, amount, false);
+            (uint256 token0Amount, uint256 token1Amount) = position.pool.getAmountsForLiquidity(
+                priceLower,
+                priceUpper,
+                currentPrice,
+                amount,
+                false
+            );
 
             IPool.TokenAmount[] memory withdrawAmounts = position.pool.burn(
                 abi.encode(position.lower, position.upper, amount, address(this), false)
