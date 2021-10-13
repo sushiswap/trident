@@ -65,17 +65,18 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
     }
 
     /// @dev Subscribes a non-fungible position token to an incentive.
-    function subscribe(uint256 positionId, uint256[] calldata incentiveId) public {
+    function subscribe(uint256 positionId, uint256[] calldata incentiveId) external {
         require(ownerOf[positionId] == msg.sender, "OWNER");
         Position memory position = positions[positionId];
         IConcentratedLiquidityPool pool = position.pool;
         require(position.liquidity != 0, "INACTIVE");
+        Stake memory stakeData = Stake(uint160(rangeSecondsInside(pool, position.lower, position.upper)), true);
         for (uint256 i; i < incentiveId.length; i++) {
             Incentive memory incentive = incentives[pool][incentiveId[i]];
             Stake storage stake = stakes[positionId][incentiveId[i]];
             require(stake.secondsGrowthInsideLast == 0, "SUBSCRIBED");
             require(block.timestamp >= incentive.startTime && block.timestamp < incentive.endTime, "INACTIVE_INCENTIVE");
-            stakes[positionId][incentiveId[i]] = Stake(uint160(rangeSecondsInside(pool, position.lower, position.upper)), true);
+            stakes[positionId][incentiveId[i]] = stakeData;
             emit Subscribe(positionId, incentiveId[i]);
         }
     }
