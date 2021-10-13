@@ -31,6 +31,8 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
 
     mapping(IConcentratedLiquidityPool => uint256) public incentiveCount;
     mapping(IConcentratedLiquidityPool => mapping(uint256 => Incentive)) public incentives;
+    /// @dev When subscribing to an incentive we take a snapshot of the position secondsGrowth accumulator.
+    /// @dev positionId to incentiveId to position's secondsGrowth snapshot mapping.
     mapping(uint256 => mapping(uint256 => Stake)) public stakes;
 
     constructor(address _masterDeployer) ConcentratedLiquidityPosition(_masterDeployer) {}
@@ -80,28 +82,44 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
         }
     }
 
-    function claimReward(
+    function claimRewards(
         uint256 positionId,
-        uint256 incentiveId,
+        uint256[] memory incentiveIds,
         address recipient,
         bool unwrapBento
     ) public {
         require(ownerOf[positionId] == msg.sender, "OWNER");
+
         Position memory position = positions[positionId];
         IConcentratedLiquidityPool pool = position.pool;
-        Incentive storage incentive = incentives[position.pool][incentiveId];
-        Stake storage stake = stakes[positionId][incentiveId];
-        require(stake.initialized, "UNINITIALIZED");
-        uint256 secondsGrowth = rangeSecondsInside(pool, position.lower, position.upper) - stake.secondsGrowthInsideLast;
-        uint256 secondsInside = secondsGrowth * position.liquidity; // x128
-        uint256 maxTime = block.timestamp < incentive.endTime ? incentive.endTime : block.timestamp;
-        uint256 secondsUnclaimed = ((maxTime - incentive.startTime) << 128) - incentive.secondsClaimed;
-        uint256 rewards = (incentive.rewardsUnclaimed * secondsInside) / secondsUnclaimed; // x128 cancels out
-        incentive.secondsClaimed += uint160(secondsInside);
-        stake.secondsGrowthInsideLast += uint160(secondsGrowth);
-        incentive.rewardsUnclaimed -= uint96(rewards);
-        _transfer(incentive.token, address(this), recipient, rewards, unwrapBento);
-        emit ClaimReward(positionId, incentiveId, recipient, uint96(rewards));
+
+        uint256 currentSecondsGrowth = rangeSecondsInside(pool, position.lower, position.upper);
+
+        for (uint256 i = 0; i < incentiveIds.length; i++) {
+            Incentive storage incentive = incentives[pool][incentiveIds[i]];
+            Stake storage stake = stakes[positionId][incentiveIds[i]];
+
+            require(stake.initialized, "UNINITIALIZED");
+
+            uint256 rewards;
+            uint256 secondsInside;
+
+            {
+                uint256 secondsGrowth = currentSecondsGrowth - stake.secondsGrowthInsideLast;
+                uint256 maxTime = block.timestamp < incentive.endTime ? incentive.endTime : block.timestamp;
+                uint256 secondsUnclaimed = ((maxTime - incentive.startTime) << 128) - incentive.secondsClaimed;
+                secondsInside = secondsGrowth * position.liquidity; // secondsGrowth is multiplied by 2**128
+                rewards = (incentive.rewardsUnclaimed * secondsInside) / secondsUnclaimed; // 2**128 cancels out
+            }
+
+            stake.secondsGrowthInsideLast = uint160(currentSecondsGrowth);
+            incentive.secondsClaimed += uint160(secondsInside);
+            incentive.rewardsUnclaimed -= uint96(rewards);
+
+            _transfer(incentive.token, address(this), recipient, rewards, unwrapBento);
+
+            emit ClaimReward(positionId, incentiveIds[i], recipient, uint96(rewards));
+        }
     }
 
     function getReward(uint256 positionId, uint256 incentiveId) public view returns (uint256 rewards, uint256 secondsInside) {
@@ -118,6 +136,7 @@ contract ConcentratedLiquidityPoolManager is ConcentratedLiquidityPosition {
         }
     }
 
+    /// @dev Calculates the "seconds per liquidity" accumulator for a range.
     function rangeSecondsInside(
         IConcentratedLiquidityPool pool,
         int24 lowerTick,
