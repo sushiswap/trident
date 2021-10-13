@@ -5,7 +5,7 @@ pragma solidity >=0.8.0;
 import "../TridentRouter.sol";
 
 /// @notice Trident router helper contract.
-contract TridentHelper {
+contract RouterHelper {
     /// @notice ERC-20 token for wrapped ETH (v9).
     address internal immutable wETH;
     /// @notice The user should use 0x0 if they want to deposit ETH
@@ -18,6 +18,7 @@ contract TridentHelper {
     /// @notice Provides batch function calls for this contract and returns the data from all of them if they all succeed.
     /// Adapted from https://github.com/Uniswap/uniswap-v3-periphery/blob/main/contracts/base/Multicall.sol, License-Identifier: GPL-2.0-or-later.
     /// @dev The `msg.value` should not be trusted for any method callable from this function.
+    /// @dev Uses a modified version of the batch function - preventing multiple calls of the swap functions
     /// @param data ABI-encoded params for each of the calls to make to this contract.
     /// @return results The results from each of the calls passed in via `data`.
     function batch(bytes[] calldata data) external payable returns (bytes[] memory results) {

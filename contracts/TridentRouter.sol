@@ -5,11 +5,11 @@ pragma solidity >=0.8.0;
 import "./interfaces/IBentoBoxMinimal.sol";
 import "./interfaces/IPool.sol";
 import "./interfaces/ITridentRouter.sol";
-import "./utils/TridentHelper.sol";
 import "./deployer/MasterDeployer.sol";
+import "./utils/RouterHelper.sol";
 
 /// @notice Router contract that helps in swapping across Trident pools.
-contract TridentRouter is ITridentRouter, TridentHelper {
+contract TridentRouter is ITridentRouter, RouterHelper {
     /// @notice BentoBox token vault.
     IBentoBoxMinimal public immutable bento;
     MasterDeployer public immutable masterDeployer;
@@ -25,7 +25,7 @@ contract TridentRouter is ITridentRouter, TridentHelper {
         IBentoBoxMinimal _bento,
         MasterDeployer _masterDeployer,
         address _wETH
-    ) TridentHelper(_wETH) {
+    ) RouterHelper(_wETH) {
         _bento.registerProtocol();
         bento = _bento;
         masterDeployer = _masterDeployer;
