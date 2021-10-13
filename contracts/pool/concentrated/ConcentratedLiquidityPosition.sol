@@ -8,6 +8,7 @@ import "../../interfaces/IMasterDeployer.sol";
 import "../../interfaces/ITridentRouter.sol";
 import "../../libraries/concentratedPool/FullMath.sol";
 import "../../libraries/concentratedPool/TickMath.sol";
+import "../../utils/TridentBatchable.sol";
 import "./TridentNFT.sol";
 import "hardhat/console.sol";
 
