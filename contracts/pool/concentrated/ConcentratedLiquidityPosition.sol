@@ -69,6 +69,27 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
             uint160 priceLower = TickMath.getSqrtRatioAtTick(position.lower);
             uint160 priceUpper = TickMath.getSqrtRatioAtTick(position.upper);
 
+            uint256 feeAmount0;
+            uint256 feeAmount1;
+
+            {
+                (uint256 feeGrowthInside0, uint256 feeGrowthInside1) = position.pool.rangeFeeGrowth(position.lower, position.upper);
+                feeAmount0 = FullMath.mulDiv(
+                    feeGrowthInside0 - position.feeGrowthInside0,
+                    position.liquidity,
+                    0x100000000000000000000000000000000
+                );
+
+                feeAmount1 = FullMath.mulDiv(
+                    feeGrowthInside1 - position.feeGrowthInside1,
+                    position.liquidity,
+                    0x100000000000000000000000000000000
+                );
+
+                position.feeGrowthInside0 = feeGrowthInside0;
+                position.feeGrowthInside1 = feeGrowthInside1;
+            }
+
             (uint256 token0Amount, uint256 token1Amount) = position.pool.getAmountsForLiquidity(
                 priceLower,
                 priceUpper,
@@ -83,8 +104,8 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
 
             position.liquidity -= amount;
 
-            _transfer(withdrawAmounts[0].token, address(this), recipient, token0Amount, unwrapBento);
-            _transfer(withdrawAmounts[1].token, address(this), recipient, token1Amount, unwrapBento);
+            _transfer(withdrawAmounts[0].token, address(this), recipient, token0Amount + feeAmount0, unwrapBento);
+            _transfer(withdrawAmounts[1].token, address(this), recipient, token1Amount + feeAmount1, unwrapBento);
         } else {
             collect(tokenId, recipient, unwrapBento);
             position.pool.burn(abi.encode(position.lower, position.upper, amount, recipient, unwrapBento));
