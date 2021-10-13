@@ -37,10 +37,10 @@ interface IUniswapV2Minimal {
 }
 
 /// @notice Migrator for UniswapV2-type pair pools and Trident.
-contract TridentSushiRoll is ITridentRouterMinimal {
-    ITridentRouterMinimal internal immutable tridentRouter;
+contract TridentSushiRoll {
+    address internal immutable tridentRouter;
 
-    constructor(ITridentRouterMinimal _tridentRouter) {
+    constructor(address _tridentRouter) {
         tridentRouter = _tridentRouter;
     }
     
@@ -61,18 +61,23 @@ contract TridentSushiRoll is ITridentRouterMinimal {
         
         IUniswapV2Minimal(pair).burn(address(this));
 
-        TokenInput[] memory input = new TokenInput[](2);
+        ITridentRouterMinimal.TokenInput[] memory input = new ITridentRouterMinimal.TokenInput[](2);
         
         IERC20 token0 = IERC20(IUniswapV2Minimal(pair).token0());
         IERC20 token1 = IERC20(IUniswapV2Minimal(pair).token1());
         
-        input[0] = TokenInput(address(token0), true, token0.balanceOf(address(this)));
-        input[1] = TokenInput(address(token1), true, token1.balanceOf(address(this)));
+        input[0].token = address(token0);
+        input[0].native = true;
+        input[0].amount = token0.balanceOf(address(this));
         
-        token0.approve(address(tridentRouter), input[0].amount);
-        token1.approve(address(tridentRouter), input[1].amount);
+        input[1].token = address(token1);
+        input[1].native = true;
+        input[1].amount = token1.balanceOf(address(this));
+
+        token0.approve(tridentRouter, input[0].amount);
+        token1.approve(tridentRouter, input[1].amount);
         
-        liquidity = tridentRouter.addLiquidity(
+        liquidity = ITridentRouterMinimal(tridentRouter).addLiquidity(
             input,
             pool,
             minLiquidity,
