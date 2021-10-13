@@ -28,6 +28,7 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         int24 upper;
         uint256 feeGrowthInside0; /// @dev Per unit of liquidity.
         uint256 feeGrowthInside1;
+        uint128 liquidityDebt;
     }
 
     constructor(address _masterDeployer) {
@@ -47,7 +48,15 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         uint256 feeGrowthInside1
     ) external returns (uint256 positionId) {
         require(IMasterDeployer(masterDeployer).pools(msg.sender), "NOT_POOL");
-        positions[totalSupply] = Position(IConcentratedLiquidityPool(msg.sender), amount, lower, upper, feeGrowthInside0, feeGrowthInside1);
+        positions[totalSupply] = Position(
+            IConcentratedLiquidityPool(msg.sender),
+            amount,
+            lower,
+            upper,
+            feeGrowthInside0,
+            feeGrowthInside1,
+            0
+        );
         positionId = totalSupply;
         _mint(recipient);
         emit Mint(msg.sender, recipient, positionId);
@@ -76,6 +85,7 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
             );
 
             position.liquidity -= amount;
+            position.liquidityDebt += amount;
 
             _transfer(withdrawAmounts[0].token, address(this), recipient, token0Amount, unwrapBento);
             _transfer(withdrawAmounts[1].token, address(this), recipient, token1Amount, unwrapBento);
@@ -104,17 +114,19 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
             (uint256 feeGrowthInside0, uint256 feeGrowthInside1) = position.pool.rangeFeeGrowth(position.lower, position.upper);
             token0amount = FullMath.mulDiv(
                 feeGrowthInside0 - position.feeGrowthInside0,
-                position.liquidity,
+                position.liquidity + position.liquidityDebt,
                 0x100000000000000000000000000000000
             );
             token1amount = FullMath.mulDiv(
                 feeGrowthInside1 - position.feeGrowthInside1,
-                position.liquidity,
+                position.liquidity + position.liquidityDebt,
                 0x100000000000000000000000000000000
             );
 
             position.feeGrowthInside0 = feeGrowthInside0;
             position.feeGrowthInside1 = feeGrowthInside1;
+            position.liquidityDebt = 0;
+            position.liquidityDebt = 0;
         }
 
         uint256 balance0 = bento.balanceOf(token0, address(this));
