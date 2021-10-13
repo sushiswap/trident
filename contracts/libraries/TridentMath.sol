@@ -48,7 +48,7 @@ library TridentMath {
                 r = (r + x / r) >> 1;
                 r = (r + x / r) >> 1;
                 r = (r + x / r) >> 1;
-                r = (r + x / r) >> 1; // @dev Seven iterations should be enough.
+                r = (r + x / r) >> 1; // Seven iterations should be enough.
                 uint256 r1 = x / r;
                 result = r < r1 ? r : r1;
             }
