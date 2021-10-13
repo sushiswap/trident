@@ -648,8 +648,8 @@ describe("Concentrated Liquidity Product Pool", function () {
       const recipientA = trident.accounts[1].address;
       const recipientB = trident.accounts[2].address;
       const recipientC = trident.accounts[3].address;
-      await trident.concentratedPoolManager.claimReward(mintA.tokenId, 0, recipientA, false);
-      await trident.concentratedPoolManager.claimReward(mintB.tokenId, 0, recipientB, false);
+      await trident.concentratedPoolManager.claimRewards(mintA.tokenId, [0], recipientA, false);
+      await trident.concentratedPoolManager.claimRewards(mintB.tokenId, [0], recipientB, false);
       incentive = await trident.concentratedPoolManager.incentives(pool.address, 0);
       const secondsClaimed = incentive.secondsClaimed.div(TWO_POW_128);
       const rewardsUnclaimed = incentive.rewardsUnclaimed;
@@ -686,9 +686,9 @@ describe("Concentrated Liquidity Product Pool", function () {
         inAmount: newMaxDy.div(10),
         recipient: defaultAddress,
       });
-      await trident.concentratedPoolManager.claimReward(mintA.tokenId, 0, recipientA, false);
-      await trident.concentratedPoolManager.claimReward(mintB.tokenId, 0, recipientB, false);
-      await trident.concentratedPoolManager.claimReward(mintC.tokenId, 0, recipientC, false);
+      await trident.concentratedPoolManager.claimRewards(mintA.tokenId, [0], recipientA, false);
+      await trident.concentratedPoolManager.claimRewards(mintB.tokenId, [0], recipientB, false);
+      await trident.concentratedPoolManager.claimRewards(mintC.tokenId, [0], recipientC, false);
       const newRewardsA = await trident.bento.balanceOf(trident.extraToken.address, recipientA);
       const newRewardsB = await trident.bento.balanceOf(trident.extraToken.address, recipientB);
       const newRewardsC = await trident.bento.balanceOf(trident.extraToken.address, recipientC);
