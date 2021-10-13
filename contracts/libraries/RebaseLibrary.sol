@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity ^0.8;
+pragma solidity >=0.8.0;
 
 struct Rebase {
     uint128 elastic;
     uint128 base;
 }
 
-/// @notice A rebasing library
+/// @notice A rebasing library.
 library RebaseLibrary {
     /// @notice Calculates the base value in relationship to `elastic` and `total`.
     function toBase(Rebase memory total, uint256 elastic) internal pure returns (uint256 base) {
