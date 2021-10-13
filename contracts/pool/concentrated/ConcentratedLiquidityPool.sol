@@ -192,7 +192,7 @@ contract ConcentratedLiquidityPool is IPool {
             uint160(currentPrice)
         );
 
-        (uint128 amount0Actual, uint128 amount1Actual) = _getAmountsForLiquidity(priceLower, priceUpper, currentPrice, _liquidity, true);
+        (uint128 amount0Actual, uint128 amount1Actual) = getAmountsForLiquidity(priceLower, priceUpper, currentPrice, _liquidity, true);
 
         ITridentRouter.TokenInput[] memory callbackData = new ITridentRouter.TokenInput[](2);
         callbackData[0] = ITridentRouter.TokenInput(token0, mintParams.token0native, amount0Actual);
@@ -243,7 +243,7 @@ contract ConcentratedLiquidityPool is IPool {
             if (priceLower < currentPrice && currentPrice < priceUpper) liquidity -= amount;
         }
 
-        (uint256 amount0, uint256 amount1) = _getAmountsForLiquidity(
+        (uint256 amount0, uint256 amount1) = getAmountsForLiquidity(
             uint256(priceLower),
             uint256(priceUpper),
             uint256(currentPrice),
@@ -471,13 +471,13 @@ contract ConcentratedLiquidityPool is IPool {
         require((upper / int24(tickSpacing)) % 2 != 0, "UPPER_ODD"); /// @dev Can be either -1 or 1.
     }
 
-    function _getAmountsForLiquidity(
+    function getAmountsForLiquidity(
         uint256 priceLower,
         uint256 priceUpper,
         uint256 currentPrice,
         uint256 liquidityAmount,
         bool roundUp
-    ) internal pure returns (uint128 token0amount, uint128 token1amount) {
+    ) public pure returns (uint128 token0amount, uint128 token1amount) {
         if (priceUpper <= currentPrice) {
             /// @dev Only supply `token1` (`token1` is Y).
             token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, priceUpper, roundUp));
