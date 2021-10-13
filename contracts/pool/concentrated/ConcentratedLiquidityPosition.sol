@@ -62,6 +62,8 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         Position storage position = positions[tokenId];
         if (position.liquidity < amount) amount = position.liquidity;
 
+        // (uint256 amount0, uint256 amount1) = position.pool.getAm
+
         position.pool.burn(abi.encode(position.lower, position.upper, amount, recipient, unwrapBento));
 
         if (amount < position.liquidity) {
