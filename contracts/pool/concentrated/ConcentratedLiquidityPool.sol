@@ -251,6 +251,7 @@ contract ConcentratedLiquidityPool is IPool {
             false
         );
 
+        require(amount <= uint128(type(int128).max), "overflow"); // conversion will be shifted to library
         (uint256 amount0fees, uint256 amount1fees) = _updatePosition(msg.sender, lower, upper, -int128(amount));
 
         unchecked {

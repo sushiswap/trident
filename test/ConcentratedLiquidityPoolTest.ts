@@ -1,3 +1,4 @@
+import { BigNumber } from "@ethersproject/bignumber";
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
 import {
@@ -783,6 +784,55 @@ describe("Concentrated Liquidity Product Pool", function () {
         //addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
         //await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("UPPER_ORDER");
       }
+    });
+
+    it.only("Should fail to burn if overflow", async () => {
+      const pool = trident.concentratedPools[0];
+
+      helper.reset();
+      const tickSpacing = (await pool.getImmutables())._tickSpacing;
+      const tickAtPrice = await getTickAtCurrentPrice(pool);
+      const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
+      const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+
+      let lower = nearestEvenValidTick - step;
+      let upper = nearestEvenValidTick + step + tickSpacing;
+
+      let addLiquidityParams = {
+        pool: pool,
+        amount0Desired: getBigNumber(1000),
+        amount1Desired: getBigNumber(1000),
+        native: false,
+        lowerOld: helper.insert(lower),
+        lower,
+        upperOld: helper.insert(upper),
+        upper,
+        positionOwner: trident.concentratedPoolManager.address,
+        recipient: defaultAddress,
+      };
+
+      await addLiquidityViaRouter(addLiquidityParams);
+
+      lower = 609332;
+      upper = lower + 1;
+
+      const tokens = await pool.getAssets();
+      const token0BalanceInitial = await Trident.Instance.bento.balanceOf(tokens[0], pool.address);
+
+      await expect(
+        pool
+          .connect(trident.accounts[4])
+          .burn(
+            ethers.utils.defaultAbiCoder.encode(
+              ["int24", "int24", "uint128", "address", "bool"],
+              [lower, upper, BigNumber.from(`2`).pow(128).sub(`1`), trident.accounts[4].address, false]
+            )
+          )
+      ).to.be.revertedWith("overflow");
+
+      // const token0BalanceAfter = await Trident.Instance.bento.balanceOf(tokens[0], pool.address);
+      // console.log(token0BalanceAfter.toString())
+      // expect(token0BalanceAfter).lt(getBigNumber('1'))
     });
   });
 });
