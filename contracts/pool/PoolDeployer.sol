@@ -25,9 +25,9 @@ abstract contract PoolDeployer {
         address[] memory tokens,
         bytes32 salt
     ) internal onlyMaster {
-        // @dev Store the address of the deployed contract.
+        // Store the address of the deployed contract.
         configAddress[salt] = pool;
-        // @dev Attacker used underflow, it was not very effective. poolimon!
+        // Attacker used underflow, it was not very effective. poolimon!
         // null token array would cause deployment to fail via out of bounds memory axis/gas limit.
         unchecked {
             for (uint256 i; i < tokens.length - 1; i++) {
