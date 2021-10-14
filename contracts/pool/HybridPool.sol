@@ -429,8 +429,13 @@ contract HybridPool is IPool, TridentERC20 {
         if (tokenIn == token0) {
             finalAmountOut = bento.toShare(token1, _getAmountOut(amountIn, _reserve0, _reserve1, true), false);
         } else {
+            require(tokenIn == token1, "INVALID_INPUT_TOKEN");
             finalAmountOut = bento.toShare(token0, _getAmountOut(amountIn, _reserve0, _reserve1, false), false);
         }
+    }
+
+    function getAmountIn(bytes calldata) public pure override returns (uint256) {
+        revert();
     }
 
     function getReserves() public view returns (uint256 _reserve0, uint256 _reserve1) {
