@@ -100,7 +100,7 @@
     "seedrandom": "^3.0.5",
     "solhint": "^3.0.0",
     "solhint-plugin-prettier": "^0.0.5",
-    "solidity-coverage": "^0.7.0",
+    "solidity-coverage": "^0.7.17",
     "ts-generator": "^0.1.0",
     "ts-node": "^10.0.0",
     "typechain": "^5.0.0",
