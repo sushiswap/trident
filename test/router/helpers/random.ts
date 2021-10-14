@@ -1,4 +1,4 @@
-import { Variants } from "./helperInterfaces"
+import { Variants } from "./interfaces"
 
 export function getRandom(rnd: () => number, min: number, max: number) {
     const minL = Math.log(min)
