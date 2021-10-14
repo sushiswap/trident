@@ -6,4 +6,3 @@ coverage/
 node_modules/
 package.json
 types/
-test/router/helpers/
