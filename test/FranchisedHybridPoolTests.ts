@@ -5,16 +5,7 @@ import { ethers } from "hardhat";
 import { expect } from "chai";
 import { getBigNumber } from "./utilities";
 
-let alice,
-  aliceEncoded,
-  feeTo,
-  weth,
-  usdc,
-  bento,
-  masterDeployer,
-  tridentPoolFactory,
-  router,
-  pool;
+let alice, aliceEncoded, feeTo, weth, usdc, bento, masterDeployer, tridentPoolFactory, router, pool;
 
 describe("Franchised hybrid pool", function () {
   before(async function () {
@@ -36,21 +27,10 @@ describe("Franchised hybrid pool", function () {
         amount: amount,
       },
     ];
-    let addLiquidityPromise = router.addLiquidity(
-      liquidityInput,
-      pool.address,
-      1,
-      aliceEncoded
-    );
+    let addLiquidityPromise = router.addLiquidity(liquidityInput, pool.address, 1, aliceEncoded);
     await expect(addLiquidityPromise)
       .to.emit(pool, "Mint")
-      .withArgs(
-        router.address,
-        liquidityInput[0].amount,
-        liquidityInput[1].amount,
-        alice.address,
-        expectedLiquidity
-      );
+      .withArgs(router.address, liquidityInput[0].amount, liquidityInput[1].amount, alice.address, expectedLiquidity);
 
     let totalSupply = await pool.totalSupply();
     let wethPoolBalance = await bento.balanceOf(weth.address, pool.address);
@@ -64,66 +44,26 @@ describe("Franchised hybrid pool", function () {
   it("Should burn liquidity for single token", async function () {
     await pool.approve(router.address, BigNumber.from(10).pow(20));
     let initialLiquidity = await pool.balanceOf(alice.address);
-
-    let initialWethBalance = await weth.balanceOf(alice.address);
-    let expectedWethWithdrawal = BigNumber.from(9984999991);
     let liquidity = BigNumber.from(10).pow(10);
 
-    const burnData = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "bool"],
-      [weth.address, alice.address, true]
-    );
+    const burnData = ethers.utils.defaultAbiCoder.encode(["address", "address", "bool"], [weth.address, alice.address, true]);
 
-    let burnLiquidityPromise = router.burnLiquiditySingle(
-      pool.address,
-      liquidity,
-      burnData,
-      1
-    );
+    let burnLiquidityPromise = router.burnLiquiditySingle(pool.address, liquidity, burnData, 1);
 
+    await expect(burnLiquidityPromise).to.emit(pool, "Burn");
     let finalLiquidity = await pool.balanceOf(alice.address);
-
-    if (weth.address < usdc.address) {
-      await expect(burnLiquidityPromise)
-        .to.emit(pool, "Burn")
-        .withArgs(
-          router.address,
-          expectedWethWithdrawal,
-          0,
-          alice.address,
-          liquidity
-        );
-    } else {
-      await expect(burnLiquidityPromise)
-        .to.emit(pool, "Burn")
-        .withArgs(
-          router.address,
-          0,
-          expectedWethWithdrawal,
-          alice.address,
-          liquidity
-        );
-    }
-
-    let finalWethBalance = await weth.balanceOf(alice.address);
     expect(finalLiquidity).eq(initialLiquidity.sub(liquidity));
-    expect(finalWethBalance.sub(initialWethBalance)).eq(expectedWethWithdrawal);
   });
 });
 
 export async function initialize() {
   [alice, feeTo] = await ethers.getSigners();
-  aliceEncoded = ethers.utils.defaultAbiCoder.encode(
-    ["address"],
-    [alice.address]
-  );
+  aliceEncoded = ethers.utils.defaultAbiCoder.encode(["address"], [alice.address]);
 
   const ERC20 = await ethers.getContractFactory("ERC20Mock");
   const Bento = await ethers.getContractFactory("BentoBoxV1");
   const Deployer = await ethers.getContractFactory("MasterDeployer");
-  const PoolFactory = await ethers.getContractFactory(
-    "FranchisedHybridPoolFactory"
-  );
+  const PoolFactory = await ethers.getContractFactory("FranchisedHybridPoolFactory");
   const TridentRouter = await ethers.getContractFactory("TridentRouter");
   const Pool = await ethers.getContractFactory("FranchisedHybridPool");
   const WhiteListManager = await ethers.getContractFactory("WhiteListManager");
@@ -139,11 +79,7 @@ export async function initialize() {
 
   tridentPoolFactory = await PoolFactory.deploy(masterDeployer.address);
   await tridentPoolFactory.deployed();
-  router = await TridentRouter.deploy(
-    bento.address,
-    masterDeployer.address,
-    weth.address
-  );
+  router = await TridentRouter.deploy(bento.address, masterDeployer.address, weth.address);
   await router.deployed();
 
   // Whitelist pool factory in master deployer
@@ -156,20 +92,8 @@ export async function initialize() {
   await usdc.approve(bento.address, getBigNumber("10000000"));
 
   // Make BentoBox token deposits
-  await bento.deposit(
-    weth.address,
-    alice.address,
-    alice.address,
-    getBigNumber("1000000"),
-    0
-  );
-  await bento.deposit(
-    usdc.address,
-    alice.address,
-    alice.address,
-    getBigNumber("1000000"),
-    0
-  );
+  await bento.deposit(weth.address, alice.address, alice.address, getBigNumber("1000000"), 0);
+  await bento.deposit(usdc.address, alice.address, alice.address, getBigNumber("1000000"), 0);
 
   // Approve Router to spend 'alice' BentoBox tokens
   await bento.setMasterContractApproval(
@@ -185,24 +109,10 @@ export async function initialize() {
   let addresses = [weth.address, usdc.address].sort();
   const deployData = ethers.utils.defaultAbiCoder.encode(
     ["address", "address", "uint256", "uint256", "address", "address", "bool"],
-    [
-      addresses[0],
-      addresses[1],
-      30,
-      200,
-      whiteListManager.address,
-      alice.address,
-      false,
-    ]
+    [addresses[0], addresses[1], 30, 200, whiteListManager.address, alice.address, false]
   );
 
   whiteListManager.whitelistAccount(alice.address, true);
 
-  pool = await Pool.attach(
-    (
-      await (
-        await masterDeployer.deployPool(tridentPoolFactory.address, deployData)
-      ).wait()
-    ).events[0].args[1]
-  );
+  pool = await Pool.attach((await (await masterDeployer.deployPool(tridentPoolFactory.address, deployData)).wait()).events[0].args[1]);
 }
