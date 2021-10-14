@@ -787,7 +787,7 @@ describe("Concentrated Liquidity Product Pool", function () {
       }
     });
 
-    it.only("Should fail to burn if overflow", async () => {
+    it("Should fail to burn if overflow", async () => {
       const pool = trident.concentratedPools[0];
 
       helper.reset();
