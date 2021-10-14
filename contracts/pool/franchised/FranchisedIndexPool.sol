@@ -358,6 +358,10 @@ contract FranchisedIndexPool is IPool, TridentFranchisedERC20 {
         amountOut = _getAmountOut(tokenInAmount, tokenInBalance, tokenInWeight, tokenOutBalance, tokenOutWeight);
     }
 
+    function getAmountIn(bytes calldata) public pure override returns (uint256) {
+        revert();
+    }
+
     function getReservesAndWeights() public view returns (uint256[] memory reserves, uint136[] memory weights) {
         uint256 length = tokens.length;
         reserves = new uint256[](length);

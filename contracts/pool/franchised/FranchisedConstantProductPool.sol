@@ -389,6 +389,10 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
         }
     }
 
+    function getAmountIn(bytes calldata) public pure override returns (uint256) {
+        revert();
+    }
+
     function getReserves()
         public
         view
