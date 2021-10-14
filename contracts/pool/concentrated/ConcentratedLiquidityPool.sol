@@ -64,12 +64,6 @@ contract ConcentratedLiquidityPool is IPool {
     int24 internal nearestTick; /// @dev Tick that is just below the current price.
 
     uint256 internal unlocked;
-    modifier lock() {
-        if (unlocked == 2) revert Locked();
-        unlocked = 2;
-        _;
-        unlocked = 1;
-    }
 
     mapping(int24 => Ticks.Tick) public ticks;
     mapping(address => mapping(int24 => mapping(int24 => Position))) public positions;
@@ -106,7 +100,7 @@ contract ConcentratedLiquidityPool is IPool {
         //    It can be set to address(0) if we are not minting through the positionManager contract.
         address positionRecipient;
     }
-    
+
     /// @dev Error list to optimize around pool requirements.
     error Locked();
     error ZeroAddress();
@@ -120,18 +114,25 @@ contract ConcentratedLiquidityPool is IPool {
     error UpperOdd();
     error MaxTickLiquidity();
 
+    modifier lock() {
+        if (unlocked == 2) revert Locked();
+        unlocked = 2;
+        _;
+        unlocked = 1;
+    }
+
     /// @dev Only set immutable variables here - state changes made here will not be used.
     constructor(bytes memory _deployData, IMasterDeployer _masterDeployer) {
         (address _token0, address _token1, uint24 _swapFee, uint160 _price, uint24 _tickSpacing) = abi.decode(
             _deployData,
             (address, address, uint24, uint160, uint24)
         );
-        
+
         if (_token0 == address(0)) revert ZeroAddress();
         if (_token0 == address(this)) revert InvalidToken();
         if (_token1 == address(this)) revert InvalidToken();
         if (_swapFee > MAX_FEE) revert InvalidSwapFee();
-        
+
         token0 = _token0;
         token1 = _token1;
         swapFee = _swapFee;
@@ -475,12 +476,12 @@ contract ConcentratedLiquidityPool is IPool {
             _transfer(token1, amount1, barFeeTo, false);
         }
     }
-    
+
     function _ensureTickSpacing(int24 lower, int24 upper) internal view {
         if (lower % int24(tickSpacing) != 0) revert InvalidTick();
-        if (lower / int24(tickSpacing) % 2 != 0) revert LowerEven();
+        if ((lower / int24(tickSpacing)) % 2 != 0) revert LowerEven();
         if (upper % int24(tickSpacing) != 0) revert InvalidTick();
-        if (upper / int24(tickSpacing) % 2 == 0) revert UpperOdd();
+        if ((upper / int24(tickSpacing)) % 2 == 0) revert UpperOdd();
     }
 
     function _getAmountsForLiquidity(
@@ -561,7 +562,7 @@ contract ConcentratedLiquidityPool is IPool {
         if (amount < 0) position.liquidity -= uint128(-amount);
         if (amount > 0) position.liquidity += uint128(amount);
 
-        if (position.liquidity > MAX_TICK_LIQUIDITY) revert MaxTickLiquidity();
+        if (position.liquidity >= MAX_TICK_LIQUIDITY) revert MaxTickLiquidity();
 
         position.feeGrowthInside0Last = growth0current;
         position.feeGrowthInside1Last = growth1current;
