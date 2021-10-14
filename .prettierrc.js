@@ -7,12 +7,18 @@ module.exports = {
     {
       files: "*.sol",
       options: {
-        printWidth: 160,
+        printWidth: 140,
         tabWidth: 4,
         singleQuote: false,
         bracketSpacing: false,
         explicitTypes: "always",
       },
     },
+    {
+      files: "*.ts",
+      options: {
+        printWidth: 140
+      }
+    }
   ],
 };

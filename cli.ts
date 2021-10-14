@@ -1,4 +1,4 @@
-import { BENTOBOX_ADDRESS, ChainId } from "@sushiswap/core-sdk";
+import { BENTOBOX_ADDRESS } from "@sushiswap/core-sdk";
 import { BigNumber, constants } from "ethers";
 import { task, types } from "hardhat/config";
 
@@ -43,30 +43,34 @@ task("constant-product-pool:deploy", "Constant Product Pool deploy")
   )
   .addOptionalParam("fee", "Fee tier", 30, types.int)
   .addOptionalParam("twap", "Twap enabled", true, types.boolean)
-  .setAction(async function (
-    { tokenA, tokenB, fee, twap },
-    { ethers },
-    runSuper
-  ) {
+  .addOptionalParam("verify", "Verify on Etherscan", true, types.boolean)
+  .setAction(async function ({ tokenA, tokenB, fee, twap, verify }, { ethers, run }) {
     const masterDeployer = await ethers.getContract("MasterDeployer");
 
-    const constantProductPoolFactory = await ethers.getContract(
-      "ConstantProductPoolFactory"
-    );
+    const constantProductPoolFactory = await ethers.getContract("ConstantProductPoolFactory");
 
     const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint256", "bool"],
       [...[tokenA, tokenB].sort(), fee, twap]
     );
 
-    const { events } = await (
-      await masterDeployer.deployPool(
-        constantProductPoolFactory.address,
-        deployData
-      )
-    ).wait();
+    const { events } = await (await masterDeployer.deployPool(constantProductPoolFactory.address, deployData)).wait();
 
-    console.log(events);
+    const poolAddress = events[0].args.pool;
+
+    console.log(poolAddress, events);
+
+    if (!verify) return;
+
+    // we wait some time for the contract to be propagated in etherscan's backend
+    await new Promise((r) => {
+      console.log("... waiting a minute"), setTimeout(r, 80000);
+    });
+
+    await run("verify:verify", {
+      address: poolAddress,
+      constructorArguments: [deployData, masterDeployer.address],
+    });
   });
 
 task("constant-product-pool:address", "Constant Product Pool deploy")
@@ -86,26 +90,17 @@ task("constant-product-pool:address", "Constant Product Pool deploy")
   .addOptionalParam("twap", "Twap enabled", true, types.boolean)
   .setAction(async function ({ tokenA, tokenB, fee, twap }, { ethers }) {
     const master = (await ethers.getContract("MasterDeployer")).address;
-    const factory = (await ethers.getContract("ConstantProductPoolFactory"))
-      .address;
+    const factory = (await ethers.getContract("ConstantProductPoolFactory")).address;
 
     const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint256", "bool"],
       [...[tokenA, tokenB].sort(), fee, twap]
     );
     const salt = ethers.utils.keccak256(deployData);
-    const constructorParams = ethers.utils.defaultAbiCoder
-      .encode(["bytes", "address"], [deployData, master])
-      .substring(2);
+    const constructorParams = ethers.utils.defaultAbiCoder.encode(["bytes", "address"], [deployData, master]).substring(2);
     const Pool = await ethers.getContractFactory("ConstantProductPool");
-    const initCodeHash = ethers.utils.keccak256(
-      Pool.bytecode + constructorParams
-    );
-    const poolAddress = ethers.utils.getCreate2Address(
-      factory,
-      salt,
-      initCodeHash
-    );
+    const initCodeHash = ethers.utils.keccak256(Pool.bytecode + constructorParams);
+    const poolAddress = ethers.utils.getCreate2Address(factory, salt, initCodeHash);
 
     // console.log(
     //   "is pool.bytecode identical to artifact bytecode?",
@@ -115,10 +110,7 @@ task("constant-product-pool:address", "Constant Product Pool deploy")
     console.log({ initCodeHash, poolAddress });
   });
 
-task("whitelist", "Whitelist Router on BentoBox").setAction(async function (
-  _,
-  { ethers, getChainId }
-) {
+task("whitelist", "Whitelist Router on BentoBox").setAction(async function (_, { ethers, getChainId }) {
   const dev = await ethers.getNamedSigner("dev");
 
   const chainId = await getChainId();
@@ -135,13 +127,9 @@ task("whitelist", "Whitelist Router on BentoBox").setAction(async function (
     bentoBox = BentoBox.attach(BENTOBOX_ADDRESS[chainId]);
   }
 
-  await (
-    await bentoBox.connect(dev).whitelistMasterContract(router.address, true)
-  ).wait();
+  await (await bentoBox.connect(dev).whitelistMasterContract(router.address, true)).wait();
 
-  console.log(
-    `Router successfully whitelisted on BentoBox (BentoBox: ${bentoBox.address})`
-  );
+  console.log(`Router successfully whitelisted on BentoBox (BentoBox: ${bentoBox.address})`);
 });
 
 task("router:add-liquidity", "Router add liquidity")
@@ -157,33 +145,15 @@ task("router:add-liquidity", "Router add liquidity")
     "0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa", // kovan dai
     types.string
   )
-  .addOptionalParam(
-    "pool",
-    "Pool",
-    "0x34DC0c3fff06EF015a2135444A33B12c0C5A3A71", // dai/weth
-    types.string
-  )
-  .addParam(
-    "tokenADesired",
-    "Token A Desired",
-    BigNumber.from(10).pow(18).toString(),
-    types.string
-  )
-  .addParam(
-    "tokenBDesired",
-    "Token B Desired",
-    BigNumber.from(10).pow(18).toString(),
-    types.string
-  )
+  // Probably don't need this, can compute from tokens
+  .addParam("pool", "Pool")
+  .addParam("tokenADesired", "Token A Desired", BigNumber.from(10).pow(18).toString(), types.string)
+  .addParam("tokenBDesired", "Token B Desired", BigNumber.from(10).pow(18).toString(), types.string)
   // .addParam("tokenAMinimum", "Token A Minimum")
   // .addParam("tokenBMinimum", "Token B Minimum")
   // .addParam("to", "To")
   // .addOptionalParam("deadline", "Deadline", MaxUint256)
-  .setAction(async function (
-    { tokenA, tokenB, pool },
-    { ethers, run, getChainId },
-    runSuper
-  ) {
+  .setAction(async function ({ tokenA, tokenB, pool }, { ethers, run, getChainId }, runSuper) {
     const chainId = await getChainId();
 
     const router = await ethers.getContract("TridentRouter");
@@ -203,7 +173,7 @@ task("router:add-liquidity", "Router add liquidity")
       {
         token: tokenA,
         native: false,
-        amount: ethers.BigNumber.from(10).pow(12),
+        amount: ethers.BigNumber.from(10).pow(6),
       },
       {
         token: tokenB,
@@ -212,9 +182,7 @@ task("router:add-liquidity", "Router add liquidity")
       },
     ];
 
-    await (
-      await bentoBox.connect(dev).whitelistMasterContract(router.address, true)
-    ).wait();
+    await (await bentoBox.connect(dev).whitelistMasterContract(router.address, true)).wait();
     console.log("Whitelisted master contract");
 
     await run("erc20:approve", {
@@ -229,28 +197,15 @@ task("router:add-liquidity", "Router add liquidity")
 
     console.log("Approved both tokens");
 
-    await (
-      await bentoBox
-        .connect(dev)
-        .deposit(
-          liquidityInput[0].token,
-          dev.address,
-          dev.address,
-          0,
-          liquidityInput[0].amount
-        )
-    ).wait();
-    await (
-      await bentoBox
-        .connect(dev)
-        .deposit(
-          liquidityInput[1].token,
-          dev.address,
-          dev.address,
-          0,
-          liquidityInput[1].amount
-        )
-    ).wait();
+    console.log("Depositing 1st token", [liquidityInput[0].token, dev.address, dev.address, 0, liquidityInput[0].amount]);
+    await (await bentoBox.connect(dev).deposit(liquidityInput[0].token, dev.address, dev.address, 0, liquidityInput[0].amount)).wait();
+    console.log("Depositing 2nd token");
+    await (await bentoBox.connect(dev).deposit(liquidityInput[1].token, dev.address, dev.address, 0, liquidityInput[1].amount)).wait();
+
+    console.log("Deposited");
+
+    await (await bentoBox.connect(dev).deposit(liquidityInput[0].token, dev.address, dev.address, 0, liquidityInput[0].amount)).wait();
+    await (await bentoBox.connect(dev).deposit(liquidityInput[1].token, dev.address, dev.address, 0, liquidityInput[1].amount)).wait();
 
     console.log("Deposited");
 
@@ -269,14 +224,9 @@ task("router:add-liquidity", "Router add liquidity")
 
     console.log("Set master contract approval");
 
-    const data = ethers.utils.defaultAbiCoder.encode(
-      ["address"],
-      [dev.address]
-    );
+    const data = ethers.utils.defaultAbiCoder.encode(["address"], [dev.address]);
 
-    await (
-      await router.connect(dev).addLiquidity(liquidityInput, pool, 1, data)
-    ).wait();
+    await (await router.connect(dev).addLiquidity(liquidityInput, pool, 1, data)).wait();
 
     console.log("Added liquidity");
   });
@@ -284,20 +234,9 @@ task("router:add-liquidity", "Router add liquidity")
 // misc helpers for testing purposes
 
 task("strategy:add", "Add strategy to BentoBox")
-  .addParam(
-    "token",
-    "Token of strategy",
-    "0xd0A1E359811322d97991E03f863a0C30C2cF029C"
-  ) // weth
-  .addParam(
-    "strategy",
-    "Strategy",
-    "0x65E58C475e6f9CeF0d79371cC278E7827a72b19b"
-  )
-  .setAction(async function (
-    { bento, token, strategy },
-    { ethers, getChainId }
-  ) {
+  .addParam("token", "Token of strategy", "0xd0A1E359811322d97991E03f863a0C30C2cF029C") // weth
+  .addParam("strategy", "Strategy", "0x65E58C475e6f9CeF0d79371cC278E7827a72b19b")
+  .setAction(async function ({ bento, token, strategy }, { ethers, getChainId }) {
     const dev = await ethers.getNamedSigner("dev");
     const chainId = await getChainId();
     const BentoBox = await ethers.getContractFactory("BentoBoxV1");

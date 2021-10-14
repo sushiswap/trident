@@ -336,11 +336,13 @@ contract IndexPool is IPool, TridentERC20 {
     }
 
     function getAmountOut(bytes calldata data) public view override returns (uint256 amountOut) {
-        (uint256 tokenInAmount, uint256 tokenInBalance, uint256 tokenInWeight, uint256 tokenOutBalance, uint256 tokenOutWeight) = abi.decode(
-            data,
-            (uint256, uint256, uint256, uint256, uint256)
-        );
+        (uint256 tokenInAmount, uint256 tokenInBalance, uint256 tokenInWeight, uint256 tokenOutBalance, uint256 tokenOutWeight) = abi
+            .decode(data, (uint256, uint256, uint256, uint256, uint256));
         amountOut = _getAmountOut(tokenInAmount, tokenInBalance, tokenInWeight, tokenOutBalance, tokenOutWeight);
+    }
+
+    function getAmountIn(bytes calldata) public pure override returns (uint256) {
+        revert();
     }
 
     function getReservesAndWeights() public view returns (uint256[] memory reserves, uint136[] memory weights) {

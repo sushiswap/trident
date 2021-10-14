@@ -26,7 +26,8 @@ abstract contract TridentFranchisedERC20 {
     mapping(address => mapping(address => uint256)) public allowance;
 
     /// @notice The EIP-712 typehash for this contract's {permit} struct.
-    bytes32 public constant PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+    bytes32 public constant PERMIT_TYPEHASH =
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
     /// @notice The EIP-712 typehash for this contract's domain.
     bytes32 public immutable DOMAIN_SEPARATOR;
     /// @notice owner -> nonce mapping used in {permit}.
@@ -124,7 +125,11 @@ abstract contract TridentFranchisedERC20 {
     ) external {
         require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
         bytes32 digest = keccak256(
-            abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, amount, nonces[owner]++, deadline)))
+            abi.encodePacked(
+                "\x19\x01",
+                DOMAIN_SEPARATOR,
+                keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, amount, nonces[owner]++, deadline))
+            )
         );
         address recoveredAddress = ecrecover(digest, v, r, s);
         require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_PERMIT_SIGNATURE");
@@ -154,7 +159,9 @@ abstract contract TridentFranchisedERC20 {
 
     /// @dev Checks `whiteListManager` for pool `operator` and given user `account`.
     function _checkWhiteList(address account) internal view {
-        (, bytes memory _whitelisted) = whiteListManager.staticcall(abi.encodeWithSelector(IWhiteListManager.whitelistedAccounts.selector, operator, account));
+        (, bytes memory _whitelisted) = whiteListManager.staticcall(
+            abi.encodeWithSelector(IWhiteListManager.whitelistedAccounts.selector, operator, account)
+        );
         bool whitelisted = abi.decode(_whitelisted, (bool));
         require(whitelisted, "NOT_WHITELISTED");
     }
