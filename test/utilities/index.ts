@@ -10,10 +10,7 @@ export function getBigNumber(amount: BigNumberish, decimals = 18): BigNumber {
   return BigNumber.from(amount).mul(BigNumber.from(BASE_TEN).pow(decimals));
 }
 
-export function getIntegerRandomValue(
-  exp: number,
-  rnd: any
-): [number, BigNumber] {
+export function getIntegerRandomValue(exp: number, rnd: any): [number, BigNumber] {
   if (exp <= 15) {
     const value = Math.floor(rnd() * Math.pow(10, exp));
     return [value, BigNumber.from(value)];
