@@ -464,6 +464,10 @@ contract FranchisedHybridPool is IPool, TridentFranchisedERC20 {
         }
     }
 
+    function getAmountIn(bytes calldata) public pure override returns (uint256) {
+        revert();
+    }
+
     function getReserves() public view returns (uint256 _reserve0, uint256 _reserve1) {
         (_reserve0, _reserve1) = _getReserves();
     }

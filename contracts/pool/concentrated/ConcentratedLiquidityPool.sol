@@ -647,6 +647,11 @@ contract ConcentratedLiquidityPool is IPool {
         revert();
     }
 
+    /// @dev Reserved for IPool.
+    function getAmountIn(bytes calldata) public pure override returns (uint256) {
+        revert();
+    }
+
     function getImmutables()
         public
         view
