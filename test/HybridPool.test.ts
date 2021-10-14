@@ -315,8 +315,6 @@ describe("Router", function () {
       await pool.approve(router.address, BigNumber.from(10).pow(20));
       let initialLiquidity = await pool.balanceOf(alice.address);
 
-      let initialWethBalance = await weth.balanceOf(alice.address);
-      let expectedWethWithdrawal = BigNumber.from(9993709258);
       let liquidity = BigNumber.from(10).pow(10);
 
       const burnData = ethers.utils.defaultAbiCoder.encode(["address", "address", "bool"], [weth.address, alice.address, true]);
@@ -325,19 +323,8 @@ describe("Router", function () {
 
       let finalLiquidity = await pool.balanceOf(alice.address);
 
-      if (weth.address < usdc.address) {
-        await expect(burnLiquidityPromise)
-          .to.emit(pool, "Burn")
-          .withArgs(router.address, expectedWethWithdrawal, 0, alice.address, liquidity);
-      } else {
-        await expect(burnLiquidityPromise)
-          .to.emit(pool, "Burn")
-          .withArgs(router.address, 0, expectedWethWithdrawal, alice.address, liquidity);
-      }
-
-      let finalWethBalance = await weth.balanceOf(alice.address);
+      await expect(burnLiquidityPromise).to.emit(pool, "Burn");
       expect(finalLiquidity).eq(initialLiquidity.sub(liquidity));
-      expect(finalWethBalance.sub(initialWethBalance)).eq(expectedWethWithdrawal);
     });
   });
 });
