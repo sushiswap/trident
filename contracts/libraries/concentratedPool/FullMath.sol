@@ -7,7 +7,6 @@ pragma solidity >=0.8.0;
 /// @dev Handles "phantom overflow", i.e., allows multiplication and division where an intermediate value overflows 256 bits.
 library FullMath {
     /// @dev Error list to optimize around math requirements.
-    error ZeroDenom();
     error InsuffDenom();
     error ResultMax();
     
@@ -37,7 +36,7 @@ library FullMath {
             }
             // @dev Handle non-overflow cases, 256 by 256 division.
             if (prod1 == 0) {
-                if (denominator == 0) revert ZeroDenom();
+                require(denominator > 0);
                 assembly {
                     result := div(prod0, denominator)
                 }
