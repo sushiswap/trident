@@ -63,8 +63,6 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         require(msg.sender == ownerOf[tokenId], "NOT_ID_OWNER");
         Position storage position = positions[tokenId];
 
-        if (position.liquidity < amount) amount = position.liquidity;
-
         if (amount < position.liquidity) {
             (uint256 currentPrice, ) = position.pool.getPriceAndNearestTicks();
             uint160 priceLower = TickMath.getSqrtRatioAtTick(position.lower);
@@ -109,8 +107,11 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
             _transfer(withdrawAmounts[1].token, address(this), recipient, token1Amount + feeAmount1, unwrapBento);
         } else {
             collect(tokenId, recipient, unwrapBento);
-            position.pool.burn(abi.encode(position.lower, position.upper, amount, recipient, unwrapBento));
+
+            position.pool.burn(abi.encode(position.lower, position.upper, position.liquidity, recipient, unwrapBento));
+
             delete positions[tokenId];
+
             _burn(tokenId);
         }
 
