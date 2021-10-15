@@ -14,11 +14,9 @@ import "../../libraries/concentratedPool/UnsafeMath.sol";
 import "../../libraries/concentratedPool/DyDxMath.sol";
 import "../../libraries/concentratedPool/SwapLib.sol";
 import "../../libraries/concentratedPool/Ticks.sol";
-import "hardhat/console.sol";
 
-/// @notice Trident exchange pool template with concentrated liquidity and constant product formula for swapping between an ERC-20 token pair.
-/// @dev The reserves are stored as bento shares.
-//      The curve is applied to shares as well. This pool does not care about the underlying amounts.
+/// @notice Trident exchange pool template implementing concentrated liquidity for swapping between an ERC-20 token pair.
+/// @dev Amounts are considered to be in Bentobox shared
 contract ConcentratedLiquidityPool is IPool {
     using Ticks for mapping(int24 => Ticks.Tick);
 
@@ -64,12 +62,6 @@ contract ConcentratedLiquidityPool is IPool {
     int24 internal nearestTick; /// @dev Tick that is just below the current price.
 
     uint256 internal unlocked;
-    modifier lock() {
-        require(unlocked == 1, "LOCKED");
-        unlocked = 2;
-        _;
-        unlocked = 1;
-    }
 
     mapping(int24 => Ticks.Tick) public ticks;
     mapping(address => mapping(int24 => mapping(int24 => Position))) public positions;
@@ -107,6 +99,26 @@ contract ConcentratedLiquidityPool is IPool {
         address positionRecipient;
     }
 
+    /// @dev Error list to optimize around pool requirements.
+    error Locked();
+    error ZeroAddress();
+    error InvalidToken();
+    error InvalidSwapFee();
+    error LiquidityOverflow();
+    error Token0Missing();
+    error Token1Missing();
+    error InvalidTick();
+    error LowerEven();
+    error UpperOdd();
+    error MaxTickLiquidity();
+
+    modifier lock() {
+        if (unlocked == 2) revert Locked();
+        unlocked = 2;
+        _;
+        unlocked = 1;
+    }
+
     /// @dev Only set immutable variables here - state changes made here will not be used.
     constructor(bytes memory _deployData, IMasterDeployer _masterDeployer) {
         (address _token0, address _token1, uint24 _swapFee, uint160 _price, uint24 _tickSpacing) = abi.decode(
@@ -114,10 +126,10 @@ contract ConcentratedLiquidityPool is IPool {
             (address, address, uint24, uint160, uint24)
         );
 
-        require(_token0 != address(0), "ZERO_ADDRESS");
-        require(_token0 != address(this), "INVALID_TOKEN0");
-        require(_token1 != address(this), "INVALID_TOKEN1");
-        require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
+        if (_token0 == address(0)) revert ZeroAddress();
+        if (_token0 == address(this)) revert InvalidToken();
+        if (_token1 == address(this)) revert InvalidToken();
+        if (_swapFee > MAX_FEE) revert InvalidSwapFee();
 
         token0 = _token0;
         token1 = _token1;
@@ -154,7 +166,7 @@ contract ConcentratedLiquidityPool is IPool {
         );
 
         unchecked {
-            require(_liquidity <= MAX_TICK_LIQUIDITY, "LIQUIDITY_OVERFLOW");
+            if (_liquidity > MAX_TICK_LIQUIDITY) revert LiquidityOverflow();
 
             (uint256 amount0fees, uint256 amount1fees) = _updatePosition(
                 mintParams.positionOwner,
@@ -192,7 +204,13 @@ contract ConcentratedLiquidityPool is IPool {
             uint160(currentPrice)
         );
 
-        (uint128 amount0Actual, uint128 amount1Actual) = _getAmountsForLiquidity(priceLower, priceUpper, currentPrice, _liquidity, true);
+        (uint128 amount0Actual, uint128 amount1Actual) = DyDxMath.getAmountsForLiquidity(
+            priceLower,
+            priceUpper,
+            currentPrice,
+            _liquidity,
+            true
+        );
 
         ITridentRouter.TokenInput[] memory callbackData = new ITridentRouter.TokenInput[](2);
         callbackData[0] = ITridentRouter.TokenInput(token0, mintParams.token0native, amount0Actual);
@@ -202,12 +220,12 @@ contract ConcentratedLiquidityPool is IPool {
 
         unchecked {
             if (amount0Actual != 0) {
-                require(amount0Actual + reserve0 <= _balance(token0), "TOKEN0_MISSING");
+                if (amount0Actual + reserve0 > _balance(token0)) revert Token0Missing();
                 reserve0 += amount0Actual;
             }
 
             if (amount1Actual != 0) {
-                require(amount1Actual + reserve1 <= _balance(token1), "TOKEN1_MISSING");
+                if (amount1Actual + reserve1 > _balance(token1)) revert Token1Missing();
                 reserve1 += amount1Actual;
             }
         }
@@ -243,7 +261,7 @@ contract ConcentratedLiquidityPool is IPool {
             if (priceLower < currentPrice && currentPrice < priceUpper) liquidity -= amount;
         }
 
-        (uint256 amount0, uint256 amount1) = _getAmountsForLiquidity(
+        (uint256 amount0, uint256 amount1) = DyDxMath.getAmountsForLiquidity(
             uint256(priceLower),
             uint256(priceUpper),
             uint256(currentPrice),
@@ -251,6 +269,7 @@ contract ConcentratedLiquidityPool is IPool {
             false
         );
 
+        require(amount <= uint128(type(int128).max), "overflow"); // conversion will be shifted to library
         (uint256 amount0fees, uint256 amount1fees) = _updatePosition(msg.sender, lower, upper, -int128(amount));
 
         unchecked {
@@ -464,31 +483,10 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     function _ensureTickSpacing(int24 lower, int24 upper) internal view {
-        require(lower % int24(tickSpacing) == 0, "INVALID_TICK");
-        require((lower / int24(tickSpacing)) % 2 == 0, "LOWER_EVEN");
-
-        require(upper % int24(tickSpacing) == 0, "INVALID_TICK");
-        require((upper / int24(tickSpacing)) % 2 != 0, "UPPER_ODD"); /// @dev Can be either -1 or 1.
-    }
-
-    function _getAmountsForLiquidity(
-        uint256 priceLower,
-        uint256 priceUpper,
-        uint256 currentPrice,
-        uint256 liquidityAmount,
-        bool roundUp
-    ) internal pure returns (uint128 token0amount, uint128 token1amount) {
-        if (priceUpper <= currentPrice) {
-            /// @dev Only supply `token1` (`token1` is Y).
-            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, priceUpper, roundUp));
-        } else if (currentPrice <= priceLower) {
-            /// @dev Only supply `token0` (`token0` is X).
-            token0amount = uint128(DyDxMath.getDx(liquidityAmount, priceLower, priceUpper, roundUp));
-        } else {
-            /// @dev Supply both tokens.
-            token0amount = uint128(DyDxMath.getDx(liquidityAmount, currentPrice, priceUpper, roundUp));
-            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, currentPrice, roundUp));
-        }
+        if (lower % int24(tickSpacing) != 0) revert InvalidTick();
+        if ((lower / int24(tickSpacing)) % 2 != 0) revert LowerEven();
+        if (upper % int24(tickSpacing) != 0) revert InvalidTick();
+        if ((upper / int24(tickSpacing)) % 2 == 0) revert UpperOdd();
     }
 
     function _updateReserves(
@@ -499,13 +497,13 @@ contract ConcentratedLiquidityPool is IPool {
         if (zeroForOne) {
             uint256 balance0 = _balance(token0);
             uint128 newBalance = reserve0 + inAmount;
-            require(uint256(newBalance) <= balance0, "TOKEN0_MISSING");
+            if (uint256(newBalance) > balance0) revert Token0Missing();
             reserve0 = newBalance;
             reserve1 -= uint128(amountOut);
         } else {
             uint256 balance1 = _balance(token1);
             uint128 newBalance = reserve1 + inAmount;
-            require(uint256(newBalance) <= balance1, "TOKEN1_MISSING");
+            if (uint256(newBalance) > balance1) revert Token1Missing();
             reserve1 = newBalance;
             reserve0 -= uint128(amountOut);
         }
@@ -549,7 +547,7 @@ contract ConcentratedLiquidityPool is IPool {
         if (amount < 0) position.liquidity -= uint128(-amount);
         if (amount > 0) position.liquidity += uint128(amount);
 
-        require(position.liquidity < MAX_TICK_LIQUIDITY, "MAX_TICK_LIQUIDITY");
+        if (position.liquidity >= MAX_TICK_LIQUIDITY) revert MaxTickLiquidity();
 
         position.feeGrowthInside0Last = growth0current;
         position.feeGrowthInside1Last = growth1current;
@@ -643,6 +641,11 @@ contract ConcentratedLiquidityPool is IPool {
 
     /// @dev Reserved for IPool.
     function getAmountOut(bytes calldata) public pure override returns (uint256) {
+        revert();
+    }
+
+    /// @dev Reserved for IPool.
+    function getAmountIn(bytes calldata) public pure override returns (uint256) {
         revert();
     }
 

@@ -147,16 +147,14 @@ contract ConstantProductPool is IPool, TridentERC20 {
     function burnSingle(bytes calldata data) public override lock returns (uint256 amountOut) {
         (address tokenOut, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
-        (uint256 balance0, uint256 balance1) = _balance();
         uint256 liquidity = balanceOf[address(this)];
 
         (uint256 _totalSupply, ) = _mintFee(_reserve0, _reserve1);
 
-        uint256 amount0 = (liquidity * balance0) / _totalSupply;
-        uint256 amount1 = (liquidity * balance1) / _totalSupply;
+        uint256 amount0 = (liquidity * _reserve0) / _totalSupply;
+        uint256 amount1 = (liquidity * _reserve1) / _totalSupply;
 
         _burn(address(this), liquidity);
-        kLast = TridentMath.sqrt((uint256(_reserve0) - amount0) * (uint256(_reserve1) - amount1));
 
         // Swap one token for another
         unchecked {
@@ -165,7 +163,6 @@ contract ConstantProductPool is IPool, TridentERC20 {
                 // - calculate `amountOut` as if the user first withdrew balanced liquidity and then swapped `token0` for `token1`.
                 amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1);
                 _transfer(token1, amount1, recipient, unwrapBento);
-                balance1 -= amount1;
                 amountOut = amount1;
                 amount0 = 0;
             } else {
@@ -173,12 +170,14 @@ contract ConstantProductPool is IPool, TridentERC20 {
                 require(tokenOut == token0, "INVALID_OUTPUT_TOKEN");
                 amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0);
                 _transfer(token0, amount0, recipient, unwrapBento);
-                balance0 -= amount0;
                 amountOut = amount0;
                 amount1 = 0;
             }
         }
+
+        (uint256 balance0, uint256 balance1) = _balance();
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
+        kLast = TridentMath.sqrt(balance0 * balance1);
         emit Burn(msg.sender, amount0, amount1, recipient);
     }
 
@@ -319,6 +318,14 @@ contract ConstantProductPool is IPool, TridentERC20 {
         amountOut = (amountInWithFee * reserveAmountOut) / (reserveAmountIn * MAX_FEE + amountInWithFee);
     }
 
+    function _getAmountIn(
+        uint256 amountOut,
+        uint256 reserveAmountIn,
+        uint256 reserveAmountOut
+    ) internal view returns (uint256 amountIn) {
+        amountIn = (reserveAmountIn * amountOut * MAX_FEE) / ((reserveAmountOut - amountOut) * MAX_FEE_MINUS_SWAP_FEE) + 1;
+    }
+
     function _transfer(
         address token,
         uint256 shares,
@@ -361,7 +368,19 @@ contract ConstantProductPool is IPool, TridentERC20 {
         if (tokenIn == token0) {
             finalAmountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
         } else {
+            require(tokenIn == token1, "INVALID_INPUT_TOKEN");
             finalAmountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
+        }
+    }
+
+    function getAmountIn(bytes calldata data) public view override returns (uint256 finalAmountIn) {
+        (address tokenOut, uint256 amountOut) = abi.decode(data, (address, uint256));
+        (uint112 _reserve0, uint112 _reserve1, ) = _getReserves();
+        if (tokenOut == token1) {
+            finalAmountIn = _getAmountIn(amountOut, _reserve0, _reserve1);
+        } else {
+            require(tokenOut == token0, "INVALID_OUTPUT_TOKEN");
+            finalAmountIn = _getAmountIn(amountOut, _reserve1, _reserve0);
         }
     }
 
