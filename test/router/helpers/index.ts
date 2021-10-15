@@ -10,22 +10,22 @@ import { TopologyFactory } from "./TopologyFactory";
 
 let alice: SignerWithAddress, feeTo: SignerWithAddress;
 
-let testContext: TestContext;
+let ctx: TestContext;
 let tridentPoolFactory: TridentPoolFactory;
 
 export async function init(): Promise<[SignerWithAddress, string, Contract, TopologyFactory]> {
-  testContext = new TestContext();
-  await testContext.init();
+  ctx = new TestContext();
+  await ctx.init();
 
-  alice = testContext.Signer;
-  feeTo = testContext.FeeTo;
+  alice = ctx.Signer;
+  feeTo = ctx.FeeTo;
 
-  tridentPoolFactory = new TridentPoolFactory(alice, testContext.MasterDeployer, testContext.Bento);
+  tridentPoolFactory = new TridentPoolFactory(alice, ctx.MasterDeployer, ctx.Bento, ctx.TridentRouter);
   await tridentPoolFactory.init();
 
-  const topologyFactory = new TopologyFactory(testContext.Erc20Factory, tridentPoolFactory, testContext.Bento, testContext.Signer);
+  const topologyFactory = new TopologyFactory(ctx.Erc20Factory, tridentPoolFactory, ctx.Bento, ctx.Signer);
 
-  return [alice, testContext.TridentRouter.address, testContext.Bento, topologyFactory];
+  return [alice, ctx.TridentRouter.address, ctx.Bento, topologyFactory];
 }
 
 export function createRoute(
@@ -41,9 +41,9 @@ export function createRoute(
 }
 
 export async function executeTridentRoute(tridentRouteParams: TridentRoute, toTokenAddress: string) {
-  let outputBalanceBefore: BigNumber = await testContext.Bento.balanceOf(toTokenAddress, alice.address);
+  let outputBalanceBefore: BigNumber = await ctx.Bento.balanceOf(toTokenAddress, alice.address);
 
-  const router = testContext.TridentRouter as Contract;
+  const router = ctx.TridentRouter as Contract;
 
   try {
     switch (tridentRouteParams.routeType) {
@@ -64,12 +64,11 @@ export async function executeTridentRoute(tridentRouteParams: TridentRoute, toTo
     throw error;
   }
 
-  let outputBalanceAfter: BigNumber = await testContext.Bento.balanceOf(toTokenAddress, alice.address);
+  let outputBalanceAfter: BigNumber = await ctx.Bento.balanceOf(toTokenAddress, alice.address);
 
   return outputBalanceAfter.sub(outputBalanceBefore);
 }
 
 export * from "./RouterParams";
 export * from "./random";
-export * from "./interfaces";
 export * from "./constants";

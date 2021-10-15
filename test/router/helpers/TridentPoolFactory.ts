@@ -10,6 +10,7 @@ import {
   HybridPoolFactory,
   MasterDeployer,
   TickMathTest,
+  TridentRouter,
 } from "../../../types";
 import { MAX_POOL_IMBALANCE, MAX_POOL_RESERVE, MIN_POOL_IMBALANCE, MIN_POOL_RESERVE } from "./constants";
 import { choice, getRandom } from "./random";
@@ -19,6 +20,7 @@ import { ConstantProductRPool, getBigNumber, HybridRPool } from "@sushiswap/tine
 import { RToken } from "@sushiswap/sdk";
 import { BigNumber } from "ethers";
 import { createCLRPool } from "./createCLRPool";
+import { getLiquidityForAmount, getMintData, LinkedListHelper } from "../../harness/Concentrated";
 
 export class TridentPoolFactory {
   private ConcentratedLiquidityPool!: ContractFactory;
@@ -28,6 +30,7 @@ export class TridentPoolFactory {
   private MasterDeployer!: MasterDeployer;
   private Bento!: BentoBoxV1;
   private Signer!: SignerWithAddress;
+  private TridentRouter!: TridentRouter;
 
   private HybridPoolFactory!: HybridPoolFactory;
   private ConstantPoolFactory!: ConstantProductPoolFactory;
@@ -36,10 +39,11 @@ export class TridentPoolFactory {
   private ConcentratedPoolManager!: ConcentratedLiquidityPoolManager;
   private TickMath!: TickMathTest;
 
-  constructor(signer: SignerWithAddress, masterDeployer: MasterDeployer, bento: BentoBoxV1) {
+  constructor(signer: SignerWithAddress, masterDeployer: MasterDeployer, bento: BentoBoxV1, tridentRouter: TridentRouter) {
     this.Signer = signer;
     this.MasterDeployer = masterDeployer;
     this.Bento = bento;
+    this.TridentRouter = tridentRouter;
   }
 
   public async init() {
@@ -148,7 +152,51 @@ export class TridentPoolFactory {
 
     const pool = this.ConcentratedLiquidityPool.attach(poolAddress) as ConcentratedLiquidityPool;
 
+    const helper = new LinkedListHelper(-887272);
+    const step = 10800;
+
+    const tickSpacing = (await pool.getImmutables())._tickSpacing;
+    const poolPrice = (await pool.getPriceAndNearestTicks())._price;
+    const tickAtPrice = await this.TickMath.getTickAtSqrtRatio(poolPrice);
+    const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
+    const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+
+    let lower = nearestEvenValidTick - step;
+    let upper = nearestEvenValidTick + step + tickSpacing;
+
+    let addLiquidityParams = {
+      lowerOld: helper.insert(lower),
+      lower,
+      upperOld: helper.insert(upper),
+      upper,
+      amount0Desired: getBigNumber(100),
+      amount1Desired: getBigNumber(100),
+      native0: false,
+      native1: false,
+      positionOwner: this.ConcentratedPoolManager.address,
+      recipient: this.Signer.address,
+    };
+
+    const [currentPrice, priceLower, priceUpper] = await this.getPrices(pool, [lower, upper]);
+    const liquidity = getLiquidityForAmount(
+      priceLower,
+      currentPrice,
+      priceUpper,
+      addLiquidityParams.amount1Desired,
+      addLiquidityParams.amount0Desired
+    );
+    const mintData = getMintData(addLiquidityParams);
+
+    //Add liquidity
+    await this.TridentRouter.addLiquidityLazy(pool.address, liquidity, mintData);
+
     return await createCLRPool(pool);
+  }
+
+  private async getPrices(pool: ConcentratedLiquidityPool, ticks: Array<BigNumber | number>) {
+    const price = (await pool.getPriceAndNearestTicks())._price;
+    const tickPrices = await Promise.all(ticks.map((tick) => this.TickMath.getSqrtRatioAtTick(tick)));
+    return [price, ...tickPrices];
   }
 
   private async deployContracts() {

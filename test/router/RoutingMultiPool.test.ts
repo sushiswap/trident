@@ -7,7 +7,6 @@ import { closeValues, RToken } from "@sushiswap/tines";
 import * as testHelper from "./helpers";
 import { getIntegerRandomValue } from "../utilities";
 import { RouteType } from "./helpers";
-import { TopologyFactory } from "./helpers/TopologyFactory";
 
 describe("MultiPool Routing Tests - Fixed Topology", function () {
   beforeEach(async function () {
@@ -140,7 +139,7 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
     );
   });
 
-  it.skip("Should Test Normal Values With 3 Serial Pools", async function () {
+  it("Should Test Normal Values With 3 Serial Pools", async function () {
     const topology = await this.topologyFactory.getThreeSerialPools(this.rnd);
 
     const fromToken = topology.tokens[0];
@@ -150,8 +149,8 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
 
     const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
 
-    if (route == undefined) {
-      throw "Failed to get route";
+    if (route == undefined || route.status === "NoWay") {
+      throw new Error("Tines failed to get route");
     }
 
     const routerParams = testHelper.getTridentRouterParams(route, this.signer.address, this.tridentRouterAddress);
