@@ -8,9 +8,9 @@ import "../../interfaces/IMasterDeployer.sol";
 import "../../interfaces/ITridentRouter.sol";
 import "../../libraries/concentratedPool/FullMath.sol";
 import "../../libraries/concentratedPool/TickMath.sol";
+import "../../libraries/concentratedPool/DyDxMath.sol";
 import "../../utils/TridentBatchable.sol";
 import "./TridentNFT.sol";
-import "hardhat/console.sol";
 
 /// @notice Trident Concentrated Liquidity Pool periphery contract that combines non-fungible position management and staking.
 abstract contract ConcentratedLiquidityPosition is TridentNFT {
@@ -91,7 +91,7 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
                 position.feeGrowthInside1 = feeGrowthInside1;
             }
 
-            (uint256 token0Amount, uint256 token1Amount) = position.pool.getAmountsForLiquidity(
+            (uint256 token0Amount, uint256 token1Amount) = DyDxMath.getAmountsForLiquidity(
                 priceLower,
                 priceUpper,
                 currentPrice,
