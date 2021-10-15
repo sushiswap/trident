@@ -18,6 +18,8 @@ contract TridentRouter is ITridentRouter, RouterHelper {
     /// These are set when someone calls a flash swap and reset afterwards.
     address internal cachedMsgSender;
     address internal cachedPool;
+    bool internal cachedNative;
+    uint256 internal cachedAmountCap;
 
     mapping(address => bool) internal whitelistedPools;
 
@@ -71,10 +73,17 @@ contract TridentRouter is ITridentRouter, RouterHelper {
 
     /// @notice Swaps token A to token B by using callbacks.
     /// @param path Addresses of the pools and data required by the pools for the swaps.
-    /// @param amountOutMinimum Minimum amount of token B after the swap.
+    /// @param amountInMax Max amount of tokens to sell.
     /// @dev Ensure that the pools are trusted before calling this function. The pools can steal users' tokens.
     /// This function will unlikely be used in production but it shows how to use callbacks. One use case will be arbitrage.
-    function exactInputLazy(uint256 amountOutMinimum, Path[] calldata path) public payable returns (uint256 amountOut) {
+    function exactInputLazy(
+        uint256 amountInMax,
+        bool nativeInput,
+        Path[] calldata path
+    ) public payable returns (uint256 amountOut) {
+        cachedNative = nativeInput;
+        cachedAmountCap = amountInMax;
+
         // @dev Call every pool in the path.
         // Pool `N` should transfer its output tokens to pool `N+1` directly.
         // The last pool should transfer its output tokens to the user.
@@ -84,13 +93,16 @@ contract TridentRouter is ITridentRouter, RouterHelper {
             cachedMsgSender = msg.sender;
             // @dev The cached pool must be the address that calls the callback.
             cachedPool = path[i].pool;
-            amountOut = IPool(path[i].pool).flashSwap(path[i].data);
+            cachedAmountCap = IPool(path[i].pool).flashSwap(path[i].data);
+            cachedNative = false;
         }
+        amountOut = cachedAmountCap;
+
         // @dev Resets the `cachedPool` to get a refund.
         // `1` is used as the default value to avoid the storage slot being released.
         cachedMsgSender = address(1);
         cachedPool = address(1);
-        require(amountOut >= amountOutMinimum, "TOO_LITTLE_RECEIVED");
+        cachedAmountCap = 1;
     }
 
     /// @notice Swaps token A to token B directly. It's the same as `exactInputSingle` except
@@ -252,14 +264,18 @@ contract TridentRouter is ITridentRouter, RouterHelper {
 
     /// @notice Used by the pool 'flashSwap' functionality to take input tokens from the user.
     function tridentSwapCallback(bytes calldata data) external {
+        (address token, uint256 amount, ) = abi.decode(data, (address, uint256, bytes));
+
+        require(amount <= cachedAmountCap, "SLIPPAGE");
         require(msg.sender == cachedPool, "UNAUTHORIZED_CALLBACK");
-        TokenInput memory tokenInput = abi.decode(data, (TokenInput));
+
         // @dev Transfer the requested tokens to the pool.
-        if (tokenInput.native) {
-            _depositFromUserToBentoBox(tokenInput.token, cachedMsgSender, msg.sender, tokenInput.amount);
+        if (cachedNative) {
+            _depositFromUserToBentoBox(token, cachedMsgSender, msg.sender, amount);
         } else {
-            bento.transfer(tokenInput.token, cachedMsgSender, msg.sender, tokenInput.amount);
+            bento.transfer(token, cachedMsgSender, msg.sender, amount);
         }
+
         // @dev Resets the `msg.sender`'s authorization.
         cachedMsgSender = address(1);
     }

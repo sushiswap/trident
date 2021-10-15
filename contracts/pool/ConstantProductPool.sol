@@ -209,33 +209,36 @@ contract ConstantProductPool is IPool, TridentERC20 {
     }
 
     /// @dev Swaps one token for another. The router must support swap callbacks and ensure there isn't too much slippage.
-    function flashSwap(bytes calldata data) public override lock returns (uint256 amountOut) {
-        (address tokenIn, address recipient, bool unwrapBento, uint256 amountIn, bytes memory context) = abi.decode(
+    function flashSwap(bytes calldata data) public override lock returns (uint256) {
+        (address tokenOut, address recipient, bool unwrapBento, uint256 amountOut, bytes memory context) = abi.decode(
             data,
             (address, address, bool, uint256, bytes)
         );
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         require(_reserve0 > 0, "POOL_UNINITIALIZED");
         unchecked {
-            if (tokenIn == token0) {
-                amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
+            if (tokenOut == token1) {
+                uint256 amountIn = _getAmountIn(amountOut, _reserve0, _reserve1);
                 _transfer(token1, amountOut, recipient, unwrapBento);
+                context = abi.encode(token0, amountIn, context);
                 ITridentCallee(msg.sender).tridentSwapCallback(context);
                 (uint256 balance0, uint256 balance1) = _balance();
                 require(balance0 - _reserve0 >= amountIn, "INSUFFICIENT_AMOUNT_IN");
                 _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-                emit Swap(recipient, tokenIn, token1, amountIn, amountOut);
+                emit Swap(recipient, token0, token1, amountIn, amountOut);
             } else {
-                require(tokenIn == token1, "INVALID_INPUT_TOKEN");
-                amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
+                require(tokenOut == token0, "INVALID_OUTPUT_TOKEN");
+                uint256 amountIn = _getAmountIn(amountOut, _reserve1, _reserve0);
                 _transfer(token0, amountOut, recipient, unwrapBento);
+                context = abi.encode(token0, amountIn, context);
                 ITridentCallee(msg.sender).tridentSwapCallback(context);
                 (uint256 balance0, uint256 balance1) = _balance();
                 require(balance1 - _reserve1 >= amountIn, "INSUFFICIENT_AMOUNT_IN");
                 _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-                emit Swap(recipient, tokenIn, token0, amountIn, amountOut);
+                emit Swap(recipient, token1, token0, amountIn, amountOut);
             }
         }
+        return amountOut;
     }
 
     /// @dev Updates `barFee` for Trident protocol.
