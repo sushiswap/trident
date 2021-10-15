@@ -16,6 +16,7 @@ import {
 } from "./harness/Concentrated";
 import { getBigNumber } from "./harness/helpers";
 import { Trident, TWO_POW_96 } from "./harness/Trident";
+import { customError } from "./utilities/pools";
 
 describe("Concentrated Liquidity Product Pool", function () {
   let snapshotId: string;
@@ -467,7 +468,7 @@ describe("Concentrated Liquidity Product Pool", function () {
           tokenId: Number(mint.tokenId.toString()),
           liquidityAmount: userLiquidityPartial,
           recipient: trident.accounts[0].address,
-          unwrapBento: true,
+          unwrapBento: false,
         };
         await removeLiquidityViaManager(removeLiquidityParams);
         removeLiquidityParams.liquidityAmount = userLiquidity.sub(userLiquidityPartial);
@@ -727,27 +728,27 @@ describe("Concentrated Liquidity Product Pool", function () {
           recipient: trident.accounts[0].address,
         };
 
-        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("INVALID_TICK");
+        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("InvalidTick"));
         // LOWER_EVEN
         addLiquidityParams.lower = nearestEvenValidTick - step + tickSpacing;
         addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("LOWER_EVEN");
+        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("LowerEven"));
 
         // INVALID_TICK (UPPER)
         addLiquidityParams.lower = nearestEvenValidTick - step;
         addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing + 1;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("INVALID_TICK");
+        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("InvalidTick"));
 
         // UPPER_ODD
         addLiquidityParams.lower = nearestEvenValidTick - step;
         addLiquidityParams.upper = nearestEvenValidTick + step;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("UPPER_ODD");
+        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("UpperOdd"));
 
         // WRONG ORDER
         addLiquidityParams.lower = nearestEvenValidTick + 3 * step;
@@ -786,7 +787,7 @@ describe("Concentrated Liquidity Product Pool", function () {
       }
     });
 
-    it.only("Should fail to burn if overflow", async () => {
+    it("Should fail to burn if overflow", async () => {
       const pool = trident.concentratedPools[0];
 
       helper.reset();

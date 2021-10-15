@@ -78,13 +78,19 @@ describe("Router", function () {
 
   describe("HybridPool", function () {
     it("Should add liquidity directly to the pool", async function () {
-      await bento.transfer(weth.address, alice.address, pool.address, BigNumber.from(10).pow(19));
-      await bento.transfer(usdc.address, alice.address, pool.address, BigNumber.from(10).pow(19));
-      await pool.mint(aliceEncoded);
+      const amount = BigNumber.from(10).pow(19);
+      const expectedLiquidity = amount.mul(2).sub(1000);
+
+      await bento.transfer(weth.address, alice.address, pool.address, amount);
+      await bento.transfer(usdc.address, alice.address, pool.address, amount);
+
+      await expect(pool.mint(aliceEncoded)).to.emit(pool, "Mint").withArgs(alice.address, amount, amount, alice.address, expectedLiquidity);
       expect(await pool.totalSupply()).gt(1);
-      await bento.transfer(dai.address, alice.address, daiUsdcPool.address, BigNumber.from(10).pow(19));
-      await bento.transfer(usdc.address, alice.address, daiUsdcPool.address, BigNumber.from(10).pow(19));
-      await daiUsdcPool.mint(aliceEncoded);
+      await bento.transfer(dai.address, alice.address, daiUsdcPool.address, amount);
+      await bento.transfer(usdc.address, alice.address, daiUsdcPool.address, amount);
+      await expect(daiUsdcPool.mint(aliceEncoded))
+        .to.emit(daiUsdcPool, "Mint")
+        .withArgs(alice.address, amount, amount, alice.address, expectedLiquidity);
     });
 
     it("Should add liquidity", async function () {
@@ -103,7 +109,11 @@ describe("Router", function () {
           amount: BigNumber.from(10).pow(18),
         },
       ];
-      await router.addLiquidity(liquidityInput, pool.address, 1, aliceEncoded);
+      let addLiquidityPromise = router.addLiquidity(liquidityInput, pool.address, 1, aliceEncoded);
+      let expectedLiquidity = BigNumber.from(10).pow(18).mul(2);
+      await expect(addLiquidityPromise)
+        .to.emit(pool, "Mint")
+        .withArgs(router.address, liquidityInput[0].amount, liquidityInput[1].amount, alice.address, expectedLiquidity);
       let intermediateTotalSupply = await pool.totalSupply();
       let intermediatePoolWethBalance = await bento.balanceOf(weth.address, pool.address);
       let intermediatePoolUsdcBalance = await bento.balanceOf(usdc.address, pool.address);
@@ -129,7 +139,8 @@ describe("Router", function () {
           amount: BigNumber.from(10).pow(18),
         },
       ];
-      await router.addLiquidity(liquidityInput, pool.address, 1, aliceEncoded);
+      addLiquidityPromise = router.addLiquidity(liquidityInput, pool.address, 1, aliceEncoded);
+      await expect(addLiquidityPromise).to.emit(pool, "Mint");
 
       let finalTotalSupply = await pool.totalSupply();
       let finalPoolWethBalance = await bento.balanceOf(weth.address, pool.address);
@@ -164,7 +175,11 @@ describe("Router", function () {
           amount: BigNumber.from(10).pow(18),
         },
       ];
+
+      let addLiquidityPromise = router.addLiquidity(liquidityInputOptimal, pool.address, 1, aliceEncoded);
       await router.addLiquidity(liquidityInputOptimal, pool.address, 1, aliceEncoded);
+
+      await expect(addLiquidityPromise).to.emit(pool, "Mint");
 
       let intermediateTotalSupply = await pool.totalSupply();
       let intermediatePoolWethBalance = await bento.balanceOf(weth.address, pool.address);
@@ -184,7 +199,9 @@ describe("Router", function () {
           amount: BigNumber.from(10).pow(18),
         },
       ];
-      await router.addLiquidity(liquidityInputOptimal, pool.address, 1, aliceEncoded);
+
+      addLiquidityPromise = router.addLiquidity(liquidityInputOptimal, pool.address, 1, aliceEncoded);
+      await expect(addLiquidityPromise).to.emit(pool, "Mint");
 
       let finalTotalSupply = await pool.totalSupply();
       let finalPoolWethBalance = await bento.balanceOf(weth.address, pool.address);
@@ -292,6 +309,22 @@ describe("Router", function () {
 
       await router.exactInputSingleWithNativeToken(params);
       expect(await bento.balanceOf(weth.address, pool.address)).gt(oldPoolWethBalance);
+    });
+
+    it("Should burn liquidity for single token", async function () {
+      await pool.approve(router.address, BigNumber.from(10).pow(20));
+      let initialLiquidity = await pool.balanceOf(alice.address);
+
+      let liquidity = BigNumber.from(10).pow(10);
+
+      const burnData = ethers.utils.defaultAbiCoder.encode(["address", "address", "bool"], [weth.address, alice.address, true]);
+
+      let burnLiquidityPromise = router.burnLiquiditySingle(pool.address, liquidity, burnData, 1);
+
+      let finalLiquidity = await pool.balanceOf(alice.address);
+
+      await expect(burnLiquidityPromise).to.emit(pool, "Burn");
+      expect(finalLiquidity).eq(initialLiquidity.sub(liquidity));
     });
   });
 });
