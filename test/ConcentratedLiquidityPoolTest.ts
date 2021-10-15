@@ -468,7 +468,7 @@ describe("Concentrated Liquidity Product Pool", function () {
           tokenId: Number(mint.tokenId.toString()),
           liquidityAmount: userLiquidityPartial,
           recipient: trident.accounts[0].address,
-          unwrapBento: true,
+          unwrapBento: false,
         };
         await removeLiquidityViaManager(removeLiquidityParams);
         removeLiquidityParams.liquidityAmount = userLiquidity.sub(userLiquidityPartial);
@@ -787,7 +787,7 @@ describe("Concentrated Liquidity Product Pool", function () {
       }
     });
 
-    it.only("Should fail to burn if overflow", async () => {
+    it("Should fail to burn if overflow", async () => {
       const pool = trident.concentratedPools[0];
 
       helper.reset();

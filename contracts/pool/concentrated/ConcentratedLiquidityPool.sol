@@ -14,11 +14,9 @@ import "../../libraries/concentratedPool/UnsafeMath.sol";
 import "../../libraries/concentratedPool/DyDxMath.sol";
 import "../../libraries/concentratedPool/SwapLib.sol";
 import "../../libraries/concentratedPool/Ticks.sol";
-import "hardhat/console.sol";
 
-/// @notice Trident exchange pool template with concentrated liquidity and constant product formula for swapping between an ERC-20 token pair.
-/// @dev The reserves are stored as bento shares.
-//      The curve is applied to shares as well. This pool does not care about the underlying amounts.
+/// @notice Trident exchange pool template implementing concentrated liquidity for swapping between an ERC-20 token pair.
+/// @dev Amounts are considered to be in Bentobox shared
 contract ConcentratedLiquidityPool is IPool {
     using Ticks for mapping(int24 => Ticks.Tick);
 
@@ -206,7 +204,13 @@ contract ConcentratedLiquidityPool is IPool {
             uint160(currentPrice)
         );
 
-        (uint128 amount0Actual, uint128 amount1Actual) = DyDxMath.getAmountsForLiquidity(priceLower, priceUpper, currentPrice, _liquidity, true);
+        (uint128 amount0Actual, uint128 amount1Actual) = DyDxMath.getAmountsForLiquidity(
+            priceLower,
+            priceUpper,
+            currentPrice,
+            _liquidity,
+            true
+        );
 
         ITridentRouter.TokenInput[] memory callbackData = new ITridentRouter.TokenInput[](2);
         callbackData[0] = ITridentRouter.TokenInput(token0, mintParams.token0native, amount0Actual);

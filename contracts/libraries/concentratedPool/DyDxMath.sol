@@ -84,4 +84,24 @@ library DyDxMath {
             }
         }
     }
+
+    function getAmountsForLiquidity(
+        uint256 priceLower,
+        uint256 priceUpper,
+        uint256 currentPrice,
+        uint256 liquidityAmount,
+        bool roundUp
+    ) internal pure returns (uint128 token0amount, uint128 token1amount) {
+        if (priceUpper <= currentPrice) {
+            /// @dev Only supply `token1` (`token1` is Y).
+            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, priceUpper, roundUp));
+        } else if (currentPrice <= priceLower) {
+            /// @dev Only supply `token0` (`token0` is X).
+            token0amount = uint128(DyDxMath.getDx(liquidityAmount, priceLower, priceUpper, roundUp));
+        } else {
+            /// @dev Supply both tokens.
+            token0amount = uint128(DyDxMath.getDx(liquidityAmount, currentPrice, priceUpper, roundUp));
+            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, currentPrice, roundUp));
+        }
+    }
 }
