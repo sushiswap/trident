@@ -801,7 +801,7 @@ contract BentoBoxV1 is MasterContractManager, BoringBatchable {
     /// @param amount Token amount in native representation to deposit.
     /// @param share Token amount represented in shares to deposit. Takes precedence over `amount`.
     /// @return amountOut The amount deposited.
-    /// @return shareOut The deposited amount repesented in shares.
+    /// @return shareOut The deposited amount represented in shares.
     function deposit(
         IERC20 token_,
         address from,

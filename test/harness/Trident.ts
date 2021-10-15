@@ -25,6 +25,7 @@ export class Trident {
 
   public accounts!: SignerWithAddress[];
   public tokens!: ERC20Mock[];
+  public extraToken!: ERC20Mock;
   public tokenMap: [{ string: ERC20Mock }] = {} as [{ string: ERC20Mock }];
   public bento!: BentoBoxV1;
   public masterDeployer!: MasterDeployer;
@@ -65,8 +66,8 @@ export class Trident {
       await this.deployTokens(ERC20);
       await this.deployBento(Bento);
       await this.deployTridentPeriphery(Deployer, TridentRouter);
-      await this.prepareBento();
       await this.deployConcentratedPeriphery(ConcentratedPoolManager, ConcentratedPoolFactory, TickMath);
+      await this.prepareBento();
       await this.addFactoriesToWhitelist();
       await this.deployConcentratedCore(ConcentratedLiquidityPool);
       resolve(this);
@@ -145,6 +146,7 @@ export class Trident {
       ERC20.deploy("TokenA", "TOK", this.tokenSupply),
       ERC20.deploy("TokenB", "TOK", this.tokenSupply),
     ] as Promise<ERC20Mock>[]);
+    this.extraToken = (await ERC20.deploy("TokenC", "TOK", this.tokenSupply)) as ERC20Mock;
     this.tokenMap[this.tokens[0].address] = this.tokens[0];
     this.tokenMap[this.tokens[1].address] = this.tokens[1];
     this.tokens = sortTokens(this.tokens);
@@ -164,10 +166,7 @@ export class Trident {
     ConcentratedPoolFactory: ContractFactory,
     TickMath: ContractFactory
   ) {
-    this.concentratedPoolManager = (await ConcentratedPoolManager.deploy(
-      this.tokens[0].address,
-      this.masterDeployer.address
-    )) as ConcentratedLiquidityPoolManager;
+    this.concentratedPoolManager = (await ConcentratedPoolManager.deploy(this.masterDeployer.address)) as ConcentratedLiquidityPoolManager;
     this.concentratedPoolFactory = (await ConcentratedPoolFactory.deploy(this.masterDeployer.address)) as ConcentratedLiquidityPoolFactory;
     // for testing
     this.tickMath = (await TickMath.deploy()) as TickMathTest;
@@ -181,15 +180,26 @@ export class Trident {
     await Promise.all([
       this.tokens[0].approve(this.bento.address, this.tokenSupply),
       this.tokens[1].approve(this.bento.address, this.tokenSupply),
+      this.extraToken.approve(this.bento.address, this.tokenSupply),
     ]);
     await Promise.all([
       this.bento.deposit(this.tokens[0].address, this.accounts[0].address, this.accounts[0].address, this.tokenSupply.div(2), 0),
       this.bento.deposit(this.tokens[1].address, this.accounts[0].address, this.accounts[0].address, this.tokenSupply.div(2), 0),
+      this.bento.deposit(this.extraToken.address, this.accounts[0].address, this.accounts[0].address, this.tokenSupply.div(2), 0),
     ]);
     await this.bento.whitelistMasterContract(this.router.address, true);
+    await this.bento.whitelistMasterContract(this.concentratedPoolManager.address, true);
     await this.bento.setMasterContractApproval(
       this.accounts[0].address,
       this.router.address,
+      true,
+      "0",
+      "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000000000000000000000000000"
+    );
+    await this.bento.setMasterContractApproval(
+      this.accounts[0].address,
+      this.concentratedPoolManager.address,
       true,
       "0",
       "0x0000000000000000000000000000000000000000000000000000000000000000",

@@ -1,13 +1,21 @@
 import { expect } from "chai";
 import seedrandom from "seedrandom";
-
-import * as testHelper from "./helpers";
-import { areCloseValues, getIntegerRandomValue } from "../utilities";
-import { RouteType } from "./helpers/constants";
-import { closeValues, RToken } from "@sushiswap/tines";
 import { Contract } from "@ethersproject/contracts";
 
-describe("MultiPool Routing Tests", function () {
+import { closeValues, RToken } from "@sushiswap/tines";
+
+import * as testHelper from "./helpers";
+import { getIntegerRandomValue } from "../utilities";
+import { RouteType } from "./helpers";
+
+async function checkTokenBalancesAreZero(tokens: RToken[], bentoContract: Contract, tridentAddress: string) {
+  for (let index = 0; index < tokens.length; index++) {
+    const tokenBalance = await bentoContract.balanceOf(tokens[index].address, tridentAddress);
+    expect(tokenBalance).equal(0);
+  }
+}
+
+describe("MultiPool Routing Tests - Fixed Topology", function () {
   beforeEach(async function () {
     [this.signer, this.tridentRouterAddress, this.bento] = await testHelper.init();
     this.gasPrice = 1 * 200 * 1e-9;
@@ -51,7 +59,7 @@ describe("MultiPool Routing Tests", function () {
   });
 
   it("Should Test Normal Values with 3 Parallel Pools", async function () {
-    const topology = await testHelper.getAB3VariantTopoplogy(this.rnd);
+    const topology = await testHelper.getThreeParallelPools(this.rnd);
 
     const fromToken = topology.tokens[0];
     const toToken = topology.tokens[1];
@@ -81,7 +89,7 @@ describe("MultiPool Routing Tests", function () {
   });
 
   it("Should Test Normal Values with 2 Parallel Pools", async function () {
-    const topology = await testHelper.getAB2VariantTopoplogy(this.rnd);
+    const topology = await testHelper.getTwoParallelPools(this.rnd);
 
     const fromToken = topology.tokens[0];
     const toToken = topology.tokens[1];
@@ -111,7 +119,7 @@ describe("MultiPool Routing Tests", function () {
   });
 
   it("Should Test Normal Values With 2 Serial Pools", async function () {
-    const topology = await testHelper.getABCTopoplogy(this.rnd);
+    const topology = await testHelper.getTwoSerialPools(this.rnd);
 
     const fromToken = topology.tokens[0];
     const toToken = topology.tokens[2];
@@ -139,7 +147,7 @@ describe("MultiPool Routing Tests", function () {
   });
 
   it("Should Test Normal Values With 3 Serial Pools", async function () {
-    const topology = await testHelper.getABCDTopoplogy(this.rnd);
+    const topology = await testHelper.getThreeSerialPools(this.rnd);
 
     const fromToken = topology.tokens[0];
     const toToken = topology.tokens[2];
@@ -195,7 +203,7 @@ describe("MultiPool Routing Tests", function () {
   });
 
   it("Should Test Normal Values With 2 Serial Pools will revert due to slippage", async function () {
-    const topology = await testHelper.getABCTopoplogy(this.rnd);
+    const topology = await testHelper.getTwoSerialPools(this.rnd);
 
     const fromToken = topology.tokens[0];
     const toToken = topology.tokens[2];

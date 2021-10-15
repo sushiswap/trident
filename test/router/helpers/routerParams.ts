@@ -3,7 +3,7 @@ import { ethers } from "hardhat";
 import { getBigNumber, MultiRoute } from "@sushiswap/tines";
 
 import { RouteType } from "./constants";
-import { ComplexPathParams, ExactInputParams, ExactInputSingleParams, InitialPath, Output, Path, PercentagePath, TridentRoute } from "./helperInterfaces";
+import { ComplexPathParams, ExactInputParams, ExactInputSingleParams, InitialPath, Output, Path, PercentagePath, TridentRoute } from "./interfaces";
 import { BigNumber } from "@ethersproject/bignumber";
 
 
@@ -165,7 +165,7 @@ function getRouteType(multiRoute: MultiRoute) {
 function getInitialPathAmount(legIndex: number, multiRoute: MultiRoute, initialPaths: InitialPath[], initialPathCount: number): BigNumber {
   let amount;
 
-  if(legIndex === initialPathCount - 1){
+  if(initialPathCount > 1 && legIndex === initialPathCount - 1){
     const sumIntialPathAmounts = initialPaths.map(p => p.amount).reduce(function(a, b)
     {
       return a.add(b);

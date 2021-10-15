@@ -46,7 +46,7 @@ contract ConcentratedLiquidityPool is IPool {
 
     uint128 public liquidity;
 
-    uint160 internal secondsPerLiquidity; /// @dev Multiplied by 2^128.
+    uint160 internal secondsGrowthGlobal; /// @dev Multiplied by 2^128.
     uint32 internal lastObservation;
 
     uint256 public feeGrowthGlobal0; /// @dev All fee growth counters are multiplied by 2^128.
@@ -64,12 +64,6 @@ contract ConcentratedLiquidityPool is IPool {
     int24 internal nearestTick; /// @dev Tick that is just below the current price.
 
     uint256 internal unlocked;
-    modifier lock() {
-        require(unlocked == 1, "LOCKED");
-        unlocked = 2;
-        _;
-        unlocked = 1;
-    }
 
     mapping(int24 => Ticks.Tick) public ticks;
     mapping(address => mapping(int24 => mapping(int24 => Position))) public positions;
@@ -107,6 +101,26 @@ contract ConcentratedLiquidityPool is IPool {
         address positionRecipient;
     }
 
+    /// @dev Error list to optimize around pool requirements.
+    error Locked();
+    error ZeroAddress();
+    error InvalidToken();
+    error InvalidSwapFee();
+    error LiquidityOverflow();
+    error Token0Missing();
+    error Token1Missing();
+    error InvalidTick();
+    error LowerEven();
+    error UpperOdd();
+    error MaxTickLiquidity();
+
+    modifier lock() {
+        if (unlocked == 2) revert Locked();
+        unlocked = 2;
+        _;
+        unlocked = 1;
+    }
+
     /// @dev Only set immutable variables here - state changes made here will not be used.
     constructor(bytes memory _deployData, IMasterDeployer _masterDeployer) {
         (address _token0, address _token1, uint24 _swapFee, uint160 _price, uint24 _tickSpacing) = abi.decode(
@@ -114,10 +128,10 @@ contract ConcentratedLiquidityPool is IPool {
             (address, address, uint24, uint160, uint24)
         );
 
-        require(_token0 != address(0), "ZERO_ADDRESS");
-        require(_token0 != address(this), "INVALID_TOKEN0");
-        require(_token1 != address(this), "INVALID_TOKEN1");
-        require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
+        if (_token0 == address(0)) revert ZeroAddress();
+        if (_token0 == address(this)) revert InvalidToken();
+        if (_token1 == address(this)) revert InvalidToken();
+        if (_swapFee > MAX_FEE) revert InvalidSwapFee();
 
         token0 = _token0;
         token1 = _token1;
@@ -153,8 +167,8 @@ contract ConcentratedLiquidityPool is IPool {
             mintParams.amount0Desired
         );
 
-        {
-            require(_liquidity <= MAX_TICK_LIQUIDITY, "LIQUIDITY_OVERFLOW");
+        unchecked {
+            if (_liquidity > MAX_TICK_LIQUIDITY) revert LiquidityOverflow();
 
             (uint256 amount0fees, uint256 amount1fees) = _updatePosition(
                 mintParams.positionOwner,
@@ -177,11 +191,12 @@ contract ConcentratedLiquidityPool is IPool {
         }
 
         _ensureTickSpacing(mintParams.lower, mintParams.upper);
+
         nearestTick = Ticks.insert(
             ticks,
             feeGrowthGlobal0,
             feeGrowthGlobal1,
-            secondsPerLiquidity,
+            secondsGrowthGlobal,
             mintParams.lowerOld,
             mintParams.lower,
             mintParams.upperOld,
@@ -201,12 +216,12 @@ contract ConcentratedLiquidityPool is IPool {
 
         unchecked {
             if (amount0Actual != 0) {
-                require(amount0Actual + reserve0 <= _balance(token0), "TOKEN0_MISSING");
+                if (amount0Actual + reserve0 > _balance(token0)) revert Token0Missing();
                 reserve0 += amount0Actual;
             }
 
             if (amount1Actual != 0) {
-                require(amount1Actual + reserve1 <= _balance(token1), "TOKEN1_MISSING");
+                if (amount1Actual + reserve1 > _balance(token1)) revert Token1Missing();
                 reserve1 += amount1Actual;
             }
         }
@@ -250,6 +265,7 @@ contract ConcentratedLiquidityPool is IPool {
             false
         );
 
+        require(amount <= uint128(type(int128).max), "overflow"); // conversion will be shifted to library
         (uint256 amount0fees, uint256 amount1fees) = _updatePosition(msg.sender, lower, upper, -int128(amount));
 
         unchecked {
@@ -272,7 +288,7 @@ contract ConcentratedLiquidityPool is IPool {
         emit Burn(msg.sender, amount0, amount1, recipient);
     }
 
-    function burnSingle(bytes calldata) public override returns (uint256) {
+    function burnSingle(bytes calldata) public pure override returns (uint256) {
         revert();
     }
 
@@ -310,12 +326,12 @@ contract ConcentratedLiquidityPool is IPool {
             nextTickToCross: zeroForOne ? nearestTick : ticks[nearestTick].nextTick
         });
 
-        {
+        unchecked {
             uint256 timestamp = block.timestamp;
-            uint256 diff = timestamp - uint256(lastObservation); /// @dev Underflow in 2106.
+            uint256 diff = timestamp - uint256(lastObservation); /// @dev Underflow in 2106. Don't do staking rewards in the year 2106.
             if (diff > 0 && liquidity > 0) {
                 lastObservation = uint32(timestamp);
-                secondsPerLiquidity += uint160((diff << 128) / liquidity);
+                secondsGrowthGlobal += uint160((diff << 128) / liquidity);
             }
         }
 
@@ -394,7 +410,7 @@ contract ConcentratedLiquidityPool is IPool {
                 (cache.currentLiquidity, cache.nextTickToCross) = Ticks.cross(
                     ticks,
                     cache.nextTickToCross,
-                    secondsPerLiquidity,
+                    secondsGrowthGlobal,
                     cache.currentLiquidity,
                     cache.feeGrowthGlobal,
                     zeroForOne
@@ -405,7 +421,7 @@ contract ConcentratedLiquidityPool is IPool {
                     (cache.currentLiquidity, cache.nextTickToCross) = Ticks.cross(
                         ticks,
                         cache.nextTickToCross,
-                        secondsPerLiquidity,
+                        secondsGrowthGlobal,
                         cache.currentLiquidity,
                         cache.feeGrowthGlobal,
                         zeroForOne
@@ -437,7 +453,7 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     /// @dev Reserved for IPool.
-    function flashSwap(bytes calldata) public override returns (uint256) {
+    function flashSwap(bytes calldata) public pure override returns (uint256) {
         revert();
     }
 
@@ -463,11 +479,10 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     function _ensureTickSpacing(int24 lower, int24 upper) internal view {
-        require(lower % int24(tickSpacing) == 0, "INVALID_TICK");
-        require((lower / int24(tickSpacing)) % 2 == 0, "LOWER_EVEN");
-
-        require(upper % int24(tickSpacing) == 0, "INVALID_TICK");
-        require((upper / int24(tickSpacing)) % 2 != 0, "UPPER_ODD"); /// @dev Can be either -1 or 1.
+        if (lower % int24(tickSpacing) != 0) revert InvalidTick();
+        if ((lower / int24(tickSpacing)) % 2 != 0) revert LowerEven();
+        if (upper % int24(tickSpacing) != 0) revert InvalidTick();
+        if ((upper / int24(tickSpacing)) % 2 == 0) revert UpperOdd();
     }
 
     function _updateReserves(
@@ -478,13 +493,13 @@ contract ConcentratedLiquidityPool is IPool {
         if (zeroForOne) {
             uint256 balance0 = _balance(token0);
             uint128 newBalance = reserve0 + inAmount;
-            require(uint256(newBalance) <= balance0, "TOKEN0_MISSING");
+            if (uint256(newBalance) > balance0) revert Token0Missing();
             reserve0 = newBalance;
             reserve1 -= uint128(amountOut);
         } else {
             uint256 balance1 = _balance(token1);
             uint128 newBalance = reserve1 + inAmount;
-            require(uint256(newBalance) <= balance1, "TOKEN1_MISSING");
+            if (uint256(newBalance) > balance1) revert Token1Missing();
             reserve1 = newBalance;
             reserve0 -= uint128(amountOut);
         }
@@ -528,7 +543,7 @@ contract ConcentratedLiquidityPool is IPool {
         if (amount < 0) position.liquidity -= uint128(-amount);
         if (amount > 0) position.liquidity += uint128(amount);
 
-        require(position.liquidity < MAX_TICK_LIQUIDITY, "MAX_TICK_LIQUIDITY");
+        if (position.liquidity >= MAX_TICK_LIQUIDITY) revert MaxTickLiquidity();
 
         position.feeGrowthInside0Last = growth0current;
         position.feeGrowthInside1Last = growth1current;
@@ -614,31 +629,6 @@ contract ConcentratedLiquidityPool is IPool {
         feeGrowthInside1 = _feeGrowthGlobal1 - feeGrowthBelow1 - feeGrowthAbove1;
     }
 
-    function rangeSecondsInside(int24 lowerTick, int24 upperTick) public view returns (uint256 secondsInside) {
-        int24 currentTick = nearestTick;
-
-        Ticks.Tick storage lower = ticks[lowerTick];
-        Ticks.Tick storage upper = ticks[upperTick];
-
-        uint256 secondsGlobal = secondsPerLiquidity;
-        uint256 secondsBelow;
-        uint256 secondsAbove;
-
-        if (lowerTick <= currentTick) {
-            secondsBelow = lower.secondsPerLiquidityOutside;
-        } else {
-            secondsBelow = secondsGlobal - lower.secondsPerLiquidityOutside;
-        }
-
-        if (currentTick < upperTick) {
-            secondsAbove = upper.secondsPerLiquidityOutside;
-        } else {
-            secondsAbove = secondsGlobal - upper.secondsPerLiquidityOutside;
-        }
-
-        secondsInside = secondsGlobal - secondsBelow - secondsAbove;
-    }
-
     function getAssets() public view override returns (address[] memory assets) {
         assets = new address[](2);
         assets[0] = token0;
@@ -647,6 +637,11 @@ contract ConcentratedLiquidityPool is IPool {
 
     /// @dev Reserved for IPool.
     function getAmountOut(bytes calldata) public pure override returns (uint256) {
+        revert();
+    }
+
+    /// @dev Reserved for IPool.
+    function getAmountIn(bytes calldata) public pure override returns (uint256) {
         revert();
     }
 
@@ -689,8 +684,8 @@ contract ConcentratedLiquidityPool is IPool {
         _reserve1 = reserve1;
     }
 
-    function getLiquidityAndLastObservation() public view returns (uint160 _secondsPerLiquidity, uint32 _lastObservation) {
-        _secondsPerLiquidity = secondsPerLiquidity;
+    function getSecondsGrowthAndLastObservation() public view returns (uint160 _secondsGrowthGlobal, uint32 _lastObservation) {
+        _secondsGrowthGlobal = secondsGrowthGlobal;
         _lastObservation = lastObservation;
     }
 }

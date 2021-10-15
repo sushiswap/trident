@@ -1,3 +1,4 @@
+import { BigNumber } from "@ethersproject/bignumber";
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
 import {
@@ -15,8 +16,9 @@ import {
 } from "./harness/Concentrated";
 import { getBigNumber } from "./harness/helpers";
 import { Trident, TWO_POW_96 } from "./harness/Trident";
+import { customError } from "./utilities/pools";
 
-describe.only("Concentrated Liquidity Product Pool", function () {
+describe("Concentrated Liquidity Product Pool", function () {
   let snapshotId: string;
   let trident: Trident;
   let defaultAddress: string;
@@ -126,7 +128,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         const maxDx = await getDx(await pool.liquidity(), lowerPrice, currentPrice, false);
 
         // swap back and forth
-        const output = await swapViaRouter({
+        const swapTx = await swapViaRouter({
           pool: pool,
           unwrapBento: true,
           zeroForOne: true,
@@ -138,7 +140,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           pool: pool,
           unwrapBento: false,
           zeroForOne: false,
-          inAmount: output,
+          inAmount: swapTx.output,
           recipient: defaultAddress,
         });
       }
@@ -186,7 +188,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         const upperPrice = await trident.tickMath.getSqrtRatioAtTick(upper);
         const maxDy = await getDy(await pool.liquidity(), currentPrice, upperPrice, false);
 
-        const output = await swapViaRouter({
+        const swapTx = await swapViaRouter({
           pool: pool,
           unwrapBento: true,
           zeroForOne: false,
@@ -198,7 +200,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           pool: pool,
           unwrapBento: false,
           zeroForOne: true,
-          inAmount: output,
+          inAmount: swapTx.output,
           recipient: defaultAddress,
         });
       }
@@ -244,7 +246,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         const upperPrice = await trident.tickMath.getSqrtRatioAtTick(upper);
         const maxDy = await getDy(await pool.liquidity(), currentPrice, upperPrice, false);
 
-        const output = await swapViaRouter({
+        const swapTx = await swapViaRouter({
           pool: pool,
           unwrapBento: true,
           zeroForOne: false,
@@ -256,7 +258,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           pool: pool,
           unwrapBento: false,
           zeroForOne: true,
-          inAmount: output,
+          inAmount: swapTx.output,
           recipient: defaultAddress,
         });
       }
@@ -301,7 +303,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         const upperPrice = await trident.tickMath.getSqrtRatioAtTick(upper);
         const maxDy = await getDy(await pool.liquidity(), currentPrice, upperPrice, false);
 
-        let output = await swapViaRouter({
+        let swapTx = await swapViaRouter({
           pool: pool,
           unwrapBento: true,
           zeroForOne: false,
@@ -309,11 +311,11 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           recipient: defaultAddress,
         });
 
-        output = await swapViaRouter({
+        swapTx = await swapViaRouter({
           pool: pool,
           unwrapBento: false,
           zeroForOne: true,
-          inAmount: output,
+          inAmount: swapTx.output,
           recipient: defaultAddress,
         });
 
@@ -330,11 +332,11 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         );
         const smallerPositionFees1 = await collectFees({ pool, tokenId: tokenIdA, recipient: defaultAddress, unwrapBento: false });
 
-        output = await swapViaRouter({
+        swapTx = await swapViaRouter({
           pool: pool,
           unwrapBento: false,
           zeroForOne: false,
-          inAmount: output,
+          inAmount: swapTx.output,
           recipient: defaultAddress,
         });
 
@@ -342,7 +344,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           pool: pool,
           unwrapBento: false,
           zeroForOne: true,
-          inAmount: output,
+          inAmount: swapTx.output,
           recipient: defaultAddress,
         });
 
@@ -401,7 +403,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         const maxDx = await getDx(await pool.liquidity(), lowerPrice, currentPrice, false);
 
         // swap back and forth
-        const output = await swapViaRouter({
+        const swapTx = await swapViaRouter({
           pool: pool,
           unwrapBento: true,
           zeroForOne: true,
@@ -413,7 +415,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           pool: pool,
           unwrapBento: false,
           zeroForOne: false,
-          inAmount: output,
+          inAmount: swapTx.output,
           recipient: defaultAddress,
         });
 
@@ -462,6 +464,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         const userLiquidityPartial = userLiquidity.sub(userLiquidity.div(3));
 
         let removeLiquidityParams = {
+          pool: pool,
           tokenId: Number(mint.tokenId.toString()),
           liquidityAmount: userLiquidityPartial,
           recipient: trident.accounts[0].address,
@@ -474,7 +477,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
     });
 
     it("Should calcualte seconds inside correctly", async () => {
-      for (const pool of [trident.concentratedPools[0]]) {
+      for (const pool of trident.concentratedPools) {
         helper.reset();
 
         const tickSpacing = (await pool.getImmutables())._tickSpacing;
@@ -526,9 +529,9 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           inAmount: maxDy.div(3).mul(2),
           recipient: defaultAddress,
         });
-        const fistSplData = await pool.getLiquidityAndLastObservation();
-        let firstSplA = await pool.rangeSecondsInside(lowerA, upperA);
-        expect((await fistSplData)._secondsPerLiquidity.toString()).to.be.eq(
+        const fistSplData = await pool.getSecondsGrowthAndLastObservation();
+        let firstSplA = await trident.concentratedPoolManager.rangeSecondsInside(pool.address, lowerA, upperA);
+        expect((await fistSplData)._secondsGrowthGlobal.toString()).to.be.eq(
           firstSplA.toString(),
           "didn't credit seconds per liquidity to active position"
         );
@@ -540,10 +543,10 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           inAmount: maxDy.div(3).mul(2),
           recipient: defaultAddress,
         });
-        const secondSplData = await pool.getLiquidityAndLastObservation();
-        const secondSplA = await pool.rangeSecondsInside(lowerA, upperA);
-        const secondSplB = await pool.rangeSecondsInside(lowerB, upperB);
-        expect(secondSplData._secondsPerLiquidity.toString()).to.be.eq(
+        const secondSplData = await pool.getSecondsGrowthAndLastObservation();
+        const secondSplA = await trident.concentratedPoolManager.rangeSecondsInside(pool.address, lowerA, upperA);
+        const secondSplB = await trident.concentratedPoolManager.rangeSecondsInside(pool.address, lowerB, upperB);
+        expect(secondSplData._secondsGrowthGlobal.toString()).to.be.eq(
           secondSplA.toString(),
           "didn't credit seconds per liquidity to active position"
         );
@@ -557,8 +560,8 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           inAmount: maxDy,
           recipient: defaultAddress,
         });
-        const thirdSplA = await pool.rangeSecondsInside(lowerA, upperA);
-        const thirdSplB = await pool.rangeSecondsInside(lowerB, upperB);
+        const thirdSplA = await trident.concentratedPoolManager.rangeSecondsInside(pool.address, lowerA, upperA);
+        const thirdSplB = await trident.concentratedPoolManager.rangeSecondsInside(pool.address, lowerB, upperB);
         const splAseconds = thirdSplA.sub(secondSplA).mul(liquidityA);
         const splBseconds = thirdSplB.sub(secondSplB).mul(liquidityB);
         const totalSeconds = splAseconds.add(splBseconds).div(TWO_POW_128);
@@ -566,7 +569,138 @@ describe.only("Concentrated Liquidity Product Pool", function () {
       }
     });
 
-    it.skip("Should create incentive", async () => {});
+    it("Should create incentive", async () => {
+      helper.reset();
+      const pool = trident.concentratedPools[0];
+      const tickSpacing = (await pool.getImmutables())._tickSpacing;
+      const tickAtPrice = await getTickAtCurrentPrice(pool);
+      const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
+      const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+      const lower = nearestEvenValidTick - step;
+      const upper = nearestEvenValidTick + step + tickSpacing;
+
+      // add the following global liquidity
+      //                  ▼
+      // ---------------------|xxxxxxxxxxx|-----
+      // --------|xxxxxxxxxxxxxxxxxxxxxxxx|----------
+      // --------|xxxxxxxxxxxxxxxxxxxxxxxx|----------
+
+      let addLiquidityParams = {
+        pool: pool,
+        amount0Desired: getBigNumber(100),
+        amount1Desired: getBigNumber(100),
+        native: true,
+        lowerOld: helper.insert(lower - step),
+        lower: lower - step,
+        upperOld: helper.insert(upper + step),
+        upper: upper + step,
+        positionOwner: trident.concentratedPoolManager.address,
+        recipient: defaultAddress,
+      };
+      const mintA = await addLiquidityViaRouter(addLiquidityParams);
+
+      addLiquidityParams.amount0Desired = getBigNumber(200);
+      addLiquidityParams.amount1Desired = getBigNumber(200);
+      const mintB = await addLiquidityViaRouter(addLiquidityParams);
+
+      addLiquidityParams.amount0Desired = getBigNumber(100);
+      addLiquidityParams.amount1Desired = getBigNumber(100);
+      addLiquidityParams = helper.setTicks(lower + 2 * step, upper + 4 * step, addLiquidityParams);
+      const mintC = await addLiquidityViaRouter(addLiquidityParams);
+
+      // 1 swap should happen before we start an incentive
+      const currentPrice = (await pool.getPriceAndNearestTicks())._price;
+      const upperPrice = await Trident.Instance.tickMath.getSqrtRatioAtTick(lower + 2 * step);
+      const maxDy = await getDy(await pool.liquidity(), currentPrice, upperPrice, false);
+      let swapTx = await swapViaRouter({
+        pool: pool,
+        unwrapBento: true,
+        zeroForOne: false,
+        inAmount: maxDy.div(3),
+        recipient: defaultAddress,
+      });
+
+      const block = await ethers.provider.getBlock(swapTx.tx.blockNumber as number);
+      const incentiveLength = 10000; // in seconds
+      const incentiveAmount = getBigNumber(1000);
+
+      await trident.concentratedPoolManager.addIncentive(pool.address, {
+        owner: defaultAddress,
+        token: trident.extraToken.address,
+        rewardsUnclaimed: incentiveAmount,
+        secondsClaimed: 123,
+        startTime: block.timestamp + 1,
+        endTime: block.timestamp + 1 + incentiveLength,
+        expiry: block.timestamp + 999999999,
+      });
+      let incentive = await trident.concentratedPoolManager.incentives(pool.address, 0);
+      await network.provider.send("evm_setNextBlockTimestamp", [block.timestamp + 2]);
+      expect(incentive.secondsClaimed.toString()).to.be.eq("0", "didn't reset seconds claimed");
+      await trident.concentratedPoolManager.subscribe(mintA.tokenId, [0]);
+      await trident.concentratedPoolManager.subscribe(mintB.tokenId, [0]);
+      await trident.concentratedPoolManager.subscribe(mintC.tokenId, [0]);
+      await network.provider.send("evm_setNextBlockTimestamp", [block.timestamp + incentiveLength / 4]);
+      swapTx = await swapViaRouter({
+        pool: pool,
+        unwrapBento: true,
+        zeroForOne: false,
+        inAmount: maxDy.div(3),
+        recipient: defaultAddress,
+      });
+      const recipientA = trident.accounts[1].address;
+      const recipientB = trident.accounts[2].address;
+      const recipientC = trident.accounts[3].address;
+      await trident.concentratedPoolManager.claimRewards(mintA.tokenId, [0], recipientA, false);
+      await trident.concentratedPoolManager.claimRewards(mintB.tokenId, [0], recipientB, false);
+      incentive = await trident.concentratedPoolManager.incentives(pool.address, 0);
+      const secondsClaimed = incentive.secondsClaimed.div(TWO_POW_128);
+      const rewardsUnclaimed = incentive.rewardsUnclaimed;
+      const expectedRewardsUnclaimed = incentiveAmount.div(4).mul(3); // tree quarters
+      const rewardsA = await trident.bento.balanceOf(trident.extraToken.address, recipientA);
+      const rewardsB = await trident.bento.balanceOf(trident.extraToken.address, recipientB);
+      expect(secondsClaimed.sub(1).lte(incentiveLength / 4) && secondsClaimed.add(1).gte(incentiveLength / 4)).to.be.eq(
+        true,
+        "didn't claim a querter of reward duration"
+      );
+      expect(rewardsUnclaimed.sub(10).lte(expectedRewardsUnclaimed) && rewardsUnclaimed.add(10).gte(expectedRewardsUnclaimed)).to.be.eq(
+        true,
+        "didn't claim a quarter of rewards"
+      );
+      let ratio = rewardsA.mul(2).mul(1e6).div(rewardsB);
+      expect(ratio.gte(999900) && ratio.lte(1000100)).to.be.eq(true, "Didn't split rewards proportionally");
+      const newCurrentPrice = (await pool.getPriceAndNearestTicks())._price;
+      const oldLiq = await pool.liquidity();
+      const newMaxDy = await getDy(await pool.liquidity(), newCurrentPrice, upperPrice, false);
+      swapTx = await swapViaRouter({
+        pool: pool,
+        unwrapBento: true,
+        zeroForOne: false,
+        inAmount: newMaxDy.mul(2),
+        recipient: defaultAddress,
+      });
+      const newLiq = await pool.liquidity();
+      expect(newLiq.gt(oldLiq), "we didn't move into another range");
+      await network.provider.send("evm_setNextBlockTimestamp", [block.timestamp + incentiveLength + 1000]);
+      swapTx = await swapViaRouter({
+        pool: pool,
+        unwrapBento: true,
+        zeroForOne: false,
+        inAmount: newMaxDy.div(10),
+        recipient: defaultAddress,
+      });
+      await trident.concentratedPoolManager.claimRewards(mintA.tokenId, [0], recipientA, false);
+      await trident.concentratedPoolManager.claimRewards(mintB.tokenId, [0], recipientB, false);
+      await trident.concentratedPoolManager.claimRewards(mintC.tokenId, [0], recipientC, false);
+      const newRewardsA = await trident.bento.balanceOf(trident.extraToken.address, recipientA);
+      const newRewardsB = await trident.bento.balanceOf(trident.extraToken.address, recipientB);
+      const newRewardsC = await trident.bento.balanceOf(trident.extraToken.address, recipientC);
+      ratio = rewardsA.mul(2).mul(1e6).div(rewardsB);
+      expect(ratio.gte(999900) && ratio.lte(1000100)).to.be.eq(true, "Didn't split rewards proportionally");
+      incentive = await trident.concentratedPoolManager.incentives(pool.address, 0);
+      const sum = newRewardsA.add(newRewardsB).add(newRewardsC);
+      expect(sum.add(incentive.rewardsUnclaimed)).to.be.eq(incentiveAmount.toString(), "We distributed the wrong amount of tokens");
+      expect(incentive.rewardsUnclaimed.lt("99999"), "didn't leave dust in incentive");
+    });
   });
 
   describe("Invalid actions", async () => {
@@ -594,27 +728,27 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           recipient: trident.accounts[0].address,
         };
 
-        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("INVALID_TICK");
+        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("InvalidTick"));
         // LOWER_EVEN
         addLiquidityParams.lower = nearestEvenValidTick - step + tickSpacing;
         addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("LOWER_EVEN");
+        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("LowerEven"));
 
         // INVALID_TICK (UPPER)
         addLiquidityParams.lower = nearestEvenValidTick - step;
         addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing + 1;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("INVALID_TICK");
+        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("InvalidTick"));
 
         // UPPER_ODD
         addLiquidityParams.lower = nearestEvenValidTick - step;
         addLiquidityParams.upper = nearestEvenValidTick + step;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("UPPER_ODD");
+        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("UpperOdd"));
 
         // WRONG ORDER
         addLiquidityParams.lower = nearestEvenValidTick + 3 * step;
@@ -651,6 +785,55 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         //addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
         //await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("UPPER_ORDER");
       }
+    });
+
+    it.only("Should fail to burn if overflow", async () => {
+      const pool = trident.concentratedPools[0];
+
+      helper.reset();
+      const tickSpacing = (await pool.getImmutables())._tickSpacing;
+      const tickAtPrice = await getTickAtCurrentPrice(pool);
+      const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
+      const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+
+      let lower = nearestEvenValidTick - step;
+      let upper = nearestEvenValidTick + step + tickSpacing;
+
+      let addLiquidityParams = {
+        pool: pool,
+        amount0Desired: getBigNumber(1000),
+        amount1Desired: getBigNumber(1000),
+        native: false,
+        lowerOld: helper.insert(lower),
+        lower,
+        upperOld: helper.insert(upper),
+        upper,
+        positionOwner: trident.concentratedPoolManager.address,
+        recipient: defaultAddress,
+      };
+
+      await addLiquidityViaRouter(addLiquidityParams);
+
+      lower = 609332;
+      upper = lower + 1;
+
+      const tokens = await pool.getAssets();
+      const token0BalanceInitial = await Trident.Instance.bento.balanceOf(tokens[0], pool.address);
+
+      await expect(
+        pool
+          .connect(trident.accounts[4])
+          .burn(
+            ethers.utils.defaultAbiCoder.encode(
+              ["int24", "int24", "uint128", "address", "bool"],
+              [lower, upper, BigNumber.from(`2`).pow(128).sub(`1`), trident.accounts[4].address, false]
+            )
+          )
+      ).to.be.revertedWith("overflow");
+
+      // const token0BalanceAfter = await Trident.Instance.bento.balanceOf(tokens[0], pool.address);
+      // console.log(token0BalanceAfter.toString())
+      // expect(token0BalanceAfter).lt(getBigNumber('1'))
     });
   });
 });

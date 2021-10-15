@@ -1,6 +1,7 @@
 import { ethers } from "hardhat";
 import { BigNumber, BigNumberish } from "ethers";
 import { ERC20Mock } from "../../types";
+import { expect } from "chai";
 
 export const ZERO = BigNumber.from(0);
 export const ONE = BigNumber.from(1);
@@ -9,6 +10,10 @@ export const E18 = BigNumber.from(10).pow(18);
 export const MAX_FEE = BigNumber.from(10000);
 
 export const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000";
+
+export function expectAlmostEqual(actual, expected, reason = "") {
+  expect(actual).to.be.within(expected.sub(ONE), expected.add(ONE), reason);
+}
 
 export function encodedAddress(account) {
   return ethers.utils.defaultAbiCoder.encode(["address"], [account.address]);

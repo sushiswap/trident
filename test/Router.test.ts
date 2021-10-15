@@ -392,6 +392,38 @@ describe("Router", function () {
       expect(await bento.balanceOf(weth.address, alice.address)).eq(oldAliceBentoWethBalance.add(expectedAmountOut));
     });
 
+    it("Should swap using ETH", async function () {
+      let amountIn = BigNumber.from(10).pow(18);
+      let expectedAmountOut = await pool.getAmountOut(encodedTokenAmount(weth.address, amountIn));
+      expect(expectedAmountOut).gt(1);
+      let params = {
+        amountIn: amountIn,
+        amountOutMinimum: expectedAmountOut,
+        pool: pool.address,
+        tokenIn: "0x0000000000000000000000000000000000000000",
+        data: encodedSwapData(weth.address, alice.address, true),
+      };
+
+      let oldAliceEthBalance = await ethers.provider.getBalance(alice.address);
+      let oldAliceWethBalance = await weth.balanceOf(alice.address);
+      let oldAliceSushiBalance = await sushi.balanceOf(alice.address);
+      let oldPoolWethBalance = await bento.balanceOf(weth.address, pool.address);
+      let oldPoolSushiBalance = await bento.balanceOf(sushi.address, pool.address);
+      let oldAliceBentoWethBalance = await bento.balanceOf(weth.address, alice.address);
+      let oldAliceBentoSushiBalance = await bento.balanceOf(sushi.address, alice.address);
+
+      await router.exactInputSingleWithNativeToken(params, { value: amountIn });
+
+      // Some ETH spent on gas fee as well
+      expect(await ethers.provider.getBalance(alice.address)).lte(oldAliceEthBalance.sub(amountIn));
+      expect(await weth.balanceOf(alice.address)).eq(oldAliceWethBalance);
+      expect(await sushi.balanceOf(alice.address)).eq(oldAliceSushiBalance.add(expectedAmountOut));
+      expect(await bento.balanceOf(sushi.address, alice.address)).eq(oldAliceBentoSushiBalance);
+      expect(await bento.balanceOf(weth.address, alice.address)).eq(oldAliceBentoWethBalance);
+      expect(await bento.balanceOf(weth.address, pool.address)).eq(oldPoolWethBalance.add(amountIn));
+      expect(await bento.balanceOf(sushi.address, pool.address)).eq(oldPoolSushiBalance.sub(expectedAmountOut));
+    });
+
     it("Should do complex swap", async function () {
       // sedona -> weth -> 40% dai
       //                -> 60% sushi -> dai

@@ -82,6 +82,7 @@ abstract contract TridentNFT {
     /// @param operator Address of the party that can pull `tokenId`s from 'owner''s account or approve others to do same.
     /// @param approved The approval status of `operator`.
     function setApprovalForAll(address operator, bool approved) external {
+        require(operator != address(0), "INVALID_OPERATOR");
         isApprovedForAll[msg.sender][operator] = approved;
         emit ApprovalForAll(msg.sender, operator, approved);
     }
@@ -91,16 +92,7 @@ abstract contract TridentNFT {
     /// @param tokenId The Id to move.
     function transfer(address recipient, uint256 tokenId) external {
         require(msg.sender == ownerOf[tokenId], "NOT_OWNER");
-        /// @dev This is safe from under/overflow -
-        // ownership is checked against decrement,
-        // and sum of all user balances can't reasonably exceed type(uint256).max (see {_mint}).
-        unchecked {
-            balanceOf[msg.sender]--;
-            balanceOf[recipient]++;
-        }
-        delete getApproved[tokenId];
-        ownerOf[tokenId] = recipient;
-        emit Transfer(msg.sender, recipient, tokenId);
+        _transfer(msg.sender, recipient, tokenId);
     }
 
     /// @notice Transfers `tokenId` from 'owner' to `recipient`. Caller needs ownership or approval from 'owner'.
@@ -113,16 +105,7 @@ abstract contract TridentNFT {
     ) public {
         address owner = ownerOf[tokenId];
         require(msg.sender == owner || msg.sender == getApproved[tokenId] || isApprovedForAll[owner][msg.sender], "NOT_APPROVED");
-        /// @dev This is safe from under/overflow -
-        // ownership is checked against decrement,
-        // and sum of all user balances can't reasonably exceed type(uint256).max (see {_mint}).
-        unchecked {
-            balanceOf[owner]--;
-            balanceOf[recipient]++;
-        }
-        delete getApproved[tokenId];
-        ownerOf[tokenId] = recipient;
-        emit Transfer(owner, recipient, tokenId);
+        _transfer(owner, recipient, tokenId);
     }
 
     /// @notice Transfers `tokenId` from 'owner' to `recipient` with no data. Caller needs ownership or approval from 'owner',
@@ -184,10 +167,8 @@ abstract contract TridentNFT {
                 )
             );
             address recoveredAddress = ecrecover(digest, v, r, s);
-            require(
-                (recoveredAddress != address(0) && recoveredAddress == owner) || isApprovedForAll[owner][recoveredAddress],
-                "INVALID_PERMIT_SIGNATURE"
-            );
+            require(recoveredAddress != address(0), "INVALID_PERMIT_SIGNATURE");
+            require(recoveredAddress == owner || isApprovedForAll[owner][recoveredAddress], "INVALID_SIGNER");
         }
         getApproved[tokenId] = spender;
         emit Approval(owner, spender, tokenId);
@@ -242,13 +223,26 @@ abstract contract TridentNFT {
     }
 
     function _burn(uint256 tokenId) internal {
+        // @dev We tranfer the NFT to address(0) rather than burning to keep Total Supply static.
         address owner = ownerOf[tokenId];
         require(owner != address(0), "NOT_MINTED");
-        /// @dev This is safe from underflow - balance of any 'owner' is greater than 0.
+        _transfer(owner, address(0), tokenId);
+    }
+
+    function _transfer(
+        address from,
+        address to,
+        uint256 tokenId
+    ) internal {
+        /// @dev This is safe from under/overflow -
+        // ownership is checked against decrement,
+        // and sum of all user balances can't reasonably exceed type(uint256).max (see {_mint}).
         unchecked {
-            balanceOf[owner]--;
+            balanceOf[from]--;
+            balanceOf[to]++;
         }
-        delete ownerOf[tokenId];
-        emit Transfer(owner, address(0), tokenId);
+        delete getApproved[tokenId];
+        ownerOf[tokenId] = to;
+        emit Transfer(from, to, tokenId);
     }
 }
