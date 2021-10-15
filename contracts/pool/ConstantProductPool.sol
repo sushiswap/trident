@@ -379,6 +379,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         if (tokenOut == token1) {
             finalAmountIn = _getAmountIn(amountOut, _reserve0, _reserve1);
         } else {
+            require(tokenOut == token0, "INVALID_OUTPUT_TOKEN");
             finalAmountIn = _getAmountIn(amountOut, _reserve1, _reserve0);
         }
     }
