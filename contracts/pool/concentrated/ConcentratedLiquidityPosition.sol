@@ -15,7 +15,6 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
     event Mint(address indexed pool, address indexed recipient, uint256 indexed positionId);
     event Burn(address indexed pool, address indexed owner, uint256 indexed positionId);
 
-    address public immutable wETH;
     IBentoBoxMinimal public immutable bento;
     IMasterDeployer public immutable masterDeployer;
 
@@ -26,14 +25,16 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         uint128 liquidity;
         int24 lower;
         int24 upper;
-        uint256 feeGrowthInside0; /// @dev Per unit of liquidity.
+        uint256 feeGrowthInside0; // Per unit of liquidity.
         uint256 feeGrowthInside1;
     }
 
-    constructor(address _wETH, address _masterDeployer) {
-        wETH = _wETH;
-        masterDeployer = IMasterDeployer(_masterDeployer);
-        bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
+    constructor(IMasterDeployer _masterDeployer) {
+        // Don't need to check _masterDeployer != address(0) as we make a call to it.
+        masterDeployer = _masterDeployer;
+        IBentoBoxMinimal _bento = IBentoBoxMinimal(_masterDeployer.bento());
+        _bento.registerProtocol();
+        bento = _bento;
     }
 
     function positionMintCallback(
@@ -44,7 +45,7 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         uint256 feeGrowthInside0,
         uint256 feeGrowthInside1
     ) external returns (uint256 positionId) {
-        require(IMasterDeployer(masterDeployer).pools(msg.sender), "NOT_POOL");
+        require(masterDeployer.pools(msg.sender), "NOT_POOL");
         positions[totalSupply] = Position(IConcentratedLiquidityPool(msg.sender), amount, lower, upper, feeGrowthInside0, feeGrowthInside1);
         positionId = totalSupply;
         _mint(recipient);
@@ -108,7 +109,7 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
             uint256 newBalance0 = amount0fees + balance0;
             uint256 newBalance1 = amount1fees + balance1;
 
-            /// @dev Rounding errors due to frequent claiming of other users in the same position may cost us some raw
+            // Rounding errors due to frequent claiming of other users in the same position may cost us some raw.
             if (token0amount > newBalance0) token0amount = newBalance0;
             if (token1amount > newBalance1) token1amount = newBalance1;
         }
