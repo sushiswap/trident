@@ -1,26 +1,25 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { RPool, RToken } from "@sushiswap/tines";
 import { BigNumber, Contract, ContractFactory } from "ethers";
+import { MasterDeployer } from "../../../types";
 import { RouteType } from "./constants";
- 
+
 export interface Topology {
   tokens: RToken[];
   prices: number[];
   pools: RPool[];
 }
-  
+
 export interface Variants {
-  [key: string]: number
+  [key: string]: number;
 }
 
 export interface PoolDeploymentContracts {
-  hybridPoolFactory: ContractFactory,
-  hybridPoolContract: Contract,
-  constPoolFactory: ContractFactory, 
-  constantPoolContract: Contract, 
-  masterDeployerContract: Contract,
-  bentoContract: Contract,
-  account: SignerWithAddress
+  constPoolFactory: ContractFactory;
+  constantPoolContract: Contract;
+  masterDeployerContract: Contract;
+  bentoContract: Contract;
+  account: SignerWithAddress;
 }
 export interface InitialPath {
   tokenIn: string;
@@ -56,7 +55,7 @@ export interface ComplexPathParams extends TridentRoute {
 }
 
 export interface ExactInputSingleParams extends TridentRoute {
-  amountIn: BigNumber
+  amountIn: BigNumber;
   amountOutMinimum: BigNumber;
   tokenIn: string;
   pool: string;
@@ -65,11 +64,11 @@ export interface ExactInputSingleParams extends TridentRoute {
 
 export interface ExactInputParams extends TridentRoute {
   tokenIn: string;
-  amountIn: BigNumber
+  amountIn: BigNumber;
   amountOutMinimum: BigNumber;
   path: Path[];
 }
 
 export interface TridentRoute {
-  routeType: RouteType
+  routeType: RouteType;
 }

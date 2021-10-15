@@ -430,7 +430,7 @@
   dependencies:
     "@ethersproject/logger" "^5.4.0"
 
-"@ethersproject/providers@5.4.5", "@ethersproject/providers@^5.4.4":
+"@ethersproject/providers@5.4.5", "@ethersproject/providers@^5.4.0", "@ethersproject/providers@^5.4.4":
   version "5.4.5"
   resolved "https://registry.yarnpkg.com/@ethersproject/providers/-/providers-5.4.5.tgz#eb2ea2a743a8115f79604a8157233a3a2c832928"
   integrity sha512-1GkrvkiAw3Fj28cwi1Sqm8ED1RtERtpdXmRfwIBGmqBSN5MoeRUHuwHPppMtbPayPgpFcvD7/Gdc9doO5fGYgw==
@@ -786,6 +786,22 @@
   dependencies:
     antlr4ts "^0.5.0-alpha.4"
 
+"@sushiswap/core-sdk@1.0.0-canary.5":
+  version "1.0.0-canary.5"
+  resolved "https://registry.yarnpkg.com/@sushiswap/core-sdk/-/core-sdk-1.0.0-canary.5.tgz#06e36124725d5e1bc91577cc200241f24a3e68d7"
+  integrity sha512-RUSQP2W35k64OTS4L41ZMl5Js1UtxPIjMBDJYoTdl/5o/Oah5sVtyBtcLSzBEUt2BIdQiF/lVv4FvJ7QN9ENWQ==
+  dependencies:
+    "@ethersproject/address" "^5.4.0"
+    "@ethersproject/bignumber" "^5.4.0"
+    "@ethersproject/providers" "^5.4.0"
+    "@ethersproject/solidity" "^5.4.0"
+    big.js "^6.1.0"
+    decimal.js-light "^2.5.0"
+    jsbi "^3.2.0"
+    tiny-invariant "^1.1.0"
+    tiny-warning "^1.0.0"
+    toformat "^2.0.0"
+
 "@sushiswap/core-sdk@^0.1.2":
   version "0.1.2"
   resolved "https://registry.yarnpkg.com/@sushiswap/core-sdk/-/core-sdk-0.1.2.tgz#d6ae5d252bb603b2664f119988da50d96d0fff01"
@@ -816,10 +832,13 @@
     tiny-warning "^1.0.3"
     toformat "^2.0.0"
 
-"@sushiswap/tines@^0.1.8":
-  version "0.1.8"
-  resolved "https://registry.yarnpkg.com/@sushiswap/tines/-/tines-0.1.8.tgz#f6f7e027432c8fc106d2de82040ccf595036264c"
-  integrity sha512-/ikMJ4NOU4kfZvcpfmYpTdaP5+v3Uziwl8PX8fIe33P4Desvr0nofYSxQaywLZHuyNGek16EG0/N8+0iRR/3PQ==
+"@sushiswap/tines@^0.1.12":
+  version "0.1.12"
+  resolved "https://registry.yarnpkg.com/@sushiswap/tines/-/tines-0.1.12.tgz#bdd6754e4a45adf735f0efb40b1fba6701e7bde0"
+  integrity sha512-wX9I/3y44jnurUHvuqvjcSFPhS5EejF599uah2z3fQaiMFrMv6XBLchTXyj2ctJQHerUKDdjol7bsCMEeC763Q==
+  dependencies:
+    "@ethersproject/bignumber" "^5.4.0"
+    "@sushiswap/core-sdk" "1.0.0-canary.5"
 
 "@szmarczak/http-timer@^1.1.2":
   version "1.1.2"
@@ -5803,6 +5822,11 @@ jsbi@^3.1.0:
   version "3.2.3"
   resolved "https://registry.yarnpkg.com/jsbi/-/jsbi-3.2.3.tgz#bb3c3bfcd9f18fbf14e1e6b749d1805b304c663e"
   integrity sha512-j6G1XZPxyYxALX0XvgJMkyfwCpG/NOmzS8vDwXcAO5y3l2aclpabU9W0yli+G7Bfpv4j9Sg+Ln70i+wENNcaaw==
+
+jsbi@^3.2.0:
+  version "3.2.5"
+  resolved "https://registry.yarnpkg.com/jsbi/-/jsbi-3.2.5.tgz#b37bb90e0e5c2814c1c2a1bcd8c729888a2e37d6"
+  integrity sha512-aBE4n43IPvjaddScbvWRA2YlTzKEynHzu7MqOyTipdHucf/VxS63ViCjxYRg86M8Rxwbt/GfzHl1kKERkt45fQ==
 
 jsbn@~0.1.0:
   version "0.1.1"
