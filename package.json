@@ -45,7 +45,8 @@
     "export:all": "hardhat export --export-all exports/all.json",
     "prepublishOnly": "export:all",
     "version:canary": "yarn version --prerelease --preid=canary",
-    "publish:canary": "npm publish --access public --tag canary"
+    "publish:canary": "npm publish --access public --tag canary",
+    "size": "hardhat compile && hardhat size-contracts"
   },
   "lint-staged": {
     "*.ts": [
