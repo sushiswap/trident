@@ -2,8 +2,12 @@
 
 pragma solidity >=0.8.0;
 
+import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
+
 /// @notice Trident Concentrated Liquidity Pool ERC-721 implementation with ERC-20/EIP-2612-like extensions,
-// as well as partially, MetaData and Enumerable extensions.
+/// as well as partially, MetaData and Enumerable extensions.
 /// @author Adapted from RariCapital, https://github.com/Rari-Capital/solmate/blob/main/src/erc721/ERC721.sol,
 // License-Identifier: AGPL-3.0-only, and Shoyu, https://github.com/sushiswap/shoyu/blob/master/contracts/base/BaseNFT721.sol,
 // License-Identifier: MIT.
@@ -65,7 +69,7 @@ abstract contract TridentNFT {
     /// @param interfaceId XOR of all function selectors in the reference interface.
     /// @return supported Returns 'true' if `interfaceId` is flagged as implemented.
     function supportsInterface(bytes4 interfaceId) external pure returns (bool supported) {
-        supported = interfaceId == 0x80ac58cd || interfaceId == 0x5b5e139f;
+        supported = interfaceId == type(IERC165).interfaceId || interfaceId == type(IERC721).interfaceId || interfaceId == type(IERC721Metadata).interfaceId;
     }
 
     /// @notice Approves `tokenId` from `msg.sender` 'owner' or 'operator' to be spent by `spender`.
@@ -132,7 +136,7 @@ abstract contract TridentNFT {
     ) public {
         transferFrom(address(0), recipient, tokenId);
         if (recipient.code.length != 0) {
-            /// @dev `onERC721Received(address,address,uint,bytes)`.
+            // `onERC721Received(address,address,uint,bytes)`.
             (, bytes memory returned) = recipient.staticcall(abi.encodeWithSelector(0x150b7a02, msg.sender, address(0), tokenId, data));
             bytes4 selector = abi.decode(returned, (bytes4));
             require(selector == 0x150b7a02, "NOT_ERC721_RECEIVER");
@@ -156,7 +160,7 @@ abstract contract TridentNFT {
     ) external {
         require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
         address owner = ownerOf[tokenId];
-        /// @dev This is reasonably safe from overflow - incrementing `nonces` beyond
+        // This is reasonably safe from overflow - incrementing `nonces` beyond
         // 'type(uint256).max' is exceedingly unlikely compared to optimization benefits.
         unchecked {
             bytes32 digest = keccak256(
@@ -190,7 +194,7 @@ abstract contract TridentNFT {
         bytes32 s
     ) external {
         require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
-        /// @dev This is reasonably safe from overflow - incrementing `nonces` beyond
+        // This is reasonably safe from overflow - incrementing `nonces` beyond
         // 'type(uint256).max' is exceedingly unlikely compared to optimization benefits.
         unchecked {
             bytes32 digest = keccak256(
@@ -211,7 +215,7 @@ abstract contract TridentNFT {
     }
 
     function _mint(address recipient) internal {
-        /// @dev This is reasonably safe from overflow - incrementing beyond
+        // This is reasonably safe from overflow - incrementing beyond
         // 'type(uint256).max' is exceedingly unlikely compared to optimization benefits.
         unchecked {
             uint256 tokenId = totalSupply++;
@@ -223,7 +227,7 @@ abstract contract TridentNFT {
     }
 
     function _burn(uint256 tokenId) internal {
-        // @dev We tranfer the NFT to address(0) rather than burning to keep Total Supply static.
+        // We tranfer the NFT to address(0) rather than burning to keep Total Supply static.
         address owner = ownerOf[tokenId];
         require(owner != address(0), "NOT_MINTED");
         _transfer(owner, address(0), tokenId);
@@ -234,9 +238,9 @@ abstract contract TridentNFT {
         address to,
         uint256 tokenId
     ) internal {
-        /// @dev This is safe from under/overflow -
+        // This is safe from under/overflow -
         // ownership is checked against decrement,
-        // and sum of all user balances can't reasonably exceed type(uint256).max (see {_mint}).
+        // and sum of all user balances can't reasonably exceed 'type(uint256).max' (see {_mint}).
         unchecked {
             balanceOf[from]--;
             balanceOf[to]++;
