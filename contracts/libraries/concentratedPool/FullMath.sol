@@ -83,12 +83,12 @@ library FullMath {
             // Now use Newton-Raphson iteration to improve the precision.
             // Thanks to Hensel's lifting lemma, this also works in modular
             // arithmetic, doubling the correct bits in each step.
-            inv *= 2 - denominator * inv; // @dev Inverse mod 2**8.
-            inv *= 2 - denominator * inv; // @dev Inverse mod 2**16.
-            inv *= 2 - denominator * inv; // @dev Inverse mod 2**32.
-            inv *= 2 - denominator * inv; // @dev Inverse mod 2**64.
-            inv *= 2 - denominator * inv; // @dev Inverse mod 2**128.
-            inv *= 2 - denominator * inv; // @dev Inverse mod 2**256.
+            inv *= 2 - denominator * inv; // Inverse mod 2**8.
+            inv *= 2 - denominator * inv; // Inverse mod 2**16.
+            inv *= 2 - denominator * inv; // Inverse mod 2**32.
+            inv *= 2 - denominator * inv; // Inverse mod 2**64.
+            inv *= 2 - denominator * inv; // Inverse mod 2**128.
+            inv *= 2 - denominator * inv; // Inverse mod 2**256.
             // Because the division is now exact we can divide by multiplying
             // with the modular inverse of denominator. This will give us the
             // correct result modulo 2**256. Since the precoditions guarantee
