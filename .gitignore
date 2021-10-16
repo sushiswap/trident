@@ -23,3 +23,8 @@ coverage.json
 local/
 
 tenderly.yaml
+
+
+#cerotra
+.certora*
+last_conf*

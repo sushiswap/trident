@@ -12,7 +12,7 @@ interface Receiver {
 contract TridentRouterHarness is TridentRouter {
     constructor(
         IBentoBoxMinimal _bento,
-        MasterDeployer _masterDeployer,
+        IMasterDeployer _masterDeployer,
         address _wETH
     ) TridentRouter(_bento, _masterDeployer, _wETH) {}
 

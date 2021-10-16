@@ -182,4 +182,9 @@ contract SymbolicPool is IPool, TridentERC20 {
     function getSplitValue(uint256 liquidity) private pure returns (uint256) {
         return liquidity / 2;
     }
+
+    //not used by contract
+    function getAmountIn(bytes calldata data) external view override returns (uint256 finalAmountIn) {
+
+     }
 }

@@ -21,19 +21,19 @@ perl -0777 -i -pe 's/\) public payable allowed\(from\)/\) public virtual payable
 perl -0777 -i -pe 's/\) public allowed\(from\) returns/\) public virtual allowed\(from\) returns/g' contracts/flat/BentoBoxV1Flat.sol
 
 ##################################################
-#                  TridentHelper                 #
+#                  RouterHelper                 #
 ##################################################
 # internal to public
-perl -0777 -i -pe 's/address internal immutable wETH;/address public immutable wETH;/g' contracts/utils/TridentHelper.sol
+perl -0777 -i -pe 's/address internal immutable wETH;/address public immutable wETH;/g' contracts/utils/RouterHelper.sol
 
 # virtualizing batch function and others
-perl -0777 -i -pe 's/function batch\(bytes\[\] calldata data\) external/function batch\(bytes\[\] calldata data\) external virtual/g' contracts/utils/TridentHelper.sol
+perl -0777 -i -pe 's/function batch\(bytes\[\] calldata data\) external/function batch\(bytes\[\] calldata data\) external virtual/g' contracts/utils/RouterHelper.sol
 # ) external { -> ) public virtual {
-perl -0777 -i -pe 's/\) external \{/\) public virtual \{/g' contracts/utils/TridentHelper.sol
+perl -0777 -i -pe 's/\) external \{/\) public virtual \{/g' contracts/utils/RouterHelper.sol
 # ) public { -> ) public virtual {
-perl -0777 -i -pe 's/\) public \{/\) public virtual \{/g' contracts/utils/TridentHelper.sol
+perl -0777 -i -pe 's/\) public \{/\) public virtual \{/g' contracts/utils/RouterHelper.sol
 # ) internal { -> ) internal virtual {
-perl -0777 -i -pe 's/\) internal \{/\) internal virtual \{/g' contracts/utils/TridentHelper.sol
+perl -0777 -i -pe 's/\) internal \{/\) internal virtual \{/g' contracts/utils/RouterHelper.sol
 
 ##################################################
 #                   TridentRouter                #
@@ -223,3 +223,8 @@ perl -0777 -i -pe 's/uint256 internal constant MAX_FEE = 10000;/uint256 public c
 
 # internal -> public unlocked
 perl -0777 -i -pe 's/uint256 internal unlocked/uint256 public unlocked/g' contracts/pool/HybridPool.sol
+
+
+ perl -0777 -i -pe 's/\/\/\/ \@notice/\/\/notice/g' contracts/pool/TridentERC20.sol
+
+ perl -0777 -i -pe 's/\/\/\/ \@notice/\/\/notice/g' contracts/utils/RouterHelper.sol  
