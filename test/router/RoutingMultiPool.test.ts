@@ -126,6 +126,8 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
       throw new Error("Tines failed to get route");
     }
 
+    expect(route.legs.length).equal(2);
+
     const routerParams = this.swapParams.getTridentRouterParams(route, this.signer.address, topology.pools, this.tridentRouterAddress);
 
     expect(routerParams.routeType).equal(RouteType.SinglePath);
@@ -144,7 +146,7 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
     const topology: Topology = await this.topologyFactory.getThreeSerialPools(this.rnd);
 
     const fromToken = topology.tokens[0];
-    const toToken = topology.tokens[2];
+    const toToken = topology.tokens[3];
     const baseToken = topology.tokens[1];
     const [amountIn] = getIntegerRandomValue(20, this.rnd);
 
@@ -153,6 +155,8 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
     if (route == undefined || route.status === "NoWay") {
       throw new Error("Tines failed to get route");
     }
+
+    expect(route.legs.length).equal(3);
 
     const routerParams = this.swapParams.getTridentRouterParams(route, this.signer.address, topology.pools, this.tridentRouterAddress);
 

@@ -66,7 +66,8 @@ export class TopologyFactory {
   }
 
   public async getThreeParallelPools(rnd: () => number): Promise<Topology> {
-    return await this.getTopoplogyWithClPools(2, 3, rnd);
+    return await this.getTopoplogy(2, 3, rnd);
+    //return await this.getTopoplogyWithClPools(2, 3, rnd);
   }
 
   public async getFivePoolBridge(rnd: () => number): Promise<Topology> {
@@ -241,7 +242,7 @@ export class TopologyFactory {
 
     await this.approveAndFund(tokenContracts);
 
-    let poolType = 1;
+    let poolType = 0;
     for (i = 0; i < poolCount; i++) {
       for (let index = 0; index < poolVariants; index++) {
         const j = i + 1;
@@ -252,9 +253,9 @@ export class TopologyFactory {
         const price0 = topology.prices[i];
         const price1 = topology.prices[j];
 
-        if (poolType % 2 == 0) {
+        if (poolType % 3 == 0) {
           topology.pools.push(await this.PoolFactory.getCLPool(token0, token1, price0 / price1, rnd));
-        } else if (poolType % 3 == 0) {
+        } else if (poolType % 3 == 1) {
           topology.pools.push(await this.PoolFactory.getHybridPool(token0, token1, price0 / price1, rnd));
         } else {
           topology.pools.push(await this.PoolFactory.getCPPool(token0, token1, price0 / price1, rnd));

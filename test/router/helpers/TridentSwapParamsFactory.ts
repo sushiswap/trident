@@ -226,7 +226,7 @@ export class TridentSwapParamsFactory {
 
       data = ethers.utils.defaultAbiCoder.encode(
         ["bool", "uint256", "address", "bool"],
-        [false, getBigNumber(leg.assumedAmountIn), recipent, unwrapBento]
+        [true, getBigNumber(leg.assumedAmountIn), recipent, unwrapBento]
       );
     }
 
