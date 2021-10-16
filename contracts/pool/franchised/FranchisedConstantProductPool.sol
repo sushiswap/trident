@@ -13,8 +13,8 @@ import "./TridentFranchisedERC20.sol";
 /// @dev The reserves are stored as bento shares.
 ///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
 contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
-    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
-    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
+    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient, uint256 liquidity);
+    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient, uint256 liquidity);
     event Sync(uint256 reserve0, uint256 reserve1);
 
     uint256 internal constant MINIMUM_LIQUIDITY = 1000;
@@ -52,10 +52,15 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
     }
 
     constructor(bytes memory _deployData, address _masterDeployer) {
-        (address _token0, address _token1, uint256 _swapFee, bool _twapSupport, address _whiteListManager, address _operator, bool _level2) = abi.decode(
-            _deployData,
-            (address, address, uint256, bool, address, address, bool)
-        );
+        (
+            address _token0,
+            address _token1,
+            uint256 _swapFee,
+            bool _twapSupport,
+            address _whiteListManager,
+            address _operator,
+            bool _level2
+        ) = abi.decode(_deployData, (address, address, uint256, bool, address, address, bool));
 
         // @dev Factory ensures that the tokens are sorted.
         require(_token0 != address(0), "ZERO_ADDRESS");
@@ -114,7 +119,8 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
         _mint(recipient, liquidity);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         kLast = TridentMath.sqrt(balance0 * balance1);
-        emit Mint(msg.sender, amount0, amount1, recipient);
+        uint256 liquidityForEvent = liquidity;
+        emit Mint(msg.sender, amount0, amount1, recipient, liquidityForEvent);
     }
 
     /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
@@ -147,7 +153,7 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
         withdrawnAmounts = new TokenAmount[](2);
         withdrawnAmounts[0] = TokenAmount({token: address(token0), amount: amount0});
         withdrawnAmounts[1] = TokenAmount({token: address(token1), amount: amount1});
-        emit Burn(msg.sender, amount0, amount1, recipient);
+        emit Burn(msg.sender, amount0, amount1, recipient, liquidity);
     }
 
     /// @dev Burns LP tokens sent to this contract and swaps one of the output tokens for another
@@ -189,7 +195,7 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
         }
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         kLast = TridentMath.sqrt(balance0 * balance1);
-        emit Burn(msg.sender, amount0, amount1, recipient);
+        emit Burn(msg.sender, amount0, amount1, recipient, liquidity);
     }
 
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
@@ -380,8 +386,13 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
         if (tokenIn == token0) {
             finalAmountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
         } else {
+            require(tokenIn == token1, "INVALID_INPUT_TOKEN");
             finalAmountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
         }
+    }
+
+    function getAmountIn(bytes calldata) public pure override returns (uint256) {
+        revert();
     }
 
     function getReserves()

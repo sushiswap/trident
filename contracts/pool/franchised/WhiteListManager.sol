@@ -10,7 +10,8 @@ contract WhiteListManager {
     /// @notice EIP-712 related variables and functions.
     string private constant EIP191_PREFIX_FOR_EIP712_STRUCTURED_DATA = "\x19\x01";
     bytes32 private constant APPROVAL_SIGNATURE_HASH = keccak256("SetWhitelisting(address account,bool approved,uint256 deadline)");
-    bytes32 private constant DOMAIN_SEPARATOR_SIGNATURE_HASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
+    bytes32 private constant DOMAIN_SEPARATOR_SIGNATURE_HASH =
+        keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
     bytes32 private immutable _DOMAIN_SEPARATOR;
     uint256 private immutable DOMAIN_SEPARATOR_CHAIN_ID;
 

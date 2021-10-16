@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 pragma solidity >=0.8.0;
+import "../libraries/RebaseLibrary.sol";
 
-/// @notice Minimal BentoBox vault interface. 
+/// @notice Minimal BentoBox vault interface.
 /// @dev `token` is aliased as `address` from `IERC20` for simplicity.
 interface IBentoBoxMinimal {
     /// @notice Balance per ERC-20 token per account in shares.
     function balanceOf(address, address) external view returns (uint256);
-    
+
     /// @dev Helper function to represent an `amount` of `token` in shares.
     /// @param token The ERC-20 token.
     /// @param amount The `token` amount.
@@ -18,7 +19,7 @@ interface IBentoBoxMinimal {
         uint256 amount,
         bool roundUp
     ) external view returns (uint256 share);
-    
+
     /// @dev Helper function to represent shares back into the `token` amount.
     /// @param token The ERC-20 token.
     /// @param share The amount of shares.
@@ -29,7 +30,7 @@ interface IBentoBoxMinimal {
         uint256 share,
         bool roundUp
     ) external view returns (uint256 amount);
-    
+
     /// @notice Registers this contract so that users can approve it for BentoBox.
     function registerProtocol() external;
 
@@ -40,7 +41,7 @@ interface IBentoBoxMinimal {
     /// @param amount Token amount in native representation to deposit.
     /// @param share Token amount represented in shares to deposit. Takes precedence over `amount`.
     /// @return amountOut The amount deposited.
-    /// @return shareOut The deposited amount repesented in shares.
+    /// @return shareOut The deposited amount represented in shares.
     function deposit(
         address token_,
         address from,
@@ -74,4 +75,7 @@ interface IBentoBoxMinimal {
         address to,
         uint256 share
     ) external;
+
+    /// @dev Reads the Rebase `totals`from storage for a given token
+    function totals(address token) external view returns (Rebase memory total);
 }

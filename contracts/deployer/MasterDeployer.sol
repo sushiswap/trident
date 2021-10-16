@@ -8,22 +8,18 @@ import "../utils/TridentOwnable.sol";
 /// @notice Trident pool deployer contract with template factory whitelist.
 /// @author Mudit Gupta.
 contract MasterDeployer is TridentOwnable {
-    event DeployPool(address indexed _factory, address indexed pool);
-    event AddToWhitelist(address indexed _factory);
-    event RemoveFromWhitelist(address indexed _factory);
-    event BarFeeUpdated(uint256 indexed _barFee);
-    event MigratorUpdated(address indexed _migrator);
+    event DeployPool(address indexed factory, address indexed pool, bytes deployData);
+    event AddToWhitelist(address indexed factory);
+    event RemoveFromWhitelist(address indexed factory);
+    event BarFeeUpdated(uint256 indexed barFee);
 
     uint256 public barFee;
-    address public migrator;
-
     address public immutable barFeeTo;
     address public immutable bento;
 
     uint256 internal constant MAX_FEE = 10000; // @dev 100%.
 
     mapping(address => bool) public pools;
-
     mapping(address => bool) public whitelistedFactories;
 
     constructor(
@@ -44,7 +40,7 @@ contract MasterDeployer is TridentOwnable {
         require(whitelistedFactories[_factory], "FACTORY_NOT_WHITELISTED");
         pool = IPoolFactory(_factory).deployPool(_deployData);
         pools[pool] = true;
-        emit DeployPool(_factory, pool);
+        emit DeployPool(_factory, pool, _deployData);
     }
 
     function addToWhitelist(address _factory) external onlyOwner {
@@ -61,10 +57,5 @@ contract MasterDeployer is TridentOwnable {
         require(_barFee <= MAX_FEE, "INVALID_BAR_FEE");
         barFee = _barFee;
         emit BarFeeUpdated(_barFee);
-    }
-
-    function setMigrator(address _migrator) external onlyOwner {
-        migrator = _migrator;
-        emit MigratorUpdated(_migrator);
     }
 }

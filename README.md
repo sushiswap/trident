@@ -8,12 +8,13 @@ TRIDENT 🔱 is a newly developed AMM and routing system from [SushiSwap](https:
 
 | Contract                   | Address                                    |
 | -------------------------- | ------------------------------------------ |
-| TridentRouter              | 0x9F48E9b7DF64191e374C1B134fC0B197C7f02CAb |
-| MasterDeployer             | 0xa2A7Aa74cb94f37221FD49F5BA6F3fF876092700 |
-| ConstantProductPoolFactory | 0x5e343eD1586e13d5e34A204667FAb0D81F85a2c2 |
-| HybridPoolFactory          | 0x0FaBb19C1362cbdd83a13D9b53F54934b05fC771 |
-| IndexPoolFactory           | 0x6c27a62230B46BF52084C8110b05FEd34e480489 |
-| WETH-DAI Cpp               | 0x6a658a7B8ed066397342e882987149bA230F9bE9 |
+| BentoBox                   | 0xc381a85ed7C7448Da073b7d6C9d4cBf1Cbf576f0 |
+| TridentRouter              | 0xabBf36386800A2676737Fdde61905BbF123284b3 |
+| MasterDeployer             | 0xcbD2dB3c724fA4349618fb390f736185Db21a1A1 |
+| ConstantProductPoolFactory | 0xD6A52478FB50f0aaB6E3Bf86f691c0D61DF18f38 |
+| HybridPoolFactory          | 0x4fbeDaEcb25C8094a5bd3b75CD51F02EC956Ad31 |
+| IndexPoolFactory           | 0x3fD4142E61688Db9671D6CcD937543517dAca916 |
+| WETH-DAI Cpp               | 0x1Ef635cE55EaE43D62211779ac133860fcEb9886 |
 
 ## Extensibility
 
@@ -23,23 +24,23 @@ Trident is designed as an extensible AMM deployment framework that allows develo
 
 Initially, Trident has been developed with four primary pool types for launch:
 
-### [ConstantProductPool](./contracts/pool/ConstantProductPool.sol)
+### [ConstantProductPool](**./contracts/pool/ConstantProductPool.sol**)
 
-Constant product pools are the "classic" pools that users will be most familar with. Constant product pools are a 50/50 pair pool, meaning that users first provide 50% of each of Token X and Token Y to provide liquidity. In this pool type, swaps occur over an x\*y=k constant product formula.
+Constant product pools are the "classic" pools that users will be most familiar with, where trading happens between two assets over the x\*y=k constant product formula. In this pool liquidity providers own both of the pool's assets in a 50:50 ratio but the pool does supports a native zap in where liquidity can be added in any ratio of the two tokens. This pool is our most "gas optimized" pool, where swaps are up to 25% cheaper than swaps on the existing Sushi AMM.
 
-### [HybridPool](./contracts/pool/HybridPool.sol)
+### [ConcentratedLiquidityPool](**./contracts/pool/concentrated/ConcentratedLiquidityPool.sol**)
 
-Hybrid pools allow users to use a [stableswap](https://curve.fi/files/stableswap-paper.pdf) curve with reduced price impacts. Hybrid pools are best utilized for swapping like-kind assets. Hybrid pools are configurable to allow 2, 3, or any other amount of swappable assets.
+Concentrated liquidity pools allow liquidity providers to specify a price range on which to provide liquidity on. Providing liquidity on a narrower price range has a multiplying effect on the added liquidity, meaning traders will experience lesser price impacts. This makes the Concentrated Liquidity pool more capital efficient than the classic pool with the tradeoff being liquidity providers can suffer greater impermanent loss. Each concentrated liquidity pool supports two assets.
 
-### [ConcentratedLiquidityPool](./contracts/pool/concentrated/ConcentratedLiquidityPool.sol)
+### [HybridPool](**./contracts/pool/HybridPool.sol**)
 
-Concentrated liquidity pools allow liquidity providers to specify a range in which to provide liquidity in terms of the ratio of Token X to Token Y. The benefit of this design is it will allow liquidity providers to more narrowly scope their liquidity provisioning to maximize swap fees.
+Hybrid pools are designed for swapping like-kind assets. They are an implementation of the [stableswap](https://curve.fi/files/stableswap-paper.pdf) curve which is a hybrid of the x\*y=k and x\+y=k formulas. The pool works by concentrating liquidity around the price of 1 (e.g. 1 USDC per DAI or 1 renBTC per WBTC). Each hybrid pool supports two assets.
 
-### [IndexPool](./contracts/pool/IndexPool.sol)
+### [IndexPool](**./contracts/pool/IndexPool.sol**)
 
-Index pools are similar to constant product pools with the exception that they will allow different weights to be assigned to swappable assets (up to 8, currently). The advantage of this pool type is that it shifts price impacts by token weights.
+Index pools are designed to hold from two to eight tokens, each with a different weight. Trading between two assets of the pool happens over a modified version of the constant product formula. The advantage of these pools is liquidity providers can utilize them to create auto rebalancing indices (e.g. a DeFi blue-chip index) that best match their risk profile.
 
-All of these pools will have configurable fees that will allow liquidity providers to choose the pool that best suits their risk profile.
+All of these pools will have configurable fees that will allow liquidity providers to strike a balance between offsetting their impermanent loss and having the pool stay market competitive.
 
 As a gas-saving measure, Trident further allows pool deployers to disable TWAP oracles. Architecturally, this makes the most sense for common pairs that already have accurate Chainlink price oracles.
 

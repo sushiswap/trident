@@ -1,11 +1,7 @@
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-const deployFunction: DeployFunction = async function ({
-  deployments,
-  getNamedAccounts,
-  ethers,
-}: HardhatRuntimeEnvironment) {
+const deployFunction: DeployFunction = async function ({ deployments, getNamedAccounts, ethers }: HardhatRuntimeEnvironment) {
   console.log("Running ConstantProductPoolFactory deploy script");
   const { deploy } = deployments;
 
