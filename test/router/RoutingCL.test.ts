@@ -11,7 +11,7 @@ const helper = new LinkedListHelper(-887272);
 const step = 10800;
 let snapshotId: string;
 
-describe.skip("Concentrated Pool Routing", async () => {
+describe("Concentrated Pool Routing", async () => {
   before(async () => {
     trident = await Trident.Instance.init();
     defaultAddress = trident.accounts[0].address;

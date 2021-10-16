@@ -1,5 +1,5 @@
 import { ethers } from "hardhat";
-import { getBigNumber,RToken, MultiRoute, findMultiRouting, RPool, ConstantProductRPool, HybridRPool, }  from "@sushiswap/tines"
+import { getBigNumber,RToken, MultiRoute, findMultiRoute, RPool, ConstantProductRPool, HybridRPool, }  from "@sushiswap/tines"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { BigNumber, Contract, ContractFactory } from "ethers";
 
@@ -35,7 +35,7 @@ export async function init(): Promise<[SignerWithAddress, string, Contract]> {
 }
 
 export function createRoute(fromToken: RToken, toToken: RToken, baseToken: RToken, topology: Topology, amountIn: number, gasPrice: number): MultiRoute | undefined {
-  const route = findMultiRouting(
+  const route = findMultiRoute(
     fromToken,
     toToken,
     amountIn,
