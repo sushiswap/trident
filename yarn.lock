@@ -848,10 +848,13 @@
     tiny-warning "^1.0.3"
     toformat "^2.0.0"
 
-"@sushiswap/tines@^0.1.8":
-  version "0.1.8"
-  resolved "https://registry.yarnpkg.com/@sushiswap/tines/-/tines-0.1.8.tgz#f6f7e027432c8fc106d2de82040ccf595036264c"
-  integrity sha512-/ikMJ4NOU4kfZvcpfmYpTdaP5+v3Uziwl8PX8fIe33P4Desvr0nofYSxQaywLZHuyNGek16EG0/N8+0iRR/3PQ==
+"@sushiswap/tines@^0.1.12":
+  version "0.1.12"
+  resolved "https://registry.yarnpkg.com/@sushiswap/tines/-/tines-0.1.12.tgz#bdd6754e4a45adf735f0efb40b1fba6701e7bde0"
+  integrity sha512-wX9I/3y44jnurUHvuqvjcSFPhS5EejF599uah2z3fQaiMFrMv6XBLchTXyj2ctJQHerUKDdjol7bsCMEeC763Q==
+  dependencies:
+    "@ethersproject/bignumber" "^5.4.0"
+    "@sushiswap/core-sdk" "1.0.0-canary.5"
 
 "@szmarczak/http-timer@^1.1.2":
   version "1.1.2"
