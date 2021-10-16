@@ -66,7 +66,7 @@ export class TopologyFactory {
   }
 
   public async getThreeParallelPools(rnd: () => number): Promise<Topology> {
-    return await this.getTopoplogy(2, 3, rnd);
+    return await this.getTopoplogyWithClPools(2, 3, rnd);
   }
 
   public async getFivePoolBridge(rnd: () => number): Promise<Topology> {

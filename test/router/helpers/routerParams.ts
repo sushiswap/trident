@@ -1,23 +1,15 @@
 import { ethers } from "hardhat";
 
-import { getBigNumber, MultiRoute } from "@sushiswap/tines";
+import { CLRPool, ConstantProductRPool, getBigNumber, HybridRPool, MultiRoute, RPool } from "@sushiswap/tines";
 
 import { RouteType } from "./constants";
-import {
-  ComplexPathParams,
-  ExactInputParams,
-  ExactInputSingleParams,
-  InitialPath,
-  Output,
-  Path,
-  PercentagePath,
-  TridentRoute,
-} from "./interfaces";
+import { ComplexPathParams, ExactInputParams, ExactInputSingleParams, InitialPath, Output, Path, PercentagePath } from "./interfaces";
 import { BigNumber } from "@ethersproject/bignumber";
 
 export function getTridentRouterParams(
   multiRoute: MultiRoute,
   senderAddress: string,
+  pools: RPool[],
   tridentRouterAddress: string = "",
   slippagePercentage: number = 0.5
 ): ExactInputParams | ExactInputSingleParams | ComplexPathParams {
@@ -28,23 +20,28 @@ export function getTridentRouterParams(
 
   switch (routeType) {
     case RouteType.SinglePool:
-      routerParams = getExactInputSingleParams(multiRoute, senderAddress, slippage);
+      routerParams = getExactInputSingleParams(multiRoute, senderAddress, slippage, pools);
       break;
 
     case RouteType.SinglePath:
-      routerParams = getExactInputParams(multiRoute, senderAddress, slippage);
+      routerParams = getExactInputParams(multiRoute, senderAddress, slippage, pools);
       break;
 
     case RouteType.ComplexPath:
     default:
-      routerParams = getComplexPathParams(multiRoute, senderAddress, tridentRouterAddress, slippage);
+      routerParams = getComplexPathParams(multiRoute, senderAddress, tridentRouterAddress, slippage, pools);
       break;
   }
 
   return routerParams;
 }
 
-function getExactInputSingleParams(multiRoute: MultiRoute, senderAddress: string, slippage: number): ExactInputSingleParams {
+function getExactInputSingleParams(
+  multiRoute: MultiRoute,
+  senderAddress: string,
+  slippage: number,
+  pools: RPool[]
+): ExactInputSingleParams {
   return {
     amountIn: getBigNumber(multiRoute.amountIn * multiRoute.legs[0].absolutePortion),
     amountOutMinimum: getBigNumber(multiRoute.amountOut * slippage),
@@ -55,29 +52,33 @@ function getExactInputSingleParams(multiRoute: MultiRoute, senderAddress: string
   };
 }
 
-function getExactInputParams(multiRoute: MultiRoute, senderAddress: string, slippage: number): ExactInputParams {
+function getExactInputParams(multiRoute: MultiRoute, senderAddress: string, slippage: number, pools: RPool[]): ExactInputParams {
   const routeLegs = multiRoute.legs.length;
   let paths: Path[] = [];
 
   for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
     const recipentAddress = isLastLeg(legIndex, multiRoute) ? senderAddress : multiRoute.legs[legIndex + 1].poolAddress;
 
+    const pool = pools.find((p) => p.address === multiRoute.legs[legIndex].poolAddress);
+
+    if (pool === undefined) {
+      throw new Error(
+        `An error occurred trying to get ExactInput params. Pool with address ${multiRoute.legs[legIndex].poolAddress} is not in topology.`
+      );
+    }
+
+    const swapData = getSwapDataForPool(pool, multiRoute, legIndex, recipentAddress, false);
+
     if (multiRoute.legs[legIndex].tokenFrom.address === multiRoute.fromToken.address) {
       const path: Path = {
         pool: multiRoute.legs[legIndex].poolAddress,
-        data: ethers.utils.defaultAbiCoder.encode(
-          ["address", "address", "bool"],
-          [multiRoute.legs[legIndex].tokenFrom.address, recipentAddress, false]
-        ),
+        data: swapData,
       };
       paths.push(path);
     } else {
       const path: Path = {
         pool: multiRoute.legs[legIndex].poolAddress,
-        data: ethers.utils.defaultAbiCoder.encode(
-          ["address", "address", "bool"],
-          [multiRoute.legs[legIndex].tokenFrom.address, recipentAddress, false]
-        ),
+        data: swapData,
       };
       paths.push(path);
     }
@@ -98,7 +99,8 @@ function getComplexPathParams(
   multiRoute: MultiRoute,
   senderAddress: string,
   tridentRouterAddress: string,
-  slippage: number
+  slippage: number,
+  pools: RPool[]
 ): ComplexPathParams {
   let initialPaths: InitialPath[] = [];
   let percentagePaths: PercentagePath[] = [];
@@ -116,27 +118,32 @@ function getComplexPathParams(
   outputs.push(output);
 
   for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
+    const pool = pools.find((p) => p.address === multiRoute.legs[legIndex].poolAddress);
+
+    if (pool === undefined) {
+      throw new Error(
+        `An error occurred trying to get ExactInput params. Pool with address ${multiRoute.legs[legIndex].poolAddress} is not in topology.`
+      );
+    }
+
+    const swapData = getSwapDataForPool(pool, multiRoute, legIndex, tridentRouterAddress, false);
+
     if (multiRoute.legs[legIndex].tokenFrom.address === multiRoute.fromToken.address) {
       const initialPath: InitialPath = {
         tokenIn: multiRoute.legs[legIndex].tokenFrom.address,
         pool: multiRoute.legs[legIndex].poolAddress,
         amount: getInitialPathAmount(legIndex, multiRoute, initialPaths, initialPathCount),
         native: false,
-        data: ethers.utils.defaultAbiCoder.encode(
-          ["address", "address", "bool"],
-          [multiRoute.legs[legIndex].tokenFrom.address, tridentRouterAddress, false]
-        ),
+        data: swapData,
       };
+
       initialPaths.push(initialPath);
     } else {
       const percentagePath: PercentagePath = {
         tokenIn: multiRoute.legs[legIndex].tokenFrom.address,
         pool: multiRoute.legs[legIndex].poolAddress,
         balancePercentage: getBigNumber(multiRoute.legs[legIndex].swapPortion * 10 ** 8),
-        data: ethers.utils.defaultAbiCoder.encode(
-          ["address", "address", "bool"],
-          [multiRoute.legs[legIndex].tokenFrom.address, tridentRouterAddress, false]
-        ),
+        data: swapData,
       };
       percentagePaths.push(percentagePath);
     }
@@ -192,4 +199,25 @@ function getInitialPathAmount(legIndex: number, multiRoute: MultiRoute, initialP
   }
 
   return amount;
+}
+
+function getSwapDataForPool(pool: RPool, multiRoute: MultiRoute, legIndex: number, recipent: string, unwrapBento: boolean): string {
+  let data: string = "";
+  const leg = multiRoute.legs[legIndex];
+
+  if (pool instanceof HybridRPool || pool instanceof ConstantProductRPool) {
+    data = ethers.utils.defaultAbiCoder.encode(["address", "address", "bool"], [leg.tokenFrom.address, recipent, unwrapBento]);
+  } else if (pool instanceof CLRPool) {
+    // (bool zeroForOne, uint256 inAmount, address recipient, bool unwrapBento)
+    // TODO: zeroForOne ?
+
+    //const clPool = new ConcentratedLiquidityPool(pool.address);
+
+    data = ethers.utils.defaultAbiCoder.encode(
+      ["bool", "uint256", "address", "bool"],
+      [false, getBigNumber(leg.assumedAmountIn), recipent, unwrapBento]
+    );
+  }
+
+  return data;
 }

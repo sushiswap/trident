@@ -7,6 +7,7 @@ import { closeValues, RToken } from "@sushiswap/tines";
 import * as testHelper from "./helpers";
 import { getIntegerRandomValue } from "../utilities";
 import { RouteType } from "./helpers";
+import { Topology } from "./helpers/interfaces";
 
 describe("MultiPool Routing Tests - Fixed Topology", function () {
   beforeEach(async function () {
@@ -31,8 +32,8 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
 
     const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, 1000000, this.gasPrice);
 
-    if (route == undefined) {
-      throw "Failed to get route";
+    if (route == undefined || route.status === "NoWay") {
+      throw new Error("Tines failed to get route");
     }
 
     expect(route.legs.length).equal(5);
@@ -61,13 +62,13 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
 
     const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
 
-    if (route == undefined) {
-      throw "Failed to get route";
+    if (route == undefined || route.status === "NoWay") {
+      throw new Error("Tines failed to get route");
     }
 
     expect(route.legs.length).equal(3);
 
-    const routerParams = testHelper.getTridentRouterParams(route, this.signer.address, this.tridentRouterAddress);
+    const routerParams = testHelper.getTridentRouterParams(route, this.signer.address, topology.pools, this.tridentRouterAddress);
 
     expect(routerParams.routeType).equal(RouteType.ComplexPath);
 
@@ -91,8 +92,8 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
 
     const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
 
-    if (route == undefined) {
-      throw "Failed to get route";
+    if (route == undefined || route.status === "NoWay") {
+      throw new Error("Tines failed to get route");
     }
 
     expect(route.legs.length).equal(2);
@@ -121,8 +122,8 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
 
     const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
 
-    if (route == undefined) {
-      throw "Failed to get route";
+    if (route == undefined || route.status === "NoWay") {
+      throw new Error("Tines failed to get route");
     }
 
     const routerParams = testHelper.getTridentRouterParams(route, this.signer.address, this.tridentRouterAddress);
@@ -140,7 +141,7 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
   });
 
   it("Should Test Normal Values With 3 Serial Pools", async function () {
-    const topology = await this.topologyFactory.getThreeSerialPools(this.rnd);
+    const topology: Topology = await this.topologyFactory.getThreeSerialPools(this.rnd);
 
     const fromToken = topology.tokens[0];
     const toToken = topology.tokens[2];
@@ -153,7 +154,7 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
       throw new Error("Tines failed to get route");
     }
 
-    const routerParams = testHelper.getTridentRouterParams(route, this.signer.address, this.tridentRouterAddress);
+    const routerParams = testHelper.getTridentRouterParams(route, this.signer.address, topology.pools, this.tridentRouterAddress);
 
     expect(routerParams.routeType).equal(RouteType.SinglePath);
 
@@ -177,8 +178,8 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
 
     const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
 
-    if (route == undefined) {
-      throw "Failed to get route";
+    if (route == undefined || route.status === "NoWay") {
+      throw new Error("Tines failed to get route");
     }
 
     const routerParams = testHelper.getTridentRouterParams(route, this.signer.address, this.tridentRouterAddress);
@@ -205,8 +206,8 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
 
     const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
 
-    if (route == undefined) {
-      throw "Failed to get route";
+    if (route == undefined || route.status === "NoWay") {
+      throw new Error("Tines failed to get route");
     }
 
     route.amountOut = route.amountOut * (1 + 1 / 100);
