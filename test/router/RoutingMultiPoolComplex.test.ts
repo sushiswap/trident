@@ -5,8 +5,8 @@ import { Contract } from "@ethersproject/contracts";
 import { closeValues, RouteStatus, RToken } from "@sushiswap/tines";
 
 import * as testHelper from "./helpers";
+import { Topology } from "./helpers";
 import { getIntegerRandomValue } from "../utilities";
-import { getRandom, Topology, RouteType } from "./helpers";
 
 async function checkTokenBalancesAreZero(tokens: RToken[], bentoContract: Contract, tridentAddress: string) {
   for (let index = 0; index < tokens.length; index++) {
@@ -17,7 +17,7 @@ async function checkTokenBalancesAreZero(tokens: RToken[], bentoContract: Contra
 
 describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function () {
   before(async function () {
-    [this.signer, this.tridentRouterAddress, this.bento, this.topologyFactory] = await testHelper.init();
+    [this.signer, this.tridentRouterAddress, this.bento, this.topologyFactory, this.swapParams] = await testHelper.init();
     this.gasPrice = 1 * 200 * 1e-9;
     this.rnd = seedrandom("5");
   });
@@ -50,7 +50,7 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
         if (route.status === RouteStatus.NoWay) {
           expect(route.amountOut).equal(0);
         } else {
-          const routerParams = testHelper.getTridentRouterParams(route, this.signer.address, this.tridentRouterAddress);
+          const routerParams = this.swapParams.getTridentRouterParams(route, this.signer.address, this.tridentRouterAddress);
 
           expect(routerParams).to.not.be.undefined;
 

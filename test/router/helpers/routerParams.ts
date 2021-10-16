@@ -2,7 +2,7 @@ import { ethers } from "hardhat";
 
 import { CLRPool, ConstantProductRPool, getBigNumber, HybridRPool, MultiRoute, RPool } from "@sushiswap/tines";
 
-import { RouteType } from "./constants";
+import { RouteType } from "./RouteType";
 import { ComplexPathParams, ExactInputParams, ExactInputSingleParams, InitialPath, Output, Path, PercentagePath } from "./interfaces";
 import { BigNumber } from "@ethersproject/bignumber";
 
@@ -211,11 +211,11 @@ function getSwapDataForPool(pool: RPool, multiRoute: MultiRoute, legIndex: numbe
     // (bool zeroForOne, uint256 inAmount, address recipient, bool unwrapBento)
     // TODO: zeroForOne ?
 
-    //const clPool = new ConcentratedLiquidityPool(pool.address);
+    //const clPool = new ConcentratedLiquidityPoolFactory().attach(pool.address);
 
     data = ethers.utils.defaultAbiCoder.encode(
       ["bool", "uint256", "address", "bool"],
-      [false, getBigNumber(leg.assumedAmountIn), recipent, unwrapBento]
+      [true, getBigNumber(leg.assumedAmountIn), recipent, unwrapBento]
     );
   }
 

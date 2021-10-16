@@ -12,7 +12,7 @@ import {
   TickMathTest,
   TridentRouter,
 } from "../../../types";
-import { MAX_POOL_IMBALANCE, MAX_POOL_RESERVE, MIN_POOL_IMBALANCE, MIN_POOL_RESERVE } from "./constants";
+
 import { choice, getRandom } from "./random";
 import { ethers } from "hardhat";
 import { ContractFactory } from "@ethersproject/contracts";
@@ -38,6 +38,11 @@ export class TridentPoolFactory {
   private ConcentratedPoolFactory!: ConcentratedLiquidityPoolFactory;
   private ConcentratedPoolManager!: ConcentratedLiquidityPoolManager;
   private TickMath!: TickMathTest;
+
+  private MIN_POOL_RESERVE = 1e12;
+  private MAX_POOL_RESERVE = 1e23;
+  private MIN_POOL_IMBALANCE = 1 / (1 + 1e-3);
+  private MAX_POOL_IMBALANCE = 1 + 1e-3;
 
   constructor(signer: SignerWithAddress, masterDeployer: MasterDeployer, bento: BentoBoxV1, tridentRouter: TridentRouter) {
     this.Signer = signer;
@@ -134,6 +139,10 @@ export class TridentPoolFactory {
     await hybridPool.mint(ethers.utils.defaultAbiCoder.encode(["address"], [this.Signer.address]));
 
     return new HybridRPool(hybridPool.address, t0, t1, fee / 10_000, A, getBigNumber(reserve0), getBigNumber(reserve1));
+  }
+
+  public getCLPoolInstance(address: string): ConcentratedLiquidityPool {
+    return this.ConcentratedLiquidityPool.attach(address) as ConcentratedLiquidityPool;
   }
 
   public async getCLPool(t0: RToken, t1: RToken, price: number, rnd: () => number, fee = 5, tickIncrement = 1) {
@@ -240,11 +249,11 @@ export class TridentPoolFactory {
   }
 
   private getPoolImbalance(rnd: () => number) {
-    return getRandom(rnd, MIN_POOL_IMBALANCE, MAX_POOL_IMBALANCE);
+    return getRandom(rnd, this.MIN_POOL_IMBALANCE, this.MAX_POOL_IMBALANCE);
   }
 
   private getPoolReserve(rnd: () => number) {
-    return getRandom(rnd, MIN_POOL_RESERVE, MAX_POOL_RESERVE);
+    return getRandom(rnd, this.MIN_POOL_RESERVE, this.MAX_POOL_RESERVE);
   }
 
   private getPoolFee(rnd: () => number) {

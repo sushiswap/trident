@@ -2,7 +2,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { RPool, RToken } from "@sushiswap/tines";
 import { BigNumber, Contract, ContractFactory } from "ethers";
 import { MasterDeployer } from "../../../types";
-import { RouteType } from "./constants";
+import { RouteType } from "./RouteType";
 
 export interface Topology {
   tokens: RToken[];

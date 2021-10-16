@@ -3,29 +3,30 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { BigNumber, Contract } from "ethers";
 
 import { Topology, TridentRoute } from "./interfaces";
-import { RouteType } from "./constants";
 import { TridentPoolFactory } from "./TridentPoolFactory";
 import { TestContext } from "./TestContext";
 import { TopologyFactory } from "./TopologyFactory";
+import { RouteType } from "./RouteType";
+import { TridentSwapParamsFactory } from "./TridentSwapParamsFactory";
 
 let alice: SignerWithAddress, feeTo: SignerWithAddress;
 
 let ctx: TestContext;
-let tridentPoolFactory: TridentPoolFactory;
 
-export async function init(): Promise<[SignerWithAddress, string, Contract, TopologyFactory]> {
+export async function init(): Promise<[SignerWithAddress, string, Contract, TopologyFactory, TridentSwapParamsFactory]> {
   ctx = new TestContext();
   await ctx.init();
 
   alice = ctx.Signer;
   feeTo = ctx.FeeTo;
 
-  tridentPoolFactory = new TridentPoolFactory(alice, ctx.MasterDeployer, ctx.Bento, ctx.TridentRouter);
+  const tridentPoolFactory = new TridentPoolFactory(alice, ctx.MasterDeployer, ctx.Bento, ctx.TridentRouter);
   await tridentPoolFactory.init();
 
   const topologyFactory = new TopologyFactory(ctx.Erc20Factory, tridentPoolFactory, ctx.Bento, ctx.Signer);
+  const swapParams = new TridentSwapParamsFactory(tridentPoolFactory);
 
-  return [alice, ctx.TridentRouter.address, ctx.Bento, topologyFactory];
+  return [alice, ctx.TridentRouter.address, ctx.Bento, topologyFactory, swapParams];
 }
 
 export function createRoute(
@@ -71,4 +72,5 @@ export async function executeTridentRoute(tridentRouteParams: TridentRoute, toTo
 
 export * from "./RouterParams";
 export * from "./random";
-export * from "./constants";
+export * from "./RouteType";
+export * from "./Interfaces";
