@@ -313,7 +313,7 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage
-    /// - price is √(y/x)
+    // - price is √(y/x)
     /// - x is token0
     /// - zero for one -> price will move down.
     function swap(bytes memory data) public override lock returns (uint256 amountOut) {
