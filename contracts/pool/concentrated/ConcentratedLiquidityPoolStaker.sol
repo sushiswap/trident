@@ -40,7 +40,9 @@ contract ConcentratedLiquidityPoolStaker {
 
     constructor(IPoolManager _poolManager) {
         poolManager = _poolManager;
-        bento = IBentoBoxMinimal(_poolManager.bento());
+        IBentoBoxMinimal _bento = IBentoBoxMinimal(_poolManager.bento());
+        _bento.registerProtocol();
+        bento = _bento;
     }
 
     function addIncentive(IConcentratedLiquidityPool pool, Incentive memory incentive) public {
