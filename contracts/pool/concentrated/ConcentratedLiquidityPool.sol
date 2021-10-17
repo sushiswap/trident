@@ -26,7 +26,7 @@ contract ConcentratedLiquidityPool is IPool {
     event Sync(uint256 reserveShares0, uint256 reserveShares1);
 
     /// @dev References for tickSpacing:
-    // 100 tickSpacing -> 2% between ticks.
+    /// 100 tickSpacing -> 2% between ticks.
     bytes32 public constant override poolIdentifier = "Trident:ConcentratedLiquidity";
 
     uint24 internal constant MAX_FEE = 100000; /// @dev Maximum `swapFee` is 10%.
@@ -92,10 +92,10 @@ contract ConcentratedLiquidityPool is IPool {
         uint256 amount1Desired;
         bool token0native;
         bool token1native;
-        /// @dev To mint an NFT the positionOwner should be set to the positionManager contract.
+        // To mint an NFT the positionOwner should be set to the positionManager contract.
         address positionOwner;
-        /// @dev When minting through the positionManager contract positionRecipient should be the NFT recipient.
-        //    It can be set to address(0) if we are not minting through the positionManager contract.
+        // When minting through the positionManager contract positionRecipient should be the NFT recipient.
+        // It can be set to address(0) if we are not minting through the positionManager contract.
         address positionRecipient;
     }
 
@@ -136,7 +136,7 @@ contract ConcentratedLiquidityPool is IPool {
         swapFee = _swapFee;
         price = _price;
         tickSpacing = _tickSpacing;
-        /// @dev Prevents global liquidity overflow in the case all ticks are initialised.
+        // Prevents global liquidity overflow in the case all ticks are initialised.
         MAX_TICK_LIQUIDITY = Ticks.getMaxLiquidity(_tickSpacing);
         ticks[TickMath.MIN_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
         ticks[TickMath.MAX_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
@@ -149,7 +149,7 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
-    // The router must ensure that sufficient LP tokens are minted by using the return value.
+    /// The router must ensure that sufficient LP tokens are minted by using the return value.
     function mint(bytes calldata data) public override lock returns (uint256 _liquidity) {
         MintParams memory mintParams = abi.decode(data, (MintParams));
 
@@ -269,7 +269,7 @@ contract ConcentratedLiquidityPool is IPool {
             false
         );
 
-        require(amount <= uint128(type(int128).max), "overflow"); // conversion will be shifted to library
+        require(amount <= uint128(type(int128).max), "overflow"); // Conversion happens in the library.
         (uint256 amount0fees, uint256 amount1fees) = _updatePosition(msg.sender, lower, upper, -int128(amount));
 
         unchecked {
@@ -313,9 +313,9 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage
-    // - price is √(y/x)
-    // - x is token0
-    // - zero for one -> price will move down.
+    /// - price is √(y/x)
+    /// - x is token0
+    /// - zero for one -> price will move down.
     function swap(bytes memory data) public override lock returns (uint256 amountOut) {
         (bool zeroForOne, uint256 inAmount, address recipient, bool unwrapBento) = abi.decode(data, (bool, uint256, address, bool));
 
@@ -332,7 +332,7 @@ contract ConcentratedLiquidityPool is IPool {
 
         unchecked {
             uint256 timestamp = block.timestamp;
-            uint256 diff = timestamp - uint256(lastObservation); /// @dev Underflow in 2106. Don't do staking rewards in the year 2106.
+            uint256 diff = timestamp - uint256(lastObservation); // Underflow in 2106. Don't do staking rewards in the year 2106.
             if (diff > 0 && liquidity > 0) {
                 lastObservation = uint32(timestamp);
                 secondsGrowthGlobal += uint160((diff << 128) / liquidity);
@@ -387,13 +387,13 @@ contract ConcentratedLiquidityPool is IPool {
                     // Calculate new price after swap: ΔP = Δy/L.
                     uint256 newPrice = cache.currentPrice +
                         FullMath.mulDiv(cache.input, 0x1000000000000000000000000, cache.currentLiquidity);
-                    /// @dev Calculate output of swap
+                    // Calculate output of swap
                     // - Δx = Δ(1/√P) · L.
                     output = DyDxMath.getDx(cache.currentLiquidity, cache.currentPrice, newPrice, false);
                     cache.currentPrice = newPrice;
                     cache.input = 0;
                 } else {
-                    /// @dev Swap & cross the tick.
+                    // Swap & cross the tick.
                     output = DyDxMath.getDx(cache.currentLiquidity, cache.currentPrice, nextTickPrice, false);
                     cache.currentPrice = nextTickPrice;
                     cross = true;
@@ -586,16 +586,16 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     /// @dev Generic formula for fee growth inside a range: (globalGrowth - growthBelow - growthAbove)
-    // - available counters: global, outside u, outside v.
+    /// - available counters: global, outside u, outside v.
 
-    //                  u         ▼         v
-    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - feeGrowthOutside(u) - feeGrowthOutside(v))
+    ///                  u         ▼         v
+    /// ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - feeGrowthOutside(u) - feeGrowthOutside(v))
 
-    //             ▼    u                   v
-    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - (global - feeGrowthOutside(u)) - feeGrowthOutside(v))
+    ///             ▼    u                   v
+    /// ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - (global - feeGrowthOutside(u)) - feeGrowthOutside(v))
 
-    //                  u                   v    ▼
-    // ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - feeGrowthOutside(u) - (global - feeGrowthOutside(v)))
+    ///                  u                   v    ▼
+    /// ----|----|-------|xxxxxxxxxxxxxxxxxxx|--------|--------- (global - feeGrowthOutside(u) - (global - feeGrowthOutside(v)))
 
     /// @notice Calculates the fee growth inside a range (per unit of liquidity).
     /// @dev Multiply `rangeFeeGrowth` delta by the provided liquidity to get accrued fees for some period.
@@ -605,7 +605,7 @@ contract ConcentratedLiquidityPool is IPool {
         Ticks.Tick storage lower = ticks[lowerTick];
         Ticks.Tick storage upper = ticks[upperTick];
 
-        /// @dev Calculate fee growth below & above.
+        // Calculate fee growth below & above.
         uint256 _feeGrowthGlobal0 = feeGrowthGlobal0;
         uint256 _feeGrowthGlobal1 = feeGrowthGlobal1;
         uint256 feeGrowthBelow0;
@@ -665,7 +665,7 @@ contract ConcentratedLiquidityPool is IPool {
     {
         _MAX_TICK_LIQUIDITY = MAX_TICK_LIQUIDITY;
         _tickSpacing = tickSpacing;
-        _swapFee = swapFee; /// @dev 1000 corresponds to 0.1% fee.
+        _swapFee = swapFee; // 1000 corresponds to 0.1% fee.
         _barFeeTo = barFeeTo;
         _bento = bento;
         _masterDeployer = masterDeployer;

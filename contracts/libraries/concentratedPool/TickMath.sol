@@ -46,7 +46,7 @@ library TickMath {
             if (absTick & 0x80000 != 0) ratio = (ratio * 0x48a170391f7dc42444e8fa2) >> 128;
 
             if (tick > 0) ratio = type(uint256).max / ratio;
-            // @dev This divides by 1<<32 rounding up to go from a Q128.128 to a Q128.96.
+            // This divides by 1<<32 rounding up to go from a Q128.128 to a Q128.96.
             // We then downcast because we know the result always fits within 160 bits due to our tick input constraint.
             // We round up in the division so getTickAtSqrtRatio of the output price is always consistent.
             sqrtPriceX96 = uint160((ratio >> 32) + (ratio % (1 << 32) == 0 ? 0 : 1));
@@ -59,7 +59,7 @@ library TickMath {
     /// @param sqrtPriceX96 The sqrt ratio for which to compute the tick as a Q64.96.
     /// @return tick The greatest tick for which the ratio is less than or equal to the input ratio.
     function getTickAtSqrtRatio(uint160 sqrtPriceX96) internal pure returns (int24 tick) {
-        // @dev Second inequality must be < because the price can never reach the price at the max tick.
+        // Second inequality must be < because the price can never reach the price at the max tick.
         require(sqrtPriceX96 >= MIN_SQRT_RATIO && sqrtPriceX96 < MAX_SQRT_RATIO, "R");
         uint256 ratio = uint256(sqrtPriceX96) << 32;
 
@@ -195,7 +195,7 @@ library TickMath {
                 log_2 := or(log_2, shl(50, f))
             }
 
-            int256 log_sqrt10001 = log_2 * 255738958999603826347141; // @dev 128.128 number.
+            int256 log_sqrt10001 = log_2 * 255738958999603826347141; // 128.128 number.
 
             int24 tickLow = int24((log_sqrt10001 - 3402992956809132418596140100660247210) >> 128);
             int24 tickHi = int24((log_sqrt10001 + 291339464771989622907027621153398088495) >> 128);
