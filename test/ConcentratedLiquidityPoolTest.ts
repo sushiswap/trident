@@ -18,7 +18,7 @@ import { getBigNumber } from "./harness/helpers";
 import { Trident, TWO_POW_96 } from "./harness/Trident";
 import { customError } from "./utilities/pools";
 
-describe.only("Concentrated Liquidity Product Pool", function () {
+describe("Concentrated Liquidity Product Pool", function () {
   let snapshotId: string;
   let trident: Trident;
   let defaultAddress: string;
@@ -530,7 +530,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           recipient: defaultAddress,
         });
         const fistSplData = await pool.getSecondsGrowthAndLastObservation();
-        let firstSplA = await trident.concentratedPoolManager.rangeSecondsInside(pool.address, lowerA, upperA);
+        let firstSplA = await trident.concentratedPoolStaker.rangeSecondsInside(pool.address, lowerA, upperA);
         expect((await fistSplData)._secondsGrowthGlobal.toString()).to.be.eq(
           firstSplA.toString(),
           "didn't credit seconds per liquidity to active position"
@@ -544,8 +544,8 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           recipient: defaultAddress,
         });
         const secondSplData = await pool.getSecondsGrowthAndLastObservation();
-        const secondSplA = await trident.concentratedPoolManager.rangeSecondsInside(pool.address, lowerA, upperA);
-        const secondSplB = await trident.concentratedPoolManager.rangeSecondsInside(pool.address, lowerB, upperB);
+        const secondSplA = await trident.concentratedPoolStaker.rangeSecondsInside(pool.address, lowerA, upperA);
+        const secondSplB = await trident.concentratedPoolStaker.rangeSecondsInside(pool.address, lowerB, upperB);
         expect(secondSplData._secondsGrowthGlobal.toString()).to.be.eq(
           secondSplA.toString(),
           "didn't credit seconds per liquidity to active position"
@@ -560,8 +560,8 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           inAmount: maxDy,
           recipient: defaultAddress,
         });
-        const thirdSplA = await trident.concentratedPoolManager.rangeSecondsInside(pool.address, lowerA, upperA);
-        const thirdSplB = await trident.concentratedPoolManager.rangeSecondsInside(pool.address, lowerB, upperB);
+        const thirdSplA = await trident.concentratedPoolStaker.rangeSecondsInside(pool.address, lowerA, upperA);
+        const thirdSplB = await trident.concentratedPoolStaker.rangeSecondsInside(pool.address, lowerB, upperB);
         const splAseconds = thirdSplA.sub(secondSplA).mul(liquidityA);
         const splBseconds = thirdSplB.sub(secondSplB).mul(liquidityB);
         const totalSeconds = splAseconds.add(splBseconds).div(TWO_POW_128);
@@ -624,7 +624,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
       const incentiveLength = 10000; // in seconds
       const incentiveAmount = getBigNumber(1000);
 
-      await trident.concentratedPoolManager.addIncentive(pool.address, {
+      await trident.concentratedPoolStaker.addIncentive(pool.address, {
         owner: defaultAddress,
         token: trident.extraToken.address,
         rewardsUnclaimed: incentiveAmount,
@@ -633,12 +633,12 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         endTime: block.timestamp + 1 + incentiveLength,
         expiry: block.timestamp + 999999999,
       });
-      let incentive = await trident.concentratedPoolManager.incentives(pool.address, 0);
+      let incentive = await trident.concentratedPoolStaker.incentives(pool.address, 0);
       await network.provider.send("evm_setNextBlockTimestamp", [block.timestamp + 2]);
       expect(incentive.secondsClaimed.toString()).to.be.eq("0", "didn't reset seconds claimed");
-      await trident.concentratedPoolManager.subscribe(mintA.tokenId, [0]);
-      await trident.concentratedPoolManager.subscribe(mintB.tokenId, [0]);
-      await trident.concentratedPoolManager.subscribe(mintC.tokenId, [0]);
+      await trident.concentratedPoolStaker.subscribe(mintA.tokenId, [0]);
+      await trident.concentratedPoolStaker.subscribe(mintB.tokenId, [0]);
+      await trident.concentratedPoolStaker.subscribe(mintC.tokenId, [0]);
       await network.provider.send("evm_setNextBlockTimestamp", [block.timestamp + incentiveLength / 4]);
       swapTx = await swapViaRouter({
         pool: pool,
@@ -650,9 +650,9 @@ describe.only("Concentrated Liquidity Product Pool", function () {
       const recipientA = trident.accounts[1].address;
       const recipientB = trident.accounts[2].address;
       const recipientC = trident.accounts[3].address;
-      await trident.concentratedPoolManager.claimRewards(mintA.tokenId, [0], recipientA, false);
-      await trident.concentratedPoolManager.claimRewards(mintB.tokenId, [0], recipientB, false);
-      incentive = await trident.concentratedPoolManager.incentives(pool.address, 0);
+      await trident.concentratedPoolStaker.claimRewards(mintA.tokenId, [0], recipientA, false);
+      await trident.concentratedPoolStaker.claimRewards(mintB.tokenId, [0], recipientB, false);
+      incentive = await trident.concentratedPoolStaker.incentives(pool.address, 0);
       const secondsClaimed = incentive.secondsClaimed.div(TWO_POW_128);
       const rewardsUnclaimed = incentive.rewardsUnclaimed;
       const expectedRewardsUnclaimed = incentiveAmount.div(4).mul(3); // tree quarters
@@ -688,15 +688,15 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         inAmount: newMaxDy.div(10),
         recipient: defaultAddress,
       });
-      await trident.concentratedPoolManager.claimRewards(mintA.tokenId, [0], recipientA, false);
-      await trident.concentratedPoolManager.claimRewards(mintB.tokenId, [0], recipientB, false);
-      await trident.concentratedPoolManager.claimRewards(mintC.tokenId, [0], recipientC, false);
+      await trident.concentratedPoolStaker.claimRewards(mintA.tokenId, [0], recipientA, false);
+      await trident.concentratedPoolStaker.claimRewards(mintB.tokenId, [0], recipientB, false);
+      await trident.concentratedPoolStaker.claimRewards(mintC.tokenId, [0], recipientC, false);
       const newRewardsA = await trident.bento.balanceOf(trident.extraToken.address, recipientA);
       const newRewardsB = await trident.bento.balanceOf(trident.extraToken.address, recipientB);
       const newRewardsC = await trident.bento.balanceOf(trident.extraToken.address, recipientC);
       ratio = rewardsA.mul(2).mul(1e6).div(rewardsB);
       expect(ratio.gte(999900) && ratio.lte(1000100)).to.be.eq(true, "Didn't split rewards proportionally");
-      incentive = await trident.concentratedPoolManager.incentives(pool.address, 0);
+      incentive = await trident.concentratedPoolStaker.incentives(pool.address, 0);
       const sum = newRewardsA.add(newRewardsB).add(newRewardsC);
       expect(sum.add(incentive.rewardsUnclaimed)).to.be.eq(incentiveAmount.toString(), "We distributed the wrong amount of tokens");
       expect(incentive.rewardsUnclaimed.lt("99999"), "didn't leave dust in incentive");
