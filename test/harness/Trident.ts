@@ -40,8 +40,6 @@ export class Trident {
   }
 
   public async init() {
-    if (this.initialising) return this.initialising;
-
     this.initialising = new Promise<Trident>(async (resolve) => {
       this.accounts = await ethers.getSigners();
 
