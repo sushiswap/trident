@@ -5,7 +5,7 @@ pragma solidity >=0.8.0;
 import "../../interfaces/IBentoBoxMinimal.sol";
 import "../../interfaces/IMasterDeployer.sol";
 import "../../interfaces/IPool.sol";
-import "../../interfaces/IPositionManager.sol";
+import "../../interfaces/concentratedPool/IPositionManager.sol";
 import "../../interfaces/ITridentCallee.sol";
 import "../../interfaces/ITridentRouter.sol";
 import "../../libraries/concentratedPool/FullMath.sol";

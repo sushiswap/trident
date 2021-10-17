@@ -2,9 +2,9 @@
 
 pragma solidity >=0.8.0;
 
-import "../../interfaces/IBentoBoxMinimal.sol";
-import "../../interfaces/IConcentratedLiquidityPoolManager.sol";
+import "../../interfaces/concentratedPool/IConcentratedLiquidityPoolManager.sol";
 import "../../interfaces/IMasterDeployer.sol";
+import "../../interfaces/IBentoBoxMinimal.sol";
 import "../../interfaces/ITridentRouter.sol";
 import "../../libraries/concentratedPool/FullMath.sol";
 import "../../libraries/concentratedPool/TickMath.sol";
@@ -13,7 +13,7 @@ import "../../utils/TridentBatchable.sol";
 import "./TridentNFT.sol";
 
 /// @notice Trident Concentrated Liquidity Pool periphery contract that combines non-fungible position management and staking.
-contract ConcentratedLiquidityPosition is IConcentratedLiquidityPoolManager, TridentNFT {
+contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerStruct, TridentNFT {
     event Mint(address indexed pool, address indexed recipient, uint256 indexed positionId);
     event Burn(address indexed pool, address indexed owner, uint256 indexed positionId);
 
@@ -23,7 +23,6 @@ contract ConcentratedLiquidityPosition is IConcentratedLiquidityPoolManager, Tri
     mapping(uint256 => Position) public positions;
 
     constructor(address _masterDeployer) {
-        /// @dev Don't need to check _masterDeployer != address(0) as we make a call to it.
         masterDeployer = IMasterDeployer(_masterDeployer);
         IBentoBoxMinimal _bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
         _bento.registerProtocol();

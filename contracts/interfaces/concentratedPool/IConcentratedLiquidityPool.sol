@@ -2,10 +2,10 @@
 
 pragma solidity >=0.8.0;
 
-import "./IPool.sol";
-import "./IBentoBoxMinimal.sol";
-import "./IMasterDeployer.sol";
-import "../libraries/concentratedPool/Ticks.sol";
+import "./../IPool.sol";
+import "./../IBentoBoxMinimal.sol";
+import "./../IMasterDeployer.sol";
+import "../../libraries/concentratedPool/Ticks.sol";
 
 /// @notice Trident Concentrated Liquidity Pool interface.
 interface IConcentratedLiquidityPool is IPool {
