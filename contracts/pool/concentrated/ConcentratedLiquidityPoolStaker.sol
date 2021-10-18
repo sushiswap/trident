@@ -108,7 +108,7 @@ contract ConcentratedLiquidityPoolStaker {
             Incentive storage incentive = incentives[pool][incentiveIds[i]];
             Stake storage stake = stakes[positionId][incentiveIds[i]];
 
-            require(stake.timestamp >= position.latestAddition, "UNINITIALIZED");
+            require(stake.timestamp >= position.latestAddition, "MUST_RESUBSCRIBE");
 
             uint256 rewards;
             uint256 secondsInside;
