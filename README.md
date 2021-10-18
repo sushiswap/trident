@@ -74,8 +74,6 @@ At Sushi, we believe deeply in growing the open source ecosystem of DeFi. Our Tr
 ## Post Launch Roadmap
 
 - [Franchised pools](./contracts/pool/constantProduct/FranchisedConstantProductPool.sol)
-  (./contracts/pool/hybrid/FranchisedHybrid.sol)
-  (./contracts/pool/index/FranchisedIndexPool.sol)
 
   - Following the launch of Trident, Sushi will begin formalizing franchised pools for institutional and other permissioned use cases. Franchised pools are a way to allow users to provide liquidity on decentralized exchanges while meeting their compliance needs. As such, these pools will be differentiated from the main Trident AMM system and will allow whitelisting and similar features for liquidity providers and swappers.
 
