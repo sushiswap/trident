@@ -8,6 +8,7 @@ import {
   ConcentratedLiquidityPool,
   ConcentratedLiquidityPoolFactory,
   ConcentratedLiquidityPoolManager,
+  ConcentratedLiquidityPoolStaker,
   MasterDeployer,
   TickMathTest,
   TridentRouter,
@@ -31,6 +32,7 @@ export class Trident {
   public masterDeployer!: MasterDeployer;
   public router!: TridentRouter;
   public concentratedPoolManager!: ConcentratedLiquidityPoolManager;
+  public concentratedPoolStaker!: ConcentratedLiquidityPoolStaker;
   public concentratedPoolFactory!: ConcentratedLiquidityPoolFactory;
   public concentratedPools!: ConcentratedLiquidityPool[];
   public tickMath!: TickMathTest;
@@ -40,38 +42,37 @@ export class Trident {
   }
 
   public async init() {
-    this.initialising = new Promise<Trident>(async (resolve) => {
-      this.accounts = await ethers.getSigners();
+    this.accounts = await ethers.getSigners();
 
-      const [ERC20, Bento, Deployer, TridentRouter, ConcentratedPoolManager, TickMath, TickLibrary] = await Promise.all(
+    const [ERC20, Bento, Deployer, TridentRouter, ConcentratedPoolManager, ConcentratedPoolStaker, TickMath, TickLibrary] =
+      await Promise.all(
         getFactories([
           "ERC20Mock",
           "BentoBoxV1",
           "MasterDeployer",
           "TridentRouter",
           "ConcentratedLiquidityPoolManager",
+          "ConcentratedLiquidityPoolStaker",
           "TickMathTest",
           "Ticks",
         ])
       );
 
-      const tickLibrary = await TickLibrary.deploy();
-      const clpLibs = {};
-      clpLibs["Ticks"] = tickLibrary.address;
-      const ConcentratedPoolFactory = await ethers.getContractFactory("ConcentratedLiquidityPoolFactory", { libraries: clpLibs });
-      const ConcentratedLiquidityPool = await ethers.getContractFactory("ConcentratedLiquidityPool", { libraries: clpLibs });
+    const tickLibrary = await TickLibrary.deploy();
+    const clpLibs = {};
+    clpLibs["Ticks"] = tickLibrary.address;
+    const ConcentratedPoolFactory = await ethers.getContractFactory("ConcentratedLiquidityPoolFactory", { libraries: clpLibs });
+    const ConcentratedLiquidityPool = await ethers.getContractFactory("ConcentratedLiquidityPool", { libraries: clpLibs });
 
-      await this.deployTokens(ERC20);
-      await this.deployBento(Bento);
-      await this.deployTridentPeriphery(Deployer, TridentRouter);
-      await this.deployConcentratedPeriphery(ConcentratedPoolManager, ConcentratedPoolFactory, TickMath);
-      await this.prepareBento();
-      await this.addFactoriesToWhitelist();
-      await this.deployConcentratedCore(ConcentratedLiquidityPool);
-      resolve(this);
-    });
+    await this.deployTokens(ERC20);
+    await this.deployBento(Bento);
+    await this.deployTridentPeriphery(Deployer, TridentRouter);
+    await this.deployConcentratedPeriphery(ConcentratedPoolManager, ConcentratedPoolStaker, ConcentratedPoolFactory, TickMath);
+    await this.prepareBento();
+    await this.addFactoriesToWhitelist();
+    await this.deployConcentratedCore(ConcentratedLiquidityPool);
 
-    return this.initialising;
+    return this;
   }
 
   public async getTokenBalance(tokens: string[], address: string, native: boolean) {
@@ -161,10 +162,14 @@ export class Trident {
 
   private async deployConcentratedPeriphery(
     ConcentratedPoolManager: ContractFactory,
+    ConcentratedPoolStaker: ContractFactory,
     ConcentratedPoolFactory: ContractFactory,
     TickMath: ContractFactory
   ) {
     this.concentratedPoolManager = (await ConcentratedPoolManager.deploy(this.masterDeployer.address)) as ConcentratedLiquidityPoolManager;
+    this.concentratedPoolStaker = (await ConcentratedPoolStaker.deploy(
+      this.concentratedPoolManager.address
+    )) as ConcentratedLiquidityPoolStaker;
     this.concentratedPoolFactory = (await ConcentratedPoolFactory.deploy(this.masterDeployer.address)) as ConcentratedLiquidityPoolFactory;
     // for testing
     this.tickMath = (await TickMath.deploy()) as TickMathTest;
@@ -187,17 +192,16 @@ export class Trident {
     ]);
     await this.bento.whitelistMasterContract(this.router.address, true);
     await this.bento.whitelistMasterContract(this.concentratedPoolManager.address, true);
-    await this.bento.setMasterContractApproval(
-      this.accounts[0].address,
-      this.router.address,
-      true,
-      "0",
-      "0x0000000000000000000000000000000000000000000000000000000000000000",
-      "0x0000000000000000000000000000000000000000000000000000000000000000"
-    );
-    await this.bento.setMasterContractApproval(
-      this.accounts[0].address,
-      this.concentratedPoolManager.address,
+    await this.bento.whitelistMasterContract(this.concentratedPoolStaker.address, true);
+    await this.bentoApproval(this.accounts[0].address, this.router.address);
+    await this.bentoApproval(this.accounts[0].address, this.concentratedPoolManager.address);
+    await this.bentoApproval(this.accounts[0].address, this.concentratedPoolStaker.address);
+  }
+
+  private bentoApproval(from, to) {
+    return this.bento.setMasterContractApproval(
+      from,
+      to,
       true,
       "0",
       "0x0000000000000000000000000000000000000000000000000000000000000000",

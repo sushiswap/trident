@@ -2,7 +2,7 @@
 
 pragma solidity >=0.8.0;
 
-/// @notice Trident Concentrated Liquidity Pool Position manager interface.
+/// @notice Trident concentrated Liquidity pool mint callback receiver.
 interface IPositionManager {
     function positionMintCallback(
         address recipient,
