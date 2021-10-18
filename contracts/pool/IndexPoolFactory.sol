@@ -8,6 +8,8 @@ import "./PoolDeployer.sol";
 /// @notice Contract for deploying Trident exchange Index Pool with configurations.
 /// @author Mudit Gupta
 contract IndexPoolFactory is PoolDeployer {
+    bytes32 public constant poolIdentifier = "Trident:Index";
+
     constructor(address _masterDeployer) PoolDeployer(_masterDeployer) {}
 
     function deployPool(bytes memory _deployData) external returns (address pool) {
