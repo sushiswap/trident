@@ -18,7 +18,7 @@ TRIDENT 🔱 is a newly developed AMM and routing system from [SushiSwap](https:
 
 ## Extensibility
 
-Trident is designed as an extensible AMM framework that allows developers to add new pool types that conform to the [IPool interface](./contracts/interfaces/IPool.sol). Before launch, an [EIP](https://eips.ethereum.org/) will be submitted for the IPool interface design to help standardize pool interfaces across Ethereum. As new AMM pool types are designed or experimented with, they can be added to Trident so long as they conform to the interface. In this way Trident will *at minimum* be a superset of all popular AMM pool designs as well as a future-proof architecture for Sushi to build on.
+Trident is designed as an extensible AMM framework that allows developers to add new pool types that conform to the [IPool interface](./contracts/interfaces/IPool.sol). Before launch, an [EIP](https://eips.ethereum.org/) will be submitted for the IPool interface design to help standardize pool interfaces across Ethereum. As new AMM pool types are designed or experimented with, they can be added to Trident so long as they conform to the interface. In this way Trident will _at minimum_ be a superset of all popular AMM pool designs as well as a future-proof architecture for Sushi to build on.
 
 ## Launch Pools
 
