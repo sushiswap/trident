@@ -438,16 +438,22 @@ export async function addLiquidityViaRouter(params: {
   expect(newPoolBalances[0].toString()).to.be.eq(oldPoolBalances[0].add(dx).toString(), "Didn't receive correct amount of token0");
   expect(newPoolBalances[1].toString()).to.be.eq(oldPoolBalances[1].add(dy).toString(), "Didn't receive correct amount of token1");
   if (positionOwner === Trident.Instance.concentratedPoolManager.address) {
-    expect(oldTotalSupply.add(1).toString()).to.be.eq(newTotalSupply.toString(), "nft wasn't minted");
+    if (positionId == 0) {
+      expect(oldTotalSupply.add(1).toString()).to.be.eq(newTotalSupply.toString(), "nft wasn't minted");
+    }
     const [_pool, _liquidity, _lower, _upper, _feeGrowth0, _feeGrowth1] = await Trident.Instance.concentratedPoolManager.positions(
-      oldTotalSupply
+      positionId == 0 || positionId == undefined ? oldTotalSupply : positionId || 0
     );
-    const nftOwner = await Trident.Instance.concentratedPoolManager.ownerOf(oldTotalSupply);
-    expect(nftOwner).to.be.eq(recipient, "ower doesn't receive the nft position");
+
+    const nftOwner = await Trident.Instance.concentratedPoolManager.ownerOf(
+      positionId == 0 || positionId == undefined ? oldTotalSupply : positionId || 0
+    );
+
+    expect(nftOwner).to.be.eq(recipient, "owner doesn't receive the nft position");
     expect(_pool).to.be.eq(pool.address, "position isn't of the correct pool");
     expect(_lower).to.be.eq(lower, "position doesn't have the correct lower tick");
     expect(_upper).to.be.eq(upper, "position doesn't have the correct upper tick");
-    expect(_liquidity).to.be.eq(liquidity, "position doens't have the minted liquidity");
+    expect(_liquidity).to.be.gte(liquidity, "position doens't have the minted liquidity");
     // TODO check pool reserve change is correct!
     // TODO add function to calculate range fee growth here and ensure that positionManager saved the correct value
   }
