@@ -19,6 +19,7 @@ import { Trident, TWO_POW_96 } from "./harness/Trident";
 import { customError } from "./utilities/pools";
 
 describe("Concentrated Liquidity Product Pool", function () {
+  let _snapshotId: string;
   let snapshotId: string;
   let trident: Trident;
   let defaultAddress: string;
@@ -26,6 +27,7 @@ describe("Concentrated Liquidity Product Pool", function () {
   const step = 10800;
 
   before(async () => {
+    _snapshotId = await ethers.provider.send("evm_snapshot", []);
     trident = await Trident.Instance.init();
     defaultAddress = trident.accounts[0].address;
     snapshotId = await ethers.provider.send("evm_snapshot", []);
@@ -34,6 +36,11 @@ describe("Concentrated Liquidity Product Pool", function () {
   afterEach(async () => {
     await network.provider.send("evm_revert", [snapshotId]);
     snapshotId = await ethers.provider.send("evm_snapshot", []);
+  });
+
+  after(async () => {
+    await network.provider.send("evm_revert", [_snapshotId]);
+    _snapshotId = await ethers.provider.send("evm_snapshot", []);
   });
 
   describe("Valid actions", async () => {
