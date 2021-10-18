@@ -12,7 +12,6 @@ import "../../libraries/concentratedPool/TickMath.sol";
 import "../../libraries/concentratedPool/DyDxMath.sol";
 import "../../utils/TridentBatchable.sol";
 import "./TridentNFT.sol";
-import "hardhat/console.sol";
 
 /// @notice Trident Concentrated Liquidity Pool periphery contract that combines non-fungible position management and staking.
 contract ConcentratedLiquidityPoolManager is IPositionManager, IConcentratedLiquidityPoolManagerStruct, TridentNFT, TridentBatchable {
@@ -83,7 +82,6 @@ contract ConcentratedLiquidityPoolManager is IPositionManager, IConcentratedLiqu
         uint256 oldLiquidity;
 
         if (amount < position.liquidity) {
-            console.log("oke");
             (withdrawAmounts, feeAmounts, oldLiquidity) = position.pool.decreaseLiquidity(
                 position.lower,
                 position.upper,
