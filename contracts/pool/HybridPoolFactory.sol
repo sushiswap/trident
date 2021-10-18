@@ -8,6 +8,8 @@ import "./PoolDeployer.sol";
 /// @notice Contract for deploying Trident exchange Hybrid Pool with configurations.
 /// @author Mudit Gupta.
 contract HybridPoolFactory is PoolDeployer {
+    bytes32 public constant poolIdentifier = "Trident:HybridPool";
+    
     constructor(address _masterDeployer) PoolDeployer(_masterDeployer) {}
 
     function deployPool(bytes memory _deployData) external returns (address pool) {
