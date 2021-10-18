@@ -121,6 +121,7 @@ contract ConcentratedLiquidityPoolManager is IPositionManager, IConcentratedLiqu
         address recipient,
         bool unwrapBento
     ) public returns (uint256 token0amount, uint256 token1amount) {
+        require(msg.sender == ownerOf[tokenId], "NOT_ID_OWNER");
         Position storage position = positions[tokenId];
 
         address[] memory tokens = position.pool.getAssets();
