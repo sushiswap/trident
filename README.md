@@ -1,6 +1,6 @@
 # Trident: SushiSwap Next Generation Exchange
 
-TRIDENT 🔱 is a newly developed AMM and routing system from [SushiSwap](https://sushi.com/) (Sushi). Trident is not a fork of any existing AMM, though to start, it incorporates popular AMM concepts into a single, upgradeable framework. The Sushi core team began development with [Andre Cronje](https://github.com/andrecronje) as [Deriswap](https://andrecronje.medium.com/deriswap-capital-efficient-swaps-futures-options-and-loans-ea424b24a41c). This development continued on as [Mirin](https://github.com/sushiswap/mirin) developed by [LevX](https://github.com/levx-io). On May 12th, 2021, Sushi began building Trident in earnest on the Mirin/Deriswap foundation.
+TRIDENT 🔱 is a newly developed AMM and routing system from [SushiSwap](https://sushi.com/) (Sushi). As a system, Trident is not a fork of any existing AMM, though to start, it incorporates popular AMM concepts into a single, upgradeable framework. The Sushi core team began development with [Andre Cronje](https://github.com/andrecronje) as [Deriswap](https://andrecronje.medium.com/deriswap-capital-efficient-swaps-futures-options-and-loans-ea424b24a41c). This development continued on as [Mirin](https://github.com/sushiswap/mirin) developed by [LevX](https://github.com/levx-io). On May 12th, 2021, Sushi began building Trident in earnest on the Mirin/Deriswap foundation.
 
 ## Deployment
 
@@ -18,31 +18,31 @@ TRIDENT 🔱 is a newly developed AMM and routing system from [SushiSwap](https:
 
 ## Extensibility
 
-Trident is designed as an extensible AMM deployment framework that allows developers to implement new pool types that conform to the [IPool interface](./contracts/interfaces/IPool.sol). Before launch, an [EIP](https://eips.ethereum.org/) will be submitted for the IPool interface design to standardize pool interfaces across Ethereum. As new pool types are designed or experimented with, they can be added to Trident so long as they conform to the interface. In this way Trident will at minimum be a superset of all AMM pool designs as well as a future-proof architecture for Sushi to build on.
+Trident is designed as an extensible AMM framework that allows developers to add new pool types that conform to the [IPool interface](./contracts/interfaces/IPool.sol). Before launch, an [EIP](https://eips.ethereum.org/) will be submitted for the IPool interface design to help standardize pool interfaces across Ethereum. As new AMM pool types are designed or experimented with, they can be added to Trident so long as they conform to the interface. In this way Trident will *at minimum* be a superset of all popular AMM pool designs as well as a future-proof architecture for Sushi to build on.
 
 ## Launch Pools
 
 Initially, Trident has been developed with four primary pool types for launch:
 
-### [ConstantProductPool](**./contracts/pool/ConstantProductPool.sol**)
+### [ConstantProductPool](./contracts/pool/ConstantProductPool.sol)
 
-Constant product pools are the "classic" pools that users will be most familiar with, where trading happens between two assets over the x\*y=k constant product formula. In this pool liquidity providers own both of the pool's assets in a 50:50 ratio but the pool does supports a native zap in where liquidity can be added in any ratio of the two tokens. This pool is our most "gas optimized" pool, where swaps are up to 25% cheaper than swaps on the existing Sushi AMM.
+Constant product pools are the "classic" pools that users will be most familiar with, where trading happens between two assets over the x\*y=k constant product formula. In this pool type, liquidity providers own both of the pool's assets in a 50:50 ratio, but the pool also supports a native zap-in feature where liquidity can be added in any ratio of the two tokens. This pool is our most "gas optimized" pool, where swaps are up to 25% cheaper than swaps on the existing Sushi AMM.
 
-### [ConcentratedLiquidityPool](**./contracts/pool/concentrated/ConcentratedLiquidityPool.sol**)
+### [ConcentratedLiquidityPool](./contracts/pool/concentrated/ConcentratedLiquidityPool.sol)
 
-Concentrated liquidity pools allow liquidity providers to specify a price range on which to provide liquidity on. Providing liquidity on a narrower price range has a multiplying effect on the added liquidity, meaning traders will experience lesser price impacts. This makes the Concentrated Liquidity pool more capital efficient than the classic pool with the tradeoff being liquidity providers can suffer greater impermanent loss. Each concentrated liquidity pool supports two assets.
+Concentrated liquidity pools allow liquidity providers to specify a price range on which to provide liquidity. Providing liquidity on a narrower price range has a multiplying effect on the added liquidity, meaning traders will experience lesser price impacts. This makes the Concentrated Liquidity pool more capital efficient than the classic pool, with the tradeoff being that liquidity providers can suffer greater impermanent loss. Each concentrated liquidity pool supports two assets.
 
-### [HybridPool](**./contracts/pool/HybridPool.sol**)
+### [HybridPool](./contracts/pool/HybridPool.sol)
 
-Hybrid pools are designed for swapping like-kind assets. They are an implementation of the [stableswap](https://curve.fi/files/stableswap-paper.pdf) curve which is a hybrid of the x\*y=k and x\+y=k formulas. The pool works by concentrating liquidity around the price of 1 (e.g. 1 USDC per DAI or 1 renBTC per WBTC). Each hybrid pool supports two assets.
+Hybrid pools are designed for swapping like-kind assets. They are an implementation of the [stableswap](https://curve.fi/files/stableswap-paper.pdf) curve which is a hybrid of the x\*y=k and x\+y=k formulas. The pool works by concentrating liquidity around the price of 1 (e.g., 1 USDC per DAI or 1 renBTC per WBTC). Each hybrid pool supports two assets, with larger baskets supported in upcoming implementations.
 
-### [IndexPool](**./contracts/pool/IndexPool.sol**)
+### [IndexPool](./contracts/pool/IndexPool.sol)
 
-Index pools are designed to hold from two to eight tokens, each with a different weight. Trading between two assets of the pool happens over a modified version of the constant product formula. The advantage of these pools is liquidity providers can utilize them to create auto rebalancing indices (e.g. a DeFi blue-chip index) that best match their risk profile.
+Index pools are designed to hold from two to eight tokens, each with a different weight. Trading between two assets of the pool happens over a modified version of the constant product formula used in classic pools. The advantage of these pools is liquidity providers can utilize them to create auto rebalancing indices (e.g., a DeFi blue-chip index) that best match their risk profile.
 
-All of these pools will have configurable fees that will allow liquidity providers to strike a balance between offsetting their impermanent loss and having the pool stay market competitive.
+> All of these pools will have configurable fees that allow liquidity providers to strike a balance between offsetting their impermanent loss and having the pool stay market competitive.
 
-As a gas-saving measure, Trident further allows pool deployers to disable TWAP oracles. Architecturally, this makes the most sense for common pairs that already have accurate Chainlink price oracles.
+> As a gas-saving measure, Trident further allows pool deployers to disable TWAP oracles. Architecturally, this makes the most sense for common pairs that already have accurate Chainlink price oracles.
 
 ## BentoBox Integration
 
