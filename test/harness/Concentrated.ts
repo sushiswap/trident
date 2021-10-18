@@ -451,7 +451,7 @@ export async function addLiquidityViaRouter(params: {
     // TODO check pool reserve change is correct!
     // TODO add function to calculate range fee growth here and ensure that positionManager saved the correct value
   }
-  return { dy, dx, tokenId: oldTotalSupply, liquidity };
+  return { dy, dx, tokenId: oldTotalSupply.gt(positionId || 0) ? oldTotalSupply : BigNumber.from(positionId), liquidity };
 }
 
 export async function _addLiquidityViaRouter(params: {
