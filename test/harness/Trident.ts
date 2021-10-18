@@ -9,6 +9,7 @@ import {
   ConcentratedLiquidityPoolFactory,
   ConcentratedLiquidityPoolManager,
   ConcentratedLiquidityPoolStaker,
+  DyDxMath,
   MasterDeployer,
   TickMathTest,
   TridentRouter,
@@ -36,6 +37,7 @@ export class Trident {
   public concentratedPoolFactory!: ConcentratedLiquidityPoolFactory;
   public concentratedPools!: ConcentratedLiquidityPool[];
   public tickMath!: TickMathTest;
+  public dyDxMath!: DyDxMath;
 
   public static get Instance() {
     return this._instance || (this._instance = new this());
@@ -44,7 +46,7 @@ export class Trident {
   public async init() {
     this.accounts = await ethers.getSigners();
 
-    const [ERC20, Bento, Deployer, TridentRouter, ConcentratedPoolManager, ConcentratedPoolStaker, TickMath, TickLibrary] =
+    const [ERC20, Bento, Deployer, TridentRouter, ConcentratedPoolManager, ConcentratedPoolStaker, TickMath, TickLibrary, DyDxMath] =
       await Promise.all(
         getFactories([
           "ERC20Mock",
@@ -55,12 +57,15 @@ export class Trident {
           "ConcentratedLiquidityPoolStaker",
           "TickMathTest",
           "Ticks",
+          "DyDxMath",
         ])
       );
 
     const tickLibrary = await TickLibrary.deploy();
+    const dydxLibrary = await DyDxMath.deploy();
     const clpLibs = {};
     clpLibs["Ticks"] = tickLibrary.address;
+    clpLibs["DyDxMath"] = dydxLibrary.address;
     const ConcentratedPoolFactory = await ethers.getContractFactory("ConcentratedLiquidityPoolFactory", { libraries: clpLibs });
     const ConcentratedLiquidityPool = await ethers.getContractFactory("ConcentratedLiquidityPool", { libraries: clpLibs });
 

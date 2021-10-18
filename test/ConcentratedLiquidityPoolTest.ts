@@ -18,7 +18,7 @@ import { getBigNumber } from "./harness/helpers";
 import { Trident, TWO_POW_96 } from "./harness/Trident";
 import { customError } from "./utilities/pools";
 
-describe("Concentrated Liquidity Product Pool", function () {
+describe.only("Concentrated Liquidity Product Pool", function () {
   let snapshotId: string;
   let trident: Trident;
   let defaultAddress: string;
@@ -434,7 +434,7 @@ describe("Concentrated Liquidity Product Pool", function () {
       }
     });
 
-    it("Should burn the position and receive tokens back", async () => {
+    it.only("Should burn the position and receive tokens back", async () => {
       for (const pool of trident.concentratedPools) {
         helper.reset();
 
@@ -470,9 +470,10 @@ describe("Concentrated Liquidity Product Pool", function () {
           recipient: trident.accounts[0].address,
           unwrapBento: false,
         };
+        console.log("burn");
         await removeLiquidityViaManager(removeLiquidityParams);
         removeLiquidityParams.liquidityAmount = userLiquidity.sub(userLiquidityPartial);
-        await removeLiquidityViaManager(removeLiquidityParams);
+        // await removeLiquidityViaManager(removeLiquidityParams);
       }
     });
 
@@ -762,14 +763,14 @@ describe("Concentrated Liquidity Product Pool", function () {
         addLiquidityParams.upper = nearestEvenValidTick + tickSpacing;
         addLiquidityParams.lowerOld = lower;
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("TICK_OUT_OF_BOUNDS");
+        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("TickOutOfBounds"));
 
         // UPPER_RANGE
         addLiquidityParams.lower = nearestEvenValidTick;
         addLiquidityParams.upper = Math.floor(887272 / tickSpacing) * tickSpacing + tickSpacing;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("TICK_OUT_OF_BOUNDS");
+        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("TickOutOfBounds"));
 
         // LOWER_ORDER - TO DO
         //addLiquidityParams.lower = nearestEvenValidTick;
@@ -818,22 +819,12 @@ describe("Concentrated Liquidity Product Pool", function () {
       upper = lower + 1;
 
       const tokens = await pool.getAssets();
-      const token0BalanceInitial = await Trident.Instance.bento.balanceOf(tokens[0], pool.address);
 
       await expect(
         pool
           .connect(trident.accounts[4])
-          .burn(
-            ethers.utils.defaultAbiCoder.encode(
-              ["int24", "int24", "uint128", "address", "bool"],
-              [lower, upper, BigNumber.from(`2`).pow(128).sub(`1`), trident.accounts[4].address, false]
-            )
-          )
-      ).to.be.revertedWith("overflow");
-
-      // const token0BalanceAfter = await Trident.Instance.bento.balanceOf(tokens[0], pool.address);
-      // console.log(token0BalanceAfter.toString())
-      // expect(token0BalanceAfter).lt(getBigNumber('1'))
+          .decreaseLiquidity(lower, upper, BigNumber.from(`2`).pow(128).sub(`1`), trident.accounts[4].address, false)
+      ).to.be.revertedWith(customError("overflow"));
     });
   });
 });
