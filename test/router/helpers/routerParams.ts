@@ -35,11 +35,11 @@ function getExactInputSingleParams(multiRoute: MultiRoute, senderAddress: string
     return {
         amountIn: getBigNumber(multiRoute.amountIn * multiRoute.legs[0].absolutePortion),
         amountOutMinimum: getBigNumber(multiRoute.amountOut * slippage),
-        tokenIn: multiRoute.legs[0].token.address,
-        pool: multiRoute.legs[0].address,
+        tokenIn: multiRoute.legs[0].tokenFrom.address,
+        pool: multiRoute.legs[0].poolAddress,
         data: ethers.utils.defaultAbiCoder.encode(
         ["address", "address", "bool"],
-        [multiRoute.legs[0].token.address, senderAddress, false]
+        [multiRoute.legs[0].tokenFrom.address, senderAddress, false]
         ),
         routeType: RouteType.SinglePool
     }; 
@@ -50,14 +50,14 @@ function getExactInputParams(multiRoute: MultiRoute, senderAddress: string, slip
     let paths: Path[] = [];
 
     for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
-        const recipentAddress = isLastLeg(legIndex, multiRoute) ? senderAddress : multiRoute.legs[legIndex + 1].address;
+        const recipentAddress = isLastLeg(legIndex, multiRoute) ? senderAddress : multiRoute.legs[legIndex + 1].poolAddress;
     
-        if (multiRoute.legs[legIndex].token.address === multiRoute.fromToken.address) {
+        if (multiRoute.legs[legIndex].tokenFrom.address === multiRoute.fromToken.address) {
           const path: Path = { 
-            pool: multiRoute.legs[legIndex].address,  
+            pool: multiRoute.legs[legIndex].poolAddress,  
             data: ethers.utils.defaultAbiCoder.encode(
               ["address", "address", "bool"],
-              [multiRoute.legs[legIndex].token.address, recipentAddress, false]
+              [multiRoute.legs[legIndex].tokenFrom.address, recipentAddress, false]
             ),
           };
           paths.push(path);
@@ -65,10 +65,10 @@ function getExactInputParams(multiRoute: MultiRoute, senderAddress: string, slip
         } else 
         {
           const path: Path = { 
-            pool: multiRoute.legs[legIndex].address, 
+            pool: multiRoute.legs[legIndex].poolAddress, 
             data: ethers.utils.defaultAbiCoder.encode(
               ["address", "address", "bool"],
-              [multiRoute.legs[legIndex].token.address, recipentAddress, false]
+              [multiRoute.legs[legIndex].tokenFrom.address, recipentAddress, false]
             ),
           };
           paths.push(path);
@@ -76,7 +76,7 @@ function getExactInputParams(multiRoute: MultiRoute, senderAddress: string, slip
       } 
   
     let inputParams: ExactInputParams = {
-      tokenIn: multiRoute.legs[0].token.address,
+      tokenIn: multiRoute.legs[0].tokenFrom.address,
       amountIn: getBigNumber(multiRoute.amountIn),
       amountOutMinimum: getBigNumber(multiRoute.amountOut * slippage),
       path: paths,
@@ -92,7 +92,7 @@ function getComplexPathParams(multiRoute: MultiRoute, senderAddress: string, tri
     let outputs: Output[] = [];
 
     const routeLegs = multiRoute.legs.length;
-    const initialPathCount = multiRoute.legs.filter(leg => leg.token.address === multiRoute.fromToken.address).length;
+    const initialPathCount = multiRoute.legs.filter(leg => leg.tokenFrom.address === multiRoute.fromToken.address).length;
   
     const output: Output = {
       token: multiRoute.toToken.address,
@@ -104,26 +104,26 @@ function getComplexPathParams(multiRoute: MultiRoute, senderAddress: string, tri
     
     for (let legIndex = 0; legIndex < routeLegs; ++legIndex) { 
   
-      if (multiRoute.legs[legIndex].token.address === multiRoute.fromToken.address) {
+      if (multiRoute.legs[legIndex].tokenFrom.address === multiRoute.fromToken.address) {
         const initialPath: InitialPath = {
-          tokenIn: multiRoute.legs[legIndex].token.address,
-          pool: multiRoute.legs[legIndex].address, 
+          tokenIn: multiRoute.legs[legIndex].tokenFrom.address,
+          pool: multiRoute.legs[legIndex].poolAddress, 
           amount: getInitialPathAmount(legIndex, multiRoute, initialPaths, initialPathCount),
           native: false,
           data: ethers.utils.defaultAbiCoder.encode(
             ["address", "address", "bool"],
-            [multiRoute.legs[legIndex].token.address, tridentRouterAddress, false]
+            [multiRoute.legs[legIndex].tokenFrom.address, tridentRouterAddress, false]
           ),
         };
         initialPaths.push(initialPath);
       } else { 
         const percentagePath: PercentagePath = {
-          tokenIn: multiRoute.legs[legIndex].token.address,
-          pool: multiRoute.legs[legIndex].address,
+          tokenIn: multiRoute.legs[legIndex].tokenFrom.address,
+          pool: multiRoute.legs[legIndex].poolAddress,
           balancePercentage: getBigNumber(multiRoute.legs[legIndex].swapPortion * 10**8),
           data: ethers.utils.defaultAbiCoder.encode(
             ["address", "address", "bool"],
-            [multiRoute.legs[legIndex].token.address, tridentRouterAddress, false] 
+            [multiRoute.legs[legIndex].tokenFrom.address, tridentRouterAddress, false] 
           ),
         };
         percentagePaths.push(percentagePath);
@@ -149,7 +149,7 @@ function getRouteType(multiRoute: MultiRoute) {
     return RouteType.SinglePool;
   }
 
-  const routeInputTokens = multiRoute.legs.map(function (leg) { return leg.token.address});
+  const routeInputTokens = multiRoute.legs.map(function (leg) { return leg.tokenFrom.address});
 
   if((new Set(routeInputTokens)).size === routeInputTokens.length){
     return RouteType.SinglePath;

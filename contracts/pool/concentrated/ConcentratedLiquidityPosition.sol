@@ -127,7 +127,9 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
 
         Position storage position = positions[tokenId];
 
-        (address token0, address token1) = _getAssets(position.pool);
+        address[] memory assets = position.pool.getAssets();
+        address token0 = assets[0];
+        address token1 = assets[1];
 
         {
             (uint256 feeGrowthInside0, uint256 feeGrowthInside1) = position.pool.rangeFeeGrowth(position.lower, position.upper);
@@ -160,12 +162,6 @@ abstract contract ConcentratedLiquidityPosition is TridentNFT {
         }
         _transfer(token0, address(this), recipient, token0amount, unwrapBento);
         _transfer(token1, address(this), recipient, token1amount, unwrapBento);
-    }
-
-    function _getAssets(IConcentratedLiquidityPool pool) internal view returns (address token0, address token1) {
-        address[] memory pair = pool.getAssets();
-        token0 = pair[0];
-        token1 = pair[1];
     }
 
     function _transfer(

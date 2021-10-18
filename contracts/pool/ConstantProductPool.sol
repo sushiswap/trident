@@ -155,6 +155,8 @@ contract ConstantProductPool is IPool, TridentERC20 {
         uint256 amount0 = (liquidity * _reserve0) / _totalSupply;
         uint256 amount1 = (liquidity * _reserve1) / _totalSupply;
 
+        kLast = TridentMath.sqrt((_reserve0 - amount0) * (_reserve1 - amount1));
+
         _burn(address(this), liquidity);
 
         // Swap one token for another
@@ -178,7 +180,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
 
         (uint256 balance0, uint256 balance1) = _balance();
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        kLast = TridentMath.sqrt(balance0 * balance1);
+
         emit Burn(msg.sender, amount0, amount1, recipient, liquidity);
     }
 
