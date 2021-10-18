@@ -20,20 +20,19 @@ import "../../libraries/concentratedPool/Ticks.sol";
 contract ConcentratedLiquidityPool is IPool {
     using Ticks for mapping(int24 => Ticks.Tick);
 
-    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
-    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
+    event Mint(address indexed owner, uint256 amount0, uint256 amount1);
+    event Burn(address indexed owner, uint256 amount0, uint256 amount1);
     event Collect(address indexed sender, uint256 amount0, uint256 amount1);
     event Sync(uint256 reserveShares0, uint256 reserveShares1);
 
-    /// @dev References for tickSpacing:
-    /// 100 tickSpacing -> 2% between ticks.
     bytes32 public constant override poolIdentifier = "Trident:ConcentratedLiquidity";
 
     uint24 internal constant MAX_FEE = 100000; /// @dev Maximum `swapFee` is 10%.
-
-    uint128 internal immutable MAX_TICK_LIQUIDITY;
+    /// @dev References for tickSpacing:
+    /// 100 tickSpacing -> 2% between ticks.
     uint24 internal immutable tickSpacing;
     uint24 internal immutable swapFee; /// @dev 1000 corresponds to 0.1% fee. Fee is measured in pips.
+    uint128 internal immutable MAX_TICK_LIQUIDITY;
 
     address internal immutable barFeeTo;
     IBentoBoxMinimal internal immutable bento;
@@ -92,11 +91,9 @@ contract ConcentratedLiquidityPool is IPool {
         uint256 amount1Desired;
         bool token0native;
         bool token1native;
-        // To mint an NFT the positionOwner should be set to the positionManager contract.
-        address positionOwner;
-        // When minting through the positionManager contract positionRecipient should be the NFT recipient.
-        // It can be set to address(0) if we are not minting through the positionManager contract.
+        address positionOwner; // To mint an NFT the positionOwner should be set to the positionManager contract.
         address positionRecipient;
+        uint256 positionId;
     }
 
     /// @dev Error list to optimize around pool requirements.
@@ -111,6 +108,7 @@ contract ConcentratedLiquidityPool is IPool {
     error LowerEven();
     error UpperOdd();
     error MaxTickLiquidity();
+    error Overflow();
 
     modifier lock() {
         if (unlocked == 2) revert Locked();
@@ -149,7 +147,7 @@ contract ConcentratedLiquidityPool is IPool {
     }
 
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
-    /// The router must ensure that sufficient LP tokens are minted by using the return value.
+    /// The router must ensure that sufficient liquidity has been minted.
     function mint(bytes calldata data) public override lock returns (uint256 _liquidity) {
         MintParams memory mintParams = abi.decode(data, (MintParams));
 
@@ -166,9 +164,7 @@ contract ConcentratedLiquidityPool is IPool {
         );
 
         unchecked {
-            if (_liquidity > MAX_TICK_LIQUIDITY) revert LiquidityOverflow();
-
-            (uint256 amount0fees, uint256 amount1fees) = _updatePosition(
+            (uint256 amount0fees, uint256 amount1fees, ) = _updatePosition(
                 mintParams.positionOwner,
                 mintParams.lower,
                 mintParams.upper,
@@ -212,11 +208,12 @@ contract ConcentratedLiquidityPool is IPool {
             true
         );
 
-        ITridentRouter.TokenInput[] memory callbackData = new ITridentRouter.TokenInput[](2);
-        callbackData[0] = ITridentRouter.TokenInput(token0, mintParams.token0native, amount0Actual);
-        callbackData[1] = ITridentRouter.TokenInput(token1, mintParams.token1native, amount1Actual);
-
-        ITridentCallee(msg.sender).tridentMintCallback(abi.encode(callbackData));
+        {
+            ITridentRouter.TokenInput[] memory callbackData = new ITridentRouter.TokenInput[](2);
+            callbackData[0] = ITridentRouter.TokenInput(token0, mintParams.token0native, amount0Actual);
+            callbackData[1] = ITridentRouter.TokenInput(token1, mintParams.token1native, amount1Actual);
+            ITridentCallee(msg.sender).tridentMintCallback(abi.encode(callbackData));
+        }
 
         unchecked {
             if (amount0Actual != 0) {
@@ -239,47 +236,72 @@ contract ConcentratedLiquidityPool is IPool {
                 mintParams.upper,
                 uint128(_liquidity),
                 feeGrowth0,
-                feeGrowth1
+                feeGrowth1,
+                mintParams.positionId
             );
         }
 
-        emit Mint(mintParams.positionOwner, amount0Actual, amount1Actual, mintParams.positionRecipient);
+        emit Mint(mintParams.positionOwner, amount0Actual, amount1Actual);
     }
 
-    /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
-    function burn(bytes calldata data) public override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
-        (int24 lower, int24 upper, uint128 amount, address recipient, bool unwrapBento) = abi.decode(
-            data,
-            (int24, int24, uint128, address, bool)
-        );
+    /// @notice Burn function that cannpt conform to the IPool interface due to having two return values.
+    /// @dev Burns LP tokens sent to this contract.
+    function decreaseLiquidity(
+        int24 lower,
+        int24 upper,
+        uint128 amount,
+        address recipient,
+        bool unwrapBento
+    )
+        public
+        returns (
+            IPool.TokenAmount[] memory withdrawnAmounts,
+            IPool.TokenAmount[] memory feesWithdrawn,
+            uint256 oldLiquidity
+        )
+    {
+        uint256 amount0;
+        uint256 amount1;
 
-        uint160 priceLower = TickMath.getSqrtRatioAtTick(lower);
-        uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper);
-        uint160 currentPrice = price;
+        {
+            uint160 priceLower = TickMath.getSqrtRatioAtTick(lower);
+            uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper);
+            uint160 currentPrice = price;
 
-        unchecked {
-            if (priceLower < currentPrice && currentPrice < priceUpper) liquidity -= amount;
+            unchecked {
+                if (priceLower < currentPrice && currentPrice < priceUpper) liquidity -= amount;
+            }
+
+            (amount0, amount1) = DyDxMath.getAmountsForLiquidity(
+                uint256(priceLower),
+                uint256(priceUpper),
+                uint256(currentPrice),
+                uint256(amount),
+                false
+            );
         }
 
-        (uint256 amount0, uint256 amount1) = DyDxMath.getAmountsForLiquidity(
-            uint256(priceLower),
-            uint256(priceUpper),
-            uint256(currentPrice),
-            uint256(amount),
-            false
-        );
+        {
+            // Ensure no overflow happens when we cast to int128.
+            if (amount > uint128(type(int128).max)) revert Overflow();
 
-        require(amount <= uint128(type(int128).max), "overflow"); // Conversion happens in the library.
-        (uint256 amount0fees, uint256 amount1fees) = _updatePosition(msg.sender, lower, upper, -int128(amount));
+            uint256 amount0fees;
+            uint256 amount1fees;
+            (amount0fees, amount1fees, oldLiquidity) = _updatePosition(msg.sender, lower, upper, -int128(amount));
 
-        unchecked {
-            amount0 += amount0fees;
-            amount1 += amount1fees;
+            withdrawnAmounts = new TokenAmount[](2);
+            withdrawnAmounts[0] = TokenAmount({token: token0, amount: amount0});
+            withdrawnAmounts[1] = TokenAmount({token: token1, amount: amount1});
+
+            feesWithdrawn = new TokenAmount[](2);
+            withdrawnAmounts[0] = TokenAmount({token: token0, amount: amount0fees});
+            withdrawnAmounts[1] = TokenAmount({token: token1, amount: amount1fees});
+
+            unchecked {
+                amount0 += amount0fees;
+                amount1 += amount1fees;
+            }
         }
-
-        withdrawnAmounts = new TokenAmount[](2);
-        withdrawnAmounts[0] = TokenAmount({token: token0, amount: amount0});
-        withdrawnAmounts[1] = TokenAmount({token: token1, amount: amount1});
 
         unchecked {
             reserve0 -= uint128(amount0);
@@ -289,7 +311,11 @@ contract ConcentratedLiquidityPool is IPool {
         _transferBothTokens(recipient, amount0, amount1, unwrapBento);
 
         nearestTick = Ticks.remove(ticks, lower, upper, amount, nearestTick);
-        emit Burn(msg.sender, amount0, amount1, recipient);
+        emit Burn(msg.sender, amount0, amount1);
+    }
+
+    function burn(bytes calldata) public pure override returns (IPool.TokenAmount[] memory) {
+        revert();
     }
 
     function burnSingle(bytes calldata) public pure override returns (uint256) {
@@ -302,7 +328,7 @@ contract ConcentratedLiquidityPool is IPool {
         address recipient,
         bool unwrapBento
     ) public lock returns (uint256 amount0fees, uint256 amount1fees) {
-        (amount0fees, amount1fees) = _updatePosition(msg.sender, lower, upper, 0);
+        (amount0fees, amount1fees, ) = _updatePosition(msg.sender, lower, upper, 0);
 
         _transferBothTokens(recipient, amount0fees, amount1fees, unwrapBento);
 
@@ -528,7 +554,14 @@ contract ConcentratedLiquidityPool is IPool {
         int24 lower,
         int24 upper,
         int128 amount
-    ) internal returns (uint256 amount0fees, uint256 amount1fees) {
+    )
+        internal
+        returns (
+            uint256 amount0fees,
+            uint256 amount1fees,
+            uint256 oldLiquidity
+        )
+    {
         Position storage position = positions[owner][lower][upper];
 
         (uint256 growth0current, uint256 growth1current) = rangeFeeGrowth(lower, upper);
@@ -544,10 +577,16 @@ contract ConcentratedLiquidityPool is IPool {
             0x100000000000000000000000000000000
         );
 
-        if (amount < 0) position.liquidity -= uint128(-amount);
-        if (amount > 0) position.liquidity += uint128(amount);
+        oldLiquidity = position.liquidity;
 
-        if (position.liquidity >= MAX_TICK_LIQUIDITY) revert MaxTickLiquidity();
+        if (amount < 0) {
+            position.liquidity -= uint128(-amount);
+        }
+
+        if (amount > 0) {
+            position.liquidity += uint128(amount);
+            if (position.liquidity > MAX_TICK_LIQUIDITY) revert LiquidityOverflow();
+        }
 
         position.feeGrowthInside0Last = growth0current;
         position.feeGrowthInside1Last = growth1current;
