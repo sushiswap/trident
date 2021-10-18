@@ -3,7 +3,7 @@
 pragma solidity >=0.8.0;
 
 import "./IndexPool.sol";
-import "./PoolDeployer.sol";
+import "../PoolDeployer.sol";
 
 /// @notice Contract for deploying Trident exchange Index Pool with configurations.
 /// @author Mudit Gupta

@@ -2,7 +2,7 @@
 
 pragma solidity >=0.8.0;
 
-import "../../interfaces/IWhiteListManager.sol";
+import "../interfaces/IWhiteListManager.sol";
 
 /// @notice Trident franchised pool ERC-20 with EIP-2612 extension.
 /// @author Adapted from RariCapital, https://github.com/Rari-Capital/solmate/blob/main/src/erc20/ERC20.sol,

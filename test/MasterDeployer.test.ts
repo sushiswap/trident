@@ -1,7 +1,7 @@
 import { keccak256, pack } from "@ethersproject/solidity";
 
 import { MAX_FEE } from "./utilities";
-import { bytecode as constantProductPoolBytecode } from "../artifacts/contracts/pool/ConstantProductPool.sol/ConstantProductPool.json";
+import { bytecode as constantProductPoolBytecode } from "../artifacts/contracts/pool/constantProduct/ConstantProductPool.sol/ConstantProductPool.json";
 import { defaultAbiCoder } from "@ethersproject/abi";
 import { ethers } from "hardhat";
 import { expect } from "chai";
