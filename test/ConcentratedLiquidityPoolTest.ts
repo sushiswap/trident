@@ -18,7 +18,7 @@ import { getBigNumber } from "./harness/helpers";
 import { Trident, TWO_POW_96 } from "./harness/Trident";
 import { customError } from "./utilities/pools";
 
-describe.only("Concentrated Liquidity Product Pool", function () {
+describe("Concentrated Liquidity Product Pool", function () {
   let snapshotId: string;
   let trident: Trident;
   let defaultAddress: string;
