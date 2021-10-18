@@ -14,7 +14,6 @@ import "../../libraries/concentratedPool/UnsafeMath.sol";
 import "../../libraries/concentratedPool/DyDxMath.sol";
 import "../../libraries/concentratedPool/SwapLib.sol";
 import "../../libraries/concentratedPool/Ticks.sol";
-import "hardhat/console.sol";
 
 /// @notice Trident exchange pool template implementing concentrated liquidity for swapping between an ERC-20 token pair.
 /// @dev Amounts are considered to be in Bentobox shared
@@ -295,8 +294,8 @@ contract ConcentratedLiquidityPool is IPool {
             withdrawnAmounts[1] = TokenAmount({token: token1, amount: amount1});
 
             feesWithdrawn = new TokenAmount[](2);
-            withdrawnAmounts[0] = TokenAmount({token: token0, amount: amount0fees});
-            withdrawnAmounts[1] = TokenAmount({token: token1, amount: amount1fees});
+            feesWithdrawn[0] = TokenAmount({token: token0, amount: amount0fees});
+            feesWithdrawn[1] = TokenAmount({token: token1, amount: amount1fees});
 
             unchecked {
                 amount0 += amount0fees;

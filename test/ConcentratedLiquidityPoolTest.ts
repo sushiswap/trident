@@ -434,7 +434,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
       }
     });
 
-    it.only("Should burn the position and receive tokens back", async () => {
+    it("Should burn the position and receive tokens back", async () => {
       for (const pool of trident.concentratedPools) {
         helper.reset();
 
@@ -823,7 +823,7 @@ describe.only("Concentrated Liquidity Product Pool", function () {
         pool
           .connect(trident.accounts[4])
           .decreaseLiquidity(lower, upper, BigNumber.from(`2`).pow(128).sub(`1`), trident.accounts[4].address, false)
-      ).to.be.revertedWith(customError("overflow"));
+      ).to.be.revertedWith(customError("Overflow"));
     });
   });
 });
