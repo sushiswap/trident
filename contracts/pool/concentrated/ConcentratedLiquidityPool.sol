@@ -14,6 +14,7 @@ import "../../libraries/concentratedPool/UnsafeMath.sol";
 import "../../libraries/concentratedPool/DyDxMath.sol";
 import "../../libraries/concentratedPool/SwapLib.sol";
 import "../../libraries/concentratedPool/Ticks.sol";
+import "hardhat/console.sol";
 
 /// @notice Trident exchange pool template implementing concentrated liquidity for swapping between an ERC-20 token pair.
 /// @dev Amounts are considered to be in Bentobox shared
@@ -244,7 +245,7 @@ contract ConcentratedLiquidityPool is IPool {
         emit Mint(mintParams.positionOwner, amount0Actual, amount1Actual);
     }
 
-    /// @notice Burn function that cannpt conform to the IPool interface due to having two return values.
+    /// @notice Burn function that cannpt conform to the IPool interface due to having three return values.
     /// @dev Burns LP tokens sent to this contract.
     function decreaseLiquidity(
         int24 lower,

@@ -38,7 +38,6 @@ interface IConcentratedLiquidityPool is IPool {
         bool unwrapBento
     )
         external
-        view
         returns (
             TokenAmount[] memory withdrawnAmounts,
             TokenAmount[] memory feesWithdrawn,

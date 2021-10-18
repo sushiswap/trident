@@ -470,10 +470,9 @@ describe.only("Concentrated Liquidity Product Pool", function () {
           recipient: trident.accounts[0].address,
           unwrapBento: false,
         };
-        console.log("burn");
         await removeLiquidityViaManager(removeLiquidityParams);
         removeLiquidityParams.liquidityAmount = userLiquidity.sub(userLiquidityPartial);
-        // await removeLiquidityViaManager(removeLiquidityParams);
+        await removeLiquidityViaManager(removeLiquidityParams);
       }
     });
 
