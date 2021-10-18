@@ -43,7 +43,7 @@ library DyDxMath {
         uint256 currentPrice,
         uint256 dy,
         uint256 dx
-    ) internal pure returns (uint256 liquidity) {
+    ) public pure returns (uint256 liquidity) {
         unchecked {
             if (priceUpper <= currentPrice) {
                 liquidity = FullMath.mulDiv(dy, 0x1000000000000000000000000, priceUpper - priceLower);
