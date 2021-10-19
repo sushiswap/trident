@@ -1,5 +1,5 @@
 import { ContractFactory } from "@ethersproject/contracts";
-import { Contract } from "ethers";
+import { BigNumber, Contract } from "ethers";
 import { BentoBoxV1 } from "../../../types";
 import { Topology } from "./interfaces";
 import { getRandom } from "./random";
@@ -231,6 +231,7 @@ export class TopologyFactory {
     for (var i = 0; i < tokenCount; ++i) {
       topology.tokens.push({ name: `Token${i}`, address: "" + i });
       topology.prices.push(this.getTokenPrice(rnd));
+      //topology.prices.push((BigNumber.from(2).pow(96)).toNumber());
     }
 
     for (let i = 0; i < topology.tokens.length; i++) {
@@ -253,12 +254,15 @@ export class TopologyFactory {
         const price0 = topology.prices[i];
         const price1 = topology.prices[j];
 
+        const poolPrice = price0 / price1;
+        console.log(`Pool Price: ${poolPrice}`);
+
         if (poolType % 3 == 0) {
-          topology.pools.push(await this.PoolFactory.getCLPool(token0, token1, price0 / price1, rnd));
+          topology.pools.push(await this.PoolFactory.getCLPool(token0, token1, poolPrice, rnd));
         } else if (poolType % 3 == 1) {
-          topology.pools.push(await this.PoolFactory.getHybridPool(token0, token1, price0 / price1, rnd));
+          topology.pools.push(await this.PoolFactory.getHybridPool(token0, token1, poolPrice, rnd));
         } else {
-          topology.pools.push(await this.PoolFactory.getCPPool(token0, token1, price0 / price1, rnd));
+          topology.pools.push(await this.PoolFactory.getCPPool(token0, token1, poolPrice, rnd));
         }
 
         poolType++;

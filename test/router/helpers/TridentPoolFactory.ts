@@ -148,7 +148,7 @@ export class TridentPoolFactory {
   public async getCLPool(t0: RToken, t1: RToken, price: number, rnd: () => number, fee = 5, tickIncrement = 1) {
     const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint24", "uint160", "uint24"],
-      [t0.address, t1.address, fee, BigNumber.from(2).pow(96), tickIncrement]
+      [t0.address, t1.address, fee, getBigNumber(price), tickIncrement]
     );
 
     let deployResult = await (await this.MasterDeployer.deployPool(this.ConcentratedPoolFactory.address, deployData)).wait();
@@ -196,7 +196,6 @@ export class TridentPoolFactory {
     );
     const mintData = getMintData(addLiquidityParams);
 
-    //Add liquidity
     await this.TridentRouter.addLiquidityLazy(pool.address, liquidity, mintData);
 
     return await createCLRPool(pool);
