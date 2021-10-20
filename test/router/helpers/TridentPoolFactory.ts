@@ -184,6 +184,7 @@ export class TridentPoolFactory {
       native1: false,
       positionOwner: this.ConcentratedPoolManager.address,
       recipient: this.Signer.address,
+      positionId: 0,
     };
 
     const [currentPrice, priceLower, priceUpper] = await this.getPrices(pool, [lower, upper]);
@@ -234,6 +235,7 @@ export class TridentPoolFactory {
       native1: native1,
       positionOwner,
       recipient: recipient,
+      positionId: 0,
     });
     await this.TridentRouter.addLiquidityLazy(pool.address, liquidity, mintData);
   }
@@ -249,6 +251,7 @@ export class TridentPoolFactory {
     const ticksContractFactory = await ethers.getContractFactory("Ticks");
     const clPoolManagerFactory = await ethers.getContractFactory("ConcentratedLiquidityPoolManager");
     const tickMath = await ethers.getContractFactory("TickMathTest");
+    const dyDxMath = await ethers.getContractFactory("DyDxMath");
 
     const hybridPoolFactory = await ethers.getContractFactory("HybridPoolFactory");
     this.HybridPool = await ethers.getContractFactory("HybridPool");
@@ -257,8 +260,10 @@ export class TridentPoolFactory {
     this.ConstantProductPool = await ethers.getContractFactory("ConstantProductPool");
 
     const tickLibrary = await ticksContractFactory.deploy();
+    const dyDxLibrary = await dyDxMath.deploy();
     const clpLibs = {};
     clpLibs["Ticks"] = tickLibrary.address;
+    clpLibs["DyDxMath"] = dyDxLibrary.address;
 
     const clPoolFactory = await ethers.getContractFactory("ConcentratedLiquidityPoolFactory", { libraries: clpLibs });
 
