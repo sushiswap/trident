@@ -1,7 +1,7 @@
 import { ContractFactory } from "@ethersproject/contracts";
 import { BigNumber, Contract } from "ethers";
 import { BentoBoxV1 } from "../../../types";
-import { Topology } from "./interfaces";
+import { Topology } from "./Interfaces";
 import { getRandom } from "./random";
 import { TridentPoolFactory } from "./TridentPoolFactory";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";

@@ -7,7 +7,7 @@ import { closeValues, RToken } from "@sushiswap/tines";
 import * as testHelper from "./helpers";
 import { getIntegerRandomValue } from "../utilities";
 import { RouteType } from "./helpers";
-import { Topology } from "./helpers/interfaces";
+import { Topology } from "./helpers/Interfaces";
 
 describe("MultiPool Routing Tests - Fixed Topology", function () {
   beforeEach(async function () {
