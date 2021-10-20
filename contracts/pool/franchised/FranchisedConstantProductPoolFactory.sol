@@ -19,16 +19,16 @@ contract FranchisedConstantProductPoolFactory is PoolDeployer {
             (tokenA, tokenB) = (tokenB, tokenA);
         }
 
-        // @dev Strips any extra data.
+        // Strips any extra data.
         _deployData = abi.encode(tokenA, tokenB, swapFee, twapSupport, whiteListManager, operator, level2);
 
         address[] memory tokens = new address[](2);
         tokens[0] = tokenA;
         tokens[1] = tokenB;
 
-        // @dev Salt is not actually needed since `_deployData` is part of creationCode and already contains the salt.
+        // Salt is not actually needed since `_deployData` is part of creationCode and already contains the salt.
         bytes32 salt = keccak256(_deployData);
-        pool = address(new FranchisedConstantProductPool{salt: salt}(_deployData, masterDeployer));
+        pool = address(new FranchisedConstantProductPool{salt: salt}(_deployData, IMasterDeployer(masterDeployer)));
         _registerPool(pool, tokens, salt);
     }
 }
