@@ -145,7 +145,7 @@ export class TridentPoolFactory {
     return this.ConcentratedLiquidityPool.attach(address) as ConcentratedLiquidityPool;
   }
 
-  public async getCLPool(t0: RToken, t1: RToken, price: number, rnd: () => number, fee = 5, tickIncrement = 1) {
+  public async getCLPool(t0: RToken, t1: RToken, price: number, rnd: () => number, fee = 5, tickIncrement = 60) {
     const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint24", "uint160", "uint24"],
       [t0.address, t1.address, fee, getBigNumber(Math.sqrt(price) * 2 ** 96), tickIncrement]
@@ -178,8 +178,8 @@ export class TridentPoolFactory {
       lower,
       upperOld: helper.insert(upper),
       upper,
-      amount0Desired: getBigNumber(23725853477275405647872),
-      amount1Desired: getBigNumber(2372585347727540564787),
+      amount0Desired: getBigNumber(1e26),
+      amount1Desired: getBigNumber(1e26),
       native0: false,
       native1: false,
       positionOwner: this.ConcentratedPoolManager.address,
@@ -187,6 +187,7 @@ export class TridentPoolFactory {
     };
 
     const [currentPrice, priceLower, priceUpper] = await this.getPrices(pool, [lower, upper]);
+
     const liquidity = getLiquidityForAmount(
       priceLower,
       currentPrice,
@@ -198,7 +199,43 @@ export class TridentPoolFactory {
 
     await this.TridentRouter.addLiquidityLazy(pool.address, liquidity, mintData);
 
+    addLiquidityParams = helper.setTicks(lower - tickIncrement * step, upper + tickIncrement * step, addLiquidityParams);
+    await this.addLiquidityViaRouter(pool, addLiquidityParams);
+
     return await createCLRPool(pool);
+  }
+
+  private async addLiquidityViaRouter(
+    pool: ConcentratedLiquidityPool,
+    params: {
+      lowerOld: number;
+      lower: number;
+      upperOld: number;
+      upper: number;
+      amount0Desired: BigNumber;
+      amount1Desired: BigNumber;
+      native0: boolean;
+      native1: boolean;
+      positionOwner: string;
+      recipient: string;
+    }
+  ) {
+    const { amount0Desired, amount1Desired, native0, native1, lowerOld, lower, upperOld, upper, positionOwner, recipient } = params;
+    const [currentPrice, priceLower, priceUpper] = await this.getPrices(pool, [lower, upper]);
+    const liquidity = getLiquidityForAmount(priceLower, currentPrice, priceUpper, amount1Desired, amount0Desired);
+    const mintData = getMintData({
+      lowerOld,
+      lower,
+      upperOld,
+      upper,
+      amount0Desired,
+      amount1Desired,
+      native0: native0,
+      native1: native1,
+      positionOwner,
+      recipient: recipient,
+    });
+    await this.TridentRouter.addLiquidityLazy(pool.address, liquidity, mintData);
   }
 
   private async getPrices(pool: ConcentratedLiquidityPool, ticks: Array<BigNumber | number>) {

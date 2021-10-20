@@ -221,9 +221,6 @@ export class TridentSwapParamsFactory {
     } else if (pool instanceof CLRPool) {
       // (bool zeroForOne, uint256 inAmount, address recipient, bool unwrapBento)
       // TODO: zeroForOne ?
-
-      //const clPool = new ConcentratedLiquidityPoolFactory().attach(pool.address);
-
       data = ethers.utils.defaultAbiCoder.encode(
         ["bool", "uint256", "address", "bool"],
         [true, getBigNumber(leg.assumedAmountIn), recipent, unwrapBento]

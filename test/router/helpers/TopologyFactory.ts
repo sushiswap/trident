@@ -261,9 +261,9 @@ export class TopologyFactory {
 
           topology.pools.push(await this.PoolFactory.getCLPool(token0, token1, poolPrice, rnd));
         } else if (poolType % 3 == 1) {
-          topology.pools.push(await this.PoolFactory.getHybridPool(token0, token1, poolPrice, rnd));
+          topology.pools.push(await this.PoolFactory.getHybridPool(token0, token1, poolPrice, rnd, 1e23));
         } else {
-          topology.pools.push(await this.PoolFactory.getCPPool(token0, token1, poolPrice, rnd));
+          topology.pools.push(await this.PoolFactory.getCPPool(token0, token1, poolPrice, rnd, 0.003, 1e23));
         }
 
         poolType++;
