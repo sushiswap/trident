@@ -1,6 +1,6 @@
 {
   "name": "@sushiswap/trident",
-  "version": "1.0.0-canary.15",
+  "version": "1.0.0-canary.23",
   "files": [
     "artifacts",
     "contracts",
@@ -42,8 +42,11 @@
     "prettier": "prettier --write 'test/**/*.{js,ts}' && prettier --write contracts/**/*.sol",
     "lint": "yarn prettier && solhint -c .solhint.json contracts/**/*.sol",
     "prepare": "husky install",
-    "prepublishOnly": "hardhat export --export-all exports/all.json",
-    "bump": "yarn version --prerelease --preid=canary && npm publish --tag canary"
+    "export:all": "hardhat export --export-all exports/all.json",
+    "prepublishOnly": "export:all",
+    "version:canary": "yarn version --prerelease --preid=canary",
+    "publish:canary": "npm publish --access public --tag canary",
+    "size": "hardhat compile && hardhat size-contracts"
   },
   "lint-staged": {
     "*.ts": [
@@ -62,10 +65,10 @@
     "@nomiclabs/hardhat-solhint": "^2.0.0",
     "@nomiclabs/hardhat-waffle": "^2.0.0",
     "@openzeppelin/contracts": "^4.2.0",
-    "@sushiswap/core-sdk": "^1.0.0-canary.2",
+    "@sushiswap/core-sdk": "1.0.0-canary.5",
     "@sushiswap/prettier-config": "^0.1.0",
-    "@sushiswap/sdk": "5.0.0-canary.87", 
-    "@sushiswap/tines": "^0.1.12", 
+    "@sushiswap/sdk": "5.0.0-canary.95",
+    "@sushiswap/tines": "^0.1.12",
     "@tenderly/hardhat-tenderly": "^1.0.0",
     "@typechain/ethers-v5": "^7.0.0",
     "@typechain/hardhat": "^2.0.0",
@@ -98,13 +101,10 @@
     "seedrandom": "^3.0.5",
     "solhint": "^3.0.0",
     "solhint-plugin-prettier": "^0.0.5",
-    "solidity-coverage": "^0.7.0",
+    "solidity-coverage": "^0.7.17",
     "ts-generator": "^0.1.0",
     "ts-node": "^10.0.0",
     "typechain": "^5.0.0",
     "typescript": "^4.0.0"
-  },
-  "dependencies": {
-    "@sushiswap/core-sdk": "^0.1.2"
   }
 }

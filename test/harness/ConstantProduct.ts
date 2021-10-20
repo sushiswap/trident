@@ -124,7 +124,6 @@ export async function addLiquidity(poolIndex, amount0, amount1, native0 = false,
   ];
 
   const [kLast, barFee, swapFee] = await Promise.all([pools[poolIndex].kLast(), masterDeployer.barFee(), pools[poolIndex].swapFee()]);
-
   const [computedLiquidity, expectedIncreaseInTotalSupply] = liquidityCalculations(
     initialBalances,
     amount0,
@@ -134,8 +133,10 @@ export async function addLiquidity(poolIndex, amount0, amount1, native0 = false,
     swapFee
   );
 
-  await router.addLiquidity(liquidityInput, pool.address, computedLiquidity, aliceEncoded);
-
+  var addLiquidityPromise = router.addLiquidity(liquidityInput, pool.address, computedLiquidity, aliceEncoded);
+  await expect(addLiquidityPromise)
+    .to.emit(pool, "Mint")
+    .withArgs(router.address, amount0, amount1, accounts[0].address, computedLiquidity);
   const finalBalances = await getBalances(pool, accounts[0].address, token0, token1);
 
   // Total supply increased
@@ -259,18 +260,19 @@ export async function burnLiquidity(poolIndex, amount, withdrawType, unwrapBento
 
   let [amount0, amount1, feeMint] = burnCalculations(initialBalances, amount, kLast, barFee);
 
+  var burnLiquidityPromise;
   if (withdrawType == 0) {
     // Withdraw in token0 only
     amount0 = amount0.add(getAmountOut(amount1, initialBalances[2].sub(amount1), initialBalances[1].sub(amount0), swapFee));
     amount1 = ZERO;
     const burnData = utils.defaultAbiCoder.encode(["address", "address", "bool"], [token0.address, accounts[0].address, unwrapBento]);
-    await router.burnLiquiditySingle(pool.address, amount, burnData, amount0);
+    burnLiquidityPromise = router.burnLiquiditySingle(pool.address, amount, burnData, amount0);
   } else if (withdrawType == 1) {
     // Withdraw in token1 only
     amount1 = amount1.add(getAmountOut(amount0, initialBalances[1].sub(amount0), initialBalances[2].sub(amount1), swapFee));
     amount0 = ZERO;
     const burnData = utils.defaultAbiCoder.encode(["address", "address", "bool"], [token1.address, accounts[0].address, unwrapBento]);
-    await router.burnLiquiditySingle(pool.address, amount, burnData, amount1);
+    burnLiquidityPromise = router.burnLiquiditySingle(pool.address, amount, burnData, amount1);
   } else {
     // Withdraw evenly
     const minWithdrawals = [
@@ -284,7 +286,13 @@ export async function burnLiquidity(poolIndex, amount, withdrawType, unwrapBento
       },
     ];
     const burnData = utils.defaultAbiCoder.encode(["address", "bool"], [accounts[0].address, unwrapBento]);
-    await router.burnLiquidity(pool.address, amount, burnData, minWithdrawals);
+    burnLiquidityPromise = router.burnLiquidity(pool.address, amount, burnData, minWithdrawals);
+  }
+
+  if (token0.address < token1.address) {
+    await expect(burnLiquidityPromise).to.emit(pool, "Burn").withArgs(router.address, amount0, amount1, accounts[0].address, amount);
+  } else {
+    await expect(burnLiquidityPromise).to.emit(pool, "Burn").withArgs(router.address, amount1, amount0, accounts[0].address, amount);
   }
 
   const finalBalances = await getBalances(pool, accounts[0].address, token0, token1);

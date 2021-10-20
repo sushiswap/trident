@@ -3,7 +3,6 @@
 pragma solidity >=0.8.0;
 
 import "./FullMath.sol";
-import "hardhat/console.sol";
 
 /// @notice Math library that facilitates fee handling for Trident Concentrated Liquidity Pools.
 library SwapLib {
@@ -32,12 +31,12 @@ library SwapLib {
 
         amountOut += output - feeAmount;
 
-        /// @dev Calculate `protocolFee` and convert pips to bips.
+        // Calculate `protocolFee` and convert pips to bips.
         uint256 feeDelta = FullMath.mulDivRoundingUp(feeAmount, barFee, 1e4);
 
         protocolFee += feeDelta;
 
-        /// @dev Updating `feeAmount` based on the protocolFee.
+        // Updating `feeAmount` based on the protocolFee.
         feeAmount -= feeDelta;
 
         feeGrowthGlobal += FullMath.mulDiv(feeAmount, 0x100000000000000000000000000000000, currentLiquidity);
