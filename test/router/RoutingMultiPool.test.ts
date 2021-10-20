@@ -8,13 +8,6 @@ import * as testHelper from "./helpers";
 import { getIntegerRandomValue } from "../utilities";
 import { RouteType } from "./helpers";
 
-async function checkTokenBalancesAreZero(tokens: RToken[], bentoContract: Contract, tridentAddress: string) {
-  for (let index = 0; index < tokens.length; index++) {
-    const tokenBalance = await bentoContract.balanceOf(tokens[index].address, tridentAddress);
-    expect(tokenBalance).equal(0);
-  }
-}
-
 describe("MultiPool Routing Tests - Fixed Topology", function () {
   beforeEach(async function () {
     [this.signer, this.tridentRouterAddress, this.bento] = await testHelper.init();

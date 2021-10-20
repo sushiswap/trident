@@ -145,12 +145,8 @@ task("router:add-liquidity", "Router add liquidity")
     "0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa", // kovan dai
     types.string
   )
-  .addOptionalParam(
-    "pool",
-    "Pool",
-    "0x34DC0c3fff06EF015a2135444A33B12c0C5A3A71", // dai/weth
-    types.string
-  )
+  // Probably don't need this, can compute from tokens
+  .addParam("pool", "Pool")
   .addParam("tokenADesired", "Token A Desired", BigNumber.from(10).pow(18).toString(), types.string)
   .addParam("tokenBDesired", "Token B Desired", BigNumber.from(10).pow(18).toString(), types.string)
   // .addParam("tokenAMinimum", "Token A Minimum")
@@ -177,7 +173,7 @@ task("router:add-liquidity", "Router add liquidity")
       {
         token: tokenA,
         native: false,
-        amount: ethers.BigNumber.from(10).pow(12),
+        amount: ethers.BigNumber.from(10).pow(6),
       },
       {
         token: tokenB,
@@ -201,7 +197,9 @@ task("router:add-liquidity", "Router add liquidity")
 
     console.log("Approved both tokens");
 
+    console.log("Depositing 1st token", [liquidityInput[0].token, dev.address, dev.address, 0, liquidityInput[0].amount]);
     await (await bentoBox.connect(dev).deposit(liquidityInput[0].token, dev.address, dev.address, 0, liquidityInput[0].amount)).wait();
+    console.log("Depositing 2nd token");
     await (await bentoBox.connect(dev).deposit(liquidityInput[1].token, dev.address, dev.address, 0, liquidityInput[1].amount)).wait();
 
     console.log("Deposited");

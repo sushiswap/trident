@@ -2,10 +2,10 @@
 
 pragma solidity >=0.8.0;
 
-import "./IPool.sol";
-import "./IBentoBoxMinimal.sol";
-import "./IMasterDeployer.sol";
-import "../libraries/concentratedPool/Ticks.sol";
+import "./../IPool.sol";
+import "./../IBentoBoxMinimal.sol";
+import "./../IMasterDeployer.sol";
+import "../../libraries/concentratedPool/Ticks.sol";
 
 /// @notice Trident Concentrated Liquidity Pool interface.
 interface IConcentratedLiquidityPool is IPool {
@@ -19,6 +19,8 @@ interface IConcentratedLiquidityPool is IPool {
 
     function feeGrowthGlobal0() external view returns (uint256);
 
+    function feeGrowthGlobal1() external view returns (uint256);
+
     function rangeFeeGrowth(int24 lowerTick, int24 upperTick) external view returns (uint256 feeGrowthInside0, uint256 feeGrowthInside1);
 
     function collect(
@@ -27,6 +29,20 @@ interface IConcentratedLiquidityPool is IPool {
         address,
         bool
     ) external returns (uint256 amount0fees, uint256 amount1fees);
+
+    function decreaseLiquidity(
+        int24 lower,
+        int24 upper,
+        uint128 amount,
+        address recipient,
+        bool unwrapBento
+    )
+        external
+        returns (
+            TokenAmount[] memory withdrawnAmounts,
+            TokenAmount[] memory feesWithdrawn,
+            uint256 oldLiquidity
+        );
 
     function getImmutables()
         external

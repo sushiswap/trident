@@ -2,7 +2,7 @@
 
 pragma solidity >=0.8.0;
 
-import "../../interfaces/IConcentratedLiquidityPool.sol";
+import "../../interfaces/concentratedPool/IConcentratedLiquidityPool.sol";
 import "../../libraries/concentratedPool/TickMath.sol";
 import "../../libraries/concentratedPool/Ticks.sol";
 

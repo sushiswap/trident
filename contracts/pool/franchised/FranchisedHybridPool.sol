@@ -15,8 +15,8 @@ import "./TridentFranchisedERC20.sol";
 contract FranchisedHybridPool is IPool, TridentFranchisedERC20 {
     using MathUtils for uint256;
 
-    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
-    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
+    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient, uint256 liquidity);
+    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient, uint256 liquidity);
     event Sync(uint256 reserve0, uint256 reserve1);
 
     uint256 internal constant MINIMUM_LIQUIDITY = 10**3;
@@ -113,7 +113,8 @@ contract FranchisedHybridPool is IPool, TridentFranchisedERC20 {
         require(liquidity != 0, "INSUFFICIENT_LIQUIDITY_MINTED");
         _mint(recipient, liquidity);
         _updateReserves();
-        emit Mint(msg.sender, amount0, amount1, recipient);
+        uint256 liquidityForEvent = liquidity;
+        emit Mint(msg.sender, amount0, amount1, recipient, liquidityForEvent);
     }
 
     /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
@@ -140,7 +141,7 @@ contract FranchisedHybridPool is IPool, TridentFranchisedERC20 {
         withdrawnAmounts[0] = TokenAmount({token: token0, amount: amount0});
         withdrawnAmounts[1] = TokenAmount({token: token1, amount: amount1});
 
-        emit Burn(msg.sender, amount0, amount1, recipient);
+        emit Burn(msg.sender, amount0, amount1, recipient, liquidity);
     }
 
     /// @dev Burns LP tokens sent to this contract and swaps one of the output tokens for another
@@ -178,7 +179,7 @@ contract FranchisedHybridPool is IPool, TridentFranchisedERC20 {
             amount1 = 0;
         }
         _updateReserves();
-        emit Burn(msg.sender, amount0, amount1, recipient);
+        emit Burn(msg.sender, amount0, amount1, recipient, liquidity);
     }
 
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
@@ -460,6 +461,7 @@ contract FranchisedHybridPool is IPool, TridentFranchisedERC20 {
         if (tokenIn == token0) {
             finalAmountOut = _getAmountOut(amountIn, _reserve0, _reserve1, true);
         } else {
+            require(tokenIn == token1, "INVALID_INPUT_TOKEN");
             finalAmountOut = _getAmountOut(amountIn, _reserve0, _reserve1, false);
         }
     }
