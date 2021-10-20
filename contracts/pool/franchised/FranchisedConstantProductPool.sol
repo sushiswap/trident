@@ -56,10 +56,10 @@ contract FranchisedConstantProductPool is IPool, TridentFranchisedERC20 {
             address _token1,
             uint256 _swapFee,
             bool _twapSupport,
-            address _whiteListManager,
+            IWhiteListManager _whiteListManager,
             address _operator,
             bool _level2
-        ) = abi.decode(_deployData, (address, address, uint256, bool, address, address, bool));
+        ) = abi.decode(_deployData, (address, address, uint256, bool, IWhiteListManager, address, bool));
 
         // Factory ensures that the tokens are sorted.
         require(_token0 != address(0), "ZERO_ADDRESS");
