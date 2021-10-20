@@ -6,35 +6,41 @@ import "../../interfaces/IWhiteListManager.sol";
 
 /// @notice Trident franchised pool ERC-20 with EIP-2612 extension.
 /// @author Adapted from RariCapital, https://github.com/Rari-Capital/solmate/blob/main/src/erc20/ERC20.sol,
-/// License-Identifier: AGPL-3.0-only.
+// License-Identifier: AGPL-3.0-only.
 abstract contract TridentFranchisedERC20 {
-    event Approval(address indexed owner, address indexed spender, uint256 amount);
     event Transfer(address indexed sender, address indexed recipient, uint256 amount);
+    event Approval(address indexed owner, address indexed spender, uint256 amount);
 
     string public constant name = "Sushi Franchised LP Token";
     string public constant symbol = "SLP";
     uint8 public constant decimals = 18;
 
-    address public whiteListManager;
+    IWhiteListManager public whiteListManager;
     address public operator;
     bool public level2;
 
     uint256 public totalSupply;
-    /// @notice owner -> balance mapping.
+    /// @dev owner -> balance mapping.
     mapping(address => uint256) public balanceOf;
-    /// @notice owner -> spender -> allowance mapping.
+    /// @dev owner -> spender -> allowance mapping.
     mapping(address => mapping(address => uint256)) public allowance;
 
-    /// @notice The EIP-712 typehash for this contract's {permit} struct.
-    bytes32 public constant PERMIT_TYPEHASH =
-        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
-    /// @notice The EIP-712 typehash for this contract's domain.
-    bytes32 public immutable DOMAIN_SEPARATOR;
-    /// @notice owner -> nonce mapping used in {permit}.
+    /// @dev Chain Id at this contract's deployment.
+    uint256 internal immutable DOMAIN_SEPARATOR_CHAIN_ID;
+    /// @dev EIP-712 typehash for this contract's domain at deployment.
+    bytes32 internal immutable _DOMAIN_SEPARATOR;
+    /// @dev EIP-712 typehash for this contract's {permit} struct.
+    bytes32 public constant PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+    /// @dev owner -> nonce mapping used in {permit}.
     mapping(address => uint256) public nonces;
 
     constructor() {
-        DOMAIN_SEPARATOR = keccak256(
+        DOMAIN_SEPARATOR_CHAIN_ID = block.chainid;
+        _DOMAIN_SEPARATOR = _calculateDomainSeparator();
+    }
+
+    function _calculateDomainSeparator() internal view returns (bytes32 domainSeperator) {
+        domainSeperator = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
                 keccak256(bytes(name)),
@@ -47,13 +53,18 @@ abstract contract TridentFranchisedERC20 {
 
     /// @dev Initializes whitelist settings from pool.
     function initialize(
-        address _whiteListManager,
+        IWhiteListManager _whiteListManager,
         address _operator,
         bool _level2
     ) internal {
         whiteListManager = _whiteListManager;
         operator = _operator;
         if (_level2) level2 = true;
+    }
+    
+    /// @notice EIP-712 typehash for this contract's domain.
+    function DOMAIN_SEPARATOR() public view returns (bytes32 domainSeperator) {
+        domainSeperator = block.chainid == DOMAIN_SEPARATOR_CHAIN_ID ? _DOMAIN_SEPARATOR : _calculateDomainSeparator();
     }
 
     /// @notice Approves `amount` from `msg.sender` to be spent by `spender`.
@@ -73,7 +84,7 @@ abstract contract TridentFranchisedERC20 {
     function transfer(address recipient, uint256 amount) external returns (bool) {
         if (level2) _checkWhiteList(recipient);
         balanceOf[msg.sender] -= amount;
-        // @dev This is safe from overflow - the sum of all user
+        // This is safe from overflow - the sum of all user
         // balances can't exceed 'type(uint256).max'.
         unchecked {
             balanceOf[recipient] += amount;
@@ -97,7 +108,7 @@ abstract contract TridentFranchisedERC20 {
             allowance[sender][msg.sender] -= amount;
         }
         balanceOf[sender] -= amount;
-        // @dev This is safe from overflow - the sum of all user
+        // This is safe from overflow - the sum of all user
         // balances can't exceed 'type(uint256).max'.
         unchecked {
             balanceOf[recipient] += amount;
@@ -124,22 +135,26 @@ abstract contract TridentFranchisedERC20 {
         bytes32 s
     ) external {
         require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
-        bytes32 digest = keccak256(
-            abi.encodePacked(
-                "\x19\x01",
-                DOMAIN_SEPARATOR,
-                keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, amount, nonces[owner]++, deadline))
-            )
-        );
-        address recoveredAddress = ecrecover(digest, v, r, s);
-        require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_PERMIT_SIGNATURE");
-        allowance[recoveredAddress][spender] = amount;
+        // This is reasonably safe from overflow - incrementing `nonces` beyond
+        // 'type(uint256).max' is exceedingly unlikely compared to optimization benefits.
+        unchecked {
+            bytes32 digest = keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    DOMAIN_SEPARATOR(),
+                    keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, amount, nonces[owner]++, deadline))
+                )
+            );
+            address recoveredAddress = ecrecover(digest, v, r, s);
+            require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_PERMIT_SIGNATURE");
+            allowance[recoveredAddress][spender] = amount;
+        }
         emit Approval(owner, spender, amount);
     }
 
     function _mint(address recipient, uint256 amount) internal {
         totalSupply += amount;
-        // @dev This is safe from overflow - the sum of all user
+        // This is safe from overflow - the sum of all user
         // balances can't exceed 'type(uint256).max'.
         unchecked {
             balanceOf[recipient] += amount;
@@ -149,7 +164,7 @@ abstract contract TridentFranchisedERC20 {
 
     function _burn(address sender, uint256 amount) internal {
         balanceOf[sender] -= amount;
-        // @dev This is safe from underflow - users won't ever
+        // This is safe from underflow - users won't ever
         // have a balance larger than `totalSupply`.
         unchecked {
             totalSupply -= amount;
@@ -158,11 +173,7 @@ abstract contract TridentFranchisedERC20 {
     }
 
     /// @dev Checks `whiteListManager` for pool `operator` and given user `account`.
-    function _checkWhiteList(address account) internal view {
-        (, bytes memory _whitelisted) = whiteListManager.staticcall(
-            abi.encodeWithSelector(IWhiteListManager.whitelistedAccounts.selector, operator, account)
-        );
-        bool whitelisted = abi.decode(_whitelisted, (bool));
-        require(whitelisted, "NOT_WHITELISTED");
+    function _checkWhiteList(address account) internal {
+        require(whiteListManager.whitelistedAccounts(operator, account), "NOT_WHITELISTED");
     }
 }
