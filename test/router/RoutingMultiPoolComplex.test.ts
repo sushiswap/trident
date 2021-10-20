@@ -50,7 +50,12 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
         if (route.status === RouteStatus.NoWay) {
           expect(route.amountOut).equal(0);
         } else {
-          const routerParams = this.swapParams.getTridentRouterParams(route, this.signer.address, this.tridentRouterAddress);
+          const routerParams = this.swapParams.getTridentRouterParams(
+            route,
+            this.signer.address,
+            topology.pools,
+            this.tridentRouterAddress
+          );
 
           expect(routerParams).to.not.be.undefined;
 
