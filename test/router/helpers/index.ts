@@ -2,7 +2,7 @@ import { RToken, MultiRoute, findMultiRoute } from "@sushiswap/tines";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { BigNumber, Contract } from "ethers";
 
-import { Topology, TridentRoute } from "./Interfaces";
+import { Topology, TridentRoute } from "./interfaces";
 import { TridentPoolFactory } from "./TridentPoolFactory";
 import { TestContext } from "./TestContext";
 import { TopologyFactory } from "./TopologyFactory";
@@ -72,4 +72,4 @@ export async function executeTridentRoute(tridentRouteParams: TridentRoute, toTo
 
 export * from "./random";
 export * from "./RouteType";
-export * from "./Interfaces";
+export * from "./interfaces";
