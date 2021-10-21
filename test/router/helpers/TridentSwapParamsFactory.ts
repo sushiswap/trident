@@ -4,7 +4,7 @@ import { BigNumber } from "@ethersproject/bignumber";
 import { CLRPool, ConstantProductRPool, getBigNumber, HybridRPool, MultiRoute, RPool } from "@sushiswap/tines";
 
 import { TridentPoolFactory } from "./TridentPoolFactory";
-import { ComplexPathParams, ExactInputParams, ExactInputSingleParams, InitialPath, Output, Path, PercentagePath } from "./Interfaces";
+import { ComplexPathParams, ExactInputParams, ExactInputSingleParams, InitialPath, Output, Path, PercentagePath } from "./interfaces";
 import { RouteType } from "./RouteType";
 
 export class TridentSwapParamsFactory {
