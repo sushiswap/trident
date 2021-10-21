@@ -5,8 +5,8 @@ import { Contract } from "@ethersproject/contracts";
 import { closeValues, RouteStatus, RToken } from "@sushiswap/tines";
 
 import * as testHelper from "./helpers";
-import { Topology } from "./helpers";
 import { getIntegerRandomValue } from "../utilities";
+import { Topology } from "./helpers";
 
 async function checkTokenBalancesAreZero(tokens: RToken[], bentoContract: Contract, tridentAddress: string) {
   for (let index = 0; index < tokens.length; index++) {
