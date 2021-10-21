@@ -219,11 +219,11 @@ export class TridentSwapParamsFactory {
     if (pool instanceof HybridRPool || pool instanceof ConstantProductRPool) {
       data = ethers.utils.defaultAbiCoder.encode(["address", "address", "bool"], [leg.tokenFrom.address, recipent, unwrapBento]);
     } else if (pool instanceof CLRPool) {
-      // (bool zeroForOne, uint256 inAmount, address recipient, bool unwrapBento)
-      // TODO: zeroForOne ?
+      const zeroForOne = pool.token0.address === multiRoute.fromToken.address;
+
       data = ethers.utils.defaultAbiCoder.encode(
         ["bool", "uint256", "address", "bool"],
-        [true, getBigNumber(leg.assumedAmountIn), recipent, unwrapBento]
+        [zeroForOne, getBigNumber(leg.assumedAmountIn), recipent, unwrapBento]
       );
     }
 

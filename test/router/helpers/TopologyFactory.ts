@@ -255,15 +255,11 @@ export class TopologyFactory {
         let poolPrice = price0 / price1;
 
         if (poolType % 3 == 0) {
-          topology.prices[i] = getRandom(rnd, 1e2, 1e4);
-          topology.prices[j] = getRandom(rnd, 1e2, 1e4);
-          poolPrice = topology.prices[i] / topology.prices[j];
-
           topology.pools.push(await this.PoolFactory.getCLPool(token0, token1, poolPrice, rnd));
         } else if (poolType % 3 == 1) {
-          topology.pools.push(await this.PoolFactory.getHybridPool(token0, token1, poolPrice, rnd, 1e23));
+          topology.pools.push(await this.PoolFactory.getHybridPool(token0, token1, poolPrice, rnd));
         } else {
-          topology.pools.push(await this.PoolFactory.getCPPool(token0, token1, poolPrice, rnd, 0.003, 1e23));
+          topology.pools.push(await this.PoolFactory.getCPPool(token0, token1, poolPrice, rnd, 0.003, 1e22));
         }
 
         poolType++;
