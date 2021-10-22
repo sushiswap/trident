@@ -16,7 +16,7 @@ import {
 import { choice, getRandom } from "./random";
 import { ethers } from "hardhat";
 import { ContractFactory } from "@ethersproject/contracts";
-import { ConstantProductRPool, getBigNumber, HybridRPool } from "@sushiswap/tines";
+import { ConstantProductRPool, getBigNumber, HybridRPool, RPool } from "@sushiswap/tines";
 import { RToken } from "@sushiswap/sdk";
 import { BigNumber } from "ethers";
 import { createCLRPool } from "./createCLRPool";
@@ -55,9 +55,8 @@ export class TridentPoolFactory {
     await this.deployContracts();
   }
 
-  public async getRandomPool(t0: RToken, t1: RToken, price: number, rnd: () => number) {
-    if (price !== 1) return await this.getCPPool(t0, t1, price, rnd);
-    return await this.getHybridPool(t0, t1, 1, rnd);
+  public async getRandomPool(t0: RToken, t1: RToken, price: number, rnd: () => number, fee: number): Promise<RPool> {
+    return Math.random() > 0.5 ? await this.getCLPool(t0, t1, price, rnd, fee) : await this.getCPPool(t0, t1, price, rnd, fee);
   }
 
   public async getCPPool(
@@ -145,10 +144,12 @@ export class TridentPoolFactory {
     return this.ConcentratedLiquidityPool.attach(address) as ConcentratedLiquidityPool;
   }
 
-  public async getCLPool(t0: RToken, t1: RToken, price: number, rnd: () => number, fee = 5, tickIncrement = 60) {
+  public async getCLPool(t0: RToken, t1: RToken, price: number, rnd: () => number, fee = 0.0005, tickIncrement = 60) {
+    const feeContract = Math.round(fee * 10_000);
+
     const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint24", "uint160", "uint24"],
-      [t0.address, t1.address, fee, getBigNumber(Math.sqrt(price) * 2 ** 96), tickIncrement]
+      [t0.address, t1.address, feeContract, getBigNumber(Math.sqrt(price) * 2 ** 96), tickIncrement]
     );
 
     let deployResult = await (await this.MasterDeployer.deployPool(this.ConcentratedPoolFactory.address, deployData)).wait();
@@ -163,6 +164,10 @@ export class TridentPoolFactory {
 
     const helper = new LinkedListHelper(-887272);
     const step = 10800;
+
+    const imbalance = this.getPoolImbalance(rnd);
+    const reserve0 = this.getPoolReserve(rnd);
+    const reserve1 = this.getPoolReserve(rnd) * imbalance * price;
 
     const tickSpacing = (await pool.getImmutables())._tickSpacing;
     const poolPrice = (await pool.getPriceAndNearestTicks())._price;

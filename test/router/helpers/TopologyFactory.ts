@@ -45,10 +45,6 @@ export class TopologyFactory {
     }
   }
 
-  public async getRandomPools(tokenCount: number, variants: number, rnd: () => number): Promise<Topology> {
-    return await this.getTopoplogy(tokenCount, variants, rnd);
-  }
-
   public async getSinglePool(rnd: () => number): Promise<Topology> {
     return await this.getTopoplogy(2, 1, rnd);
   }
@@ -113,7 +109,9 @@ export class TopologyFactory {
     };
   }
 
-  public async getRandomCPTopology(tokenCount: number, density: number, rnd: () => number): Promise<Topology> {
+  public async getRandomTopology(tokenCount: number, density: number, rnd: () => number): Promise<Topology> {
+    const tokenContracts: Contract[] = [];
+
     const tokens: RToken[] = [];
     const prices: number[] = [];
     const pools: RPool[] = [];
@@ -123,7 +121,6 @@ export class TopologyFactory {
       prices.push(this.getTokenPrice(rnd));
     }
 
-    const tokenContracts: Contract[] = [];
     for (let i = 0; i < tokens.length; i++) {
       const tokenContract = await this.Erc20Factory.deploy(tokens[0].name, tokens[0].name, this.tokenSupply);
       await tokenContract.deployed();
@@ -132,29 +129,43 @@ export class TopologyFactory {
     }
     await this.approveAndFund(tokenContracts);
 
-    for (i = 0; i < tokenCount; ++i) {
-      for (var j = i + 1; j < tokenCount; ++j) {
-        const r = rnd();
-        if (r < density) {
-          pools.push(await this.PoolFactory.getCPPool(tokens[i], tokens[j], prices[i] / prices[j], rnd, 0.003));
-        }
-        if (r < density * density) {
-          // second pool
-          pools.push(await this.PoolFactory.getCPPool(tokens[i], tokens[j], prices[i] / prices[j], rnd, 0.0005));
-        }
-        if (r < density * density * density) {
-          // third pool
-          pools.push(await this.PoolFactory.getCPPool(tokens[i], tokens[j], prices[i] / prices[j], rnd, 0.002));
-        }
-        if (r < Math.pow(density, 4)) {
-          // forth pool
-          pools.push(await this.PoolFactory.getCPPool(tokens[i], tokens[j], prices[i] / prices[j], rnd, 0.0015));
-        }
-        if (r < Math.pow(density, 5)) {
-          // fifth pool
-          pools.push(await this.PoolFactory.getCPPool(tokens[i], tokens[j], prices[i] / prices[j], rnd, 0.001));
+    try {
+      for (i = 0; i < tokenCount; ++i) {
+        for (var j = i + 1; j < tokenCount; ++j) {
+          const r = rnd();
+          const token0 = tokens[i];
+          const token1 = tokens[j];
+
+          const price0 = prices[i];
+          const price1 = prices[j];
+
+          let poolPrice = price0 / price1;
+
+          if (r < density) {
+            pools.push(await this.PoolFactory.getRandomPool(token0, token1, poolPrice, rnd, 0.0003));
+          }
+          if (r < density * density) {
+            // second pool
+            pools.push(await this.PoolFactory.getRandomPool(token0, token1, poolPrice, rnd, 0.0005));
+          }
+          if (r < density * density * density) {
+            // third pool
+            pools.push(await this.PoolFactory.getRandomPool(token0, token1, poolPrice, rnd, 0.00002));
+          }
+          if (r < Math.pow(density, 4)) {
+            // forth pool
+            pools.push(await this.PoolFactory.getRandomPool(token0, token1, poolPrice, rnd, 0.0015));
+          }
+          if (r < Math.pow(density, 5)) {
+            // fifth pool
+            pools.push(await this.PoolFactory.getRandomPool(token0, token1, poolPrice, rnd, 0.001));
+          }
         }
       }
+    } catch (error) {
+      // console.log('An unknown error occurred generating pools');
+      // console.log(pools);
+      throw error;
     }
 
     return {
@@ -200,9 +211,6 @@ export class TopologyFactory {
         const price0 = topology.prices[i];
         const price1 = topology.prices[j];
 
-        // if (poolType % 2 == 0) {
-        //   topology.pools.push(await tridentPoolFactory.getCLPool(token0, token1, price0 / price1, rnd));
-        // } else
         if (poolType % 2 == 0) {
           topology.pools.push(await this.PoolFactory.getHybridPool(token0, token1, price0 / price1, rnd));
         } else {

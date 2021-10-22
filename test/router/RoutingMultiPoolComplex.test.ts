@@ -34,17 +34,17 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
 
   it("Random topology output prediction precision is ok", async function () {
     for (let index = 0; index < 1; index++) {
-      const topology = await this.topologyFactory.getRandomCPTopology(5, 0.3, this.rnd);
+      const topology = await this.topologyFactory.getRandomTopology(5, 0.3, this.rnd);
 
       for (let i = 0; i < 1; i++) {
         const [fromToken, toToken, baseToken] = getRandomTokens(this.rnd, topology);
 
-        const [amountIn] = getIntegerRandomValue(20, this.rnd);
+        const [amountIn] = getIntegerRandomValue(30, this.rnd);
 
         const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
 
         if (route == undefined) {
-          throw "Failed to get route";
+          throw new Error("Tines failed to find route");
         }
 
         if (route.status === RouteStatus.NoWay) {
@@ -74,6 +74,8 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
             // console.log(`Iteration: ${i}`);
             // console.log(`Route:`);
             // console.log(route);
+
+            // console.log(topology);
             throw error;
           }
 
