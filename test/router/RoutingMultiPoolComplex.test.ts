@@ -39,7 +39,7 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
       for (let i = 0; i < 1; i++) {
         const [fromToken, toToken, baseToken] = getRandomTokens(this.rnd, topology);
 
-        const [amountIn] = getIntegerRandomValue(30, this.rnd);
+        const [amountIn] = getIntegerRandomValue(21, this.rnd);
 
         const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
 

@@ -56,7 +56,7 @@ export class TridentPoolFactory {
   }
 
   public async getRandomPool(t0: RToken, t1: RToken, price: number, rnd: () => number, fee: number): Promise<RPool> {
-    return Math.random() > 0.5 ? await this.getCLPool(t0, t1, price, rnd, fee) : await this.getCPPool(t0, t1, price, rnd, fee);
+    return Math.random() > 0.5 ? await this.getCLPool(t0, t1, price, rnd, fee, 60, 1e20) : await this.getCPPool(t0, t1, price, rnd, fee);
   }
 
   public async getCPPool(
@@ -144,7 +144,15 @@ export class TridentPoolFactory {
     return this.ConcentratedLiquidityPool.attach(address) as ConcentratedLiquidityPool;
   }
 
-  public async getCLPool(t0: RToken, t1: RToken, price: number, rnd: () => number, fee = 0.0005, tickIncrement = 60) {
+  public async getCLPool(
+    t0: RToken,
+    t1: RToken,
+    price: number,
+    rnd: () => number,
+    fee = 0.0005,
+    tickIncrement = 60,
+    reserve: number = 1e25
+  ) {
     const feeContract = Math.round(fee * 10_000);
 
     const deployData = ethers.utils.defaultAbiCoder.encode(
@@ -165,10 +173,6 @@ export class TridentPoolFactory {
     const helper = new LinkedListHelper(-887272);
     const step = 10800;
 
-    const imbalance = this.getPoolImbalance(rnd);
-    const reserve0 = this.getPoolReserve(rnd);
-    const reserve1 = this.getPoolReserve(rnd) * imbalance * price;
-
     const tickSpacing = (await pool.getImmutables())._tickSpacing;
     const poolPrice = (await pool.getPriceAndNearestTicks())._price;
     const tickAtPrice = await this.TickMath.getTickAtSqrtRatio(poolPrice);
@@ -183,8 +187,8 @@ export class TridentPoolFactory {
       lower,
       upperOld: helper.insert(upper),
       upper,
-      amount0Desired: getBigNumber(1e25),
-      amount1Desired: getBigNumber(1e25),
+      amount0Desired: getBigNumber(reserve),
+      amount1Desired: getBigNumber(reserve),
       native0: false,
       native1: false,
       positionOwner: this.ConcentratedPoolManager.address,
