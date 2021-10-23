@@ -270,7 +270,7 @@ export async function removeLiquidityViaManager(params: {
   const oldUserNFTBalance = await Trident.Instance.concentratedPoolManager.balanceOf(oldOwner);
   const oldZeroAddressBalance = await Trident.Instance.concentratedPoolManager.balanceOf(ADDRESS_ZERO);
 
-  await Trident.Instance.concentratedPoolManager.burn(tokenId, liquidityAmount, recipient, unwrapBento);
+  await Trident.Instance.concentratedPoolManager.decreaseLiquidity(tokenId, liquidityAmount, recipient, unwrapBento);
 
   const newOwner = await Trident.Instance.concentratedPoolManager.ownerOf(tokenId);
   const [newPoolAddress, newUserLiquidity, newLower, newUpper, newFeeGrowthInside0, newFeeGrowthInside1] =
@@ -353,8 +353,9 @@ export async function addLiquidityViaRouter(params: {
   upper: BigNumber | number;
   positionOwner: string;
   recipient: string;
+  positionId?: number;
 }): Promise<{ dy: BigNumber; dx: BigNumber; tokenId: BigNumber; liquidity: BigNumber }> {
-  const { pool, amount0Desired, amount1Desired, native, lowerOld, lower, upperOld, upper, positionOwner, recipient } = params;
+  const { pool, amount0Desired, amount1Desired, native, lowerOld, lower, upperOld, upper, positionOwner, recipient, positionId } = params;
   const [currentPrice, priceLower, priceUpper] = await getPrices(pool, [lower, upper]);
   const liquidity = getLiquidityForAmount(priceLower, currentPrice, priceUpper, amount1Desired, amount0Desired);
   const tokens = await Promise.all([(await pool.getImmutables())._token0, (await pool.getImmutables())._token1]);
@@ -380,6 +381,7 @@ export async function addLiquidityViaRouter(params: {
     native1: native,
     positionOwner,
     recipient: recipient,
+    positionId,
   });
   await Trident.Instance.router.addLiquidityLazy(pool.address, liquidity, mintData);
   const newLiquidity = await pool.liquidity();
@@ -436,20 +438,26 @@ export async function addLiquidityViaRouter(params: {
   expect(newPoolBalances[0].toString()).to.be.eq(oldPoolBalances[0].add(dx).toString(), "Didn't receive correct amount of token0");
   expect(newPoolBalances[1].toString()).to.be.eq(oldPoolBalances[1].add(dy).toString(), "Didn't receive correct amount of token1");
   if (positionOwner === Trident.Instance.concentratedPoolManager.address) {
-    expect(oldTotalSupply.add(1).toString()).to.be.eq(newTotalSupply.toString(), "nft wasn't minted");
+    if (positionId == 0) {
+      expect(oldTotalSupply.add(1).toString()).to.be.eq(newTotalSupply.toString(), "nft wasn't minted");
+    }
     const [_pool, _liquidity, _lower, _upper, _feeGrowth0, _feeGrowth1] = await Trident.Instance.concentratedPoolManager.positions(
-      oldTotalSupply
+      positionId == 0 || positionId == undefined ? oldTotalSupply : positionId || 0
     );
-    const nftOwner = await Trident.Instance.concentratedPoolManager.ownerOf(oldTotalSupply);
-    expect(nftOwner).to.be.eq(recipient, "ower doesn't receive the nft position");
+
+    const nftOwner = await Trident.Instance.concentratedPoolManager.ownerOf(
+      positionId == 0 || positionId == undefined ? oldTotalSupply : positionId || 0
+    );
+
+    expect(nftOwner).to.be.eq(recipient, "owner doesn't receive the nft position");
     expect(_pool).to.be.eq(pool.address, "position isn't of the correct pool");
     expect(_lower).to.be.eq(lower, "position doesn't have the correct lower tick");
     expect(_upper).to.be.eq(upper, "position doesn't have the correct upper tick");
-    expect(_liquidity).to.be.eq(liquidity, "position doens't have the minted liquidity");
+    expect(_liquidity).to.be.gte(liquidity, "position doens't have the minted liquidity");
     // TODO check pool reserve change is correct!
     // TODO add function to calculate range fee growth here and ensure that positionManager saved the correct value
   }
-  return { dy, dx, tokenId: oldTotalSupply, liquidity };
+  return { dy, dx, tokenId: oldTotalSupply.gt(positionId || 0) ? oldTotalSupply : BigNumber.from(positionId), liquidity };
 }
 
 export async function _addLiquidityViaRouter(params: {
@@ -463,8 +471,9 @@ export async function _addLiquidityViaRouter(params: {
   upper: BigNumber | number;
   positionOwner: string;
   recipient: string;
+  positionId?: number;
 }) {
-  const { pool, amount0Desired, amount1Desired, native, lowerOld, lower, upperOld, upper, positionOwner, recipient } = params;
+  const { pool, amount0Desired, amount1Desired, native, lowerOld, lower, upperOld, upper, positionOwner, recipient, positionId } = params;
   const mintData = getMintData({
     lowerOld,
     lower,
@@ -476,6 +485,7 @@ export async function _addLiquidityViaRouter(params: {
     native1: native,
     positionOwner,
     recipient: recipient,
+    positionId,
   });
   await Trident.Instance.router.addLiquidityLazy(pool.address, BigNumber.from(0), mintData);
 }
@@ -539,11 +549,13 @@ export function getMintData(params: {
   native1: boolean;
   positionOwner: string;
   recipient: string;
+  positionId: number | undefined;
 }) {
-  const { lowerOld, lower, upperOld, upper, amount0Desired, amount1Desired, native0, native1, positionOwner, recipient } = params;
+  const { lowerOld, lower, upperOld, upper, amount0Desired, amount1Desired, native0, native1, positionOwner, recipient, positionId } =
+    params;
   return ethers.utils.defaultAbiCoder.encode(
-    ["int24", "int24", "int24", "int24", "uint256", "uint256", "bool", "bool", "address", "address"],
-    [lowerOld, lower, upperOld, upper, amount0Desired, amount1Desired, native0, native1, positionOwner, recipient]
+    ["int24", "int24", "int24", "int24", "uint256", "uint256", "bool", "bool", "address", "address", "uint256"],
+    [lowerOld, lower, upperOld, upper, amount0Desired, amount1Desired, native0, native1, positionOwner, recipient, positionId || 0]
   );
 }
 

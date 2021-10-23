@@ -10,6 +10,7 @@ interface IPositionManager {
         int24 upper,
         uint128 amount,
         uint256 feeGrowthInside0,
-        uint256 feeGrowthInside1
-    ) external returns (uint256 positionId);
+        uint256 feeGrowthInside1,
+        uint256 positionId
+    ) external returns (uint256 _positionId);
 }

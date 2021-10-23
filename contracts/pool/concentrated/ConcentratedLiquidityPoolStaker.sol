@@ -26,7 +26,7 @@ contract ConcentratedLiquidityPoolStaker {
 
     struct Stake {
         uint160 secondsGrowthInsideLast; // @dev x128.
-        bool initialized;
+        uint32 timestamp;
     }
 
     IBentoBoxMinimal public immutable bento;
@@ -76,11 +76,11 @@ contract ConcentratedLiquidityPoolStaker {
 
     /// @dev Subscribes a non-fungible position token to an incentive.
     function subscribe(uint256 positionId, uint256[] calldata incentiveId) external {
-        require(poolManager.ownerOf(positionId) == msg.sender, "OWNER");
+        require(poolManager.ownerOf(positionId) == msg.sender, "NOT_OWNER");
         IPoolManager.Position memory position = poolManager.positions(positionId);
         IConcentratedLiquidityPool pool = position.pool;
         require(position.liquidity != 0, "INACTIVE");
-        Stake memory stakeData = Stake(uint160(rangeSecondsInside(pool, position.lower, position.upper)), true);
+        Stake memory stakeData = Stake(uint160(rangeSecondsInside(pool, position.lower, position.upper)), uint32(block.timestamp));
         for (uint256 i; i < incentiveId.length; i++) {
             Incentive memory incentive = incentives[pool][incentiveId[i]];
             Stake storage stake = stakes[positionId][incentiveId[i]];
@@ -97,7 +97,7 @@ contract ConcentratedLiquidityPoolStaker {
         address recipient,
         bool unwrapBento
     ) public {
-        require(poolManager.ownerOf(positionId) == msg.sender, "OWNER");
+        require(poolManager.ownerOf(positionId) == msg.sender, "NOT_OWNER");
 
         IPoolManager.Position memory position = poolManager.positions(positionId);
         IConcentratedLiquidityPool pool = position.pool;
@@ -108,7 +108,7 @@ contract ConcentratedLiquidityPoolStaker {
             Incentive storage incentive = incentives[pool][incentiveIds[i]];
             Stake storage stake = stakes[positionId][incentiveIds[i]];
 
-            require(stake.initialized, "UNINITIALIZED");
+            require(stake.timestamp >= position.latestAddition, "MUST_RESUBSCRIBE");
 
             uint256 rewards;
             uint256 secondsInside;
@@ -136,7 +136,7 @@ contract ConcentratedLiquidityPoolStaker {
         IConcentratedLiquidityPool pool = position.pool;
         Incentive memory incentive = incentives[pool][positionId];
         Stake memory stake = stakes[positionId][incentiveId];
-        if (stake.initialized) {
+        if (stake.timestamp > 0) {
             uint256 secondsGrowth = rangeSecondsInside(pool, position.lower, position.upper) - stake.secondsGrowthInsideLast;
             secondsInside = secondsGrowth * position.liquidity;
             uint256 maxTime = block.timestamp < incentive.endTime ? incentive.endTime : block.timestamp;
