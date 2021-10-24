@@ -278,7 +278,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
             reserve0 = uint112(balance0);
             reserve1 = uint112(balance1);
         } else {
-            uint32 blockTimestamp = uint32(block.timestamp % 2**32);
+            uint32 blockTimestamp = uint32(block.timestamp);
             if (blockTimestamp != _blockTimestampLast && _reserve0 != 0 && _reserve1 != 0) {
                 unchecked {
                     uint32 timeElapsed = blockTimestamp - _blockTimestampLast;
