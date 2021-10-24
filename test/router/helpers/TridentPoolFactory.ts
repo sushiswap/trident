@@ -56,7 +56,7 @@ export class TridentPoolFactory {
   }
 
   public async getRandomPool(t0: RToken, t1: RToken, price: number, rnd: () => number, fee: number): Promise<RPool> {
-    return Math.random() > 0.5 ? await this.getCLPool(t0, t1, price, rnd, fee, 60, 1e20) : await this.getCPPool(t0, t1, price, rnd, fee);
+    return rnd() > 0.5 ? await this.getCLPool(t0, t1, price, rnd, fee, 60, 1e20) : await this.getCPPool(t0, t1, price, rnd, fee);
   }
 
   public async getCPPool(
