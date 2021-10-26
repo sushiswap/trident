@@ -22,9 +22,9 @@ export class TridentSwapParamsFactory {
     slippagePercentage: number = 0.5
   ): ExactInputParams | ExactInputSingleParams | ComplexPathParams {
     const routeType = this.getRouteType(multiRoute);
-    let routerParams;
-
     const slippage = 1 - slippagePercentage / 100;
+
+    let routerParams;
 
     switch (routeType) {
       case RouteType.SinglePool:
@@ -67,17 +67,12 @@ export class TridentSwapParamsFactory {
       data: swapData,
       routeType: RouteType.SinglePool,
     };
-
-    console.log("");
-    console.log(`ExactParams AmountIn - ${params.amountIn.toString()}`);
-
     return params;
   }
 
   private getExactInputParams(multiRoute: MultiRoute, senderAddress: string, slippage: number, pools: RPool[]): ExactInputParams {
     const routeLegs = multiRoute.legs.length;
     let paths: Path[] = [];
-    console.log(`Router amount in: ${multiRoute.amountIn.toString()}`);
 
     for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
       const recipentAddress = this.isLastLeg(legIndex, multiRoute) ? senderAddress : multiRoute.legs[legIndex + 1].poolAddress;
@@ -131,7 +126,6 @@ export class TridentSwapParamsFactory {
 
     const routeLegs = multiRoute.legs.length;
     const initialPathCount = multiRoute.legs.filter((leg) => leg.tokenFrom.address === multiRoute.fromToken.address).length;
-    console.log(`Initial path count: ${initialPathCount}`);
 
     const output: Output = {
       token: multiRoute.toToken.address,
@@ -179,13 +173,6 @@ export class TridentSwapParamsFactory {
       output: outputs,
       routeType: RouteType.ComplexPath,
     };
-
-    const totalInput = initialPaths
-      .map((p) => p.amount)
-      .reduce(function (sum, next) {
-        return sum.add(next);
-      });
-    console.log(`Total initial path ${totalInput.toString()}`);
 
     return complexParams;
   }
