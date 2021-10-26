@@ -34,7 +34,7 @@ export function createRoute(
   toToken: RToken,
   baseToken: RToken,
   topology: Topology,
-  amountIn: number,
+  amountIn: BigNumber | number,
   gasPrice: number
 ): MultiRoute | undefined {
   const route = findMultiRoute(fromToken, toToken, amountIn, topology.pools, baseToken, gasPrice);

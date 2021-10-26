@@ -15,6 +15,8 @@ import "../../libraries/concentratedPool/DyDxMath.sol";
 import "../../libraries/concentratedPool/SwapLib.sol";
 import "../../libraries/concentratedPool/Ticks.sol";
 
+import "hardhat/console.sol";
+
 /// @notice Trident exchange pool template implementing concentrated liquidity for swapping between an ERC-20 token pair.
 /// @dev Amounts are considered to be in Bentobox shared
 contract ConcentratedLiquidityPool is IPool {
@@ -469,6 +471,7 @@ contract ConcentratedLiquidityPool is IPool {
             liquidity = uint128(cache.currentLiquidity);
         }
 
+        console.log("InAmount before reserve update call: %s", inAmount);
         _updateReserves(zeroForOne, uint128(inAmount), amountOut);
 
         _updateFees(zeroForOne, cache.feeGrowthGlobal, uint128(cache.protocolFee));
@@ -520,15 +523,22 @@ contract ConcentratedLiquidityPool is IPool {
         uint128 inAmount,
         uint256 amountOut
     ) internal {
+        console.log("ZeroForOne: %s", zeroForOne);
+        console.log("inAmount: %s", inAmount);
+        console.log("amountOut: %s", inAmount);
         if (zeroForOne) {
             uint256 balance0 = _balance(token0);
             uint128 newBalance = reserve0 + inAmount;
+            console.log("New balance: %s", newBalance);
+            console.log("Balance1: %s", balance0);
             if (uint256(newBalance) > balance0) revert Token0Missing();
             reserve0 = newBalance;
             reserve1 -= uint128(amountOut);
         } else {
             uint256 balance1 = _balance(token1);
             uint128 newBalance = reserve1 + inAmount;
+            console.log("New balance: %s", newBalance);
+            console.log("Balance1: %s", balance1);
             if (uint256(newBalance) > balance1) revert Token1Missing();
             reserve1 = newBalance;
             reserve0 -= uint128(amountOut);

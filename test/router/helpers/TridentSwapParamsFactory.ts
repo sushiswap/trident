@@ -50,22 +50,34 @@ export class TridentSwapParamsFactory {
     slippage: number,
     pools: RPool[]
   ): ExactInputSingleParams {
-    return {
+    const pool = pools.find((p) => p.address === multiRoute.legs[0].poolAddress);
+    if (pool === undefined) {
+      throw new Error(
+        `An error occurred trying to get ExactInput params. 
+        Pool with address ${multiRoute.legs[0].poolAddress} is not in topology.`
+      );
+    }
+    const swapData = this.getSwapDataForPool(pool, multiRoute, 0, senderAddress, false);
+
+    let params: ExactInputSingleParams = {
       amountIn: getBigNumber(multiRoute.amountIn * multiRoute.legs[0].absolutePortion),
       amountOutMinimum: getBigNumber(multiRoute.amountOut * slippage),
       tokenIn: multiRoute.legs[0].tokenFrom.address,
       pool: multiRoute.legs[0].poolAddress,
-      data: ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "bool"],
-        [multiRoute.legs[0].tokenFrom.address, senderAddress, false]
-      ),
+      data: swapData,
       routeType: RouteType.SinglePool,
     };
+
+    console.log("");
+    console.log(`ExactParams AmountIn - ${params.amountIn.toString()}`);
+
+    return params;
   }
 
   private getExactInputParams(multiRoute: MultiRoute, senderAddress: string, slippage: number, pools: RPool[]): ExactInputParams {
     const routeLegs = multiRoute.legs.length;
     let paths: Path[] = [];
+    console.log(`Router amount in: ${multiRoute.amountIn.toString()}`);
 
     for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
       const recipentAddress = this.isLastLeg(legIndex, multiRoute) ? senderAddress : multiRoute.legs[legIndex + 1].poolAddress;
@@ -97,7 +109,7 @@ export class TridentSwapParamsFactory {
 
     let inputParams: ExactInputParams = {
       tokenIn: multiRoute.legs[0].tokenFrom.address,
-      amountIn: getBigNumber(multiRoute.amountIn),
+      amountIn: multiRoute.amountInBN,
       amountOutMinimum: getBigNumber(multiRoute.amountOut * slippage),
       path: paths,
       routeType: RouteType.SinglePath,
@@ -119,6 +131,7 @@ export class TridentSwapParamsFactory {
 
     const routeLegs = multiRoute.legs.length;
     const initialPathCount = multiRoute.legs.filter((leg) => leg.tokenFrom.address === multiRoute.fromToken.address).length;
+    console.log(`Initial path count: ${initialPathCount}`);
 
     const output: Output = {
       token: multiRoute.toToken.address,
@@ -167,6 +180,13 @@ export class TridentSwapParamsFactory {
       routeType: RouteType.ComplexPath,
     };
 
+    const totalInput = initialPaths
+      .map((p) => p.amount)
+      .reduce(function (sum, next) {
+        return sum.add(next);
+      });
+    console.log(`Total initial path ${totalInput.toString()}`);
+
     return complexParams;
   }
 
@@ -204,6 +224,10 @@ export class TridentSwapParamsFactory {
           return a.add(b);
         });
 
+      //   amount = multiRoute.amountInBN.sub(sumIntialPathAmounts);
+      // } else {
+      //   amount = multiRoute.amountInBN.mul(getBigNumber(multiRoute.legs[legIndex].absolutePortion));
+      // }
       amount = getBigNumber(multiRoute.amountIn).sub(sumIntialPathAmounts);
     } else {
       amount = getBigNumber(multiRoute.amountIn * multiRoute.legs[legIndex].absolutePortion);
@@ -222,7 +246,7 @@ export class TridentSwapParamsFactory {
       const zeroForOne = pool.token0.address === multiRoute.fromToken.address;
 
       data = ethers.utils.defaultAbiCoder.encode(
-        ["bool", "uint256", "address", "bool"],
+        ["bool", "uint128", "address", "bool"],
         [zeroForOne, getBigNumber(leg.assumedAmountIn), recipent, unwrapBento]
       );
     }
