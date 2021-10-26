@@ -10,12 +10,12 @@ library Ticks {
         int24 previousTick;
         int24 nextTick;
         uint128 liquidity;
-        uint256 feeGrowthOutside0; /// @dev Per unit of liquidity.
+        uint256 feeGrowthOutside0; // Per unit of liquidity.
         uint256 feeGrowthOutside1;
         uint160 secondsGrowthOutside;
     }
 
-    function getMaxLiquidity(uint24 _tickSpacing) internal pure returns (uint128) {
+    function getMaxLiquidity(uint24 _tickSpacing) public pure returns (uint128) {
         return type(uint128).max / uint128(uint24(TickMath.MAX_TICK) / (2 * uint24(_tickSpacing)));
     }
 
@@ -29,7 +29,7 @@ library Ticks {
     ) internal returns (uint256, int24) {
         ticks[nextTickToCross].secondsGrowthOutside = secondsGrowthGlobal - ticks[nextTickToCross].secondsGrowthOutside;
         if (zeroForOne) {
-            /// @dev Moving forward through the linked list
+            // Moving forward through the linked list.
             if (nextTickToCross % 2 == 0) {
                 currentLiquidity -= ticks[nextTickToCross].liquidity;
             } else {
@@ -38,7 +38,7 @@ library Ticks {
             nextTickToCross = ticks[nextTickToCross].previousTick;
             ticks[nextTickToCross].feeGrowthOutside0 = feeGrowthGlobal - ticks[nextTickToCross].feeGrowthOutside0;
         } else {
-            /// @dev Moving backwards through the linked list
+            // Moving backwards through the linked list.
             if (nextTickToCross % 2 == 0) {
                 currentLiquidity += ticks[nextTickToCross].liquidity;
             } else {
@@ -69,7 +69,7 @@ library Ticks {
         require(upper <= TickMath.MAX_TICK, "UPPER_RANGE");
 
         {
-            /// @dev Stack overflow.
+            // Stack overflow.
             uint128 currentLowerLiquidity = ticks[lower].liquidity;
             if (currentLowerLiquidity != 0 || lower == TickMath.MIN_TICK) {
                 // We are adding liquidity to an existing tick.
@@ -94,7 +94,7 @@ library Ticks {
 
         uint128 currentUpperLiquidity = ticks[upper].liquidity;
         if (currentUpperLiquidity != 0 || upper == TickMath.MAX_TICK) {
-            /// @dev We are adding liquidity to an existing tick.
+            // We are adding liquidity to an existing tick.
             ticks[upper].liquidity = currentUpperLiquidity + amount;
         } else {
             // Inserting a new tick.
@@ -133,7 +133,7 @@ library Ticks {
         Ticks.Tick storage current = ticks[lower];
 
         if (lower != TickMath.MIN_TICK && current.liquidity == amount) {
-            /// @dev Delete lower tick.
+            // Delete lower tick.
             Ticks.Tick storage previous = ticks[current.previousTick];
             Ticks.Tick storage next = ticks[current.nextTick];
 
@@ -152,7 +152,7 @@ library Ticks {
         current = ticks[upper];
 
         if (upper != TickMath.MAX_TICK && current.liquidity == amount) {
-            /// @dev Delete upper tick.
+            // Delete upper tick.
             Ticks.Tick storage previous = ticks[current.previousTick];
             Ticks.Tick storage next = ticks[current.nextTick];
 

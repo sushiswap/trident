@@ -197,7 +197,6 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         isWhiteListed(pool);
         cachedMsgSender = msg.sender;
         cachedPool = pool;
-        // @dev The pool must ensure that there's not too much slippage.
         liquidity = IPool(pool).mint(data);
         cachedMsgSender = address(1);
         cachedPool = address(1);
