@@ -80,7 +80,7 @@ methods {
 ////////////////////////////////////////////////////////////////////////////
 // cachedMsgSender is always 1, unless we are inside a callBack function
 invariant integrityOfCached() 
-    cachedMsgSender() == 1 && cachedPool() == 1
+    cachedMsgSender() <= 1 && cachedPool() <= 1
 
 ////////////////////////////////////////////////////////////////////////////
 //                                 Rules                                  //
@@ -89,14 +89,14 @@ invariant integrityOfCached()
 // Testing eth wrapping
 // Swap, malicious pool can steal input token. Shoudn't loose anything except input token.
 
-// rule sanity(method f) {
-//     env e;
+rule sanity(method f) {
+     env e;
 
-//     calldataarg args;
-//     f(e,args);
+     calldataarg args;
+     f(e,args);
 
-//     assert false;
-// }
+     assert false;
+ }
 
 // Swapping tokenIn for tokenOut, followed by tokenOut for tokenIn should
 // preserve msg.sender's balance and the final amountOut should be equal to
@@ -230,6 +230,7 @@ rule integrityOfAddLiquidity(uint256 x, uint256 y) {
     assert(liquidity > 0 <=> (amount1 > 0 || amount2 > 0), "liquidity amount implication");
     assert(liquidity >= min, "liquidity less than minLiquidity");
 }
+
 
 // TODO: naming min -> minLiquidity produces compliation errors (not sure why, need to check)
 // Seems like if most of the argument names are the same it errors

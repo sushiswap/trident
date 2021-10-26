@@ -35,6 +35,7 @@ contract TridentRouterHarness is TridentRouter {
     function exactInputSingle(ExactInputSingleParams memory params) public payable override returns (uint256 amountOut) {}
 
     // TODO: timing out on sanity
+    /*
     function callExactInput(
         address tokenIn1,
         address pool1,
@@ -60,7 +61,7 @@ contract TridentRouterHarness is TridentRouter {
 
         return super.exactInput(exactInputParams);
     }
-
+*/
     function exactInput(ExactInputParams memory params) public payable override returns (uint256 amount) {}
 
     // TODO: exactInputLazy
@@ -132,6 +133,7 @@ contract TridentRouterHarness is TridentRouter {
     function exactInputSingleWithNativeToken(ExactInputSingleParams memory params) public payable override returns (uint256 amountOut) {}
 
     // TODO: timing out on sanity
+    /*
     function callExactInputWithNativeToken(
         address tokenIn1,
         address pool1,
@@ -157,7 +159,7 @@ contract TridentRouterHarness is TridentRouter {
 
         return super.exactInputWithNativeToken(exactInputParams);
     }
-
+*/
     function exactInputWithNativeToken(ExactInputParams memory params) public payable override returns (uint256 amount) {}
 
     // TODO: need to add a call function for complexPath
@@ -203,14 +205,14 @@ contract TridentRouterHarness is TridentRouter {
         uint256 minToken1,
         uint256 minToken2
     ) external {
-        IPool.TokenAmount[] memory minWithdrawals = new IPool.TokenAmount[](2);
+/*        IPool.TokenAmount[] memory minWithdrawals = new IPool.TokenAmount[](2);
 
         minWithdrawals[0] = IPool.TokenAmount({token: token1, amount: minToken1});
         minWithdrawals[1] = IPool.TokenAmount({token: token2, amount: minToken2});
 
         bytes memory data = abi.encode(to, unwrapBento);
 
-        return super.burnLiquidity(pool, liquidity, data, minWithdrawals);
+        return super.burnLiquidity(pool, liquidity, data, minWithdrawals); */
     }
 
     function burnLiquidity(
