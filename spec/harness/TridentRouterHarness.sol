@@ -133,7 +133,7 @@ contract TridentRouterHarness is TridentRouter {
     function exactInputSingleWithNativeToken(ExactInputSingleParams memory params) public payable override returns (uint256 amountOut) {}
 
     // TODO: timing out on sanity
-    /*
+    
     function callExactInputWithNativeToken(
         address tokenIn1,
         address pool1,
@@ -144,7 +144,7 @@ contract TridentRouterHarness is TridentRouter {
         uint256 amountIn,
         uint256 amountOutMinimum
     ) public payable virtual returns (uint256 amount) {
-        Path[] memory paths = new Path[](2);
+     /*   Path[] memory paths = new Path[](2);
 
         // TODO: connect the pools using require? (Nurit - not at the moment)
         // Like pool1: tokenIn1, TokenOut1
@@ -158,8 +158,9 @@ contract TridentRouterHarness is TridentRouter {
         ExactInputParams memory exactInputParams = ExactInputParams({tokenIn: tokenIn1, amountIn: amountIn, amountOutMinimum: amountOutMinimum, path: paths});
 
         return super.exactInputWithNativeToken(exactInputParams);
+        */
     }
-*/
+
     function exactInputWithNativeToken(ExactInputParams memory params) public payable override returns (uint256 amount) {}
 
     // TODO: need to add a call function for complexPath
