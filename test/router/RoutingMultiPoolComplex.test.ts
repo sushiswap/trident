@@ -27,7 +27,7 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
   before(async function () {
     [this.signer, tridentRouterAddress, bentoContract, topologyFactory, swapParamsFactory] = await testHelper.init();
     this.gasPrice = 1 * 200 * 1e-9;
-    this.rnd = seedrandom("7");
+    this.rnd = seedrandom("6");
   });
 
   function getRandomTokens(rnd: () => number, topology: Topology): [RToken, RToken, RToken] {
