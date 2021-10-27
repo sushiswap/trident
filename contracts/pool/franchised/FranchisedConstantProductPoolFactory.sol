@@ -11,10 +11,8 @@ contract FranchisedConstantProductPoolFactory is PoolDeployer {
     constructor(address _masterDeployer) PoolDeployer(_masterDeployer) {}
 
     function deployPool(bytes memory _deployData) external returns (address pool) {
-        (address tokenA, address tokenB, uint256 swapFee, bool twapSupport, address whiteListManager, address operator, bool level2) = abi.decode(
-            _deployData,
-            (address, address, uint256, bool, address, address, bool)
-        );
+        (address tokenA, address tokenB, uint256 swapFee, bool twapSupport, address whiteListManager, address operator, bool level2) = abi
+            .decode(_deployData, (address, address, uint256, bool, address, address, bool));
         if (tokenA > tokenB) {
             (tokenA, tokenB) = (tokenB, tokenA);
         }

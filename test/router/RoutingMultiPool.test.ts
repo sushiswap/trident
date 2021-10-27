@@ -6,11 +6,11 @@ import { closeValues, RToken } from "@sushiswap/tines";
 
 import * as testHelper from "./helpers";
 import { getIntegerRandomValue } from "../utilities";
-import { RouteType } from "./helpers";
+import { RouteType, Topology } from "./helpers";
 
 describe("MultiPool Routing Tests - Fixed Topology", function () {
   beforeEach(async function () {
-    [this.signer, this.tridentRouterAddress, this.bento] = await testHelper.init();
+    [this.signer, this.tridentRouterAddress, this.bento, this.topologyFactory, this.swapParams] = await testHelper.init();
     this.gasPrice = 1 * 200 * 1e-9;
     this.rnd = seedrandom("2");
   });
@@ -22,52 +22,23 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
     }
   }
 
-  it("Should Test Normal Values with 5 pools & bridge", async function () {
-    const topology = await testHelper.getFivePoolBridge(this.rnd);
-
-    const fromToken = topology.tokens[0];
-    const toToken = topology.tokens[3];
-    const baseToken = topology.tokens[2];
-
-    const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, 1000000, this.gasPrice);
-
-    if (route == undefined) {
-      throw "Failed to get route";
-    }
-
-    expect(route.legs.length).equal(5);
-
-    const routerParams = testHelper.getTridentRouterParams(route, this.signer.address, this.tridentRouterAddress);
-
-    expect(routerParams.routeType).equal(RouteType.ComplexPath);
-
-    const amountOutPoolBN = await testHelper.executeTridentRoute(routerParams, toToken.address);
-
-    await checkTokenBalancesAreZero(topology.tokens, this.bento, this.tridentRouterAddress);
-
-    expect(closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-14)).to.equal(
-      true,
-      "predicted amount did not equal actual swapped amount"
-    );
-  });
-
   it("Should Test Normal Values with 3 Parallel Pools", async function () {
-    const topology = await testHelper.getThreeParallelPools(this.rnd);
+    const topology: Topology = await this.topologyFactory.getThreeParallelPools(this.rnd);
 
     const fromToken = topology.tokens[0];
     const toToken = topology.tokens[1];
     const baseToken = topology.tokens[1];
-    const [amountIn] = getIntegerRandomValue(30, this.rnd);
+    const [amountIn] = getIntegerRandomValue(26, this.rnd);
 
     const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
 
-    if (route == undefined) {
-      throw "Failed to get route";
+    if (route == undefined || route.status === "NoWay") {
+      throw new Error("Tines failed to get route");
     }
 
     expect(route.legs.length).equal(3);
 
-    const routerParams = testHelper.getTridentRouterParams(route, this.signer.address, this.tridentRouterAddress);
+    const routerParams = this.swapParams.getTridentRouterParams(route, this.signer.address, topology.pools, this.tridentRouterAddress);
 
     expect(routerParams.routeType).equal(RouteType.ComplexPath);
 
@@ -75,100 +46,14 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
 
     await checkTokenBalancesAreZero(topology.tokens, this.bento, this.tridentRouterAddress);
 
-    expect(closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-14)).to.equal(
-      true,
-      "predicted amount did not equal actual swapped amount"
-    );
-  });
-
-  it("Should Test Normal Values with 2 Parallel Pools", async function () {
-    const topology = await testHelper.getTwoParallelPools(this.rnd);
-
-    const fromToken = topology.tokens[0];
-    const toToken = topology.tokens[1];
-    const baseToken = topology.tokens[1];
-    const [amountIn] = getIntegerRandomValue(30, this.rnd);
-
-    const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
-
-    if (route == undefined) {
-      throw "Failed to get route";
-    }
-
-    expect(route.legs.length).equal(2);
-
-    const routerParams = testHelper.getTridentRouterParams(route, this.signer.address, this.tridentRouterAddress);
-
-    expect(routerParams.routeType).equal(RouteType.ComplexPath);
-
-    const amountOutPoolBN = await testHelper.executeTridentRoute(routerParams, toToken.address);
-
-    await checkTokenBalancesAreZero(topology.tokens, this.bento, this.tridentRouterAddress);
-
-    expect(closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-14)).to.equal(
-      true,
-      "predicted amount did not equal actual swapped amount"
-    );
-  });
-
-  it("Should Test Normal Values With 2 Serial Pools", async function () {
-    const topology = await testHelper.getTwoSerialPools(this.rnd);
-
-    const fromToken = topology.tokens[0];
-    const toToken = topology.tokens[2];
-    const baseToken = topology.tokens[1];
-    const [amountIn] = getIntegerRandomValue(20, this.rnd);
-
-    const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
-
-    if (route == undefined) {
-      throw "Failed to get route";
-    }
-
-    const routerParams = testHelper.getTridentRouterParams(route, this.signer.address, this.tridentRouterAddress);
-
-    expect(routerParams.routeType).equal(RouteType.SinglePath);
-
-    const amountOutPoolBN = await testHelper.executeTridentRoute(routerParams, toToken.address);
-
-    await checkTokenBalancesAreZero(topology.tokens, this.bento, this.tridentRouterAddress);
-
-    expect(closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-14)).to.equal(
-      true,
-      "predicted amount did not equal actual swapped amount"
-    );
-  });
-
-  it("Should Test Normal Values With 3 Serial Pools", async function () {
-    const topology = await testHelper.getThreeSerialPools(this.rnd);
-
-    const fromToken = topology.tokens[0];
-    const toToken = topology.tokens[2];
-    const baseToken = topology.tokens[1];
-    const [amountIn] = getIntegerRandomValue(20, this.rnd);
-
-    const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
-
-    if (route == undefined) {
-      throw "Failed to get route";
-    }
-
-    const routerParams = testHelper.getTridentRouterParams(route, this.signer.address, this.tridentRouterAddress);
-
-    expect(routerParams.routeType).equal(RouteType.SinglePath);
-
-    const amountOutPoolBN = await testHelper.executeTridentRoute(routerParams, toToken.address);
-
-    await checkTokenBalancesAreZero(topology.tokens, this.bento, this.tridentRouterAddress);
-
-    expect(closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-14)).to.equal(
+    expect(closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-9)).to.equal(
       true,
       "predicted amount did not equal actual swapped amount"
     );
   });
 
   it("Should Test Normal Values With 1 Pool", async function () {
-    const topology = await testHelper.getSinglePool(this.rnd);
+    const topology = await this.topologyFactory.getSinglePool(this.rnd);
 
     const fromToken = topology.tokens[0];
     const toToken = topology.tokens[1];
@@ -177,11 +62,11 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
 
     const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
 
-    if (route == undefined) {
-      throw "Failed to get route";
+    if (route == undefined || route.status === "NoWay") {
+      throw new Error("Tines failed to get route");
     }
 
-    const routerParams = testHelper.getTridentRouterParams(route, this.signer.address, this.tridentRouterAddress);
+    const routerParams = this.swapParams.getTridentRouterParams(route, this.signer.address, topology.pools, this.tridentRouterAddress);
 
     expect(routerParams.routeType).equal(RouteType.SinglePool);
 
@@ -195,8 +80,8 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
     );
   });
 
-  it("Should Test Normal Values With 2 Serial Pools will revert due to slippage", async function () {
-    const topology = await testHelper.getTwoSerialPools(this.rnd);
+  it("Should Test Normal Values With 2 Serial Pools", async function () {
+    const topology = await this.topologyFactory.getTwoSerialPools(this.rnd);
 
     const fromToken = topology.tokens[0];
     const toToken = topology.tokens[2];
@@ -205,17 +90,136 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
 
     const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
 
-    if (route == undefined) {
-      throw "Failed to get route";
+    if (route == undefined || route.status === "NoWay") {
+      throw new Error("Tines failed to get route");
+    }
+
+    expect(route.legs.length).equal(2);
+
+    const routerParams = this.swapParams.getTridentRouterParams(route, this.signer.address, topology.pools, this.tridentRouterAddress);
+
+    expect(routerParams.routeType).equal(RouteType.SinglePath);
+
+    const amountOutPoolBN = await testHelper.executeTridentRoute(routerParams, toToken.address);
+
+    await checkTokenBalancesAreZero(topology.tokens, this.bento, this.tridentRouterAddress);
+
+    expect(closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-14)).to.equal(
+      true,
+      "predicted amount did not equal actual swapped amount"
+    );
+  });
+
+  it("Should Test Normal Values With 2 Serial Pools will revert due to slippage", async function () {
+    const topology = await this.topologyFactory.getTwoSerialPools(this.rnd);
+
+    const fromToken = topology.tokens[0];
+    const toToken = topology.tokens[2];
+    const baseToken = topology.tokens[1];
+    const [amountIn] = getIntegerRandomValue(20, this.rnd);
+
+    const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
+
+    if (route == undefined || route.status === "NoWay") {
+      throw new Error("Tines failed to get route");
     }
 
     route.amountOut = route.amountOut * (1 + 1 / 100);
     route.totalAmountOut = route.totalAmountOut * (1 + 1 / 100);
 
-    const routerParams = testHelper.getTridentRouterParams(route, this.signer.address, this.tridentRouterAddress);
+    const routerParams = this.swapParams.getTridentRouterParams(route, this.signer.address, topology.pools, this.tridentRouterAddress);
 
     expect(routerParams.routeType).equal(RouteType.SinglePath);
 
     await expect(testHelper.executeTridentRoute(routerParams, toToken.address)).to.be.revertedWith("TOO_LITTLE_RECEIVED");
+  });
+
+  it("Should Test Normal Values with 2 Parallel Pools", async function () {
+    const topology = await this.topologyFactory.getTwoParallelPools(this.rnd);
+
+    const fromToken = topology.tokens[0];
+    const toToken = topology.tokens[1];
+    const baseToken = topology.tokens[1];
+    const [amountIn] = getIntegerRandomValue(30, this.rnd);
+
+    const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
+
+    if (route == undefined || route.status === "NoWay") {
+      throw new Error("Tines failed to get route");
+    }
+
+    expect(route.legs.length).equal(2);
+
+    const routerParams = this.swapParams.getTridentRouterParams(route, this.signer.address, topology.pools, this.tridentRouterAddress);
+
+    expect(routerParams.routeType).equal(RouteType.ComplexPath);
+
+    const amountOutPoolBN = await testHelper.executeTridentRoute(routerParams, toToken.address);
+
+    await checkTokenBalancesAreZero(topology.tokens, this.bento, this.tridentRouterAddress);
+
+    expect(closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-14)).to.equal(
+      true,
+      "predicted amount did not equal actual swapped amount"
+    );
+  });
+
+  it("Should Test Normal Values With 3 Serial Pools", async function () {
+    const topology: Topology = await this.topologyFactory.getThreeSerialPools(this.rnd);
+
+    const fromToken = topology.tokens[0];
+    const toToken = topology.tokens[3];
+    const baseToken = topology.tokens[1];
+    const [amountIn] = getIntegerRandomValue(20, this.rnd);
+
+    const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
+
+    if (route == undefined || route.status === "NoWay") {
+      throw new Error("Tines failed to get route");
+    }
+
+    expect(route.legs.length).equal(3);
+
+    const routerParams = this.swapParams.getTridentRouterParams(route, this.signer.address, topology.pools, this.tridentRouterAddress);
+
+    expect(routerParams.routeType).equal(RouteType.SinglePath);
+
+    const amountOutPoolBN = await testHelper.executeTridentRoute(routerParams, toToken.address);
+
+    await checkTokenBalancesAreZero(topology.tokens, this.bento, this.tridentRouterAddress);
+
+    expect(closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-14)).to.equal(
+      true,
+      "predicted amount did not equal actual swapped amount"
+    );
+  });
+
+  it("Should Test Normal Values with 5 pools & bridge", async function () {
+    const topology = await this.topologyFactory.getFivePoolBridge(this.rnd);
+
+    const fromToken = topology.tokens[0];
+    const toToken = topology.tokens[3];
+    const baseToken = topology.tokens[2];
+
+    const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, 1000000, this.gasPrice);
+
+    if (route == undefined || route.status === "NoWay") {
+      throw new Error("Tines failed to get route");
+    }
+
+    expect(route.legs.length).equal(5);
+
+    const routerParams = this.swapParams.getTridentRouterParams(route, this.signer.address, topology.pools, this.tridentRouterAddress);
+
+    expect(routerParams.routeType).equal(RouteType.ComplexPath);
+
+    const amountOutPoolBN = await testHelper.executeTridentRoute(routerParams, toToken.address);
+
+    await checkTokenBalancesAreZero(topology.tokens, this.bento, this.tridentRouterAddress);
+
+    expect(closeValues(route.amountOut, parseInt(amountOutPoolBN.toString()), 1e-14)).to.equal(
+      true,
+      "predicted amount did not equal actual swapped amount"
+    );
   });
 });
