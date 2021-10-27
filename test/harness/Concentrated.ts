@@ -534,8 +534,8 @@ export function getAmountForLiquidity(priceLower: BigNumber, currentPrice: BigNu
 }
 
 export function getSwapData(params: { zeroForOne: boolean; inAmount: BigNumber; recipient: string; unwrapBento: boolean }) {
-  const { zeroForOne, inAmount, recipient, unwrapBento } = params;
-  return ethers.utils.defaultAbiCoder.encode(["bool", "uint256", "address", "bool"], [zeroForOne, inAmount, recipient, unwrapBento]);
+  const { zeroForOne, recipient, unwrapBento } = params;
+  return ethers.utils.defaultAbiCoder.encode(["bool", "address", "bool"], [zeroForOne, recipient, unwrapBento]);
 }
 
 export function getMintData(params: {

@@ -343,7 +343,9 @@ contract ConcentratedLiquidityPool is IPool {
     /// - x is token0
     /// - zero for one -> price will move down.
     function swap(bytes memory data) public override lock returns (uint256 amountOut) {
-        (bool zeroForOne, uint256 inAmount, address recipient, bool unwrapBento) = abi.decode(data, (bool, uint256, address, bool));
+        (bool zeroForOne, address recipient, bool unwrapBento) = abi.decode(data, (bool, address, bool));
+
+        uint256 inAmount = _balance(zeroForOne ? token0 : token1) - (zeroForOne ? reserve0 : reserve1);
 
         SwapCache memory cache = SwapCache({
             feeAmount: 0,
