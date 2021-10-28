@@ -36,7 +36,7 @@ library Ticks {
                 currentLiquidity += ticks[nextTickToCross].liquidity;
             }
             nextTickToCross = ticks[nextTickToCross].previousTick;
-            ticks[nextTickToCross].feeGrowthOutside0 = feeGrowthGlobal - ticks[nextTickToCross].feeGrowthOutside0;
+            ticks[nextTickToCross].feeGrowthOutside1 = feeGrowthGlobal - ticks[nextTickToCross].feeGrowthOutside1;
         } else {
             // Moving backwards through the linked list.
             if (nextTickToCross % 2 == 0) {
@@ -45,7 +45,7 @@ library Ticks {
                 currentLiquidity -= ticks[nextTickToCross].liquidity;
             }
             nextTickToCross = ticks[nextTickToCross].nextTick;
-            ticks[nextTickToCross].feeGrowthOutside1 = feeGrowthGlobal - ticks[nextTickToCross].feeGrowthOutside1;
+            ticks[nextTickToCross].feeGrowthOutside0 = feeGrowthGlobal - ticks[nextTickToCross].feeGrowthOutside0;
         }
 
         return (currentLiquidity, nextTickToCross);
