@@ -2,18 +2,31 @@
 
 pragma solidity >=0.8.0;
 
+import "../interfaces/IBentoBoxMinimal.sol";
+import "../interfaces/IMasterDeployer.sol";
 import "../TridentRouter.sol";
 import "./TridentPermit.sol";
 
 /// @notice Trident router helper contract.
 contract RouterHelper is TridentPermit {
+    /// @notice BentoBox token vault.
+    IBentoBoxMinimal public immutable bento;
+    /// @notice Trident AMM master deployer contract.
+    IMasterDeployer public immutable masterDeployer;
     /// @notice ERC-20 token for wrapped ETH (v9).
     address internal immutable wETH;
     /// @notice The user should use 0x0 if they want to deposit ETH
     address constant USE_ETHEREUM = address(0);
 
-    constructor(address _wETH) {
+    constructor(
+        IBentoBoxMinimal _bento,
+        IMasterDeployer _masterDeployer,
+        address _wETH
+    ) {
+        bento = _bento;
+        masterDeployer = _masterDeployer;
         wETH = _wETH;
+        _bento.registerProtocol();
     }
 
     /// @notice Provides batch function calls for this contract and returns the data from all of them if they all succeed.
@@ -48,6 +61,15 @@ contract RouterHelper is TridentPermit {
             }
             results[i] = result;
         }
+    }
+
+    /// @notice Helper function to allow batching of BentoBox master contract approvals so the first trade can happen in one transaction.
+    function approveMasterContract(
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external {
+        bento.setMasterContractApproval(msg.sender, address(this), true, v, r, s);
     }
 
     /// @notice Provides gas-optimized balance check on this contract to avoid redundant extcodesize check in addition to returndatasize check.

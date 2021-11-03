@@ -78,4 +78,14 @@ interface IBentoBoxMinimal {
 
     /// @dev Reads the Rebase `totals`from storage for a given token
     function totals(address token) external view returns (Rebase memory total);
+
+    /// @dev Approves users' BentoBox assets to a "master" contract.
+    function setMasterContractApproval(
+        address user,
+        address masterContract,
+        bool approved,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external;
 }

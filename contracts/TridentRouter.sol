@@ -2,18 +2,12 @@
 
 pragma solidity >=0.8.0;
 
-import "./interfaces/IBentoBoxMinimal.sol";
 import "./interfaces/IPool.sol";
 import "./interfaces/ITridentRouter.sol";
-import "./interfaces/IMasterDeployer.sol";
 import "./utils/RouterHelper.sol";
 
 /// @notice Router contract that helps in swapping across Trident pools.
 contract TridentRouter is ITridentRouter, RouterHelper {
-    /// @notice BentoBox token vault.
-    IBentoBoxMinimal public immutable bento;
-    IMasterDeployer public immutable masterDeployer;
-
     /// @dev Used to ensure that `tridentSwapCallback` is called only by the authorized address.
     /// These are set when someone calls a flash swap and reset afterwards.
     address internal cachedMsgSender;
@@ -22,14 +16,10 @@ contract TridentRouter is ITridentRouter, RouterHelper {
     mapping(address => bool) internal whitelistedPools;
 
     constructor(
-        IBentoBoxMinimal _bento,
-        IMasterDeployer _masterDeployer,
-        address _wETH
-    ) RouterHelper(_wETH) {
-        _bento.registerProtocol();
-        bento = _bento;
-        masterDeployer = _masterDeployer;
-    }
+        IBentoBoxMinimal bento,
+        IMasterDeployer masterDeployer,
+        address wETH
+    ) RouterHelper(bento, masterDeployer, wETH) {}
 
     receive() external payable {
         require(msg.sender == wETH);
