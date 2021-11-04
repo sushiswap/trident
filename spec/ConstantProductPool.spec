@@ -446,10 +446,8 @@ rule nonZeroMint() {
 
 
 
-// 2. prove that you can't not call back the ConstantProductPool
-//      TODO: Assume unlock is true (means 2???), call any ConstantProductPool function with revert, and assert lastReverted
-// want f to only be public functions
-// TODO: filter {f -> !f.isView}
+//  No reentrancy for locked functions
+
 
 rule reentrancy(method f) filtered { f -> !f.isView}{
     require unlocked() == 2; // means locked
@@ -471,10 +469,8 @@ rule reentrancy(method f) filtered { f -> !f.isView}{
 rule integrityOfBentoBoxTokenBalances(method f) filtered { f -> f.selector != flashSwapWrapper(address, address, bool, uint256, bytes).selector}{
     validState(false);
 
-    // TODO: trying out various things
     require (totalSupply() == 0 <=> reserve0() == 0);
     require (totalSupply() == 0 <=> reserve1() == 0);
-    // require (reserve0()==bentoBox.balanceOf(token0(),currentContract) || reserve1()==bentoBox.balanceOf(token1(),currentContract));
     uint256 _reserve0 = reserve0();
     uint256 _reserve1 = reserve1();
     uint256 _totalSupply = totalSupply();
