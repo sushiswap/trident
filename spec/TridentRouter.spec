@@ -252,14 +252,8 @@ rule noChangeToOther(method f) filtered { f -> (f.selector==callAddLiquidity(add
     uint256 min2;
     address token2;
     uint256 amount2;
-
-    if (f.selector == callAddLiquidity(address, uint256, bool, address, uint256, bool, address, address, uint256).selector) {
-        callAddLiquidity(e, token, amount, native1, token2, amount2, native2, pool, user, min);
-    } else if (f.selector == callBurnLiquidity(address, uint256, address, bool, address, address, uint256, uint256).selector) {
-        callBurnLiquidity(e,pool,amount ,to,unwrapBento, token, token2, min,min2);
-    } else if (f.selector == callExactInputSingle(address, address, address, bool, uint256, uint256).selector) {
-        callExactInputSingle(e, token, pool, to, unwrapBento, amount, min);}
-
+    
+    callFunction(f, user, token, amount, pool, to, unwrapBento, native1, native2);
 
     uint256 native_ = tokenBalanceOf(token, other);
     uint256 inBento_ = bento.balanceOf(token, other);
