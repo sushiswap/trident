@@ -84,11 +84,6 @@ methods {
     // IMigrator
     desiredLiquidity() => NONDET 
 }
-
-////////////////////////////////////////////////////////////////////////////
-//                               Invariants                               //
-////////////////////////////////////////////////////////////////////////////
-
 //  Tokens cannot be the zero address or equal to each other
 invariant validityOfTokens()
     token0() != 0 && token1() != 0 && token0() != token1()
@@ -105,7 +100,6 @@ invariant reserveLessThanEqualToBalance()
 			requireInvariant validityOfTokens();
 		}
 	}
-
 // Trident's `totalSupply` is zero if and only if both the reserves are zero
 invariant integrityOfTotalSupply()
         (totalSupply() == 0 <=> reserve0() == 0) && 
@@ -143,15 +137,7 @@ invariant integrityOfTotalSupply()
     
     }
 
-    
-////////////////////////////////////////////////////////////////////////////
-//                                 Rules                                  //
-////////////////////////////////////////////////////////////////////////////
-
-
-
-
-//  Every operation that takes a token as a parameter should support both tokens
+    //  Every operation that takes a token as a parameter should support both tokens
 rule pathSanityForToken0(method f) {
     callFunction(f, token0());
 
@@ -163,95 +149,20 @@ rule pathSanityForToken1(method f) {
     assert(false);
 }
 
-// No operation changes a balanced pool's balances
-rule noChangeToBalancedPoolAssets(method f) filtered { f ->
-                    f.selector != flashSwapWrapper(address, address, bool, uint256, bytes).selector } {
-    env e;
+//  No reentrancy for locked functions
 
-    uint256 _balance0;
-    uint256 _balance1;
-
-    _balance0, _balance1 = _balance();
-    
-    validState(true);
-    // require that the system has no mirin tokens
-    require balanceOf(currentContract) == 0;
-
-    calldataarg args;
-    f(e, args);
-    
-    uint256 balance0_;
-    uint256 balance1_;
-
-    balance0_, balance1_ = _balance();
-
-    // post-condition: pool's balances don't change
-    assert(_balance0 == balance0_ && _balance1 == balance1_, 
-           "pool's balance in BentoBox changed");
-}
-
-// After every operation, a pool's balances and reserves are equal
-rule afterOpBalanceEqualsReserve(method f) {
-    env e;
-
+rule reentrancy(method f) filtered { f -> !f.isView}{
+    require unlocked() == 2; // means locked
     validState(false);
 
-    uint256 _balance0;
-    uint256 _balance1;
-
-    _balance0, _balance1 = _balance();
-
-    uint256 _reserve0 = reserve0();
-    uint256 _reserve1 = reserve1();
-
-    address to;
-    address tokenIn;
-    address tokenOut;
-    address recipient;
-    bool unwrapBento;
-
-    require to != currentContract;
-    require recipient != currentContract;
-    
-    if (f.selector == burnWrapper(address, bool).selector) {
-        burnWrapper(e, to, unwrapBento);
-    } else if (f.selector == burnSingleWrapper(address, address, bool).selector) {
-        burnSingleWrapper(e, tokenOut, to, unwrapBento);
-    } else if (f.selector == swapWrapper(address, address, bool).selector) {
-        swapWrapper(e, tokenIn, recipient, unwrapBento);
-    } else {
-        calldataarg args;
-        f(e, args);
-    }
-
-    uint256 balance0_;
-    uint256 balance1_;
-
-    balance0_, balance1_ = _balance();
-
-    uint256 reserve0_ = reserve0();
-    uint256 reserve1_ = reserve1();
-
-    
-    assert((_balance0 != balance0_ || _balance1 != balance1_ ||
-            _reserve0 != reserve0_ || _reserve1 != reserve1_) =>
-            (reserve0_ == balance0_ && reserve1_ == balance1_),
-           "balance doesn't equal reserve after state changing operations");
-}
-
-// Minting Trident is not possible for balanced pools
-rule mintingNotPossibleForBalancedPool() {
     env e;
-
-    validState(true);
-
     calldataarg args;
-    uint256 liquidity = mintWrapper@withrevert(e, args);
+    f@withrevert(e, args);
 
-    assert(lastReverted, "pool minting on no transfer to pool");
+    assert(lastReverted, "reentrancy possible");
+
 }
 
-    
 // Any operation shouldn't change some other user's assets
 rule noChangeToOthersBalancesOut(method f) {
     env e;
@@ -340,125 +251,6 @@ rule noChangeToOthersBalancesOut(method f) {
         assert(_totalOthertoken1 == totalOthertoken1_, "other's token1 balance changed");
   }
 }
-
-// Constant Product Curve is increasing for swaps
-rule increasingConstantProductCurve() {
-    env e;
-    uint256 amountIn;
-    validState(false);
-
-    require 0 <= MAX_FEE_MINUS_SWAP_FEE() && MAX_FEE_MINUS_SWAP_FEE() <= MAX_FEE();
-    
-
-    uint256 _reserve0 = reserve0();
-    uint256 _reserve1 = reserve1();
-    address tokenIn=token0();
-    address recipient;
-    bool unwrapBento;
-
-    // tokenIn is token0
-    // uint256 amountOut = swapWrapper(e,tokenIn, recipient, unwrapBento);
-    uint256 amountOut = _getAmountOut(e, amountIn, _reserve0, _reserve1);
-
-    require _reserve0 + amountIn <= max_uint256;
-
-    // uint256 reserve0_ = _reserve0 + amountIn;
-    // uint256 reserve1_ = _reserve1 - amountOut;
-    uint256 reserve0_ = reserve0();
-    uint256 reserve1_ = reserve1();
-
-    assert(_reserve0 * _reserve1 <= reserve0_ * reserve1_);
-}
-
-
-// - If `amountIn` is zero, `amountOut` should always be zero
-// - If `amountIn` token's reserve is zero, amountOut should always be zero
-rule zeroCharacteristicsOfGetAmountOut(uint256 _reserve0, uint256 _reserve1) {
-    env e;
-    uint256 amountIn;
-    address tokenIn;
-    address tokenOut;
-
-    validState(false);
-
-    // assume token0 to token1
-    require tokenIn == token0() || tokenIn == token1(); 
-
-    require _reserve0 == reserve0();
-    require _reserve1 == reserve1();
-
-    require 0 <= MAX_FEE_MINUS_SWAP_FEE() && MAX_FEE_MINUS_SWAP_FEE() <= MAX_FEE();
-
-    uint256 amountInWithFee = amountIn * MAX_FEE_MINUS_SWAP_FEE();
-
-    uint256 amountOut = getAmountOutWrapper(tokenIn, amountIn);
-
-    if (amountIn == 0) {
-        assert(amountOut == 0, "amountIn is 0, but amountOut is not 0");
-    } else if (tokenIn == token0() && reserve1() == 0) {
-        assert(amountOut == 0, "token1 has no reserves, but amountOut is non-zero");
-    } else if (tokenIn == token1() && reserve0() == 0) {
-        assert(amountOut == 0, "token0 has no reserves, but amountOut is non-zero");
-    } else if (tokenIn == token0() && amountInWithFee * _reserve1 < (_reserve0 * MAX_FEE()) + amountInWithFee) { // TODO: review
-        assert(amountOut == 0, "numerator > denominator");
-    } else if (tokenIn == token1() && amountInWithFee * _reserve0 < (_reserve1 * MAX_FEE()) + amountInWithFee) { // TODO: review
-        assert(amountOut == 0, "numerator > denominator");
-    } else {
-        assert(amountOut > 0, "amountOut not greater than zero");
-    }
-}
-
-// - `amountOut` cannot be greater that the output token's reserve
-
-rule maxAmountOut(uint256 _reserve0, uint256 _reserve1) {
-    env e;
-
-    uint256 amountIn;
-    address tokenIn;
-
-    validState(false);
-
-    require tokenIn == token0(); 
-    require _reserve0 == reserve0();
-    require _reserve1 == reserve1();
-    require _reserve0 > 0 && _reserve1 > 0;
-    require MAX_FEE_MINUS_SWAP_FEE() <= MAX_FEE();
-
-    uint256 amountOut = getAmountOutWrapper(tokenIn, amountIn);
-    
-    assert amountOut < _reserve1; 
-}
-
-// Minting zero Trident liquidity is not possible
-rule nonZeroMint() {
-    env e;
-    address to;
-
-    validState(false);
-
-    require reserve0() < bentoBox.balanceOf(token0(), currentContract) ||
-                reserve1() < bentoBox.balanceOf(token1(), currentContract);
-
-    uint256 liquidity = mintWrapper(e, to);
-
-    assert liquidity > 0;
-}
-
-
-//  No reentrancy for locked functions
-
-rule reentrancy(method f) filtered { f -> !f.isView}{
-    require unlocked() == 2; // means locked
-    validState(false);
-
-    env e;
-    calldataarg args;
-    f@withrevert(e, args);
-
-    assert(lastReverted, "reentrancy possible");
-
-}
-
 // If the bentoBox balance of one token decreases then the 
 // other token’s BentoBox increases or the totalSupply decreases. 
 // Symplifying assumption: kLast=0, so we neglect the Bar-Fee.
@@ -515,6 +307,7 @@ rule integrityOfBentoBoxTokenBalances(method f) filtered { f -> f.selector != fl
            ((reserve0_ - _reserve0 > 0) || (totalSupply_ - _totalSupply < 0)),
            "token1's balance decreased; conditions not met");
 }
+
 
 ////////////////////////////////////////////////////////////////////////////
 //                             Helper Methods                             //
