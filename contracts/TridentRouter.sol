@@ -16,8 +16,8 @@ contract TridentRouter is ITridentRouter, RouterHelper {
 
     /// @dev Used to ensure that `tridentSwapCallback` is called only by the authorized address.
     /// These are set when someone calls a flash swap and reset afterwards.
-    address internal cachedMsgSender;
-    address internal cachedPool;
+    address public cachedMsgSender;
+    address public cachedPool;
 
     mapping(address => bool) internal whitelistedPools;
 
@@ -29,9 +29,11 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         _bento.registerProtocol();
         bento = _bento;
         masterDeployer = _masterDeployer;
+        cachedMsgSender = address(1);
+        cachedPool = address(1);
     }
 
-    receive() external payable {
+    receive() external payable virtual {
         require(msg.sender == wETH);
     }
 
@@ -39,7 +41,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
     /// @param params This includes the address of token A, pool, amount of token A to swap,
     /// minimum amount of token B after the swap and data required by the pool for the swap.
     /// @dev Ensure that the pool is trusted before calling this function. The pool can steal users' tokens.
-    function exactInputSingle(ExactInputSingleParams calldata params) public payable returns (uint256 amountOut) {
+    function exactInputSingle(ExactInputSingleParams memory params) public payable virtual returns (uint256 amountOut) {
         // @dev Prefund the pool with token A.
         bento.transfer(params.tokenIn, msg.sender, params.pool, params.amountIn);
         // @dev Trigger the swap in the pool.
@@ -52,7 +54,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
     /// @param params This includes the addresses of the tokens, pools, amount of token A to swap,
     /// minimum amount of token B after the swap and data required by the pools for the swaps.
     /// @dev Ensure that the pools are trusted before calling this function. The pools can steal users' tokens.
-    function exactInput(ExactInputParams calldata params) public payable returns (uint256 amountOut) {
+    function exactInput(ExactInputParams memory params) public payable virtual returns (uint256 amountOut) {
         // @dev Pay the first pool directly.
         bento.transfer(params.tokenIn, msg.sender, params.path[0].pool, params.amountIn);
         // @dev Call every pool in the path.
@@ -74,7 +76,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
     /// @param amountOutMinimum Minimum amount of token B after the swap.
     /// @dev Ensure that the pools are trusted before calling this function. The pools can steal users' tokens.
     /// This function will unlikely be used in production but it shows how to use callbacks. One use case will be arbitrage.
-    function exactInputLazy(uint256 amountOutMinimum, Path[] calldata path) public payable returns (uint256 amountOut) {
+    function exactInputLazy(uint256 amountOutMinimum, Path[] memory path) public payable virtual returns (uint256 amountOut) {
         // @dev Call every pool in the path.
         // Pool `N` should transfer its output tokens to pool `N+1` directly.
         // The last pool should transfer its output tokens to the user.
@@ -98,7 +100,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
     /// @param params This includes the address of token A, pool, amount of token A to swap,
     /// minimum amount of token B after the swap and data required by the pool for the swap.
     /// @dev Ensure that the pool is trusted before calling this function. The pool can steal users' tokens.
-    function exactInputSingleWithNativeToken(ExactInputSingleParams calldata params) public payable returns (uint256 amountOut) {
+    function exactInputSingleWithNativeToken(ExactInputSingleParams memory params) public payable virtual returns (uint256 amountOut) {
         // @dev Deposits the native ERC-20 token from the user into the pool's `bento`.
         _depositToBentoBox(params.tokenIn, params.pool, params.amountIn);
         // @dev Trigger the swap in the pool.
@@ -112,7 +114,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
     /// @param params This includes the addresses of the tokens, pools, amount of token A to swap,
     /// minimum amount of token B after the swap and data required by the pools for the swaps.
     /// @dev Ensure that the pools are trusted before calling this function. The pools can steal users' tokens.
-    function exactInputWithNativeToken(ExactInputParams calldata params) public payable returns (uint256 amountOut) {
+    function exactInputWithNativeToken(ExactInputParams memory params) public payable virtual returns (uint256 amountOut) {
         // @dev Deposits the native ERC-20 token from the user into the pool's `bento`.
         _depositToBentoBox(params.tokenIn, params.path[0].pool, params.amountIn);
         // @dev Call every pool in the path.
@@ -131,7 +133,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
     /// @param params This includes everything needed for the swap. Look at the `ComplexPathParams` struct for more details.
     /// @dev This function is not optimized for single swaps and should only be used in complex cases where
     /// the amounts are large enough that minimizing slippage by using multiple paths is worth the extra gas.
-    function complexPath(ComplexPathParams calldata params) public payable {
+    function complexPath(ComplexPathParams memory params) public payable virtual {
         // @dev Deposit all initial tokens to respective pools and initiate the swaps.
         // Input tokens come from the user - output goes to following pools.
         for (uint256 i; i < params.initialPath.length; i++) {
@@ -172,8 +174,8 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         TokenInput[] memory tokenInput,
         address pool,
         uint256 minLiquidity,
-        bytes calldata data
-    ) public payable returns (uint256 liquidity) {
+        bytes memory data
+    ) public payable virtual returns (uint256 liquidity) {
         isWhiteListed(pool);
         // @dev Send all input tokens to the pool.
         for (uint256 i; i < tokenInput.length; i++) {
@@ -192,8 +194,8 @@ contract TridentRouter is ITridentRouter, RouterHelper {
     function addLiquidityLazy(
         address pool,
         uint256 minLiquidity,
-        bytes calldata data
-    ) public payable returns (uint256 liquidity) {
+        bytes memory data
+    ) public payable virtual returns (uint256 liquidity) {
         isWhiteListed(pool);
         cachedMsgSender = msg.sender;
         cachedPool = pool;
@@ -212,9 +214,9 @@ contract TridentRouter is ITridentRouter, RouterHelper {
     function burnLiquidity(
         address pool,
         uint256 liquidity,
-        bytes calldata data,
+        bytes memory data,
         IPool.TokenAmount[] memory minWithdrawals
-    ) public {
+    ) public virtual {
         isWhiteListed(pool);
         safeTransferFrom(pool, msg.sender, pool, liquidity);
         IPool.TokenAmount[] memory withdrawnLiquidity = IPool(pool).burn(data);
@@ -240,9 +242,9 @@ contract TridentRouter is ITridentRouter, RouterHelper {
     function burnLiquiditySingle(
         address pool,
         uint256 liquidity,
-        bytes calldata data,
+        bytes memory data,
         uint256 minWithdrawal
-    ) public {
+    ) public virtual {
         isWhiteListed(pool);
         // @dev Use 'liquidity = 0' for prefunding.
         safeTransferFrom(pool, msg.sender, pool, liquidity);
@@ -251,7 +253,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
     }
 
     /// @notice Used by the pool 'flashSwap' functionality to take input tokens from the user.
-    function tridentSwapCallback(bytes calldata data) external {
+    function tridentSwapCallback(bytes memory data) public virtual {
         require(msg.sender == cachedPool, "UNAUTHORIZED_CALLBACK");
         TokenInput memory tokenInput = abi.decode(data, (TokenInput));
         // @dev Transfer the requested tokens to the pool.
@@ -265,7 +267,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
     }
 
     /// @notice Can be used by the pool 'mint' functionality to take tokens from the user.
-    function tridentMintCallback(bytes calldata data) external {
+    function tridentMintCallback(bytes memory data) public virtual {
         require(msg.sender == cachedPool, "UNAUTHORIZED_CALLBACK");
         TokenInput[] memory tokenInput = abi.decode(data, (TokenInput[]));
         // @dev Transfer the requested tokens to the pool.
@@ -285,7 +287,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         address token,
         uint256 amount,
         address recipient
-    ) external {
+    ) public virtual {
         bento.transfer(token, address(this), recipient, amount);
     }
 
@@ -294,17 +296,17 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         address token,
         uint256 amount,
         address recipient
-    ) external {
+    ) public virtual {
         safeTransfer(token, recipient, amount);
     }
 
     /// @notice Recover mistakenly sent ETH.
-    function refundETH() external payable {
+    function refundETH() public payable virtual {
         if (address(this).balance != 0) safeTransferETH(msg.sender, address(this).balance);
     }
 
     /// @notice Unwrap this contract's `wETH` into ETH
-    function unwrapWETH(uint256 amountMinimum, address recipient) external {
+    function unwrapWETH(uint256 amountMinimum, address recipient) public virtual {
         uint256 balanceWETH = balanceOfThis(wETH);
         require(balanceWETH >= amountMinimum, "INSUFFICIENT_WETH");
         if (balanceWETH != 0) {
@@ -313,7 +315,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         }
     }
 
-    function deployPool(address _factory, bytes calldata _deployData) external returns (address) {
+    function deployPool(address _factory, bytes memory _deployData) external returns (address) {
         return masterDeployer.deployPool(_factory, _deployData);
     }
 
@@ -323,7 +325,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         address token,
         address recipient,
         uint256 amount
-    ) internal {
+    ) internal virtual {
         bento.deposit{value: token == USE_ETHEREUM ? amount : 0}(token, msg.sender, recipient, amount, 0);
     }
 
@@ -333,11 +335,11 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         address sender,
         address recipient,
         uint256 amount
-    ) internal {
+    ) internal virtual {
         bento.deposit{value: token == USE_ETHEREUM ? amount : 0}(token, sender, recipient, amount, 0);
     }
 
-    function isWhiteListed(address pool) internal {
+    function isWhiteListed(address pool) internal virtual {
         if (!whitelistedPools[pool]) {
             require(masterDeployer.pools(pool), "INVALID POOL");
             whitelistedPools[pool] = true;

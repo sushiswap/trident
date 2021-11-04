@@ -2,7 +2,7 @@
 
 pragma solidity >=0.8.0;
 
-/// @notice Trident pool ERC-20 with EIP-2612 extension.
+//notice Trident pool ERC-20 with EIP-2612 extension.
 /// @author Adapted from RariCapital, https://github.com/Rari-Capital/solmate/blob/main/src/erc20/ERC20.sol,
 /// License-Identifier: AGPL-3.0-only.
 abstract contract TridentERC20 {
@@ -14,19 +14,19 @@ abstract contract TridentERC20 {
     uint8 public constant decimals = 18;
 
     uint256 public totalSupply;
-    /// @notice owner -> balance mapping.
+    //notice owner -> balance mapping.
     mapping(address => uint256) public balanceOf;
-    /// @notice owner -> spender -> allowance mapping.
+    //notice owner -> spender -> allowance mapping.
     mapping(address => mapping(address => uint256)) public allowance;
 
-    /// @notice Chain Id at this contract's deployment.
+    //notice Chain Id at this contract's deployment.
     uint256 internal immutable DOMAIN_SEPARATOR_CHAIN_ID;
-    /// @notice EIP-712 typehash for this contract's domain at deployment.
+    //notice EIP-712 typehash for this contract's domain at deployment.
     bytes32 internal immutable _DOMAIN_SEPARATOR;
-    /// @notice EIP-712 typehash for this contract's {permit} struct.
+    //notice EIP-712 typehash for this contract's {permit} struct.
     bytes32 public constant PERMIT_TYPEHASH =
         keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
-    /// @notice owner -> nonce mapping used in {permit}.
+    //notice owner -> nonce mapping used in {permit}.
     mapping(address => uint256) public nonces;
 
     constructor() {
@@ -46,12 +46,12 @@ abstract contract TridentERC20 {
         );
     }
 
-    /// @notice EIP-712 typehash for this contract's domain.
+    //notice EIP-712 typehash for this contract's domain.
     function DOMAIN_SEPARATOR() public view returns (bytes32 domainSeperator) {
         domainSeperator = block.chainid == DOMAIN_SEPARATOR_CHAIN_ID ? _DOMAIN_SEPARATOR : _calculateDomainSeparator();
     }
 
-    /// @notice Approves `amount` from `msg.sender` to be spent by `spender`.
+    //notice Approves `amount` from `msg.sender` to be spent by `spender`.
     /// @param spender Address of the party that can pull tokens from `msg.sender`'s account.
     /// @param amount The maximum collective `amount` that `spender` can pull.
     /// @return (bool) Returns 'true' if succeeded.
@@ -61,7 +61,7 @@ abstract contract TridentERC20 {
         return true;
     }
 
-    /// @notice Transfers `amount` tokens from `msg.sender` to `recipient`.
+    //notice Transfers `amount` tokens from `msg.sender` to `recipient`.
     /// @param recipient The address to move tokens to.
     /// @param amount The token `amount` to move.
     /// @return (bool) Returns 'true' if succeeded.
@@ -76,7 +76,7 @@ abstract contract TridentERC20 {
         return true;
     }
 
-    /// @notice Transfers `amount` tokens from `sender` to `recipient`. Caller needs approval from `from`.
+    //notice Transfers `amount` tokens from `sender` to `recipient`. Caller needs approval from `from`.
     /// @param sender Address to pull tokens `from`.
     /// @param recipient The address to move tokens to.
     /// @param amount The token `amount` to move.
@@ -99,7 +99,7 @@ abstract contract TridentERC20 {
         return true;
     }
 
-    /// @notice Triggers an approval from `owner` to `spender`.
+    //notice Triggers an approval from `owner` to `spender`.
     /// @param owner The address to approve from.
     /// @param spender The address to be approved.
     /// @param amount The number of tokens that are approved (2^256-1 means infinite).

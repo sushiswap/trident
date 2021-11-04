@@ -50,6 +50,14 @@ interface IERC20 {
     ) external;
 
     function decimals() external view returns (uint256);
+
+    function transfer(address to, uint256 amount) external;
+
+    function transferFrom(
+        address from,
+        address to,
+        uint256 amount
+    ) external;
 }
 
 // File contracts/interfaces/IFlashLoan.sol
@@ -127,11 +135,11 @@ interface IStrategy {
 // License-Identifier: MIT
 
 library BoringERC20 {
-    bytes4 private constant SIG_SYMBOL = 0x95d89b41; // symbol()
-    bytes4 private constant SIG_NAME = 0x06fdde03; // name()
-    bytes4 private constant SIG_DECIMALS = 0x313ce567; // decimals()
-    bytes4 private constant SIG_TRANSFER = 0xa9059cbb; // transfer(address,uint256)
-    bytes4 private constant SIG_TRANSFER_FROM = 0x23b872dd; // transferFrom(address,address,uint256)
+    bytes4 internal constant SIG_SYMBOL = 0x95d89b41; // symbol()
+    bytes4 internal constant SIG_NAME = 0x06fdde03; // name()
+    bytes4 internal constant SIG_DECIMALS = 0x313ce567; // decimals()
+    bytes4 internal constant SIG_TRANSFER = 0xa9059cbb; // transfer(address,uint256)
+    bytes4 internal constant SIG_TRANSFER_FROM = 0x23b872dd; // transferFrom(address,address,uint256)
 
     /// @notice Provides a safe ERC20.transfer version for different ERC-20 implementations.
     /// Reverts on a failed transfer.
@@ -434,7 +442,7 @@ contract BoringFactory {
         address masterContract,
         bytes calldata data,
         bool useCreate2
-    ) public payable returns (address cloneAddress) {
+    ) public payable virtual returns (address cloneAddress) {
         require(masterContract != address(0), "BoringFactory: No masterContract");
         bytes20 targetBytes = bytes20(masterContract); // Takes the first 20 bytes of the masterContract's address
 
@@ -482,17 +490,17 @@ contract MasterContractManager is BoringOwnable, BoringFactory {
     /// @notice user nonces for masterContract approvals
     mapping(address => uint256) public nonces;
 
-    bytes32 private constant DOMAIN_SEPARATOR_SIGNATURE_HASH =
+    bytes32 internal constant DOMAIN_SEPARATOR_SIGNATURE_HASH =
         keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
     // See https://eips.ethereum.org/EIPS/eip-191
-    string private constant EIP191_PREFIX_FOR_EIP712_STRUCTURED_DATA = "\x19\x01";
-    bytes32 private constant APPROVAL_SIGNATURE_HASH =
+    string internal constant EIP191_PREFIX_FOR_EIP712_STRUCTURED_DATA = "\x19\x01";
+    bytes32 internal constant APPROVAL_SIGNATURE_HASH =
         keccak256("SetMasterContractApproval(string warning,address user,address masterContract,bool approved,uint256 nonce)");
 
     // solhint-disable-next-line var-name-mixedcase
-    bytes32 private immutable _DOMAIN_SEPARATOR;
+    bytes32 internal immutable _DOMAIN_SEPARATOR;
     // solhint-disable-next-line var-name-mixedcase
-    uint256 private immutable DOMAIN_SEPARATOR_CHAIN_ID;
+    uint256 internal immutable DOMAIN_SEPARATOR_CHAIN_ID;
 
     constructor() public {
         uint256 chainId;
@@ -502,7 +510,7 @@ contract MasterContractManager is BoringOwnable, BoringFactory {
         _DOMAIN_SEPARATOR = _calculateDomainSeparator(DOMAIN_SEPARATOR_CHAIN_ID = chainId);
     }
 
-    function _calculateDomainSeparator(uint256 chainId) private view returns (bytes32) {
+    function _calculateDomainSeparator(uint256 chainId) internal view returns (bytes32) {
         return keccak256(abi.encode(DOMAIN_SEPARATOR_SIGNATURE_HASH, keccak256("BentoBox V1"), chainId, address(this)));
     }
 
@@ -623,7 +631,12 @@ contract BaseBoringBatchable {
     // F2: Calls in the batch may be payable, delegatecall operates in the same context, so each call in the batch has access to msg.value
     // C3: The length of the loop is fully under user control, so can't be exploited
     // C7: Delegatecall is only used on the same contract, so it's safe
-    function batch(bytes[] calldata calls, bool revertOnFail) external payable returns (bool[] memory successes, bytes[] memory results) {
+    function batch(bytes[] calldata calls, bool revertOnFail)
+        external
+        payable
+        virtual
+        returns (bool[] memory successes, bytes[] memory results)
+    {
         successes = new bool[](calls.length);
         results = new bytes[](calls.length);
         for (uint256 i = 0; i < calls.length; i++) {
@@ -701,16 +714,16 @@ contract BentoBoxV1 is MasterContractManager, BoringBatchable {
     // *** CONSTANTS AND IMMUTABLES *** //
     // ******************************** //
 
-    // V2 - Can they be private?
+    // V2 - Can they be internal?
     // V2: Private to save gas, to verify it's correct, check the constructor arguments
-    IERC20 private immutable wethToken;
+    IERC20 internal immutable wethToken;
 
-    IERC20 private constant USE_ETHEREUM = IERC20(0);
-    uint256 private constant FLASH_LOAN_FEE = 50; // 0.05%
-    uint256 private constant FLASH_LOAN_FEE_PRECISION = 1e5;
-    uint256 private constant STRATEGY_DELAY = 0 weeks;
-    uint256 private constant MAX_TARGET_PERCENTAGE = 95; // 95%
-    uint256 private constant MINIMUM_SHARE_BALANCE = 1000; // To prevent the ratio going off
+    IERC20 internal constant USE_ETHEREUM = IERC20(0);
+    uint256 internal constant FLASH_LOAN_FEE = 50; // 0.05%
+    uint256 internal constant FLASH_LOAN_FEE_PRECISION = 1e5;
+    uint256 internal constant STRATEGY_DELAY = 0 weeks;
+    uint256 internal constant MAX_TARGET_PERCENTAGE = 95; // 95%
+    uint256 internal constant MINIMUM_SHARE_BALANCE = 1000; // To prevent the ratio going off
 
     // ***************** //
     // *** VARIABLES *** //
@@ -777,7 +790,7 @@ contract BentoBoxV1 is MasterContractManager, BoringBatchable {
         IERC20 token,
         uint256 amount,
         bool roundUp
-    ) external view returns (uint256 share) {
+    ) external view virtual returns (uint256 share) {
         share = totals[token].toBase(amount, roundUp);
     }
 
@@ -790,7 +803,7 @@ contract BentoBoxV1 is MasterContractManager, BoringBatchable {
         IERC20 token,
         uint256 share,
         bool roundUp
-    ) external view returns (uint256 amount) {
+    ) external view virtual returns (uint256 amount) {
         amount = totals[token].toElastic(share, roundUp);
     }
 
@@ -808,7 +821,7 @@ contract BentoBoxV1 is MasterContractManager, BoringBatchable {
         address to,
         uint256 amount,
         uint256 share
-    ) public payable allowed(from) returns (uint256 amountOut, uint256 shareOut) {
+    ) public payable virtual allowed(from) returns (uint256 amountOut, uint256 shareOut) {
         // Checks
         require(to != address(0), "BentoBox: to not set"); // To avoid a bad UI from burning funds
 
@@ -871,7 +884,7 @@ contract BentoBoxV1 is MasterContractManager, BoringBatchable {
         address to,
         uint256 amount,
         uint256 share
-    ) public allowed(from) returns (uint256 amountOut, uint256 shareOut) {
+    ) public virtual allowed(from) returns (uint256 amountOut, uint256 shareOut) {
         // Checks
         require(to != address(0), "BentoBox: to not set"); // To avoid a bad UI from burning funds
 
@@ -1004,7 +1017,7 @@ contract BentoBoxV1 is MasterContractManager, BoringBatchable {
         IERC20[] calldata tokens,
         uint256[] calldata amounts,
         bytes calldata data
-    ) public {
+    ) public virtual {
         uint256[] memory fees = new uint256[](tokens.length);
 
         uint256 len = tokens.length;

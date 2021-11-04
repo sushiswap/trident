@@ -5,24 +5,24 @@ pragma solidity >=0.8.0;
 import "../TridentRouter.sol";
 import "./TridentPermit.sol";
 
-/// @notice Trident router helper contract.
+//notice Trident router helper contract.
 contract RouterHelper is TridentPermit {
-    /// @notice ERC-20 token for wrapped ETH (v9).
-    address internal immutable wETH;
-    /// @notice The user should use 0x0 if they want to deposit ETH
+    //notice ERC-20 token for wrapped ETH (v9).
+    address public immutable wETH;
+    //notice The user should use 0x0 if they want to deposit ETH
     address constant USE_ETHEREUM = address(0);
 
     constructor(address _wETH) {
         wETH = _wETH;
     }
 
-    /// @notice Provides batch function calls for this contract and returns the data from all of them if they all succeed.
+    //notice Provides batch function calls for this contract and returns the data from all of them if they all succeed.
     /// Adapted from https://github.com/Uniswap/uniswap-v3-periphery/blob/main/contracts/base/Multicall.sol, License-Identifier: GPL-2.0-or-later.
     /// @dev The `msg.value` should not be trusted for any method callable from this function.
     /// @dev Uses a modified version of the batch function - preventing multiple calls of the single input swap functions
     /// @param data ABI-encoded params for each of the calls to make to this contract.
     /// @return results The results from each of the calls passed in via `data`.
-    function batch(bytes[] calldata data) external payable returns (bytes[] memory results) {
+    function batch(bytes[] calldata data) external payable virtual returns (bytes[] memory results) {
         results = new bytes[](data.length);
         // We only allow one exactInputSingle call to be made in a single batch call.
         // This is not really needed but we want to save users from signing malicious payloads.
@@ -50,7 +50,7 @@ contract RouterHelper is TridentPermit {
         }
     }
 
-    /// @notice Provides gas-optimized balance check on this contract to avoid redundant extcodesize check in addition to returndatasize check.
+    //notice Provides gas-optimized balance check on this contract to avoid redundant extcodesize check in addition to returndatasize check.
     /// @param token Address of ERC-20 token.
     /// @return balance Token amount held by this contract.
     function balanceOfThis(address token) internal view returns (uint256 balance) {
@@ -59,7 +59,7 @@ contract RouterHelper is TridentPermit {
         balance = abi.decode(data, (uint256));
     }
 
-    /// @notice Provides 'safe' ERC-20 {transfer} for tokens that don't consistently return true/false.
+    //notice Provides 'safe' ERC-20 {transfer} for tokens that don't consistently return true/false.
     /// @param token Address of ERC-20 token.
     /// @param recipient Account to send tokens to.
     /// @param amount Token amount to send.
@@ -67,12 +67,12 @@ contract RouterHelper is TridentPermit {
         address token,
         address recipient,
         uint256 amount
-    ) internal {
+    ) internal virtual {
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0xa9059cbb, recipient, amount)); // @dev transfer(address,uint256).
         require(success && (data.length == 0 || abi.decode(data, (bool))), "TRANSFER_FAILED");
     }
 
-    /// @notice Provides 'safe' ERC-20 {transferFrom} for tokens that don't consistently return true/false.
+    //notice Provides 'safe' ERC-20 {transferFrom} for tokens that don't consistently return true/false.
     /// @param token Address of ERC-20 token.
     /// @param sender Account to send tokens from.
     /// @param recipient Account to send tokens to.
@@ -82,22 +82,22 @@ contract RouterHelper is TridentPermit {
         address sender,
         address recipient,
         uint256 amount
-    ) internal {
+    ) internal virtual {
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x23b872dd, sender, recipient, amount)); // @dev transferFrom(address,address,uint256).
         require(success && (data.length == 0 || abi.decode(data, (bool))), "TRANSFER_FROM_FAILED");
     }
 
-    /// @notice Provides low-level `wETH` {withdraw}.
+    //notice Provides low-level `wETH` {withdraw}.
     /// @param amount Token amount to unwrap into ETH.
-    function withdrawFromWETH(uint256 amount) internal {
+    function withdrawFromWETH(uint256 amount) internal virtual {
         (bool success, ) = wETH.call(abi.encodeWithSelector(0x2e1a7d4d, amount)); // @dev withdraw(uint256).
         require(success, "WITHDRAW_FROM_WETH_FAILED");
     }
 
-    /// @notice Provides 'safe' ETH transfer.
+    //notice Provides 'safe' ETH transfer.
     /// @param recipient Account to send ETH to.
     /// @param amount ETH amount to send.
-    function safeTransferETH(address recipient, uint256 amount) internal {
+    function safeTransferETH(address recipient, uint256 amount) internal virtual {
         (bool success, ) = recipient.call{value: amount}("");
         require(success, "ETH_TRANSFER_FAILED");
     }
