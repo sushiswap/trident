@@ -128,6 +128,7 @@ contract ConcentratedLiquidityPool is IPool {
         if (_token0 == address(0)) revert ZeroAddress();
         if (_token0 == address(this)) revert InvalidToken();
         if (_token1 == address(this)) revert InvalidToken();
+        if (_token0 == _token1) revert InvalidToken();
         if (_swapFee > MAX_FEE) revert InvalidSwapFee();
 
         token0 = _token0;
