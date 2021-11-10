@@ -1,4 +1,4 @@
-# Use this run script to verify the ConstantProductPool.spec
+# Use this run script to verify the ConstantPool.Extra.spec
 certoraRun spec/harness/ConstantProductPoolHarness.sol spec/harness/SimpleBentoBox.sol spec/harness/Simplifications.sol spec/harness/DummyERC20A.sol spec/harness/DummyERC20B.sol spec/harness/SymbolicTridentCallee.sol \
 	--verify ConstantProductPoolHarness:spec/ConstantPool.Extra.spec \
 	--link ConstantProductPoolHarness:bento=SimpleBentoBox SymbolicTridentCallee:bento=SimpleBentoBox \
