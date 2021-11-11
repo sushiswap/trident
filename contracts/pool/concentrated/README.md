@@ -17,7 +17,7 @@ The linked list is represented by a `int24 => Tick` mapping where the Tick struc
 
 ## Trading
 
-Based on the **liquidity** variable wich tracks the current liquidity we can calculate the output and price impact of a trade. If the new price would cross into a new liquidity position or exit one we need to swap in steps instead.
+Based on the **liquidity** variable which tracks the current liquidity we can calculate the output and price impact of a trade. If the new price would cross into a new liquidity position or exit one we need to swap in steps instead.
 
 For the first step we use the **nearestTick** variable to calculate the price of the next initialised tick that we are crossing. Based on the difference betwen this price and the current price we can calculate the swap amounts for the first step.
 
