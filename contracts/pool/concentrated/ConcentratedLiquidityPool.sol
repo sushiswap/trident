@@ -124,10 +124,8 @@ contract ConcentratedLiquidityPool is IPool {
             _deployData,
             (address, address, uint24, uint160, uint24)
         );
-        if (TickMath.MIN_SQRT_RATIO >= price && price >= TickMath.MAX_SQRT_RATIO) revert BadPrice();
+        if (TickMath.MIN_SQRT_RATIO > _price || _price >= TickMath.MAX_SQRT_RATIO) revert BadPrice();
         if (_token0 == address(0)) revert ZeroAddress();
-        if (_token0 == address(this)) revert InvalidToken();
-        if (_token1 == address(this)) revert InvalidToken();
         if (_token0 == _token1) revert InvalidToken();
         if (_swapFee > MAX_FEE) revert InvalidSwapFee();
 
