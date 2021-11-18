@@ -9,7 +9,7 @@ import "../utils/TridentPermit.sol";
 /// @notice Interface for handling Balancer V1 LP.
 interface IBalancerV1 {
     function getFinalTokens() external view returns (address[] memory);
-    
+
     function exitPool(uint256 poolAmountIn, uint256[] calldata minAmountsOut) external;
 }
 
@@ -21,10 +21,10 @@ interface IBalancerV2 {
         bytes userData;
         bool toInternalBalance;
     }
-    
+
     /// @notice Returns asset tokens from a Balancer V2 pool.
     function getPoolTokens(bytes32 poolId) external view returns (address[] memory);
-    
+
     /// @notice Exits liquidity tokens from a Balancer V2 pool.
     function exitPool(
         bytes32 poolId,
@@ -37,9 +37,9 @@ interface IBalancerV2 {
 /// @notice Minimal Uniswap V2 LP interface.
 interface IUniswapV2Minimal {
     function token0() external view returns (address);
-    
+
     function token1() external view returns (address);
-    
+
     function burn(address to) external returns (uint256 amount0, uint256 amount1);
 }
 
@@ -77,7 +77,7 @@ interface IUniswapV3 {
             uint128 tokensOwed0,
             uint128 tokensOwed1
         );
-    
+
     struct DecreaseLiquidityParams {
         uint256 tokenId;
         uint128 liquidity;
@@ -85,14 +85,14 @@ interface IUniswapV3 {
         uint256 amount1Min;
         uint256 deadline;
     }
-    
+
     struct CollectParams {
         uint256 tokenId;
         address recipient;
         uint128 amount0Max;
         uint128 amount1Max;
     }
-    
+
     // @notice Decreases the amount of liquidity in a position and accounts it to the position
     /// @param params tokenId The ID of the token for which liquidity is being decreased,
     /// amount The amount by which liquidity will be decreased,
@@ -101,11 +101,8 @@ interface IUniswapV3 {
     /// deadline The time by which the transaction must be included to effect the change
     /// @return amount0 The amount of token0 accounted to the position's tokens owed
     /// @return amount1 The amount of token1 accounted to the position's tokens owed
-    function decreaseLiquidity(DecreaseLiquidityParams calldata params)
-        external
-        payable
-        returns (uint256 amount0, uint256 amount1);
-    
+    function decreaseLiquidity(DecreaseLiquidityParams calldata params) external payable returns (uint256 amount0, uint256 amount1);
+
     /// @notice Collects up to a maximum amount of fees owed to a specific position to the recipient
     /// @param params tokenId The ID of the NFT for which tokens are being collected,
     /// recipient The account that should receive the tokens,
@@ -123,12 +120,12 @@ interface ITridentRouterMinimal {
         bool native;
         uint256 amount;
     }
-    
+
     /// @notice Add liquidity to a pool.
     /// @param tokenInput Token address and amount to add as liquidity.
     /// @param pool Pool address to add liquidity to.
     /// @param minLiquidity Minimum output liquidity - caps slippage.
-    /// @param data Data required by the pool to add liquidity. 
+    /// @param data Data required by the pool to add liquidity.
     function addLiquidity(
         TokenInput[] calldata tokenInput,
         address pool,
@@ -142,30 +139,34 @@ contract TridentSushiRoll {
     IBalancerV2 internal immutable balancerVault;
     IUniswapV3 internal immutable uniNonfungiblePositionManager;
     ITridentRouterMinimal internal immutable tridentRouter;
-    
-    constructor(IBalancerV2 _balancerVault, IUniswapV3 _uniNonfungiblePositionManager, ITridentRouterMinimal _tridentRouter) {
+
+    constructor(
+        IBalancerV2 _balancerVault,
+        IUniswapV3 _uniNonfungiblePositionManager,
+        ITridentRouterMinimal _tridentRouter
+    ) {
         balancerVault = _balancerVault;
         uniNonfungiblePositionManager = _uniNonfungiblePositionManager;
         tridentRouter = _tridentRouter;
     }
-    
+
     // **** BAL MIGRATOR **** //
     // --------------------- //
-    
+
     function migrateFromBalancerV1toTrident(
         IBalancerV1 bPool,
-        uint256 poolAmountIn, 
+        uint256 poolAmountIn,
         uint256[] calldata minAmountsOut,
-        address tridentPool, 
+        address tridentPool,
         uint256 minLiquidity,
         bytes calldata data
     ) external returns (uint256 liquidity) {
         address[] memory tokens = bPool.getFinalTokens();
-        
+
         bPool.exitPool(poolAmountIn, minAmountsOut);
-        
+
         ITridentRouterMinimal.TokenInput[] memory input = new ITridentRouterMinimal.TokenInput[](tokens.length);
-        
+
         unchecked {
             for (uint256 i; i < tokens.length; i++) {
                 input[i].token = tokens[i];
@@ -174,13 +175,8 @@ contract TridentSushiRoll {
                 IERC20(tokens[i]).approve(address(tridentRouter), input[i].amount);
             }
         }
-        
-        liquidity = tridentRouter.addLiquidity(
-            input,
-            tridentPool,
-            minLiquidity,
-            data
-        );
+
+        liquidity = tridentRouter.addLiquidity(input, tridentPool, minLiquidity, data);
     }
 
     function migrateFromBalancerV2toTrident(
@@ -193,9 +189,9 @@ contract TridentSushiRoll {
         address[] memory tokens = balancerVault.getPoolTokens(poolId);
 
         balancerVault.exitPool(poolId, msg.sender, address(this), request);
-        
+
         ITridentRouterMinimal.TokenInput[] memory input = new ITridentRouterMinimal.TokenInput[](tokens.length);
-        
+
         unchecked {
             for (uint256 i; i < tokens.length; i++) {
                 input[i].token = tokens[i];
@@ -204,55 +200,45 @@ contract TridentSushiRoll {
                 IERC20(tokens[i]).approve(address(tridentRouter), input[i].amount);
             }
         }
-        
-        liquidity = tridentRouter.addLiquidity(
-            input,
-            tridentPool,
-            minLiquidity,
-            data
-        );
+
+        liquidity = tridentRouter.addLiquidity(input, tridentPool, minLiquidity, data);
     }
-    
+
     // **** UNI MIGRATOR **** //
     // --------------------- //
-    
+
     function migrateFromUniswapV2toTrident(
-        address pair, 
+        address pair,
         uint256 _liquidity,
         address pool,
         uint256 minLiquidity,
         bytes calldata data
     ) external returns (uint256 liquidity) {
         IERC20(pair).transferFrom(msg.sender, address(pair), _liquidity);
-        
+
         IUniswapV2Minimal(pair).burn(address(this));
 
         ITridentRouterMinimal.TokenInput[] memory input = new ITridentRouterMinimal.TokenInput[](2);
-        
+
         IERC20 token0 = IERC20(IUniswapV2Minimal(pair).token0());
         IERC20 token1 = IERC20(IUniswapV2Minimal(pair).token1());
-        
+
         input[0].token = address(token0);
         input[0].native = true;
         input[0].amount = token0.balanceOf(address(this));
-        
+
         input[1].token = address(token1);
         input[1].native = true;
         input[1].amount = token1.balanceOf(address(this));
 
         token0.approve(address(tridentRouter), input[0].amount);
         token1.approve(address(tridentRouter), input[1].amount);
-        
-        liquidity = ITridentRouterMinimal(tridentRouter).addLiquidity(
-            input,
-            pool,
-            minLiquidity,
-            data
-        );
+
+        liquidity = ITridentRouterMinimal(tridentRouter).addLiquidity(input, pool, minLiquidity, data);
     }
-    
+
     function migrateFromUniswapV3toTrident(
-        IUniswapV3.DecreaseLiquidityParams calldata decreaseLiqParams, 
+        IUniswapV3.DecreaseLiquidityParams calldata decreaseLiqParams,
         IUniswapV3.CollectParams calldata collectParams,
         address tridentPool,
         uint256 minLiquidity,
@@ -260,25 +246,20 @@ contract TridentSushiRoll {
     ) external returns (uint256 liquidity) {
         uniNonfungiblePositionManager.decreaseLiquidity(decreaseLiqParams);
         uniNonfungiblePositionManager.collect(collectParams);
-        
+
         ITridentRouterMinimal.TokenInput[] memory input = new ITridentRouterMinimal.TokenInput[](2);
 
-        (,,address token0,,,,,,,,,) = uniNonfungiblePositionManager.positions(decreaseLiqParams.tokenId);
-        (,,,address token1,,,,,,,,) = uniNonfungiblePositionManager.positions(decreaseLiqParams.tokenId);
-        
+        (, , address token0, , , , , , , , , ) = uniNonfungiblePositionManager.positions(decreaseLiqParams.tokenId);
+        (, , , address token1, , , , , , , , ) = uniNonfungiblePositionManager.positions(decreaseLiqParams.tokenId);
+
         input[0].token = token0;
         input[0].native = true;
         input[0].amount = IERC20(token0).balanceOf(address(this));
-        
+
         input[1].token = token1;
         input[1].native = true;
         input[1].amount = IERC20(token1).balanceOf(address(this));
-        
-        liquidity = tridentRouter.addLiquidity(
-            input,
-            tridentPool,
-            minLiquidity,
-            data
-        );
+
+        liquidity = tridentRouter.addLiquidity(input, tridentPool, minLiquidity, data);
     }
 }
