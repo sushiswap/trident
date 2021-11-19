@@ -136,7 +136,7 @@ interface ITridentRouterMinimal {
 
 /// @notice Liquidity migrator for Trident from popular pool types.
 contract TridentSushiRoll {
-    IBalancerV2 internal immutable balancerVault;
+    /* IBalancerV2 internal immutable balancerVault;
     IUniswapV3 internal immutable uniNonfungiblePositionManager;
     ITridentRouterMinimal internal immutable tridentRouter;
 
@@ -261,5 +261,5 @@ contract TridentSushiRoll {
         input[1].amount = IERC20(token1).balanceOf(address(this));
 
         liquidity = tridentRouter.addLiquidity(input, tridentPool, minLiquidity, data);
-    }
+    } */
 }
