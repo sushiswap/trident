@@ -35,7 +35,7 @@ interface ITridentRouterMinimal is ITridentRouter {
     ) external payable returns (uint256 liquidity);
 }
 
-/// @notice Liquidity migrator for Trident from popular pool types.
+/// @notice Liquidity migrator from UniV2 style pool to Trident Constant product pool.
 contract TridentSushiRollCP is TridentBatchable, TridentPermit {
     error MinimumOutput();
 
@@ -53,6 +53,13 @@ contract TridentSushiRollCP is TridentBatchable, TridentPermit {
         masterDeployer = _masterDeployer;
     }
 
+    /** @notice Function to migrate existing Sushiswap or other Uniswap V2 style pools to Trident.
+        @param pair Uniswap V2 style liquidity pool address.
+        @param amount Liquidity amount (Lp token balance) to be migrated.
+        @param swapFee Swap fee of the Trident CP pool we are migrating into.
+        @param twapSupport Whether the Trident CP pool we are migrating into supports twap oracles.
+        @param minReceived Slippage protection for minting liquidity on the Trident CP pool.
+        @dev If the pool with the current conditions doesn't exist it will be deployed. */
     function migrate(
         IUniswapV2Minimal pair,
         uint256 amount,
