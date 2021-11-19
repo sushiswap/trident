@@ -8,17 +8,8 @@ import "../interfaces/IBentoBoxMinimal.sol";
 import "../interfaces/ITridentRouter.sol";
 import "../interfaces/IMasterDeployer.sol";
 import "../interfaces/IPoolFactory.sol";
-import "../interfaces/IERC20.sol";
+import "../interfaces/IUniswapV2Minimal.sol";
 import "../interfaces/IPool.sol";
-
-/// @notice Minimal Uniswap V2 LP interface.
-interface IUniswapV2Minimal is IERC20 {
-    function token0() external view returns (address);
-
-    function token1() external view returns (address);
-
-    function burn(address to) external returns (uint256 amount0, uint256 amount1);
-}
 
 /// @notice Liquidity migrator from UniV2 style pool to Trident Constant product pool.
 contract TridentSushiRollCP is TridentBatchable, TridentPermit {
