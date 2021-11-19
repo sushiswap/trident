@@ -20,21 +20,6 @@ interface IUniswapV2Minimal is IERC20 {
     function burn(address to) external returns (uint256 amount0, uint256 amount1);
 }
 
-/// @notice Minimal Trident pool router interface.
-interface ITridentRouterMinimal is ITridentRouter {
-    /// @notice Add liquidity to a pool.
-    /// @param tokenInput Token address and amount to add as liquidity.
-    /// @param pool Pool address to add liquidity to.
-    /// @param minLiquidity Minimum output liquidity - caps slippage.
-    /// @param data Data required by the pool to add liquidity.
-    function addLiquidity(
-        TokenInput[] calldata tokenInput,
-        address pool,
-        uint256 minLiquidity,
-        bytes calldata data
-    ) external payable returns (uint256 liquidity);
-}
-
 /// @notice Liquidity migrator from UniV2 style pool to Trident Constant product pool.
 contract TridentSushiRollCP is TridentBatchable, TridentPermit {
     error MinimumOutput();
