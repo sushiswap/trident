@@ -63,6 +63,10 @@ contract RouterHelper is TridentPermit {
         }
     }
 
+    function deployPool(address factory, bytes calldata deployData) external payable returns (address) {
+        return masterDeployer.deployPool(factory, deployData);
+    }
+
     /// @notice Helper function to allow batching of BentoBox master contract approvals so the first trade can happen in one transaction.
     function approveMasterContract(
         uint8 v,

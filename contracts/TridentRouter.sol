@@ -302,10 +302,6 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         }
     }
 
-    function deployPool(address _factory, bytes calldata _deployData) external returns (address) {
-        return masterDeployer.deployPool(_factory, _deployData);
-    }
-
     /// @notice Deposit from the user's wallet into BentoBox.
     /// @dev Amount is the native token amount. We let BentoBox do the conversion into shares.
     function _depositToBentoBox(
