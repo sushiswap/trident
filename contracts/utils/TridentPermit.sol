@@ -4,6 +4,8 @@ pragma solidity >=0.8.0;
 
 /// @notice Generic contract exposing the permit functionality.
 abstract contract TridentPermit {
+    error PermitFailed();
+
     /// @notice Provides EIP-2612 signed approval for this contract to spend user tokens.
     /// @param token Address of ERC-20 token.
     /// @param amount Token amount to grant spending right over.
@@ -20,7 +22,7 @@ abstract contract TridentPermit {
         bytes32 s
     ) external {
         (bool success, ) = token.call(abi.encodeWithSelector(0xd505accf, msg.sender, address(this), amount, deadline, v, r, s)); // permit(address,address,uint256,uint256,uint8,bytes32,bytes32).
-        require(success, "PERMIT_FAILED");
+        if (!success) revert PermitFailed();
     }
 
     /// @notice Provides DAI-derived signed approval for this contract to spend user tokens.
@@ -39,6 +41,6 @@ abstract contract TridentPermit {
         bytes32 s
     ) external {
         (bool success, ) = token.call(abi.encodeWithSelector(0x8fcbaf0c, msg.sender, address(this), nonce, expiry, true, v, r, s)); // permit(address,address,uint256,uint256,bool,uint8,bytes32,bytes32).
-        require(success, "PERMIT_FAILED");
+        if (!success) revert PermitFailed();
     }
 }

@@ -1,11 +1,11 @@
 // @ts-nocheck
 
-import { deploy, getBigNumber, prepare } from "./utilities";
+import { getBigNumber } from "./utilities";
 
 import { BigNumber } from "ethers";
-import { Multicall } from "../typechain/Multicall";
 import { ethers } from "hardhat";
 import { expect } from "chai";
+import { Fee } from "@sushiswap/trident-sdk";
 
 const E6 = BigNumber.from(10).pow(6);
 const E8 = BigNumber.from(10).pow(8);
@@ -15,6 +15,7 @@ describe("Router", function () {
     aliceEncoded,
     weth,
     sushi,
+    xsushi,
     bento,
     masterDeployer,
     tridentPoolFactory,
@@ -41,6 +42,7 @@ describe("Router", function () {
     sushi = await ERC20.deploy("SUSHI", "SUSHI", getBigNumber("10000000"));
     dai = await ERC20.deploy("SUSHI", "SUSHI", getBigNumber("10000000"));
     sedona = await ERC20.deploy("SED", "SED", getBigNumber("10000000"));
+    xsushi = await ERC20.deploy("XSUSHI", "XSUSHI", getBigNumber("10000000"));
     bento = await Bento.deploy(weth.address);
     masterDeployer = await Deployer.deploy(17, alice.address, bento.address);
     tridentPoolFactory = await PoolFactory.deploy(masterDeployer.address);
@@ -53,11 +55,13 @@ describe("Router", function () {
     await bento.whitelistMasterContract(router.address, true);
     // Approve BentoBox token deposits
     await sushi.approve(bento.address, BigNumber.from(10).pow(30));
+    await xsushi.approve(bento.address, BigNumber.from(10).pow(30));
     await weth.approve(bento.address, BigNumber.from(10).pow(30));
     await dai.approve(bento.address, BigNumber.from(10).pow(30));
     await sedona.approve(bento.address, BigNumber.from(10).pow(30));
     // Make BentoBox token deposits
     await bento.deposit(sushi.address, alice.address, alice.address, BigNumber.from(10).pow(22), 0);
+    await bento.deposit(xsushi.address, alice.address, alice.address, BigNumber.from(10).pow(22), 0);
     await bento.deposit(weth.address, alice.address, alice.address, BigNumber.from(10).pow(22), 0);
     await bento.deposit(dai.address, alice.address, alice.address, BigNumber.from(10).pow(22), 0);
     await bento.deposit(sedona.address, alice.address, alice.address, BigNumber.from(10).pow(22), 0);
@@ -182,6 +186,34 @@ describe("Router", function () {
       expect(finalTotalSupply).gt(intermediateTotalSupply);
       expect(finalPoolWethBalance).eq(intermediatePoolWethBalance.add(BigNumber.from(10).pow(17)));
       expect(finalPoolSushiBalance).eq(intermediatePoolSushiBalance.add(BigNumber.from(10).pow(18)));
+    });
+
+    it("Should batch deployPool and add liquidity with native ETH", async function () {
+      const feeTier = Fee.DEFAULT;
+      const twap = false;
+      const addresses = [weth.address, xsushi.address].sort();
+      const deployData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "uint256", "bool"],
+        [addresses[0], addresses[1], feeTier, twap]
+      );
+
+      const liquidityInput = [
+        { token: weth.address, native: true, amount: BigNumber.from(10).pow(18) },
+        { token: xsushi.address, native: true, amount: BigNumber.from(10).pow(18) },
+      ];
+
+      await router.batch(
+        [
+          router.interface.encodeFunctionData("deployPool", [tridentPoolFactory.address, deployData]),
+          router.interface.encodeFunctionData("addLiquidity", [
+            liquidityInput,
+            "0x42917B7bcb5D0D0EFc5849754C8b32fA67247568",
+            1,
+            aliceEncoded,
+          ]),
+        ],
+        { value: BigNumber.from(10).pow(18) }
+      );
     });
 
     it("Should add one sided liquidity", async function () {
