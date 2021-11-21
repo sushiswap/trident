@@ -1,12 +1,11 @@
 // @ts-nocheck
 
-import { ADDRESS_ZERO, getBigNumber } from "./utilities";
+import { getBigNumber } from "./utilities";
 
 import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 import { expect } from "chai";
-import { Token } from "@sushiswap/core-sdk";
-import { computeConstantProductPoolAddress, Fee } from "@sushiswap/trident-sdk";
+import { Fee } from "@sushiswap/trident-sdk";
 
 const E6 = BigNumber.from(10).pow(6);
 const E8 = BigNumber.from(10).pow(8);
