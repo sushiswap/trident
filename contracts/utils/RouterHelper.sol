@@ -72,7 +72,7 @@ contract RouterHelper is TridentPermit {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external {
+    ) external payable {
         bento.setMasterContractApproval(msg.sender, address(this), true, v, r, s);
     }
 
