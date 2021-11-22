@@ -1,7 +1,6 @@
 // @ts-nocheck
 
-import { getBigNumber } from "./utilities";
-
+import { ADDRESS_ZERO, getBigNumber } from "./utilities";
 import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 import { expect } from "chai";
@@ -188,28 +187,28 @@ describe("Router", function () {
     });
 
     it("Should batch deployPool and add liquidity with native ETH", async function () {
-      const feeTier = Fee.DEFAULT;
-      const twap = false;
-      const addresses = [weth.address, xsushi.address].sort();
-      const deployData = ethers.utils.defaultAbiCoder.encode(
+      const deployDataA = ethers.utils.defaultAbiCoder.encode(
         ["address", "address", "uint256", "bool"],
-        [addresses[0], addresses[1], feeTier, twap]
+        [weth.address, xsushi.address, 30, false]
       );
+      const deployDataB = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "uint256", "bool"],
+        [weth.address, xsushi.address, 30, true]
+      );
+      await router.deployPool(tridentPoolFactory.address, deployDataA);
+
+      const poolCount = await tridentPoolFactory.poolsCount(weth.address, xsushi.address);
+      const somePoolAddy = (await tridentPoolFactory.getPools(weth.address, xsushi.address, poolCount - 1, 1))[0];
 
       const liquidityInput = [
-        { token: weth.address, native: true, amount: BigNumber.from(10).pow(18) },
+        { token: ADDRESS_ZERO, native: true, amount: BigNumber.from(10).pow(18) },
         { token: xsushi.address, native: true, amount: BigNumber.from(10).pow(18) },
       ];
 
       await router.batch(
         [
-          router.interface.encodeFunctionData("deployPool", [tridentPoolFactory.address, deployData]),
-          router.interface.encodeFunctionData("addLiquidity", [
-            liquidityInput,
-            "0x42917B7bcb5D0D0EFc5849754C8b32fA67247568",
-            1,
-            aliceEncoded,
-          ]),
+          router.interface.encodeFunctionData("deployPool", [tridentPoolFactory.address, deployDataB]),
+          router.interface.encodeFunctionData("addLiquidity", [liquidityInput, somePoolAddy, 1, aliceEncoded]),
         ],
         { value: BigNumber.from(10).pow(18) }
       );
