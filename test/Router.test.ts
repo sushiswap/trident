@@ -5,7 +5,6 @@ import { getBigNumber } from "./utilities";
 import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 import { expect } from "chai";
-import { Fee } from "@sushiswap/trident-sdk";
 
 const E6 = BigNumber.from(10).pow(6);
 const E8 = BigNumber.from(10).pow(8);
