@@ -277,7 +277,7 @@ contract HybridPool is IPool, TridentERC20 {
 
     function _updateReserves() internal {
         (uint256 _reserve0, uint256 _reserve1) = _balance();
-        require(_reserve0 < type(uint128).max && _reserve1 < type(uint128).max, "OVERFLOW");
+        require(_reserve0 <= type(uint128).max && _reserve1 <= type(uint128).max, "OVERFLOW");
         reserve0 = uint128(_reserve0);
         reserve1 = uint128(_reserve1);
         emit Sync(_reserve0, _reserve1);
@@ -388,8 +388,10 @@ contract HybridPool is IPool, TridentERC20 {
             d = _computeLiquidity(_reserve0, _reserve1);
             if (d > _dLast) {
                 // @dev `barFee` % of increase in liquidity.
-                // It's going to be slightly less than `barFee` % in reality due to the math.
-                uint256 liquidity = (_totalSupply * (d - _dLast) * barFee) / d / MAX_FEE;
+                uint256 numerator = _totalSupply * (d - _dLast);
+                uint256 denominator = (barFee * d) / MAX_FEE + _dLast;
+                uint256 liquidity = numerator / denominator;
+
                 if (liquidity != 0) {
                     _mint(barFeeTo, liquidity);
                     _totalSupply += liquidity;

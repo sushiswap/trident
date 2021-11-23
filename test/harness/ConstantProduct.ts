@@ -83,12 +83,15 @@ export async function initialize() {
     const initCodeHash = utils.keccak256(Pool.bytecode + constructorParams);
     const poolAddress = utils.getCreate2Address(poolFactory.address, salt, initCodeHash);
     pools.push(Pool.attach(poolAddress));
-    promises.push(masterDeployer.deployPool(poolFactory.address, deployData));
+    await masterDeployer.deployPool(poolFactory.address, deployData);
+    const deployedPoolAddress = (await poolFactory.getPools(token0.address, token1.address, 0, 1))[0];
+    expect(poolAddress).eq(deployedPoolAddress);
   }
-  await Promise.all(promises);
 
   // Add initial liquidity of 1k tokens each to every pool
   for (let i = 0; i < pools.length; i++) {
+    console.log(await pools[i].totalSupply());
+    console.log("Adding liquidity to pool " + i);
     await addLiquidity(i, getBigNumber(1000), getBigNumber(1000));
   }
 }

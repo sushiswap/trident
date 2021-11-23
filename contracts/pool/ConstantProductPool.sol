@@ -75,7 +75,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
         masterDeployer = IMasterDeployer(_masterDeployer);
         unlocked = 1;
-        if (_twapSupport) blockTimestampLast = 1;
+        if (_twapSupport) blockTimestampLast = uint32(block.timestamp);
     }
 
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
@@ -302,8 +302,10 @@ contract ConstantProductPool is IPool, TridentERC20 {
             computed = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
             if (computed > _kLast) {
                 // @dev `barFee` % of increase in liquidity.
-                // It's going to be slightly less than `barFee` % in reality due to the math.
-                uint256 liquidity = (_totalSupply * (computed - _kLast) * barFee) / computed / MAX_FEE;
+                uint256 numerator = _totalSupply * (computed - _kLast);
+                uint256 denominator = (barFee * computed) / MAX_FEE + _kLast;
+                uint256 liquidity = numerator / denominator;
+
                 if (liquidity != 0) {
                     _mint(barFeeTo, liquidity);
                     _totalSupply += liquidity;
