@@ -83,9 +83,10 @@ export async function initialize() {
     const initCodeHash = utils.keccak256(Pool.bytecode + constructorParams);
     const poolAddress = utils.getCreate2Address(poolFactory.address, salt, initCodeHash);
     pools.push(Pool.attach(poolAddress));
-    promises.push(masterDeployer.deployPool(poolFactory.address, deployData));
+    await masterDeployer.deployPool(poolFactory.address, deployData);
+    const deployedPoolAddress = (await poolFactory.getPools(token0.address, token1.address, 0, 1))[0];
+    expect(poolAddress).eq(deployedPoolAddress);
   }
-  await Promise.all(promises);
 
   // Add initial liquidity of 1k tokens each to every pool
   for (let i = 0; i < pools.length; i++) {
@@ -417,7 +418,10 @@ function liquidityCalculations(initialBalances, amount0, amount1, kLast, barFee,
   const preMintComputed = sqrt(initialBalances[1].add(fee0).mul(initialBalances[2].add(fee1)));
   const feeMint = preMintComputed.isZero()
     ? ZERO
-    : initialBalances[0].mul(preMintComputed.sub(kLast).mul(barFee)).div(preMintComputed.mul(MAX_FEE));
+    : initialBalances[0]
+        .mul(preMintComputed.sub(kLast))
+        .mul(barFee)
+        .div(MAX_FEE.sub(barFee).mul(preMintComputed).add(kLast.mul(barFee)));
   const updatedTotalSupply = initialBalances[0].add(feeMint);
   const computed = sqrt(initialBalances[1].add(amount0).mul(initialBalances[2].add(amount1)));
   const computedLiquidity = preMintComputed.isZero()
@@ -431,7 +435,10 @@ function burnCalculations(initialBalances, amount, kLast, barFee) {
   const preMintComputed = sqrt(initialBalances[1].mul(initialBalances[2]));
   const feeMint = preMintComputed.isZero()
     ? ZERO
-    : initialBalances[0].mul(preMintComputed.sub(kLast).mul(barFee)).div(preMintComputed.mul(MAX_FEE));
+    : initialBalances[0]
+        .mul(preMintComputed.sub(kLast))
+        .mul(barFee)
+        .div(MAX_FEE.sub(barFee).mul(preMintComputed).add(kLast.mul(barFee)));
   const updatedTotalSupply = feeMint.add(initialBalances[0]);
 
   const amount0 = amount.mul(initialBalances[1]).div(updatedTotalSupply);
