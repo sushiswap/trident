@@ -90,8 +90,6 @@ export async function initialize() {
 
   // Add initial liquidity of 1k tokens each to every pool
   for (let i = 0; i < pools.length; i++) {
-    console.log(await pools[i].totalSupply());
-    console.log("Adding liquidity to pool " + i);
     await addLiquidity(i, getBigNumber(1000), getBigNumber(1000));
   }
 }
@@ -420,7 +418,10 @@ function liquidityCalculations(initialBalances, amount0, amount1, kLast, barFee,
   const preMintComputed = sqrt(initialBalances[1].add(fee0).mul(initialBalances[2].add(fee1)));
   const feeMint = preMintComputed.isZero()
     ? ZERO
-    : initialBalances[0].mul(preMintComputed.sub(kLast).mul(barFee)).div(preMintComputed.mul(MAX_FEE));
+    : initialBalances[0]
+        .mul(preMintComputed.sub(kLast))
+        .mul(barFee)
+        .div(MAX_FEE.sub(barFee).mul(preMintComputed).add(kLast.mul(barFee)));
   const updatedTotalSupply = initialBalances[0].add(feeMint);
   const computed = sqrt(initialBalances[1].add(amount0).mul(initialBalances[2].add(amount1)));
   const computedLiquidity = preMintComputed.isZero()
@@ -434,7 +435,10 @@ function burnCalculations(initialBalances, amount, kLast, barFee) {
   const preMintComputed = sqrt(initialBalances[1].mul(initialBalances[2]));
   const feeMint = preMintComputed.isZero()
     ? ZERO
-    : initialBalances[0].mul(preMintComputed.sub(kLast).mul(barFee)).div(preMintComputed.mul(MAX_FEE));
+    : initialBalances[0]
+        .mul(preMintComputed.sub(kLast))
+        .mul(barFee)
+        .div(MAX_FEE.sub(barFee).mul(preMintComputed).add(kLast.mul(barFee)));
   const updatedTotalSupply = feeMint.add(initialBalances[0]);
 
   const amount0 = amount.mul(initialBalances[1]).div(updatedTotalSupply);

@@ -302,8 +302,9 @@ contract ConstantProductPool is IPool, TridentERC20 {
             computed = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
             if (computed > _kLast) {
                 // @dev `barFee` % of increase in liquidity.
-                uint256 numerator = _totalSupply * (computed - _kLast);
-                uint256 denominator = (barFee * computed) / MAX_FEE + _kLast;
+                uint256 _barFee = barFee;
+                uint256 numerator = _totalSupply * (computed - _kLast) * _barFee;
+                uint256 denominator = (MAX_FEE - _barFee) * computed + _barFee * _kLast;
                 uint256 liquidity = numerator / denominator;
 
                 if (liquidity != 0) {

@@ -388,8 +388,9 @@ contract HybridPool is IPool, TridentERC20 {
             d = _computeLiquidity(_reserve0, _reserve1);
             if (d > _dLast) {
                 // @dev `barFee` % of increase in liquidity.
-                uint256 numerator = _totalSupply * (d - _dLast);
-                uint256 denominator = (barFee * d) / MAX_FEE + _dLast;
+                uint256 _barFee = barFee;
+                uint256 numerator = _totalSupply * (d - _dLast) * _barFee;
+                uint256 denominator = (MAX_FEE - _barFee) * d + _barFee * _dLast;
                 uint256 liquidity = numerator / denominator;
 
                 if (liquidity != 0) {
