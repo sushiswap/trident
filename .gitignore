@@ -4,6 +4,7 @@ node_modules/
 # Hardhat
 cache/
 artifacts/
+deployments/localhost/
 
 # Typechain
 types/

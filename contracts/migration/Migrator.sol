@@ -9,17 +9,7 @@ import "../interfaces/IPoolFactory.sol";
 import "../interfaces/IPool.sol";
 import "../interfaces/IERC20.sol";
 import "../interfaces/IConstantProductPool.sol";
-
-/// @dev Legacy SushiSwap AMM interface
-interface IOldPool is IERC20 {
-    function token0() external view returns (address);
-
-    function token1() external view returns (address);
-
-    function burn(address to) external returns (uint256 amount0, uint256 amount1);
-
-    function mint(bytes calldata data) external returns (uint256 liquidity);
-}
+import "../interfaces/IUniswapV2Minimal.sol";
 
 /// @notice Trident pool migrator contract for legacy SushiSwap.
 /** Sushiswap's master chef contracts which distribute rewards to LP token holders have the option to migrate liquidity.
@@ -55,7 +45,7 @@ contract Migrator {
     /// @dev Since MasterChef has a requierment to receive the same amount of "LP" tokens back after migration we use an
     /// intermediary token so we can mint the desired balance. Anfer unstaking users can call redeem() on the intermediary
     /// token to receive their share of the LP tokens of the new Trident constant product pool.
-    function migrate(IOldPool oldPool) external returns (address) {
+    function migrate(IUniswapV2Minimal oldPool) external returns (address) {
         require(msg.sender == address(masterChef), "ONLY_CHEF");
         require(migrated[address(oldPool)] == address(0), "ONLY_ONCE");
 

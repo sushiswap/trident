@@ -1,0 +1,263 @@
+{
+  "address": "0x72a1799A36d187D273DD70D95DE0056a76af7778",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "contract IBentoBoxMinimal",
+          "name": "_bentoBox",
+          "type": "address"
+        },
+        {
+          "internalType": "contract IPoolFactory",
+          "name": "_poolFactory",
+          "type": "address"
+        },
+        {
+          "internalType": "contract IMasterDeployer",
+          "name": "_masterDeployer",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "MinimumOutput",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "PermitFailed",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes[]",
+          "name": "data",
+          "type": "bytes[]"
+        }
+      ],
+      "name": "batch",
+      "outputs": [
+        {
+          "internalType": "bytes[]",
+          "name": "results",
+          "type": "bytes[]"
+        }
+      ],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IUniswapV2Minimal",
+          "name": "pair",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "swapFee",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "twapSupport",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "minReceived",
+          "type": "uint256"
+        }
+      ],
+      "name": "migrate",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "liquidity",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "deadline",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "v",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "r",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "s",
+          "type": "bytes32"
+        }
+      ],
+      "name": "permitThis",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "nonce",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "expiry",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "v",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "r",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "s",
+          "type": "bytes32"
+        }
+      ],
+      "name": "permitThisAllowed",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "transactionHash": "0x1848c2526352a12eb69a185fe51627905ca7b092a4e086a7a85d7fd82246e0da",
+  "receipt": {
+    "to": null,
+    "from": "0x58B4B6951e9174F153635574076241315D7d3503",
+    "contractAddress": "0x72a1799A36d187D273DD70D95DE0056a76af7778",
+    "transactionIndex": 0,
+    "gasUsed": "980234",
+    "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "blockHash": "0xc4a2442bb44a11d494a6283a9e50fb4c846ce7d9f2e020ee6a58c5bc644b9a8f",
+    "transactionHash": "0x1848c2526352a12eb69a185fe51627905ca7b092a4e086a7a85d7fd82246e0da",
+    "logs": [],
+    "blockNumber": 28497216,
+    "cumulativeGasUsed": "980234",
+    "status": 1,
+    "byzantium": true
+  },
+  "args": [
+    "0xc381a85ed7C7448Da073b7d6C9d4cBf1Cbf576f0",
+    "0xde87A91358FE9C2506290cA21E81438Cd9543d58",
+    "0xdCFaae69E67E4bA73d5A890Fcae097eB3C615e96"
+  ],
+  "solcInputHash": "426130bf1086dd12d6f15ed5763ff493",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.7+commit.e28d00a7\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"contract IBentoBoxMinimal\",\"name\":\"_bentoBox\",\"type\":\"address\"},{\"internalType\":\"contract IPoolFactory\",\"name\":\"_poolFactory\",\"type\":\"address\"},{\"internalType\":\"contract IMasterDeployer\",\"name\":\"_masterDeployer\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"MinimumOutput\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"PermitFailed\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"bytes[]\",\"name\":\"data\",\"type\":\"bytes[]\"}],\"name\":\"batch\",\"outputs\":[{\"internalType\":\"bytes[]\",\"name\":\"results\",\"type\":\"bytes[]\"}],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contract IUniswapV2Minimal\",\"name\":\"pair\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"swapFee\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"twapSupport\",\"type\":\"bool\"},{\"internalType\":\"uint256\",\"name\":\"minReceived\",\"type\":\"uint256\"}],\"name\":\"migrate\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"liquidity\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"deadline\",\"type\":\"uint256\"},{\"internalType\":\"uint8\",\"name\":\"v\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"r\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"s\",\"type\":\"bytes32\"}],\"name\":\"permitThis\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"expiry\",\"type\":\"uint256\"},{\"internalType\":\"uint8\",\"name\":\"v\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"r\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"s\",\"type\":\"bytes32\"}],\"name\":\"permitThisAllowed\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{\"batch(bytes[])\":{\"details\":\"The `msg.value` should not be trusted for any method callable from this function.\",\"params\":{\"data\":\"ABI-encoded params for each of the calls to make to this contract.\"},\"returns\":{\"results\":\"The results from each of the calls passed in via `data`.\"}},\"migrate(address,uint256,uint256,bool,uint256)\":{\"details\":\"If the pool with the current conditions doesn't exist it will be deployed. \",\"params\":{\"amount\":\"Liquidity amount (Lp token balance) to be migrated.\",\"minReceived\":\"Slippage protection for minting liquidity on the Trident CP pool.\",\"pair\":\"Uniswap V2 style liquidity pool address.\",\"swapFee\":\"Swap fee of the Trident CP pool we are migrating into.\",\"twapSupport\":\"Whether the Trident CP pool we are migrating into supports twap oracles.\"}},\"permitThis(address,uint256,uint256,uint8,bytes32,bytes32)\":{\"params\":{\"amount\":\"Token amount to grant spending right over.\",\"deadline\":\"Termination for signed approval (UTC timestamp in seconds).\",\"r\":\"Half of the ECDSA signature pair.\",\"s\":\"Half of the ECDSA signature pair.\",\"token\":\"Address of ERC-20 token.\",\"v\":\"The recovery byte of the signature.\"}},\"permitThisAllowed(address,uint256,uint256,uint8,bytes32,bytes32)\":{\"params\":{\"expiry\":\"Termination for signed approval - UTC timestamp in seconds.\",\"nonce\":\"Token owner's nonce - increases at each call to {permit}.\",\"r\":\"Half of the ECDSA signature pair.\",\"s\":\"Half of the ECDSA signature pair.\",\"token\":\"Address of ERC-20 token.\",\"v\":\"The recovery byte of the signature.\"}}},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"batch(bytes[])\":{\"notice\":\"Provides batch function calls for this contract and returns the data from all of them if they all succeed. Adapted from https://github.com/Uniswap/uniswap-v3-periphery/blob/main/contracts/base/Multicall.sol, License-Identifier: GPL-2.0-or-later.\"},\"migrate(address,uint256,uint256,bool,uint256)\":{\"notice\":\"Function to migrate existing Sushiswap or other Uniswap V2 style pools to Trident.\"},\"permitThis(address,uint256,uint256,uint8,bytes32,bytes32)\":{\"notice\":\"Provides EIP-2612 signed approval for this contract to spend user tokens.\"},\"permitThisAllowed(address,uint256,uint256,uint8,bytes32,bytes32)\":{\"notice\":\"Provides DAI-derived signed approval for this contract to spend user tokens.\"}},\"notice\":\"Liquidity migrator from UniV2 style pool to Trident Constant product pool.\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/migration/TridentSushiRollCP.sol\":\"TridentSushiRollCP\"},\"evmVersion\":\"london\",\"libraries\":{\":__CACHE_BREAKER__\":\"0x00000000d41867734bbee4c6863d9255b2b06ac1\"},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":99999},\"remappings\":[]},\"sources\":{\"contracts/interfaces/IBentoBoxMinimal.sol\":{\"content\":\"// SPDX-License-Identifier: GPL-3.0-or-later\\n\\npragma solidity >=0.8.0;\\nimport \\\"../libraries/RebaseLibrary.sol\\\";\\n\\n/// @notice Minimal BentoBox vault interface.\\n/// @dev `token` is aliased as `address` from `IERC20` for simplicity.\\ninterface IBentoBoxMinimal {\\n    /// @notice Balance per ERC-20 token per account in shares.\\n    function balanceOf(address, address) external view returns (uint256);\\n\\n    /// @dev Helper function to represent an `amount` of `token` in shares.\\n    /// @param token The ERC-20 token.\\n    /// @param amount The `token` amount.\\n    /// @param roundUp If the result `share` should be rounded up.\\n    /// @return share The token amount represented in shares.\\n    function toShare(\\n        address token,\\n        uint256 amount,\\n        bool roundUp\\n    ) external view returns (uint256 share);\\n\\n    /// @dev Helper function to represent shares back into the `token` amount.\\n    /// @param token The ERC-20 token.\\n    /// @param share The amount of shares.\\n    /// @param roundUp If the result should be rounded up.\\n    /// @return amount The share amount back into native representation.\\n    function toAmount(\\n        address token,\\n        uint256 share,\\n        bool roundUp\\n    ) external view returns (uint256 amount);\\n\\n    /// @notice Registers this contract so that users can approve it for BentoBox.\\n    function registerProtocol() external;\\n\\n    /// @notice Deposit an amount of `token` represented in either `amount` or `share`.\\n    /// @param token The ERC-20 token to deposit.\\n    /// @param from which account to pull the tokens.\\n    /// @param to which account to push the tokens.\\n    /// @param amount Token amount in native representation to deposit.\\n    /// @param share Token amount represented in shares to deposit. Takes precedence over `amount`.\\n    /// @return amountOut The amount deposited.\\n    /// @return shareOut The deposited amount represented in shares.\\n    function deposit(\\n        address token,\\n        address from,\\n        address to,\\n        uint256 amount,\\n        uint256 share\\n    ) external payable returns (uint256 amountOut, uint256 shareOut);\\n\\n    /// @notice Withdraws an amount of `token` from a user account.\\n    /// @param token_ The ERC-20 token to withdraw.\\n    /// @param from which user to pull the tokens.\\n    /// @param to which user to push the tokens.\\n    /// @param amount of tokens. Either one of `amount` or `share` needs to be supplied.\\n    /// @param share Like above, but `share` takes precedence over `amount`.\\n    function withdraw(\\n        address token_,\\n        address from,\\n        address to,\\n        uint256 amount,\\n        uint256 share\\n    ) external returns (uint256 amountOut, uint256 shareOut);\\n\\n    /// @notice Transfer shares from a user account to another one.\\n    /// @param token The ERC-20 token to transfer.\\n    /// @param from which user to pull the tokens.\\n    /// @param to which user to push the tokens.\\n    /// @param share The amount of `token` in shares.\\n    function transfer(\\n        address token,\\n        address from,\\n        address to,\\n        uint256 share\\n    ) external;\\n\\n    /// @dev Reads the Rebase `totals`from storage for a given token\\n    function totals(address token) external view returns (Rebase memory total);\\n\\n    /// @dev Approves users' BentoBox assets to a \\\"master\\\" contract.\\n    function setMasterContractApproval(\\n        address user,\\n        address masterContract,\\n        bool approved,\\n        uint8 v,\\n        bytes32 r,\\n        bytes32 s\\n    ) external;\\n}\\n\",\"keccak256\":\"0x80ef2859d876a6b464e28dcaa03b4b0e8d1f81a946e3b3875d4fba66314dc369\",\"license\":\"GPL-3.0-or-later\"},\"contracts/interfaces/IERC20.sol\":{\"content\":\"// SPDX-License-Identifier: GPL-3.0-or-later\\n\\npragma solidity >=0.8.0;\\n\\n/// @dev Use a library or custom safeTransfer{From} functions when dealing with unknown tokens!\\ninterface IERC20 {\\n    function balanceOf(address account) external view returns (uint256);\\n\\n    function totalSupply() external view returns (uint256);\\n\\n    function transferFrom(\\n        address sender,\\n        address recipient,\\n        uint256 amount\\n    ) external returns (bool);\\n\\n    function transfer(address recipient, uint256 amount) external returns (bool);\\n\\n    function approve(address spender, uint256 amount) external returns (bool);\\n}\\n\",\"keccak256\":\"0x41da4ec4920467246a08c3d7d653f1327e8508e6bc29e946232cf87cea7e283f\",\"license\":\"GPL-3.0-or-later\"},\"contracts/interfaces/IMasterDeployer.sol\":{\"content\":\"// SPDX-License-Identifier: GPL-3.0-or-later\\n\\npragma solidity >=0.8.0;\\n\\n/// @notice Trident pool deployer interface.\\ninterface IMasterDeployer {\\n    function barFee() external view returns (uint256);\\n\\n    function barFeeTo() external view returns (address);\\n\\n    function bento() external view returns (address);\\n\\n    function migrator() external view returns (address);\\n\\n    function pools(address pool) external view returns (bool);\\n\\n    function deployPool(address factory, bytes calldata deployData) external returns (address);\\n}\\n\",\"keccak256\":\"0x91c23deb7e4372faa35a0ae4ef6ccd684049aea7b2c75cf63009b28591b91cbc\",\"license\":\"GPL-3.0-or-later\"},\"contracts/interfaces/IPool.sol\":{\"content\":\"// SPDX-License-Identifier: GPL-3.0-or-later\\n\\npragma solidity >=0.5.0;\\npragma experimental ABIEncoderV2;\\n\\n/// @notice Trident pool interface.\\ninterface IPool {\\n    /// @notice Executes a swap from one token to another.\\n    /// @dev The input tokens must've already been sent to the pool.\\n    /// @param data ABI-encoded params that the pool requires.\\n    /// @return finalAmountOut The amount of output tokens that were sent to the user.\\n    function swap(bytes calldata data) external returns (uint256 finalAmountOut);\\n\\n    /// @notice Executes a swap from one token to another with a callback.\\n    /// @dev This function allows borrowing the output tokens and sending the input tokens in the callback.\\n    /// @param data ABI-encoded params that the pool requires.\\n    /// @return finalAmountOut The amount of output tokens that were sent to the user.\\n    function flashSwap(bytes calldata data) external returns (uint256 finalAmountOut);\\n\\n    /// @notice Mints liquidity tokens.\\n    /// @param data ABI-encoded params that the pool requires.\\n    /// @return liquidity The amount of liquidity tokens that were minted for the user.\\n    function mint(bytes calldata data) external returns (uint256 liquidity);\\n\\n    /// @notice Burns liquidity tokens.\\n    /// @dev The input LP tokens must've already been sent to the pool.\\n    /// @param data ABI-encoded params that the pool requires.\\n    /// @return withdrawnAmounts The amount of various output tokens that were sent to the user.\\n    function burn(bytes calldata data) external returns (TokenAmount[] memory withdrawnAmounts);\\n\\n    /// @notice Burns liquidity tokens for a single output token.\\n    /// @dev The input LP tokens must've already been sent to the pool.\\n    /// @param data ABI-encoded params that the pool requires.\\n    /// @return amountOut The amount of output tokens that were sent to the user.\\n    function burnSingle(bytes calldata data) external returns (uint256 amountOut);\\n\\n    /// @return A unique identifier for the pool type.\\n    function poolIdentifier() external pure returns (bytes32);\\n\\n    /// @return An array of tokens supported by the pool.\\n    function getAssets() external view returns (address[] memory);\\n\\n    /// @notice Simulates a trade and returns the expected output.\\n    /// @dev The pool does not need to include a trade simulator directly in itself - it can use a library.\\n    /// @param data ABI-encoded params that the pool requires.\\n    /// @return finalAmountOut The amount of output tokens that will be sent to the user if the trade is executed.\\n    function getAmountOut(bytes calldata data) external view returns (uint256 finalAmountOut);\\n\\n    /// @notice Simulates a trade and returns the expected output.\\n    /// @dev The pool does not need to include a trade simulator directly in itself - it can use a library.\\n    /// @param data ABI-encoded params that the pool requires.\\n    /// @return finalAmountIn The amount of input tokens that are required from the user if the trade is executed.\\n    function getAmountIn(bytes calldata data) external view returns (uint256 finalAmountIn);\\n\\n    /// @dev This event must be emitted on all swaps.\\n    event Swap(address indexed recipient, address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut);\\n\\n    /// @dev This struct frames output tokens for burns.\\n    struct TokenAmount {\\n        address token;\\n        uint256 amount;\\n    }\\n}\\n\",\"keccak256\":\"0xa6f92ccb525b018c0c209819640e8d746f1134b4c4d9acd4f22d3e170323f1fa\",\"license\":\"GPL-3.0-or-later\"},\"contracts/interfaces/IPoolFactory.sol\":{\"content\":\"// SPDX-License-Identifier: GPL-3.0-or-later\\n\\npragma solidity >=0.8.0;\\n\\n/// @notice Trident pool deployment interface.\\ninterface IPoolFactory {\\n    function deployPool(bytes calldata _deployData) external returns (address pool);\\n\\n    function configAddress(bytes32 data) external returns (address pool);\\n}\\n\",\"keccak256\":\"0x03b9677a7914f97ca3ae57deb690cb80d0f1ef4d3541573b4dee6d3cebd5df2e\",\"license\":\"GPL-3.0-or-later\"},\"contracts/interfaces/ITridentRouter.sol\":{\"content\":\"// SPDX-License-Identifier: GPL-3.0-or-later\\n\\npragma solidity >=0.8.0;\\n\\n/// @notice Trident pool router interface.\\ninterface ITridentRouter {\\n    struct Path {\\n        address pool;\\n        bytes data;\\n    }\\n\\n    struct ExactInputSingleParams {\\n        uint256 amountIn;\\n        uint256 amountOutMinimum;\\n        address pool;\\n        address tokenIn;\\n        bytes data;\\n    }\\n\\n    struct ExactInputParams {\\n        address tokenIn;\\n        uint256 amountIn;\\n        uint256 amountOutMinimum;\\n        Path[] path;\\n    }\\n\\n    struct TokenInput {\\n        address token;\\n        bool native;\\n        uint256 amount;\\n    }\\n\\n    struct InitialPath {\\n        address tokenIn;\\n        address pool;\\n        bool native;\\n        uint256 amount;\\n        bytes data;\\n    }\\n\\n    struct PercentagePath {\\n        address tokenIn;\\n        address pool;\\n        uint64 balancePercentage; // Multiplied by 10^6. 100% = 100_000_000\\n        bytes data;\\n    }\\n\\n    struct Output {\\n        address token;\\n        address to;\\n        bool unwrapBento;\\n        uint256 minAmount;\\n    }\\n\\n    struct ComplexPathParams {\\n        InitialPath[] initialPath;\\n        PercentagePath[] percentagePath;\\n        Output[] output;\\n    }\\n}\\n\",\"keccak256\":\"0x40f1af6b213ff8827d515460f9057eb87ddc35d8020501f727d229ea239cbf24\",\"license\":\"GPL-3.0-or-later\"},\"contracts/interfaces/IUniswapV2Minimal.sol\":{\"content\":\"// SPDX-License-Identifier: GPL-3.0-or-later\\n\\npragma solidity >=0.8.0;\\n\\nimport \\\"./IERC20.sol\\\";\\n\\n/// @notice Minimal Uniswap V2 LP interface.\\ninterface IUniswapV2Minimal is IERC20 {\\n    function token0() external view returns (address);\\n\\n    function token1() external view returns (address);\\n\\n    function burn(address to) external returns (uint256 amount0, uint256 amount1);\\n}\\n\",\"keccak256\":\"0x674f8b036659f1c29d1c5a7e85f3067949f3a3239bc5cf17f476dc83721a0279\",\"license\":\"GPL-3.0-or-later\"},\"contracts/libraries/RebaseLibrary.sol\":{\"content\":\"// SPDX-License-Identifier: GPL-3.0-or-later\\n\\npragma solidity ^0.8;\\n\\nstruct Rebase {\\n    uint128 elastic;\\n    uint128 base;\\n}\\n\\n/// @notice A rebasing library\\nlibrary RebaseLibrary {\\n    /// @notice Calculates the base value in relationship to `elastic` and `total`.\\n    function toBase(Rebase memory total, uint256 elastic) internal pure returns (uint256 base) {\\n        if (total.elastic == 0) {\\n            base = elastic;\\n        } else {\\n            base = (elastic * total.base) / total.elastic;\\n        }\\n    }\\n\\n    /// @notice Calculates the elastic value in relationship to `base` and `total`.\\n    function toElastic(Rebase memory total, uint256 base) internal pure returns (uint256 elastic) {\\n        if (total.base == 0) {\\n            elastic = base;\\n        } else {\\n            elastic = (base * total.elastic) / total.base;\\n        }\\n    }\\n}\\n\",\"keccak256\":\"0xa83360497e7e2a04332211832a8ceb41ef0301892fcf1b17174d7d4466782d44\",\"license\":\"GPL-3.0-or-later\"},\"contracts/migration/TridentSushiRollCP.sol\":{\"content\":\"// SPDX-License-Identifier: GPL-3.0-or-later\\n\\npragma solidity 0.8.7;\\n\\nimport \\\"../utils/TridentBatchable.sol\\\";\\nimport \\\"../utils/TridentPermit.sol\\\";\\nimport \\\"../interfaces/IBentoBoxMinimal.sol\\\";\\nimport \\\"../interfaces/ITridentRouter.sol\\\";\\nimport \\\"../interfaces/IMasterDeployer.sol\\\";\\nimport \\\"../interfaces/IPoolFactory.sol\\\";\\nimport \\\"../interfaces/IUniswapV2Minimal.sol\\\";\\nimport \\\"../interfaces/IPool.sol\\\";\\n\\n/// @notice Liquidity migrator from UniV2 style pool to Trident Constant product pool.\\ncontract TridentSushiRollCP is TridentBatchable, TridentPermit {\\n    error MinimumOutput();\\n\\n    IBentoBoxMinimal internal immutable bentoBox;\\n    IPoolFactory internal immutable poolFactory;\\n    IMasterDeployer internal immutable masterDeployer;\\n\\n    constructor(\\n        IBentoBoxMinimal _bentoBox,\\n        IPoolFactory _poolFactory,\\n        IMasterDeployer _masterDeployer\\n    ) {\\n        bentoBox = _bentoBox;\\n        poolFactory = _poolFactory;\\n        masterDeployer = _masterDeployer;\\n    }\\n\\n    /** @notice Function to migrate existing Sushiswap or other Uniswap V2 style pools to Trident.\\n        @param pair Uniswap V2 style liquidity pool address.\\n        @param amount Liquidity amount (Lp token balance) to be migrated.\\n        @param swapFee Swap fee of the Trident CP pool we are migrating into.\\n        @param twapSupport Whether the Trident CP pool we are migrating into supports twap oracles.\\n        @param minReceived Slippage protection for minting liquidity on the Trident CP pool.\\n        @dev If the pool with the current conditions doesn't exist it will be deployed. */\\n    function migrate(\\n        IUniswapV2Minimal pair,\\n        uint256 amount,\\n        uint256 swapFee,\\n        bool twapSupport,\\n        uint256 minReceived\\n    ) external returns (uint256 liquidity) {\\n        address token0 = pair.token0();\\n        address token1 = pair.token1();\\n\\n        bytes memory poolData = abi.encode(token0, token1, swapFee, twapSupport);\\n        address tridentPool = poolFactory.configAddress(keccak256(poolData));\\n\\n        if (tridentPool == address(0)) {\\n            tridentPool = masterDeployer.deployPool(address(poolFactory), poolData);\\n        }\\n\\n        pair.transferFrom(msg.sender, address(pair), amount);\\n        (uint256 amount0, uint256 amount1) = pair.burn(address(bentoBox));\\n\\n        bentoBox.deposit(token0, address(bentoBox), tridentPool, amount0, 0);\\n        bentoBox.deposit(token1, address(bentoBox), tridentPool, amount1, 0);\\n\\n        liquidity = IPool(tridentPool).mint(abi.encode(msg.sender));\\n\\n        if (liquidity < minReceived) revert MinimumOutput();\\n    }\\n}\\n\",\"keccak256\":\"0x972ca45b82f280f36e723fbf14541193c9c76f441c83e73f1bb6f7404f3f6c33\",\"license\":\"GPL-3.0-or-later\"},\"contracts/utils/TridentBatchable.sol\":{\"content\":\"// SPDX-License-Identifier: GPL-3.0-or-later\\n\\npragma solidity >=0.8.0;\\n\\n/// @notice Generic contract exposing the batch call functionality.\\nabstract contract TridentBatchable {\\n    /// @notice Provides batch function calls for this contract and returns the data from all of them if they all succeed.\\n    /// Adapted from https://github.com/Uniswap/uniswap-v3-periphery/blob/main/contracts/base/Multicall.sol, License-Identifier: GPL-2.0-or-later.\\n    /// @dev The `msg.value` should not be trusted for any method callable from this function.\\n    /// @param data ABI-encoded params for each of the calls to make to this contract.\\n    /// @return results The results from each of the calls passed in via `data`.\\n    function batch(bytes[] calldata data) external payable returns (bytes[] memory results) {\\n        results = new bytes[](data.length);\\n\\n        for (uint256 i = 0; i < data.length; i++) {\\n            (bool success, bytes memory result) = address(this).delegatecall(data[i]);\\n\\n            if (!success) {\\n                // Next 5 lines from https://ethereum.stackexchange.com/a/83577\\n                if (result.length < 68) revert();\\n                assembly {\\n                    result := add(result, 0x04)\\n                }\\n                revert(abi.decode(result, (string)));\\n            }\\n\\n            results[i] = result;\\n        }\\n    }\\n}\\n\",\"keccak256\":\"0xba62b6a107dfc9673c0fa801b84ef151459cd62169ca88949a597d910d549659\",\"license\":\"GPL-3.0-or-later\"},\"contracts/utils/TridentPermit.sol\":{\"content\":\"// SPDX-License-Identifier: GPL-3.0-or-later\\n\\npragma solidity >=0.8.0;\\n\\n/// @notice Generic contract exposing the permit functionality.\\nabstract contract TridentPermit {\\n    error PermitFailed();\\n\\n    /// @notice Provides EIP-2612 signed approval for this contract to spend user tokens.\\n    /// @param token Address of ERC-20 token.\\n    /// @param amount Token amount to grant spending right over.\\n    /// @param deadline Termination for signed approval (UTC timestamp in seconds).\\n    /// @param v The recovery byte of the signature.\\n    /// @param r Half of the ECDSA signature pair.\\n    /// @param s Half of the ECDSA signature pair.\\n    function permitThis(\\n        address token,\\n        uint256 amount,\\n        uint256 deadline,\\n        uint8 v,\\n        bytes32 r,\\n        bytes32 s\\n    ) external {\\n        (bool success, ) = token.call(abi.encodeWithSelector(0xd505accf, msg.sender, address(this), amount, deadline, v, r, s)); // permit(address,address,uint256,uint256,uint8,bytes32,bytes32).\\n        if (!success) revert PermitFailed();\\n    }\\n\\n    /// @notice Provides DAI-derived signed approval for this contract to spend user tokens.\\n    /// @param token Address of ERC-20 token.\\n    /// @param nonce Token owner's nonce - increases at each call to {permit}.\\n    /// @param expiry Termination for signed approval - UTC timestamp in seconds.\\n    /// @param v The recovery byte of the signature.\\n    /// @param r Half of the ECDSA signature pair.\\n    /// @param s Half of the ECDSA signature pair.\\n    function permitThisAllowed(\\n        address token,\\n        uint256 nonce,\\n        uint256 expiry,\\n        uint8 v,\\n        bytes32 r,\\n        bytes32 s\\n    ) external {\\n        (bool success, ) = token.call(abi.encodeWithSelector(0x8fcbaf0c, msg.sender, address(this), nonce, expiry, true, v, r, s)); // permit(address,address,uint256,uint256,bool,uint8,bytes32,bytes32).\\n        if (!success) revert PermitFailed();\\n    }\\n}\\n\",\"keccak256\":\"0x41a005fbeccd614c4d0027c168c7fb6ba7689504356ff9040c50d2a3c53d0ec6\",\"license\":\"GPL-3.0-or-later\"}},\"version\":1}",
+  "bytecode": "0x60e060405234801561001057600080fd5b506040516111d33803806111d383398101604081905261002f91610056565b6001600160601b0319606093841b811660805291831b821660a05290911b1660c0526100bb565b60008060006060848603121561006b57600080fd5b8351610076816100a3565b6020850151909350610087816100a3565b6040850151909250610098816100a3565b809150509250925092565b6001600160a01b03811681146100b857600080fd5b50565b60805160601c60a05160601c60c05160601c6110cb610108600039600061068101526000818161059601526106ae015260008181610818015281816108e501526109ca01526110cb6000f3fe60806040526004361061003f5760003560e01c80631e897afb14610044578063776319811461006d578063a9b62c231461008f578063bd2aded2146100af575b600080fd5b610057610052366004610bdc565b6100dd565b6040516100649190610e75565b60405180910390f35b34801561007957600080fd5b5061008d610088366004610b7a565b610258565b005b34801561009b57600080fd5b5061008d6100aa366004610b7a565b61038e565b3480156100bb57600080fd5b506100cf6100ca366004610c6e565b6103ec565b604051908152602001610064565b60608167ffffffffffffffff8111156100f8576100f8611033565b60405190808252806020026020018201604052801561012b57816020015b60608152602001906001900390816101165790505b50905060005b82811015610251576000803086868581811061014f5761014f611004565b90506020028101906101619190610f08565b60405161016f929190610e12565b600060405180830381855af49150503d80600081146101aa576040519150601f19603f3d011682016040523d82523d6000602084013e6101af565b606091505b50915091508161021e576044815110156101c857600080fd5b600481019050808060200190518101906101e29190610cc0565b6040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016102159190610ef5565b60405180910390fd5b8084848151811061023157610231611004565b60200260200101819052505050808061024990610fa4565b915050610131565b5092915050565b6040513360248201523060448201526064810186905260848101859052600160a482015260ff841660c482015260e48101839052610104810182905260009073ffffffffffffffffffffffffffffffffffffffff881690638fcbaf0c90610124015b6040516020818303038152906040529060e01b6020820180517bffffffffffffffffffffffffffffffffffffffffffffffffffffffff83818316178352505050506040516103089190610e22565b6000604051808303816000865af19150503d8060008114610345576040519150601f19603f3d011682016040523d82523d6000602084013e61034a565b606091505b5050905080610385576040517fb78cb0dd00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b50505050505050565b604051336024820152306044820152606481018690526084810185905260ff841660a482015260c4810183905260e4810182905260009073ffffffffffffffffffffffffffffffffffffffff88169063d505accf90610104016102ba565b6000808673ffffffffffffffffffffffffffffffffffffffff16630dfe16816040518163ffffffff1660e01b815260040160206040518083038186803b15801561043557600080fd5b505afa158015610449573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525081019061046d9190610b56565b905060008773ffffffffffffffffffffffffffffffffffffffff1663d21220a76040518163ffffffff1660e01b815260040160206040518083038186803b1580156104b757600080fd5b505afa1580156104cb573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906104ef9190610b56565b6040805173ffffffffffffffffffffffffffffffffffffffff808616602083015283169181019190915260608101889052861515608082015290915060009060a001604080518083037fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe001815290829052805160208201207ff6ab6d99000000000000000000000000000000000000000000000000000000008352600483015291506000907f000000000000000000000000000000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff169063f6ab6d9990602401602060405180830381600087803b1580156105ef57600080fd5b505af1158015610603573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906106279190610b56565b905073ffffffffffffffffffffffffffffffffffffffff811661072d576040517f250558dc00000000000000000000000000000000000000000000000000000000815273ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000169063250558dc906106d8907f0000000000000000000000000000000000000000000000000000000000000000908690600401610e3e565b602060405180830381600087803b1580156106f257600080fd5b505af1158015610706573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525081019061072a9190610b56565b90505b6040517f23b872dd00000000000000000000000000000000000000000000000000000000815233600482015273ffffffffffffffffffffffffffffffffffffffff8b1660248201819052604482018b9052906323b872dd90606401602060405180830381600087803b1580156107a257600080fd5b505af11580156107b6573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906107da9190610c51565b506040517f89afcb4400000000000000000000000000000000000000000000000000000000815273ffffffffffffffffffffffffffffffffffffffff7f00000000000000000000000000000000000000000000000000000000000000008116600483015260009182918d16906389afcb44906024016040805180830381600087803b15801561086857600080fd5b505af115801561087c573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906108a09190610da4565b6040517f02b9446c00000000000000000000000000000000000000000000000000000000815273ffffffffffffffffffffffffffffffffffffffff89811660048301527f0000000000000000000000000000000000000000000000000000000000000000811660248301819052908716604483015260648201849052600060848301529294509092506302b9446c9060a4016040805180830381600087803b15801561094b57600080fd5b505af115801561095f573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906109839190610da4565b50506040517f02b9446c00000000000000000000000000000000000000000000000000000000815273ffffffffffffffffffffffffffffffffffffffff86811660048301527f000000000000000000000000000000000000000000000000000000000000000081166024830181905290851660448301526064820183905260006084830152906302b9446c9060a4016040805180830381600087803b158015610a2b57600080fd5b505af1158015610a3f573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190610a639190610da4565b50506040805133602082015273ffffffffffffffffffffffffffffffffffffffff851691637ba0e2e791016040516020818303038152906040526040518263ffffffff1660e01b8152600401610ab99190610ef5565b602060405180830381600087803b158015610ad357600080fd5b505af1158015610ae7573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190610b0b9190610d8b565b965087871015610b47576040517f9b9d48e100000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b50505050505095945050505050565b600060208284031215610b6857600080fd5b8151610b7381611062565b9392505050565b60008060008060008060c08789031215610b9357600080fd5b8635610b9e81611062565b95506020870135945060408701359350606087013560ff81168114610bc257600080fd5b9598949750929560808101359460a0909101359350915050565b60008060208385031215610bef57600080fd5b823567ffffffffffffffff80821115610c0757600080fd5b818501915085601f830112610c1b57600080fd5b813581811115610c2a57600080fd5b8660208260051b8501011115610c3f57600080fd5b60209290920196919550909350505050565b600060208284031215610c6357600080fd5b8151610b7381611087565b600080600080600060a08688031215610c8657600080fd5b8535610c9181611062565b945060208601359350604086013592506060860135610caf81611087565b949793965091946080013592915050565b600060208284031215610cd257600080fd5b815167ffffffffffffffff80821115610cea57600080fd5b818401915084601f830112610cfe57600080fd5b815181811115610d1057610d10611033565b604051601f82017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0908116603f01168101908382118183101715610d5657610d56611033565b81604052828152876020848701011115610d6f57600080fd5b610d80836020830160208801610f74565b979650505050505050565b600060208284031215610d9d57600080fd5b5051919050565b60008060408385031215610db757600080fd5b505080516020909101519092909150565b60008151808452610de0816020860160208601610f74565b601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0169290920160200192915050565b8183823760009101908152919050565b60008251610e34818460208701610f74565b9190910192915050565b73ffffffffffffffffffffffffffffffffffffffff83168152604060208201526000610e6d6040830184610dc8565b949350505050565b6000602080830181845280855180835260408601915060408160051b870101925083870160005b82811015610ee8577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc0888603018452610ed6858351610dc8565b94509285019290850190600101610e9c565b5092979650505050505050565b602081526000610b736020830184610dc8565b60008083357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe1843603018112610f3d57600080fd5b83018035915067ffffffffffffffff821115610f5857600080fd5b602001915036819003821315610f6d57600080fd5b9250929050565b60005b83811015610f8f578181015183820152602001610f77565b83811115610f9e576000848401525b50505050565b60007fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff821415610ffd577f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b5060010190565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b73ffffffffffffffffffffffffffffffffffffffff8116811461108457600080fd5b50565b801515811461108457600080fdfea264697066735822122085853d23e7f4f2840e1994952215c35a56e8e283fbdbb3743051a84eb489e72c64736f6c63430008070033",
+  "deployedBytecode": "0x60806040526004361061003f5760003560e01c80631e897afb14610044578063776319811461006d578063a9b62c231461008f578063bd2aded2146100af575b600080fd5b610057610052366004610bdc565b6100dd565b6040516100649190610e75565b60405180910390f35b34801561007957600080fd5b5061008d610088366004610b7a565b610258565b005b34801561009b57600080fd5b5061008d6100aa366004610b7a565b61038e565b3480156100bb57600080fd5b506100cf6100ca366004610c6e565b6103ec565b604051908152602001610064565b60608167ffffffffffffffff8111156100f8576100f8611033565b60405190808252806020026020018201604052801561012b57816020015b60608152602001906001900390816101165790505b50905060005b82811015610251576000803086868581811061014f5761014f611004565b90506020028101906101619190610f08565b60405161016f929190610e12565b600060405180830381855af49150503d80600081146101aa576040519150601f19603f3d011682016040523d82523d6000602084013e6101af565b606091505b50915091508161021e576044815110156101c857600080fd5b600481019050808060200190518101906101e29190610cc0565b6040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016102159190610ef5565b60405180910390fd5b8084848151811061023157610231611004565b60200260200101819052505050808061024990610fa4565b915050610131565b5092915050565b6040513360248201523060448201526064810186905260848101859052600160a482015260ff841660c482015260e48101839052610104810182905260009073ffffffffffffffffffffffffffffffffffffffff881690638fcbaf0c90610124015b6040516020818303038152906040529060e01b6020820180517bffffffffffffffffffffffffffffffffffffffffffffffffffffffff83818316178352505050506040516103089190610e22565b6000604051808303816000865af19150503d8060008114610345576040519150601f19603f3d011682016040523d82523d6000602084013e61034a565b606091505b5050905080610385576040517fb78cb0dd00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b50505050505050565b604051336024820152306044820152606481018690526084810185905260ff841660a482015260c4810183905260e4810182905260009073ffffffffffffffffffffffffffffffffffffffff88169063d505accf90610104016102ba565b6000808673ffffffffffffffffffffffffffffffffffffffff16630dfe16816040518163ffffffff1660e01b815260040160206040518083038186803b15801561043557600080fd5b505afa158015610449573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525081019061046d9190610b56565b905060008773ffffffffffffffffffffffffffffffffffffffff1663d21220a76040518163ffffffff1660e01b815260040160206040518083038186803b1580156104b757600080fd5b505afa1580156104cb573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906104ef9190610b56565b6040805173ffffffffffffffffffffffffffffffffffffffff808616602083015283169181019190915260608101889052861515608082015290915060009060a001604080518083037fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe001815290829052805160208201207ff6ab6d99000000000000000000000000000000000000000000000000000000008352600483015291506000907f000000000000000000000000000000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff169063f6ab6d9990602401602060405180830381600087803b1580156105ef57600080fd5b505af1158015610603573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906106279190610b56565b905073ffffffffffffffffffffffffffffffffffffffff811661072d576040517f250558dc00000000000000000000000000000000000000000000000000000000815273ffffffffffffffffffffffffffffffffffffffff7f0000000000000000000000000000000000000000000000000000000000000000169063250558dc906106d8907f0000000000000000000000000000000000000000000000000000000000000000908690600401610e3e565b602060405180830381600087803b1580156106f257600080fd5b505af1158015610706573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525081019061072a9190610b56565b90505b6040517f23b872dd00000000000000000000000000000000000000000000000000000000815233600482015273ffffffffffffffffffffffffffffffffffffffff8b1660248201819052604482018b9052906323b872dd90606401602060405180830381600087803b1580156107a257600080fd5b505af11580156107b6573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906107da9190610c51565b506040517f89afcb4400000000000000000000000000000000000000000000000000000000815273ffffffffffffffffffffffffffffffffffffffff7f00000000000000000000000000000000000000000000000000000000000000008116600483015260009182918d16906389afcb44906024016040805180830381600087803b15801561086857600080fd5b505af115801561087c573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906108a09190610da4565b6040517f02b9446c00000000000000000000000000000000000000000000000000000000815273ffffffffffffffffffffffffffffffffffffffff89811660048301527f0000000000000000000000000000000000000000000000000000000000000000811660248301819052908716604483015260648201849052600060848301529294509092506302b9446c9060a4016040805180830381600087803b15801561094b57600080fd5b505af115801561095f573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906109839190610da4565b50506040517f02b9446c00000000000000000000000000000000000000000000000000000000815273ffffffffffffffffffffffffffffffffffffffff86811660048301527f000000000000000000000000000000000000000000000000000000000000000081166024830181905290851660448301526064820183905260006084830152906302b9446c9060a4016040805180830381600087803b158015610a2b57600080fd5b505af1158015610a3f573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190610a639190610da4565b50506040805133602082015273ffffffffffffffffffffffffffffffffffffffff851691637ba0e2e791016040516020818303038152906040526040518263ffffffff1660e01b8152600401610ab99190610ef5565b602060405180830381600087803b158015610ad357600080fd5b505af1158015610ae7573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190610b0b9190610d8b565b965087871015610b47576040517f9b9d48e100000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b50505050505095945050505050565b600060208284031215610b6857600080fd5b8151610b7381611062565b9392505050565b60008060008060008060c08789031215610b9357600080fd5b8635610b9e81611062565b95506020870135945060408701359350606087013560ff81168114610bc257600080fd5b9598949750929560808101359460a0909101359350915050565b60008060208385031215610bef57600080fd5b823567ffffffffffffffff80821115610c0757600080fd5b818501915085601f830112610c1b57600080fd5b813581811115610c2a57600080fd5b8660208260051b8501011115610c3f57600080fd5b60209290920196919550909350505050565b600060208284031215610c6357600080fd5b8151610b7381611087565b600080600080600060a08688031215610c8657600080fd5b8535610c9181611062565b945060208601359350604086013592506060860135610caf81611087565b949793965091946080013592915050565b600060208284031215610cd257600080fd5b815167ffffffffffffffff80821115610cea57600080fd5b818401915084601f830112610cfe57600080fd5b815181811115610d1057610d10611033565b604051601f82017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0908116603f01168101908382118183101715610d5657610d56611033565b81604052828152876020848701011115610d6f57600080fd5b610d80836020830160208801610f74565b979650505050505050565b600060208284031215610d9d57600080fd5b5051919050565b60008060408385031215610db757600080fd5b505080516020909101519092909150565b60008151808452610de0816020860160208601610f74565b601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0169290920160200192915050565b8183823760009101908152919050565b60008251610e34818460208701610f74565b9190910192915050565b73ffffffffffffffffffffffffffffffffffffffff83168152604060208201526000610e6d6040830184610dc8565b949350505050565b6000602080830181845280855180835260408601915060408160051b870101925083870160005b82811015610ee8577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc0888603018452610ed6858351610dc8565b94509285019290850190600101610e9c565b5092979650505050505050565b602081526000610b736020830184610dc8565b60008083357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe1843603018112610f3d57600080fd5b83018035915067ffffffffffffffff821115610f5857600080fd5b602001915036819003821315610f6d57600080fd5b9250929050565b60005b83811015610f8f578181015183820152602001610f77565b83811115610f9e576000848401525b50505050565b60007fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff821415610ffd577f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b5060010190565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b73ffffffffffffffffffffffffffffffffffffffff8116811461108457600080fd5b50565b801515811461108457600080fdfea264697066735822122085853d23e7f4f2840e1994952215c35a56e8e283fbdbb3743051a84eb489e72c64736f6c63430008070033",
+  "devdoc": {
+    "kind": "dev",
+    "methods": {
+      "batch(bytes[])": {
+        "details": "The `msg.value` should not be trusted for any method callable from this function.",
+        "params": {
+          "data": "ABI-encoded params for each of the calls to make to this contract."
+        },
+        "returns": {
+          "results": "The results from each of the calls passed in via `data`."
+        }
+      },
+      "migrate(address,uint256,uint256,bool,uint256)": {
+        "details": "If the pool with the current conditions doesn't exist it will be deployed. ",
+        "params": {
+          "amount": "Liquidity amount (Lp token balance) to be migrated.",
+          "minReceived": "Slippage protection for minting liquidity on the Trident CP pool.",
+          "pair": "Uniswap V2 style liquidity pool address.",
+          "swapFee": "Swap fee of the Trident CP pool we are migrating into.",
+          "twapSupport": "Whether the Trident CP pool we are migrating into supports twap oracles."
+        }
+      },
+      "permitThis(address,uint256,uint256,uint8,bytes32,bytes32)": {
+        "params": {
+          "amount": "Token amount to grant spending right over.",
+          "deadline": "Termination for signed approval (UTC timestamp in seconds).",
+          "r": "Half of the ECDSA signature pair.",
+          "s": "Half of the ECDSA signature pair.",
+          "token": "Address of ERC-20 token.",
+          "v": "The recovery byte of the signature."
+        }
+      },
+      "permitThisAllowed(address,uint256,uint256,uint8,bytes32,bytes32)": {
+        "params": {
+          "expiry": "Termination for signed approval - UTC timestamp in seconds.",
+          "nonce": "Token owner's nonce - increases at each call to {permit}.",
+          "r": "Half of the ECDSA signature pair.",
+          "s": "Half of the ECDSA signature pair.",
+          "token": "Address of ERC-20 token.",
+          "v": "The recovery byte of the signature."
+        }
+      }
+    },
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {
+      "batch(bytes[])": {
+        "notice": "Provides batch function calls for this contract and returns the data from all of them if they all succeed. Adapted from https://github.com/Uniswap/uniswap-v3-periphery/blob/main/contracts/base/Multicall.sol, License-Identifier: GPL-2.0-or-later."
+      },
+      "migrate(address,uint256,uint256,bool,uint256)": {
+        "notice": "Function to migrate existing Sushiswap or other Uniswap V2 style pools to Trident."
+      },
+      "permitThis(address,uint256,uint256,uint8,bytes32,bytes32)": {
+        "notice": "Provides EIP-2612 signed approval for this contract to spend user tokens."
+      },
+      "permitThisAllowed(address,uint256,uint256,uint8,bytes32,bytes32)": {
+        "notice": "Provides DAI-derived signed approval for this contract to spend user tokens."
+      }
+    },
+    "notice": "Liquidity migrator from UniV2 style pool to Trident Constant product pool.",
+    "version": 1
+  },
+  "storageLayout": {
+    "storage": [],
+    "types": null
+  }
+}

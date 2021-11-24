@@ -35,7 +35,7 @@ interface IBentoBoxMinimal {
     function registerProtocol() external;
 
     /// @notice Deposit an amount of `token` represented in either `amount` or `share`.
-    /// @param token_ The ERC-20 token to deposit.
+    /// @param token The ERC-20 token to deposit.
     /// @param from which account to pull the tokens.
     /// @param to which account to push the tokens.
     /// @param amount Token amount in native representation to deposit.
@@ -43,7 +43,7 @@ interface IBentoBoxMinimal {
     /// @return amountOut The amount deposited.
     /// @return shareOut The deposited amount represented in shares.
     function deposit(
-        address token_,
+        address token,
         address from,
         address to,
         uint256 amount,
@@ -78,4 +78,14 @@ interface IBentoBoxMinimal {
 
     /// @dev Reads the Rebase `totals`from storage for a given token
     function totals(address token) external view returns (Rebase memory total);
+
+    /// @dev Approves users' BentoBox assets to a "master" contract.
+    function setMasterContractApproval(
+        address user,
+        address masterContract,
+        bool approved,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external;
 }
