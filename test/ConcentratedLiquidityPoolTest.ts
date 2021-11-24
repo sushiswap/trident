@@ -496,7 +496,7 @@ describe("Concentrated Liquidity Product Pool", function () {
       }
     });
 
-    it.only("Should distribute fees correctly after crossing ticks", async () => {
+    it("Should distribute fees correctly after crossing ticks", async () => {
       for (const pool of trident.concentratedPools) {
         helper.reset();
 
@@ -523,22 +523,25 @@ describe("Concentrated Liquidity Product Pool", function () {
           recipient: defaultAddress,
         };
 
+        // in range liquiditiy addition
         (await addLiquidityViaRouter(addLiquidityParams)).tokenId;
 
-        // 1 sided liq addition
         addLiquidityParams = helper.setTicks(
           nearestEvenValidTick + step + tickSpacing + tickSpacing,
           nearestEvenValidTick + step * 2 + tickSpacing,
           addLiquidityParams
         );
         addLiquidityParams.amount1Desired = getBigNumber("0");
+        // out of range (1 sided) liq addition
         (await addLiquidityViaRouter(addLiquidityParams)).tokenId;
-
+        // console.log((await Trident.Instance.concentratedPoolHelper.getTickState(pool.address, 6)).map(a => a[0]));
         // swap within tick
         const currentPrice = (await pool.getPriceAndNearestTicks())._price;
         const upperPrice = await trident.tickMath.getSqrtRatioAtTick(upper);
         const lowerPrice = await trident.tickMath.getSqrtRatioAtTick(lower);
         const maxDx = await getDx(await pool.liquidity(), lowerPrice, currentPrice, false);
+        const feeGrowthGlobal0_init = await pool.feeGrowthGlobal0();
+        const feeGrowthGlobal1_init = await pool.feeGrowthGlobal1();
 
         let swapTx = await swapViaRouter({
           pool: pool,
@@ -549,15 +552,17 @@ describe("Concentrated Liquidity Product Pool", function () {
         });
 
         const positionNewFeeGrowth = await pool.rangeFeeGrowth(lower, upper);
-        const globalFeeGrowth0 = await pool.feeGrowthGlobal0();
-        const globalFeeGrowth1 = await pool.feeGrowthGlobal1();
+        const feeGrowthGlobal0 = await pool.feeGrowthGlobal0();
+        const feeGrowthGlobal1 = await pool.feeGrowthGlobal1();
 
+        expect(feeGrowthGlobal0.eq(feeGrowthGlobal0_init)).to.be.eq(true, "accreddited fees for the wrong token");
+        expect(feeGrowthGlobal1.gt(feeGrowthGlobal1_init)).to.be.eq(true, "didn't take fees");
         expect(positionNewFeeGrowth.feeGrowthInside0.toString()).to.be.eq(
-          globalFeeGrowth0.toString(),
+          feeGrowthGlobal0.toString(),
           "Fee growth 0 wasn't accredited to the positions"
         );
         expect(positionNewFeeGrowth.feeGrowthInside1.toString()).to.be.eq(
-          globalFeeGrowth1.toString(),
+          feeGrowthGlobal1.toString(),
           "Fee growth 1 wasn't accredited to the positions"
         );
 
@@ -578,8 +583,20 @@ describe("Concentrated Liquidity Product Pool", function () {
         expect(newPrice.gt(upperPrice)).to.be.true;
         expect(newPrice.lt(upper1Price)).to.be.true; // ensure we crossed out of the initial range
 
-        const _positionNewFeeGrowth = await pool.rangeFeeGrowth(lower, upper);
-        expect(_positionNewFeeGrowth.toString()).to.be.eq(positionNewFeeGrowth.toString(), "position fee growth isn't persistent");
+        const positionNewFeeGrowth_end = await pool.rangeFeeGrowth(lower, upper);
+        const feeGrowthGlobal0_end = await pool.feeGrowthGlobal0();
+        const feeGrowthGlobal1_end = await pool.feeGrowthGlobal1();
+
+        expect(feeGrowthGlobal0_end.gt(feeGrowthGlobal0)).to.be.eq(true, "accredited fees for the wrong token");
+        expect(feeGrowthGlobal1_end.eq(feeGrowthGlobal1)).to.be.eq(true, "didn't take fees");
+        expect(positionNewFeeGrowth_end.feeGrowthInside0.gt(positionNewFeeGrowth.feeGrowthInside0)).to.be.eq(
+          true,
+          "didn't account for token1 fees"
+        );
+        expect(positionNewFeeGrowth_end.feeGrowthInside1.toString()).to.be.eq(
+          positionNewFeeGrowth.feeGrowthInside1.toString(),
+          "position fee growth 1 isn't persistent"
+        );
       }
     });
 
