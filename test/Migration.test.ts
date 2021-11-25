@@ -1,8 +1,9 @@
 import { ethers, network } from "hardhat";
 import { expect } from "chai";
+import { customError } from "./utilities/pools";
 
 describe("Migration", function () {
-  let chef, migrator, usdcWethLp, usdc, weth, masterDeployer, factory, Pool, snapshotId, ERC20;
+  let _owner, owner, chef, migrator, usdcWethLp, usdc, weth, masterDeployer, factory, Pool, snapshotId, ERC20, manualMigrator;
 
   before(async () => {
     snapshotId = await ethers.provider.send("evm_snapshot", []);
@@ -19,31 +20,38 @@ describe("Migration", function () {
       ],
     });
 
+    _owner = "0x9a8541ddf3a932a9a922b607e9cf7301f1d47bd1"; // timelock, owner of MasterChef
+    owner = await ethers.getSigner(_owner);
     const [alice] = await ethers.getSigners();
-    const _owner = "0x9a8541ddf3a932a9a922b607e9cf7301f1d47bd1";
-    const chefOwner = await ethers.getSigner(_owner);
     const BentoBox = await ethers.getContractFactory("BentoBoxV1");
     const MasterDeployer = await ethers.getContractFactory("MasterDeployer");
     const Factory = await ethers.getContractFactory("ConstantProductPoolFactory");
+    const ManualMigrator = await ethers.getContractFactory("TridentSushiRollCP");
     const Migrator = await ethers.getContractFactory("Migrator");
     Pool = await ethers.getContractFactory("ConstantProductPool");
     ERC20 = await ethers.getContractFactory("ERC20Mock");
+    chef = await ethers.getContractAt(mcABI, "0xc2EdaD668740f1aA35E4D8f227fB8E17dcA888Cd", owner);
+    usdc = await ERC20.attach("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+    weth = await ERC20.attach("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+    usdcWethLp = await ERC20.attach("0x397FF1542f962076d0BFE58eA045FfA2d347ACa0"); // pid 1
 
+    await network.provider.send("hardhat_setBalance", [chef.address, "0x100000000000000000000"]);
+    await network.provider.request({
+      method: "hardhat_impersonateAccount",
+      params: [chef.address],
+    });
     await network.provider.send("hardhat_setBalance", [_owner, "0x100000000000000000000"]);
+    await usdcWethLp.connect(await ethers.getSigner(chef.address)).transfer(_owner, "0xfffffffff"); // give some LP tokens to _owner for testing purposes
     await network.provider.request({
       method: "hardhat_impersonateAccount",
       params: [_owner],
     });
 
-    chef = await ethers.getContractAt(mcABI, "0xc2EdaD668740f1aA35E4D8f227fB8E17dcA888Cd", chefOwner);
-    usdc = await ERC20.attach("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
-    weth = await ERC20.attach("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-    usdcWethLp = await ERC20.attach("0x397FF1542f962076d0BFE58eA045FfA2d347ACa0"); // pid 1
-
     const bentoBox = await BentoBox.deploy(weth.address);
     masterDeployer = await MasterDeployer.deploy(0, alice.address, bentoBox.address);
     factory = await Factory.deploy(masterDeployer.address);
     migrator = await Migrator.deploy(bentoBox.address, masterDeployer.address, factory.address, chef.address);
+    manualMigrator = await ManualMigrator.deploy(bentoBox.address, factory.address, masterDeployer.address);
 
     await masterDeployer.addToWhitelist(factory.address);
     await chef.setMigrator(migrator.address);
@@ -91,6 +99,22 @@ describe("Migration", function () {
 
     const newMcBalance = await intermediaryToken.balanceOf(chef.address);
     expect(newMcBalance.toString()).to.be.eq(newMcBalance.toString(), "MC didn't receive the correct amount of the intermediary token");
+  });
+
+  it("Should migrate uniswap v2 style Lp positions outside of MasterChef", async () => {
+    // _owner has some usdc-weth lp coins we can migrate
+    const balance = await usdcWethLp.balanceOf(_owner);
+    usdcWethLp.connect(owner).approve(manualMigrator.address, balance);
+    await expect(manualMigrator.connect(owner).migrate(usdcWethLp.address, balance.div(2), 30, false, balance)).to.be.revertedWith(
+      customError("MinimumOutput")
+    );
+    await manualMigrator.connect(owner).migrate(usdcWethLp.address, balance.div(2), 30, false, 1);
+    const poolAddy = (await factory.getPools(usdc.address, weth.address, 0, 1))[0];
+    const pool = await ERC20.attach(poolAddy);
+    const newBalance = await pool.balanceOf(_owner);
+    await manualMigrator.connect(owner).migrate(usdcWethLp.address, balance.div(2), 30, false, 1);
+    expect(newBalance.gt(0)).to.be.true;
+    expect((await pool.balanceOf(_owner)).gt(newBalance)).to.be.true;
   });
 
   after(async () => {

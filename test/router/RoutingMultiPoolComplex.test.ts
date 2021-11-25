@@ -2,11 +2,19 @@ import { expect } from "chai";
 import seedrandom from "seedrandom";
 import { Contract } from "@ethersproject/contracts";
 
-import { closeValues, RouteStatus, RToken } from "@sushiswap/tines";
+import { closeValues, getBigNumber, RouteStatus, RToken } from "@sushiswap/tines";
 
 import * as testHelper from "./helpers";
 import { getIntegerRandomValue } from "../utilities";
-import { getRandomPools, getRandom, Topology, RouteType } from "./helpers";
+import { Topology, TridentRoute } from "./helpers";
+import { TopologyFactory } from "./helpers/TopologyFactory";
+import { TridentSwapParamsFactory } from "./helpers/TridentSwapParamsFactory";
+import * as tines from "@sushiswap/tines";
+
+let topologyFactory: TopologyFactory;
+let swapParamsFactory: TridentSwapParamsFactory;
+let bentoContract: Contract;
+let tridentRouterAddress: string;
 
 async function checkTokenBalancesAreZero(tokens: RToken[], bentoContract: Contract, tridentAddress: string) {
   for (let index = 0; index < tokens.length; index++) {
@@ -17,9 +25,9 @@ async function checkTokenBalancesAreZero(tokens: RToken[], bentoContract: Contra
 
 describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function () {
   before(async function () {
-    [this.signer, this.tridentRouterAddress, this.bento] = await testHelper.init();
+    [this.signer, tridentRouterAddress, bentoContract, topologyFactory, swapParamsFactory] = await testHelper.init();
     this.gasPrice = 1 * 200 * 1e-9;
-    this.rnd = seedrandom("5");
+    this.rnd = seedrandom("7");
   });
 
   function getRandomTokens(rnd: () => number, topology: Topology): [RToken, RToken, RToken] {
@@ -33,47 +41,35 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
   }
 
   it("Random topology output prediction precision is ok", async function () {
-    for (let index = 0; index < 1; index++) {
-      const topology = await testHelper.getRandomCPTopology(5, 0.3, this.rnd);
+    for (let index = 0; index < 10; index++) {
+      // console.log(`Topology #${index}`);
+      const topology = await topologyFactory.getRandomTopology(5, 0.3, this.rnd);
 
       for (let i = 0; i < 1; i++) {
         const [fromToken, toToken, baseToken] = getRandomTokens(this.rnd, topology);
-
-        const [amountIn] = getIntegerRandomValue(20, this.rnd);
-
+        const [amountIn, amountInBn] = getIntegerRandomValue(21, this.rnd);
         const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
 
         if (route == undefined) {
-          throw "Failed to get route";
+          throw new Error("Tines failed to find route");
         }
 
         if (route.status === RouteStatus.NoWay) {
           expect(route.amountOut).equal(0);
         } else {
-          const routerParams = testHelper.getTridentRouterParams(route, this.signer.address, this.tridentRouterAddress);
+          const routerParams: TridentRoute = swapParamsFactory.getTridentRouterParams(
+            route,
+            this.signer.address,
+            topology.pools,
+            tridentRouterAddress
+          );
 
           expect(routerParams).to.not.be.undefined;
 
-          let actualAmountOutBN;
+          let actualAmountOutBN = await testHelper.executeTridentRoute(routerParams, toToken.address);
 
           try {
-            actualAmountOutBN = await testHelper.executeTridentRoute(routerParams, toToken.address);
-          } catch (error) {
-            // console.log("");
-            // console.log("Swap Failed");
-            // console.log("");
-
-            // console.log("Error:");
-            // console.log(error);
-
-            // console.log(`Iteration: ${i}`);
-            // console.log(`Route:`);
-            // console.log(route);
-            throw error;
-          }
-
-          try {
-            await checkTokenBalancesAreZero(topology.tokens, this.bento, this.tridentRouterAddress);
+            await checkTokenBalancesAreZero(topology.tokens, bentoContract, tridentRouterAddress);
           } catch (error) {
             console.log("Failed token balances check");
             throw error;
@@ -91,7 +87,7 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
             "predicted amount did not equal actual swapped amount"
           );
 
-          await testHelper.refreshPools(topology);
+          await topologyFactory.refreshPools(topology);
         }
       }
     }

@@ -6,6 +6,7 @@ import { defaultAbiCoder } from "@ethersproject/abi";
 import { ethers } from "hardhat";
 import { expect } from "chai";
 import { getCreate2Address } from "@ethersproject/address";
+import { customError } from "./utilities/pools";
 
 describe("MasterDeployer", function () {
   before(async function () {
@@ -72,7 +73,7 @@ describe("MasterDeployer", function () {
         [...[this.weth.address, this.sushi.address].sort(), 30, true]
       );
 
-      await expect(this.constantProductPoolFactory.deployPool(deployData)).to.be.revertedWith("UNAUTHORIZED_DEPLOYER");
+      await expect(this.constantProductPoolFactory.deployPool(deployData)).to.be.revertedWith(customError("UnauthorisedDeployer"));
     });
 
     // TODO: Fix this
