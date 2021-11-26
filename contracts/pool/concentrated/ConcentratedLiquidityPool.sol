@@ -75,7 +75,8 @@ contract ConcentratedLiquidityPool is IPool {
         uint256 feeAmount;
         uint256 totalFeeAmount;
         uint256 protocolFee;
-        uint256 feeGrowthGlobal;
+        uint256 feeGrowthGlobalA;
+        uint256 feeGrowthGlobalB;
         uint256 currentPrice;
         uint256 currentLiquidity;
         uint256 input;
@@ -349,7 +350,8 @@ contract ConcentratedLiquidityPool is IPool {
             feeAmount: 0,
             totalFeeAmount: 0,
             protocolFee: 0,
-            feeGrowthGlobal: zeroForOne ? feeGrowthGlobal1 : feeGrowthGlobal0,
+            feeGrowthGlobalA: zeroForOne ? feeGrowthGlobal1 : feeGrowthGlobal0,
+            feeGrowthGlobalB: zeroForOne ? feeGrowthGlobal0 : feeGrowthGlobal1,
             currentPrice: uint256(price),
             currentLiquidity: uint256(liquidity),
             input: inAmount,
@@ -426,7 +428,10 @@ contract ConcentratedLiquidityPool is IPool {
                     cache.input -= maxDy;
                 }
             }
-            (cache.totalFeeAmount, amountOut, cache.protocolFee, cache.feeGrowthGlobal) = SwapLib.handleFees(
+
+            // cache.feeGrowthGlobalA is the feeGrowthGlobal counter for the output token.
+            // It increases each swap step.
+            (cache.totalFeeAmount, amountOut, cache.protocolFee, cache.feeGrowthGlobalA) = SwapLib.handleFees(
                 output,
                 swapFee,
                 barFee,
@@ -434,7 +439,7 @@ contract ConcentratedLiquidityPool is IPool {
                 cache.totalFeeAmount,
                 amountOut,
                 cache.protocolFee,
-                cache.feeGrowthGlobal
+                cache.feeGrowthGlobalA
             );
             if (cross) {
                 (cache.currentLiquidity, cache.nextTickToCross) = Ticks.cross(
@@ -442,7 +447,8 @@ contract ConcentratedLiquidityPool is IPool {
                     cache.nextTickToCross,
                     secondsGrowthGlobal,
                     cache.currentLiquidity,
-                    cache.feeGrowthGlobal,
+                    cache.feeGrowthGlobalA,
+                    cache.feeGrowthGlobalB,
                     zeroForOne
                 );
                 if (cache.currentLiquidity == 0) {
@@ -453,7 +459,8 @@ contract ConcentratedLiquidityPool is IPool {
                         cache.nextTickToCross,
                         secondsGrowthGlobal,
                         cache.currentLiquidity,
-                        cache.feeGrowthGlobal,
+                        cache.feeGrowthGlobalA,
+                        cache.feeGrowthGlobalB,
                         zeroForOne
                     );
                 }
@@ -471,7 +478,7 @@ contract ConcentratedLiquidityPool is IPool {
 
         _updateReserves(zeroForOne, uint128(inAmount), amountOut);
 
-        _updateFees(zeroForOne, cache.feeGrowthGlobal, uint128(cache.protocolFee));
+        _updateFees(zeroForOne, cache.feeGrowthGlobalA, uint128(cache.protocolFee));
 
         if (zeroForOne) {
             _transfer(token1, amountOut, recipient, unwrapBento);

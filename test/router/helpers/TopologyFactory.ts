@@ -241,7 +241,7 @@ export class TopologyFactory {
     }
 
     for (let i = 0; i < topology.tokens.length; i++) {
-      const tokenContract = await this.Erc20Factory.deploy(topology.tokens[0].name, topology.tokens[0].name, this.tokenSupply);
+      const tokenContract = await this.Erc20Factory.deploy(topology.tokens[i].name, topology.tokens[i].name, this.tokenSupply);
       await tokenContract.deployed();
       tokenContracts.push(tokenContract);
       topology.tokens[i].address = tokenContract.address;

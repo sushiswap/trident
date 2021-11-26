@@ -7,6 +7,7 @@ import {
   BentoBoxV1,
   ConcentratedLiquidityPool,
   ConcentratedLiquidityPoolFactory,
+  ConcentratedLiquidityPoolHelper,
   ConcentratedLiquidityPoolManager,
   ConcentratedLiquidityPoolStaker,
   DyDxMath,
@@ -35,6 +36,7 @@ export class Trident {
   public concentratedPoolManager!: ConcentratedLiquidityPoolManager;
   public concentratedPoolStaker!: ConcentratedLiquidityPoolStaker;
   public concentratedPoolFactory!: ConcentratedLiquidityPoolFactory;
+  public concentratedPoolHelper!: ConcentratedLiquidityPoolHelper;
   public concentratedPools!: ConcentratedLiquidityPool[];
   public tickMath!: TickMathTest;
   public dyDxMath!: DyDxMath;
@@ -46,20 +48,31 @@ export class Trident {
   public async init() {
     this.accounts = await ethers.getSigners();
 
-    const [ERC20, Bento, Deployer, TridentRouter, ConcentratedPoolManager, ConcentratedPoolStaker, TickMath, TickLibrary, DyDxMath] =
-      await Promise.all(
-        getFactories([
-          "ERC20Mock",
-          "BentoBoxV1",
-          "MasterDeployer",
-          "TridentRouter",
-          "ConcentratedLiquidityPoolManager",
-          "ConcentratedLiquidityPoolStaker",
-          "TickMathTest",
-          "Ticks",
-          "DyDxMath",
-        ])
-      );
+    const [
+      ERC20,
+      Bento,
+      Deployer,
+      TridentRouter,
+      ConcentratedPoolManager,
+      ConcentratedPoolStaker,
+      ConcentratedPoolHelper,
+      TickMath,
+      TickLibrary,
+      DyDxMath,
+    ] = await Promise.all(
+      getFactories([
+        "ERC20Mock",
+        "BentoBoxV1",
+        "MasterDeployer",
+        "TridentRouter",
+        "ConcentratedLiquidityPoolManager",
+        "ConcentratedLiquidityPoolStaker",
+        "ConcentratedLiquidityPoolHelper",
+        "TickMathTest",
+        "Ticks",
+        "DyDxMath",
+      ])
+    );
 
     const tickLibrary = await TickLibrary.deploy();
     const dydxLibrary = await DyDxMath.deploy();
@@ -72,7 +85,13 @@ export class Trident {
     await this.deployTokens(ERC20);
     await this.deployBento(Bento);
     await this.deployTridentPeriphery(Deployer, TridentRouter);
-    await this.deployConcentratedPeriphery(ConcentratedPoolManager, ConcentratedPoolStaker, ConcentratedPoolFactory, TickMath);
+    await this.deployConcentratedPeriphery(
+      ConcentratedPoolManager,
+      ConcentratedPoolStaker,
+      ConcentratedPoolFactory,
+      ConcentratedPoolHelper,
+      TickMath
+    );
     await this.prepareBento();
     await this.addFactoriesToWhitelist();
     await this.deployConcentratedCore(ConcentratedLiquidityPool);
@@ -169,6 +188,7 @@ export class Trident {
     ConcentratedPoolManager: ContractFactory,
     ConcentratedPoolStaker: ContractFactory,
     ConcentratedPoolFactory: ContractFactory,
+    ConcentratedPoolHelper: ContractFactory,
     TickMath: ContractFactory
   ) {
     this.concentratedPoolManager = (await ConcentratedPoolManager.deploy(this.masterDeployer.address)) as ConcentratedLiquidityPoolManager;
@@ -177,6 +197,7 @@ export class Trident {
     )) as ConcentratedLiquidityPoolStaker;
     this.concentratedPoolFactory = (await ConcentratedPoolFactory.deploy(this.masterDeployer.address)) as ConcentratedLiquidityPoolFactory;
     // for testing
+    this.concentratedPoolHelper = (await ConcentratedPoolHelper.deploy()) as ConcentratedLiquidityPoolHelper;
     this.tickMath = (await TickMath.deploy()) as TickMathTest;
   }
 

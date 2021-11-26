@@ -28,7 +28,8 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
     const fromToken = topology.tokens[0];
     const toToken = topology.tokens[1];
     const baseToken = topology.tokens[1];
-    const [amountIn] = getIntegerRandomValue(26, this.rnd);
+    //const [amountIn] = getIntegerRandomValue(26, this.rnd);
+    const amountIn = 1e23;
 
     const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
 

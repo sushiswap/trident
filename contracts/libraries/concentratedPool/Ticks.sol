@@ -24,7 +24,8 @@ library Ticks {
         int24 nextTickToCross,
         uint160 secondsGrowthGlobal,
         uint256 currentLiquidity,
-        uint256 feeGrowthGlobal,
+        uint256 feeGrowthGlobalA,
+        uint256 feeGrowthGlobalB,
         bool zeroForOne
     ) internal returns (uint256, int24) {
         ticks[nextTickToCross].secondsGrowthOutside = secondsGrowthGlobal - ticks[nextTickToCross].secondsGrowthOutside;
@@ -35,8 +36,9 @@ library Ticks {
             } else {
                 currentLiquidity += ticks[nextTickToCross].liquidity;
             }
+            ticks[nextTickToCross].feeGrowthOutside0 = feeGrowthGlobalB - ticks[nextTickToCross].feeGrowthOutside0;
+            ticks[nextTickToCross].feeGrowthOutside1 = feeGrowthGlobalA - ticks[nextTickToCross].feeGrowthOutside1;
             nextTickToCross = ticks[nextTickToCross].previousTick;
-            ticks[nextTickToCross].feeGrowthOutside0 = feeGrowthGlobal - ticks[nextTickToCross].feeGrowthOutside0;
         } else {
             // Moving backwards through the linked list.
             if (nextTickToCross % 2 == 0) {
@@ -44,10 +46,10 @@ library Ticks {
             } else {
                 currentLiquidity -= ticks[nextTickToCross].liquidity;
             }
+            ticks[nextTickToCross].feeGrowthOutside1 = feeGrowthGlobalB - ticks[nextTickToCross].feeGrowthOutside1;
+            ticks[nextTickToCross].feeGrowthOutside0 = feeGrowthGlobalA - ticks[nextTickToCross].feeGrowthOutside0;
             nextTickToCross = ticks[nextTickToCross].nextTick;
-            ticks[nextTickToCross].feeGrowthOutside1 = feeGrowthGlobal - ticks[nextTickToCross].feeGrowthOutside1;
         }
-
         return (currentLiquidity, nextTickToCross);
     }
 

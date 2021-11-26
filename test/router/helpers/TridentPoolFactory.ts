@@ -153,6 +153,14 @@ export class TridentPoolFactory {
     tickIncrement = 60,
     reserve: number = 1e25
   ) {
+    const flipped = t0.address > t1.address;
+    if (flipped) {
+      const t = t0;
+      t0 = t1;
+      t1 = t;
+      price = 1 / price;
+    }
+
     const feeContract = Math.round(fee * 10_000);
 
     const deployData = ethers.utils.defaultAbiCoder.encode(
@@ -188,7 +196,7 @@ export class TridentPoolFactory {
       upperOld: helper.insert(upper),
       upper,
       amount0Desired: getBigNumber(reserve),
-      amount1Desired: getBigNumber(reserve),
+      amount1Desired: getBigNumber(reserve / price),
       native0: false,
       native1: false,
       positionOwner: this.ConcentratedPoolManager.address,
