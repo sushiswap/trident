@@ -185,7 +185,7 @@ contract ConcentratedLiquidityPool is IPool {
             if (priceLower <= currentPrice && currentPrice < priceUpper) liquidity += uint128(_liquidity);
         }
 
-        _ensureTickSpacing(mintParams.lower, mintParams.upper);
+        _ensureTickSpacingAndValidity(mintParams.lower, mintParams.upper);
 
         nearestTick = Ticks.insert(
             ticks,
@@ -261,6 +261,7 @@ contract ConcentratedLiquidityPool is IPool {
             uint256 oldLiquidity
         )
     {
+        _ensureTickSpacingAndValidity(lower, upper);
         uint256 amount0;
         uint256 amount1;
 
@@ -515,11 +516,12 @@ contract ConcentratedLiquidityPool is IPool {
         }
     }
 
-    function _ensureTickSpacing(int24 lower, int24 upper) internal view {
+    function _ensureTickSpacingAndValidity(int24 lower, int24 upper) internal view {
         if (lower % int24(tickSpacing) != 0) revert InvalidTick();
         if ((lower / int24(tickSpacing)) % 2 != 0) revert LowerEven();
         if (upper % int24(tickSpacing) != 0) revert InvalidTick();
         if ((upper / int24(tickSpacing)) % 2 == 0) revert UpperOdd();
+        if (lower > upper) revert InvalidTick();
     }
 
     function _updateReserves(

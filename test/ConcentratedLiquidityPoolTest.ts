@@ -992,7 +992,7 @@ describe("Concentrated Liquidity Product Pool", function () {
         addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("WRONG_ORDER");
+        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("InvalidTick");
 
         // LOWER_RANGE
         addLiquidityParams.lower = -Math.floor(887272 / tickSpacing) * tickSpacing - tickSpacing;
@@ -1171,8 +1171,8 @@ describe("Concentrated Liquidity Product Pool", function () {
 
       await addLiquidityViaRouter(addLiquidityParams);
 
-      lower = 609332;
-      upper = lower + 1;
+      lower = 609330;
+      upper = lower + tickSpacing;
 
       const tokens = await pool.getAssets();
 

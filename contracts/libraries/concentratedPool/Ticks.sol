@@ -66,10 +66,6 @@ library Ticks {
         int24 nearestTick,
         uint160 currentPrice
     ) public returns (int24) {
-        require(lower < upper, "WRONG_ORDER");
-        require(TickMath.MIN_TICK <= lower, "LOWER_RANGE");
-        require(upper <= TickMath.MAX_TICK, "UPPER_RANGE");
-
         {
             // Stack overflow.
             uint128 currentLowerLiquidity = ticks[lower].liquidity;
