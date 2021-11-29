@@ -24,7 +24,7 @@ describe("Concentrated Liquidity Product Pool", function () {
   let trident: Trident;
   let defaultAddress: string;
   const helper = new LinkedListHelper(-887272);
-  const step = 10800;
+  const step = 10800; // 2^5 * 3^2 * 5^2 (nicely divisible number)
 
   before(async () => {
     _snapshotId = await ethers.provider.send("evm_snapshot", []);
@@ -493,6 +493,110 @@ describe("Concentrated Liquidity Product Pool", function () {
         expect(ratioY.lt(1000100) && ratioY.lt(999900), "fees 1 weren't proportionally split");
         expect(ratioX.lt(1000100) && ratioX.lt(999900), "fees 0 weren't proportionally split");
         expect(outsidePositionFees.dy.toString()).to.be.eq("0", "fees were acredited to a position not in range");
+      }
+    });
+
+    it("Should distribute fees correctly after crossing ticks", async () => {
+      for (const pool of trident.concentratedPools) {
+        helper.reset();
+
+        const tickSpacing = (await pool.getImmutables())._tickSpacing;
+        const tickAtPrice = await getTickAtCurrentPrice(pool);
+        const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
+        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+
+        const lower = nearestEvenValidTick - step;
+        const upper = nearestEvenValidTick + step + tickSpacing;
+        const lower1 = nearestEvenValidTick + step;
+        const upper1 = nearestEvenValidTick + step * 2 + tickSpacing;
+
+        let addLiquidityParams = {
+          pool: pool,
+          amount0Desired: getBigNumber(200),
+          amount1Desired: getBigNumber(200),
+          native: false,
+          lowerOld: helper.insert(lower),
+          lower,
+          upperOld: helper.insert(upper),
+          upper,
+          positionOwner: trident.concentratedPoolManager.address,
+          recipient: defaultAddress,
+        };
+
+        // in range liquiditiy addition
+        (await addLiquidityViaRouter(addLiquidityParams)).tokenId;
+
+        addLiquidityParams = helper.setTicks(
+          nearestEvenValidTick + step + tickSpacing + tickSpacing,
+          nearestEvenValidTick + step * 2 + tickSpacing,
+          addLiquidityParams
+        );
+        addLiquidityParams.amount1Desired = getBigNumber("0");
+        // out of range (1 sided) liq addition
+        (await addLiquidityViaRouter(addLiquidityParams)).tokenId;
+        // console.log((await Trident.Instance.concentratedPoolHelper.getTickState(pool.address, 6)).map(a => a[0]));
+        // swap within tick
+        const currentPrice = (await pool.getPriceAndNearestTicks())._price;
+        const upperPrice = await trident.tickMath.getSqrtRatioAtTick(upper);
+        const lowerPrice = await trident.tickMath.getSqrtRatioAtTick(lower);
+        const maxDx = await getDx(await pool.liquidity(), lowerPrice, currentPrice, false);
+        const feeGrowthGlobal0_init = await pool.feeGrowthGlobal0();
+        const feeGrowthGlobal1_init = await pool.feeGrowthGlobal1();
+
+        let swapTx = await swapViaRouter({
+          pool: pool,
+          unwrapBento: true,
+          zeroForOne: true,
+          inAmount: maxDx,
+          recipient: defaultAddress,
+        });
+
+        const positionNewFeeGrowth = await pool.rangeFeeGrowth(lower, upper);
+        const feeGrowthGlobal0 = await pool.feeGrowthGlobal0();
+        const feeGrowthGlobal1 = await pool.feeGrowthGlobal1();
+
+        expect(feeGrowthGlobal0.eq(feeGrowthGlobal0_init)).to.be.eq(true, "accreddited fees for the wrong token");
+        expect(feeGrowthGlobal1.gt(feeGrowthGlobal1_init)).to.be.eq(true, "didn't take fees");
+        expect(positionNewFeeGrowth.feeGrowthInside0.toString()).to.be.eq(
+          feeGrowthGlobal0.toString(),
+          "Fee growth 0 wasn't accredited to the positions"
+        );
+        expect(positionNewFeeGrowth.feeGrowthInside1.toString()).to.be.eq(
+          feeGrowthGlobal1.toString(),
+          "Fee growth 1 wasn't accredited to the positions"
+        );
+
+        // now trade out of the current range and check if the range still has the correct amount of fees credited
+        const maxDy = await getDy(await pool.liquidity(), (await pool.getPriceAndNearestTicks())._price, upperPrice, false);
+
+        swapTx = await swapViaRouter({
+          pool: pool,
+          unwrapBento: true,
+          zeroForOne: false,
+          inAmount: maxDy.mul(2),
+          recipient: defaultAddress,
+        });
+
+        const newPrice = (await pool.getPriceAndNearestTicks())._price;
+        const upper1Price = await trident.tickMath.getSqrtRatioAtTick(upper1);
+
+        expect(newPrice.gt(upperPrice)).to.be.true;
+        expect(newPrice.lt(upper1Price)).to.be.true; // ensure we crossed out of the initial range
+
+        const positionNewFeeGrowth_end = await pool.rangeFeeGrowth(lower, upper);
+        const feeGrowthGlobal0_end = await pool.feeGrowthGlobal0();
+        const feeGrowthGlobal1_end = await pool.feeGrowthGlobal1();
+
+        expect(feeGrowthGlobal0_end.gt(feeGrowthGlobal0)).to.be.eq(true, "accredited fees for the wrong token");
+        expect(feeGrowthGlobal1_end.eq(feeGrowthGlobal1)).to.be.eq(true, "didn't take fees");
+        expect(positionNewFeeGrowth_end.feeGrowthInside0.gt(positionNewFeeGrowth.feeGrowthInside0)).to.be.eq(
+          true,
+          "didn't account for token1 fees"
+        );
+        expect(positionNewFeeGrowth_end.feeGrowthInside1.toString()).to.be.eq(
+          positionNewFeeGrowth.feeGrowthInside1.toString(),
+          "position fee growth 1 isn't persistent"
+        );
       }
     });
 
