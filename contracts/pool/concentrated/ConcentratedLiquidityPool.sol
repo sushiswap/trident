@@ -182,7 +182,7 @@ contract ConcentratedLiquidityPool is IPool {
         }
 
         unchecked {
-            if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += uint128(_liquidity);
+            if (priceLower <= currentPrice && currentPrice < priceUpper) liquidity += uint128(_liquidity);
         }
 
         _ensureTickSpacing(mintParams.lower, mintParams.upper);
@@ -270,7 +270,7 @@ contract ConcentratedLiquidityPool is IPool {
             uint160 currentPrice = price;
 
             unchecked {
-                if (priceLower < currentPrice && currentPrice < priceUpper) liquidity -= amount;
+                if (priceLower <= currentPrice && currentPrice < priceUpper) liquidity -= amount;
             }
 
             (amount0, amount1) = DyDxMath.getAmountsForLiquidity(
