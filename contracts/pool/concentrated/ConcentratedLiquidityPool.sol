@@ -382,10 +382,10 @@ contract ConcentratedLiquidityPool is IPool {
                     // We can swap within the current range.
                     uint256 liquidityPadded = cache.currentLiquidity << 96;
                     // Calculate new price after swap: √𝑃[new] =  L · √𝑃 / (L + Δx · √𝑃)
-                    // This is derrived from Δ(1/√𝑃) = Δx/L
+                    // This is derived from Δ(1/√𝑃) = Δx/L
                     // where Δ(1/√𝑃) is 1/√𝑃[old] - 1/√𝑃[new] and we solve for √𝑃[new].
-                    // In case of an owerflow we can use: √𝑃[new] = L / (L / √𝑃 + Δx).
-                    // This is derrived by dividing the original fraction by √𝑃 on both sides.
+                    // In case of an overflow we can use: √𝑃[new] = L / (L / √𝑃 + Δx).
+                    // This is derived by dividing the original fraction by √𝑃 on both sides.
                     uint256 newPrice = uint256(
                         FullMath.mulDivRoundingUp(liquidityPadded, cache.currentPrice, liquidityPadded + cache.currentPrice * cache.input)
                     );
