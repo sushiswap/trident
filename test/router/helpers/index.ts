@@ -1,4 +1,4 @@
-import { RToken, MultiRoute, findMultiRoute } from "@sushiswap/tines";
+import { RToken, MultiRoute, findMultiRouteExactIn } from "@sushiswap/tines";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
 import { BigNumber, Contract } from "ethers";
 
@@ -37,7 +37,7 @@ export function createRoute(
   amountIn: BigNumber | number,
   gasPrice: number
 ): MultiRoute | undefined {
-  const route = findMultiRoute(fromToken, toToken, amountIn, topology.pools, baseToken, gasPrice);
+  const route = findMultiRouteExactIn(fromToken, toToken, amountIn, topology.pools, baseToken, gasPrice);
   return route;
 }
 
