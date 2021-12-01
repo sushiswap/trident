@@ -120,9 +120,9 @@ contract ConcentratedLiquidityPool is IPool {
 
     /// @dev Only set immutable variables here - state changes made here will not be used.
     constructor(bytes memory _deployData, IMasterDeployer _masterDeployer) {
-        (address _token0, address _token1, uint24 _swapFee, uint160 _price, uint24 _tickSpacing) = abi.decode(
+        (address _token0, address _token1, uint24 _swapFee, uint24 _tickSpacing) = abi.decode(
             _deployData,
-            (address, address, uint24, uint160, uint24)
+            (address, address, uint24, uint24)
         );
 
         if (_token0 == address(0)) revert ZeroAddress();
@@ -133,18 +133,25 @@ contract ConcentratedLiquidityPool is IPool {
         token0 = _token0;
         token1 = _token1;
         swapFee = _swapFee;
-        price = _price;
         tickSpacing = _tickSpacing;
-        // Prevents global liquidity overflow in the case all ticks are initialised.
-        MAX_TICK_LIQUIDITY = Ticks.getMaxLiquidity(_tickSpacing);
-        ticks[TickMath.MIN_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
-        ticks[TickMath.MAX_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
-        nearestTick = TickMath.MIN_TICK;
         bento = IBentoBoxMinimal(_masterDeployer.bento());
         barFeeTo = _masterDeployer.barFeeTo();
         barFee = _masterDeployer.barFee();
         masterDeployer = _masterDeployer;
+        MAX_TICK_LIQUIDITY = Ticks.getMaxLiquidity(_tickSpacing);
+        ticks[TickMath.MIN_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
+        ticks[TickMath.MAX_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
+        nearestTick = TickMath.MIN_TICK;
         unlocked = 1;
+    }
+
+    /// @dev Called only once from the factory.
+    /// @dev Price is not a constructor parameter to allow for predictable address calculation.
+    function setPrice(uint160 _price) external {
+        if (price == 0) {
+            TickMath.validatePrice(_price);
+            price = _price;
+        }
     }
 
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
@@ -594,6 +601,7 @@ contract ConcentratedLiquidityPool is IPool {
 
         if (amount > 0) {
             position.liquidity += uint128(amount);
+            // Prevents a global liquidity overflow in even if all ticks are initialised.
             if (position.liquidity > MAX_TICK_LIQUIDITY) revert LiquidityOverflow();
         }
 

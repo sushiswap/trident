@@ -990,7 +990,7 @@ describe("Concentrated Liquidity Product Pool", function () {
           recipient: trident.accounts[0].address,
         };
 
-        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("InvalidTick"));
+        if (tickSpacing != 1) await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("InvalidTick"));
         // LOWER_EVEN
         addLiquidityParams.lower = nearestEvenValidTick - step + tickSpacing;
         addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing;
@@ -1003,7 +1003,7 @@ describe("Concentrated Liquidity Product Pool", function () {
         addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing + 1;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("InvalidTick"));
+        if (tickSpacing != 1) await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("InvalidTick"));
 
         // UPPER_ODD
         addLiquidityParams.lower = nearestEvenValidTick - step;
