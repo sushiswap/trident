@@ -795,6 +795,22 @@
   dependencies:
     antlr4ts "^0.5.0-alpha.4"
 
+"@sushiswap/core-sdk@1.0.0-canary.14":
+  version "1.0.0-canary.14"
+  resolved "https://registry.yarnpkg.com/@sushiswap/core-sdk/-/core-sdk-1.0.0-canary.14.tgz#1f26c25907277a63c857bcc0945623d366e9cc37"
+  integrity sha512-QSfE5eMYx69NuJ87vPXf5n/yNAl5NqSe9GGq5aofHDBmUm346ROLWMLLqWkgttFL5u2aPR5PeP0j2gH9Eq6zgg==
+  dependencies:
+    "@ethersproject/address" "^5.4.0"
+    "@ethersproject/bignumber" "^5.4.0"
+    "@ethersproject/providers" "^5.4.0"
+    "@ethersproject/solidity" "^5.4.0"
+    big.js "^6.1.1"
+    decimal.js-light "^2.5.0"
+    jsbi "^4.1.0"
+    tiny-invariant "^1.1.0"
+    tiny-warning "^1.0.0"
+    toformat "^2.0.0"
+
 "@sushiswap/core-sdk@1.0.0-canary.5":
   version "1.0.0-canary.5"
   resolved "https://registry.yarnpkg.com/@sushiswap/core-sdk/-/core-sdk-1.0.0-canary.5.tgz#06e36124725d5e1bc91577cc200241f24a3e68d7"
@@ -848,13 +864,13 @@
     tiny-warning "^1.0.3"
     toformat "^2.0.0"
 
-"@sushiswap/tines@^0.1.12":
-  version "0.1.12"
-  resolved "https://registry.yarnpkg.com/@sushiswap/tines/-/tines-0.1.12.tgz#bdd6754e4a45adf735f0efb40b1fba6701e7bde0"
-  integrity sha512-wX9I/3y44jnurUHvuqvjcSFPhS5EejF599uah2z3fQaiMFrMv6XBLchTXyj2ctJQHerUKDdjol7bsCMEeC763Q==
+"@sushiswap/tines@1.0.0-canary.1":
+  version "1.0.0-canary.1"
+  resolved "https://registry.yarnpkg.com/@sushiswap/tines/-/tines-1.0.0-canary.1.tgz#52422909e13333813ae694b8a6ad0a9b15ef7a9b"
+  integrity sha512-6wRAUVbooIvq9SbMANok/g1E1H+ccWtn7RYi68lvEl3+GM370zmWNJcDUAjXupaqzR/C724tD+6ZikrW4ky6Hg==
   dependencies:
     "@ethersproject/bignumber" "^5.4.0"
-    "@sushiswap/core-sdk" "1.0.0-canary.5"
+    "@sushiswap/core-sdk" "1.0.0-canary.14"
 
 "@szmarczak/http-timer@^1.1.2":
   version "1.1.2"
@@ -2088,7 +2104,7 @@ bech32@1.1.4:
   resolved "https://registry.npmjs.org/bech32/-/bech32-1.1.4.tgz"
   integrity sha512-s0IrSOzLlbvX7yp4WBfPITzpAU8sqQcpsmwXDiKwrG4r491vwCO/XpejasRNl0piBMe/DvP4Tz0mIS/X1DPJBQ==
 
-big.js@^6.1.0:
+big.js@^6.1.0, big.js@^6.1.1:
   version "6.1.1"
   resolved "https://registry.npmjs.org/big.js/-/big.js-6.1.1.tgz"
   integrity sha512-1vObw81a8ylZO5ePrtMay0n018TcftpTA5HFKDaSuiUDBo8biRBtjIobw60OpwuvrGk+FsxKamqN4cnmj/eXdg==
@@ -5843,6 +5859,11 @@ jsbi@^3.2.0:
   version "3.2.5"
   resolved "https://registry.yarnpkg.com/jsbi/-/jsbi-3.2.5.tgz#b37bb90e0e5c2814c1c2a1bcd8c729888a2e37d6"
   integrity sha512-aBE4n43IPvjaddScbvWRA2YlTzKEynHzu7MqOyTipdHucf/VxS63ViCjxYRg86M8Rxwbt/GfzHl1kKERkt45fQ==
+
+jsbi@^4.1.0:
+  version "4.1.0"
+  resolved "https://registry.yarnpkg.com/jsbi/-/jsbi-4.1.0.tgz#f0c25ed8881bc09891334b03a3952efaa7add337"
+  integrity sha512-384Z4keIsJtYpnVggsxaB255MZctILbxv+ihtwoWPF7KNOlYHn1LFpRnUw5qsAspUAA2+I7qzjVJxVYtHVjxNw==
 
 jsbn@~0.1.0:
   version "0.1.1"
