@@ -3,6 +3,7 @@
 pragma solidity >=0.8.0;
 
 import "./TickMath.sol";
+import "hardhat/console.sol";
 
 /// @notice Tick management library for ranged liquidity.
 library Ticks {
@@ -26,13 +27,15 @@ library Ticks {
         uint256 currentLiquidity,
         uint256 feeGrowthGlobalA,
         uint256 feeGrowthGlobalB,
-        bool zeroForOne
+        bool zeroForOne,
+        uint24 tickSpacing
     ) internal returns (uint256, int24) {
         ticks[nextTickToCross].secondsGrowthOutside = secondsGrowthGlobal - ticks[nextTickToCross].secondsGrowthOutside;
+
         if (zeroForOne) {
             // Moving forward through the linked list.
-            if (nextTickToCross % 2 == 0) {
-                currentLiquidity -= ticks[nextTickToCross].liquidity;
+            if ((nextTickToCross / int24(tickSpacing)) % 2 == 0) {
+                currentLiquidity -= ticks[nextTickToCross].liquidity; // todo wrap in unchecked {}
             } else {
                 currentLiquidity += ticks[nextTickToCross].liquidity;
             }
@@ -41,7 +44,7 @@ library Ticks {
             nextTickToCross = ticks[nextTickToCross].previousTick;
         } else {
             // Moving backwards through the linked list.
-            if (nextTickToCross % 2 == 0) {
+            if ((nextTickToCross / int24(tickSpacing)) % 2 == 0) {
                 currentLiquidity += ticks[nextTickToCross].liquidity;
             } else {
                 currentLiquidity -= ticks[nextTickToCross].liquidity;
