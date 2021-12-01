@@ -449,7 +449,8 @@ contract ConcentratedLiquidityPool is IPool {
                     cache.currentLiquidity,
                     cache.feeGrowthGlobalA,
                     cache.feeGrowthGlobalB,
-                    zeroForOne
+                    zeroForOne,
+                    tickSpacing
                 );
                 if (cache.currentLiquidity == 0) {
                     // We step into a zone that has liquidity - or we reach the end of the linked list.
@@ -461,7 +462,8 @@ contract ConcentratedLiquidityPool is IPool {
                         cache.currentLiquidity,
                         cache.feeGrowthGlobalA,
                         cache.feeGrowthGlobalB,
-                        zeroForOne
+                        zeroForOne,
+                        tickSpacing
                     );
                 }
             }
@@ -532,7 +534,7 @@ contract ConcentratedLiquidityPool is IPool {
             uint128 newBalance = reserve0 + inAmount;
             if (uint256(newBalance) > balance0) revert Token0Missing();
             reserve0 = newBalance;
-            reserve1 -= uint128(amountOut);
+            reserve1 -= uint128(amountOut); // todo wrap in unchecked {}
         } else {
             uint256 balance1 = _balance(token1);
             uint128 newBalance = reserve1 + inAmount;
