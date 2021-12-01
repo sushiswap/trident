@@ -110,6 +110,7 @@ contract ConcentratedLiquidityPool is IPool {
     error UpperOdd();
     error MaxTickLiquidity();
     error Overflow();
+    error BadPrice();
 
     modifier lock() {
         if (unlocked == 2) revert Locked();
@@ -135,6 +136,8 @@ contract ConcentratedLiquidityPool is IPool {
         swapFee = _swapFee;
         price = _price;
         tickSpacing = _tickSpacing;
+
+        if (TickMath.MIN_SQRT_RATIO > _price || _price >= TickMath.MAX_SQRT_RATIO) revert BadPrice();
         // Prevents global liquidity overflow in the case all ticks are initialised.
         MAX_TICK_LIQUIDITY = Ticks.getMaxLiquidity(_tickSpacing);
         ticks[TickMath.MIN_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
