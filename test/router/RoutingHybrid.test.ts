@@ -156,7 +156,7 @@ describe("HybridPool Typescript == Solidity check", function () {
     const amountOutPoolBN = balanceAfter.sub(balanceBefore);
     const amountOutPool = amountOutPoolBN.toString();
 
-    const amountOutPrediction = poolRouterInfo.calcOutByIn(jsValue, swapDirection)[0];
+    const amountOutPrediction = poolRouterInfo.calcOutByIn(jsValue, swapDirection).out;
 
     //console.log('prediction', Math.abs(amountOutPrediction/amountOutPool-1), amountOutPrediction, amountOutPool.toString());
     expect(areCloseValues(amountOutPrediction, amountOutPoolBN, 1e-9)).equals(true, "swap amount not close enough to predicted amount");
@@ -166,8 +166,8 @@ describe("HybridPool Typescript == Solidity check", function () {
       return;
     }
 
-    const amounInExpected = poolRouterInfo.calcInByOut(amountOutPrediction, swapDirection)[0];
-    const amountOutPrediction2 = poolRouterInfo.calcOutByIn(amounInExpected, swapDirection)[0];
+    const amounInExpected = poolRouterInfo.calcInByOut(amountOutPrediction, swapDirection).inp;
+    const amountOutPrediction2 = poolRouterInfo.calcOutByIn(amounInExpected, swapDirection).out;
 
     // console.log('back1', Math.abs(amounInExpected/jsValue-1), amounInExpected, jsValue);
     // console.log('back2', Math.abs(amountOutPrediction/amountOutPrediction2-1), amountOutPrediction, amountOutPrediction2);
