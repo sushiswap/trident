@@ -123,39 +123,29 @@ export class Trident {
     prices.push(TWO_POW_96);
 
     // low price feed
-    prices.push(TWO_POW_96.div(16)); // whats the min and max value we support here??
-
-    // mid price feed
-    // prices.push(TWO_POW_96.mul(2));
+    prices.push(TWO_POW_96.div(16));
 
     // high price feed
     prices.push(TWO_POW_96.mul(16));
 
     const fees = [5, 30];
 
-    const tickSpacings = [5, 60];
+    const tickSpacings = [1, 5, 60];
 
     function data(token0, token1, fee, price, tickSpacing) {
       return utils.defaultAbiCoder.encode(["address", "address", "uint24", "uint160", "uint24"], [token0, token1, fee, price, tickSpacing]);
     }
 
-    for (let i = 0; i < prices.length; i++) {
-      for (let j = 0; j < fees.length; j++) {
-        for (let k = 0; k < tickSpacings.length; k++) {
-          await this.masterDeployer.deployPool(
-            this.concentratedPoolFactory.address,
-            data(token0.address, token1.address, fees[j], prices[i], tickSpacings[k])
-          );
-        }
+    for (let j = 0; j < fees.length; j++) {
+      for (let k = 0; k < tickSpacings.length; k++) {
+        await this.masterDeployer.deployPool(
+          this.concentratedPoolFactory.address,
+          data(token0.address, token1.address, fees[j], prices[(j + k) % prices.length], tickSpacings[k])
+        );
       }
     }
 
-    const poolAddresses = await this.concentratedPoolFactory.getPools(
-      token0.address,
-      token1.address,
-      0,
-      fees.length * prices.length * tickSpacings.length
-    );
+    const poolAddresses = await this.concentratedPoolFactory.getPools(token0.address, token1.address, 0, fees.length * tickSpacings.length);
 
     for (let poolAddress of poolAddresses) {
       concentratedPools.push((await CLP.attach(poolAddress)) as ConcentratedLiquidityPool);
