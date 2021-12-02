@@ -160,10 +160,10 @@ describe("Concentrated Pool Routing", async () => {
       const tickSpacing = (await pool.getImmutables())._tickSpacing;
       const tickAtPrice = await getTickAtCurrentPrice(pool);
       const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-      const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+      const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick - tickSpacing;
 
-      let lower = nearestEvenValidTick - step;
-      let upper = nearestEvenValidTick + step + tickSpacing;
+      let lower = nearestEvenValidTick - 2 * tickSpacing;
+      let upper = nearestEvenValidTick + 3 * tickSpacing;
 
       let addLiquidityParams = {
         pool: pool,
@@ -178,9 +178,6 @@ describe("Concentrated Pool Routing", async () => {
         recipient: defaultAddress,
       };
 
-      await addLiquidityViaRouter(addLiquidityParams);
-
-      addLiquidityParams = helper.setTicks(lower + 3 * step, upper + 5 * step, addLiquidityParams);
       await addLiquidityViaRouter(addLiquidityParams);
 
       addLiquidityParams = helper.setTicks(lower - 10 * step, upper + 10 * step, addLiquidityParams);
@@ -209,7 +206,7 @@ describe("Concentrated Pool Routing", async () => {
       const out = parseInt(swapTx.output.toString());
       // console.log("0 in", maxDy.toString(), 'out', out, "pred", predictedOutput[0],
       //   Math.abs(out/predictedOutput[0]-1));
-      expect(Math.abs(out / predictedOutput.out - 1)).lessThan(1e-12);
+      expect(Math.abs(out / predictedOutput.out - 1)).lessThan(1e-8);
 
       const routePool2 = await createCLRPool(pool);
       const predictedOutput2 = routePool2.calcOutByIn(out, true);
@@ -299,7 +296,7 @@ describe("Concentrated Pool Routing", async () => {
       const out2 = parseInt(swapTx2.output.toString());
       // console.log("1 in", out, 'out', out2, "pred", predictedOutput2[0],
       //   Math.abs(out2/predictedOutput2[0]-1));
-      expect(Math.abs(out2 / predictedOutput2.out - 1)).lessThan(1e-9);
+      expect(Math.abs(out2 / predictedOutput2.out - 1)).lessThan(1e-7);
     }
   });
 });
