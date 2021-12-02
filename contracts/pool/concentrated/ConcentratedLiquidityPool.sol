@@ -4,10 +4,9 @@ pragma solidity >=0.8.0;
 
 import "../../interfaces/IBentoBoxMinimal.sol";
 import "../../interfaces/IMasterDeployer.sol";
-import "../../interfaces/IPool.sol";
-import "../../interfaces/concentratedPool/IPositionManager.sol";
 import "../../interfaces/ITridentCallee.sol";
 import "../../interfaces/ITridentRouter.sol";
+import "../../interfaces/concentratedPool/IPositionManager.sol";
 import "../../libraries/concentratedPool/FullMath.sol";
 import "../../libraries/concentratedPool/TickMath.sol";
 import "../../libraries/concentratedPool/UnsafeMath.sol";
@@ -15,21 +14,18 @@ import "../../libraries/concentratedPool/DyDxMath.sol";
 import "../../libraries/concentratedPool/SwapLib.sol";
 import "../../libraries/concentratedPool/Ticks.sol";
 
-/// @notice Trident exchange pool template implementing concentrated liquidity for swapping between an ERC-20 token pair.
+/// @notice Trident Concentrated liquidity pool implementation.
 /// @dev Amounts are considered to be in Bentobox shared
-contract ConcentratedLiquidityPool is IPool {
+contract ConcentratedLiquidityPool {
     using Ticks for mapping(int24 => Ticks.Tick);
 
     event Mint(address indexed owner, uint256 amount0, uint256 amount1);
     event Burn(address indexed owner, uint256 amount0, uint256 amount1);
     event Collect(address indexed sender, uint256 amount0, uint256 amount1);
-    event Sync(uint256 reserveShares0, uint256 reserveShares1);
-
-    bytes32 public constant override poolIdentifier = "Trident:ConcentratedLiquidity";
+    event Swap(address indexed recipient, address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut);
 
     uint24 internal constant MAX_FEE = 100000; /// @dev Maximum `swapFee` is 10%.
-    /// @dev References for tickSpacing:
-    /// 100 tickSpacing -> 2% between ticks.
+    /// @dev Reference: tickSpacing of 100 -> 2% between ticks.
     uint24 internal immutable tickSpacing;
     uint24 internal immutable swapFee; /// @dev 1000 corresponds to 0.1% fee. Fee is measured in pips.
     uint128 internal immutable MAX_TICK_LIQUIDITY;
@@ -88,13 +84,9 @@ contract ConcentratedLiquidityPool is IPool {
         int24 lower;
         int24 upperOld;
         int24 upper;
-        uint256 amount0Desired;
-        uint256 amount1Desired;
-        bool token0native;
-        bool token1native;
-        address positionOwner; // To mint an NFT the positionOwner should be set to the positionManager contract.
-        address positionRecipient;
-        uint256 positionId;
+        uint128 amount0Desired;
+        uint128 amount1Desired;
+        bool native;
     }
 
     /// @dev Error list to optimize around pool requirements.
@@ -154,45 +146,47 @@ contract ConcentratedLiquidityPool is IPool {
         }
     }
 
-    /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
-    /// The router must ensure that sufficient liquidity has been minted.
-    function mint(bytes calldata data) public override lock returns (uint256 _liquidity) {
+    /// @dev Mints LP tokens - should be called via the CL pool manager contract.
+    function mint(bytes calldata data) public lock returns (uint256 liquidityMinted) {
         MintParams memory mintParams = abi.decode(data, (MintParams));
+
+        _ensureTickSpacing(mintParams.lower, mintParams.upper);
 
         uint256 priceLower = uint256(TickMath.getSqrtRatioAtTick(mintParams.lower));
         uint256 priceUpper = uint256(TickMath.getSqrtRatioAtTick(mintParams.upper));
         uint256 currentPrice = uint256(price);
 
-        _liquidity = DyDxMath.getLiquidityForAmounts(
+        liquidityMinted = DyDxMath.getLiquidityForAmounts(
             priceLower,
             priceUpper,
             currentPrice,
-            mintParams.amount1Desired,
-            mintParams.amount0Desired
+            uint256(mintParams.amount1Desired),
+            uint256(mintParams.amount0Desired)
         );
 
+        // Ensure no overflow happens when we cast from uint256 to int128.
+        if (liquidityMinted > uint128(type(int128).max)) revert Overflow();
+
         unchecked {
-            (uint256 amount0fees, uint256 amount1fees, ) = _updatePosition(
-                mintParams.positionOwner,
+            (uint256 amount0Fees, uint256 amount1Fees) = _updatePosition(
+                msg.sender,
                 mintParams.lower,
                 mintParams.upper,
-                int128(uint128(_liquidity))
+                int128(uint128(liquidityMinted))
             );
-            if (amount0fees > 0) {
-                _transfer(token0, amount0fees, mintParams.positionOwner, false);
-                reserve0 -= uint128(amount0fees);
+            if (amount0Fees > 0) {
+                _transfer(token0, amount0Fees, msg.sender, false);
+                reserve0 -= uint128(amount0Fees);
             }
-            if (amount1fees > 0) {
-                _transfer(token1, amount1fees, mintParams.positionOwner, false);
-                reserve1 -= uint128(amount1fees);
+            if (amount1Fees > 0) {
+                _transfer(token1, amount1Fees, msg.sender, false);
+                reserve1 -= uint128(amount1Fees);
             }
         }
 
         unchecked {
-            if (priceLower < currentPrice && currentPrice < priceUpper) liquidity += uint128(_liquidity);
+            if (priceLower <= currentPrice && currentPrice < priceUpper) liquidity += uint128(liquidityMinted);
         }
-
-        _ensureTickSpacing(mintParams.lower, mintParams.upper);
 
         nearestTick = Ticks.insert(
             ticks,
@@ -203,7 +197,7 @@ contract ConcentratedLiquidityPool is IPool {
             mintParams.lower,
             mintParams.upperOld,
             mintParams.upper,
-            uint128(_liquidity),
+            uint128(liquidityMinted),
             nearestTick,
             uint160(currentPrice)
         );
@@ -212,16 +206,11 @@ contract ConcentratedLiquidityPool is IPool {
             priceLower,
             priceUpper,
             currentPrice,
-            _liquidity,
+            liquidityMinted,
             true
         );
 
-        {
-            ITridentRouter.TokenInput[] memory callbackData = new ITridentRouter.TokenInput[](2);
-            callbackData[0] = ITridentRouter.TokenInput(token0, mintParams.token0native, amount0Actual);
-            callbackData[1] = ITridentRouter.TokenInput(token1, mintParams.token1native, amount1Actual);
-            ITridentCallee(msg.sender).tridentMintCallback(abi.encode(callbackData));
-        }
+        IPositionManager(msg.sender).mintCallback(token0, token1, amount0Actual, amount1Actual, mintParams.native);
 
         unchecked {
             if (amount0Actual != 0) {
@@ -235,52 +224,32 @@ contract ConcentratedLiquidityPool is IPool {
             }
         }
 
-        (uint256 feeGrowth0, uint256 feeGrowth1) = rangeFeeGrowth(mintParams.lower, mintParams.upper);
-
-        if (mintParams.positionRecipient != address(0)) {
-            IPositionManager(mintParams.positionOwner).positionMintCallback(
-                mintParams.positionRecipient,
-                mintParams.lower,
-                mintParams.upper,
-                uint128(_liquidity),
-                feeGrowth0,
-                feeGrowth1,
-                mintParams.positionId
-            );
-        }
-
-        emit Mint(mintParams.positionOwner, amount0Actual, amount1Actual);
+        emit Mint(msg.sender, amount0Actual, amount1Actual);
     }
 
-    /// @notice Burn function that cannpt conform to the IPool interface due to having three return values.
-    /// @dev Burns LP tokens sent to this contract.
-    function decreaseLiquidity(
+    function burn(
         int24 lower,
         int24 upper,
-        uint128 amount,
-        address recipient,
-        bool unwrapBento
+        uint128 amount
     )
         public
         returns (
-            IPool.TokenAmount[] memory withdrawnAmounts,
-            IPool.TokenAmount[] memory feesWithdrawn,
-            uint256 oldLiquidity
+            uint256 token0Amount,
+            uint256 token1Amount,
+            uint256 token0Fees,
+            uint256 token1Fees
         )
     {
-        uint256 amount0;
-        uint256 amount1;
-
         {
             uint160 priceLower = TickMath.getSqrtRatioAtTick(lower);
             uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper);
             uint160 currentPrice = price;
 
             unchecked {
-                if (priceLower < currentPrice && currentPrice < priceUpper) liquidity -= amount;
+                if (priceLower <= currentPrice && currentPrice < priceUpper) liquidity -= amount;
             }
 
-            (amount0, amount1) = DyDxMath.getAmountsForLiquidity(
+            (token0Amount, token1Amount) = DyDxMath.getAmountsForLiquidity(
                 uint256(priceLower),
                 uint256(priceUpper),
                 uint256(currentPrice),
@@ -289,56 +258,32 @@ contract ConcentratedLiquidityPool is IPool {
             );
         }
 
-        {
-            // Ensure no overflow happens when we cast to int128.
-            if (amount > uint128(type(int128).max)) revert Overflow();
+        // Ensure no overflow happens when we cast from uint128 to int128.
+        if (amount > uint128(type(int128).max)) revert Overflow();
 
-            uint256 amount0fees;
-            uint256 amount1fees;
-            (amount0fees, amount1fees, oldLiquidity) = _updatePosition(msg.sender, lower, upper, -int128(amount));
+        (token0Fees, token1Fees) = _updatePosition(msg.sender, lower, upper, -int128(amount));
 
-            withdrawnAmounts = new TokenAmount[](2);
-            withdrawnAmounts[0] = TokenAmount({token: token0, amount: amount0});
-            withdrawnAmounts[1] = TokenAmount({token: token1, amount: amount1});
-
-            feesWithdrawn = new TokenAmount[](2);
-            feesWithdrawn[0] = TokenAmount({token: token0, amount: amount0fees});
-            feesWithdrawn[1] = TokenAmount({token: token1, amount: amount1fees});
-
-            unchecked {
-                amount0 += amount0fees;
-                amount1 += amount1fees;
-            }
-        }
+        uint256 amount0;
+        uint256 amount1;
 
         unchecked {
+            amount0 = token0Amount + token0Fees;
+            amount1 = token1Amount + token1Fees;
             reserve0 -= uint128(amount0);
             reserve1 -= uint128(amount1);
         }
 
-        _transferBothTokens(recipient, amount0, amount1, unwrapBento);
+        _transferBothTokens(msg.sender, amount0, amount1, false);
 
         nearestTick = Ticks.remove(ticks, lower, upper, amount, nearestTick);
+
         emit Burn(msg.sender, amount0, amount1);
     }
 
-    function burn(bytes calldata) public pure override returns (IPool.TokenAmount[] memory) {
-        revert();
-    }
+    function collect(int24 lower, int24 upper) public lock returns (uint256 amount0fees, uint256 amount1fees) {
+        (amount0fees, amount1fees) = _updatePosition(msg.sender, lower, upper, 0);
 
-    function burnSingle(bytes calldata) public pure override returns (uint256) {
-        revert();
-    }
-
-    function collect(
-        int24 lower,
-        int24 upper,
-        address recipient,
-        bool unwrapBento
-    ) public lock returns (uint256 amount0fees, uint256 amount1fees) {
-        (amount0fees, amount1fees, ) = _updatePosition(msg.sender, lower, upper, 0);
-
-        _transferBothTokens(recipient, amount0fees, amount1fees, unwrapBento);
+        _transferBothTokens(msg.sender, amount0fees, amount1fees, false);
 
         reserve0 -= uint128(amount0fees);
         reserve1 -= uint128(amount1fees);
@@ -350,7 +295,7 @@ contract ConcentratedLiquidityPool is IPool {
     /// - price is √(y/x)
     /// - x is token0
     /// - zero for one -> price will move down.
-    function swap(bytes memory data) public override lock returns (uint256 amountOut) {
+    function swap(bytes memory data) public lock returns (uint256 amountOut) {
         (bool zeroForOne, uint256 inAmount, address recipient, bool unwrapBento) = abi.decode(data, (bool, uint256, address, bool));
 
         SwapCache memory cache = SwapCache({
@@ -498,11 +443,6 @@ contract ConcentratedLiquidityPool is IPool {
         }
     }
 
-    /// @dev Reserved for IPool.
-    function flashSwap(bytes calldata) public pure override returns (uint256) {
-        revert();
-    }
-
     /// @dev Updates `barFee` for Trident protocol.
     function updateBarFee() public {
         barFee = IMasterDeployer(masterDeployer).barFee();
@@ -570,30 +510,22 @@ contract ConcentratedLiquidityPool is IPool {
         int24 lower,
         int24 upper,
         int128 amount
-    )
-        internal
-        returns (
-            uint256 amount0fees,
-            uint256 amount1fees,
-            uint256 oldLiquidity
-        )
-    {
+    ) internal returns (uint256 amount0Fees, uint256 amount1Fees) {
         Position storage position = positions[owner][lower][upper];
 
-        (uint256 growth0current, uint256 growth1current) = rangeFeeGrowth(lower, upper);
-        amount0fees = FullMath.mulDiv(
-            growth0current - position.feeGrowthInside0Last,
+        (uint256 rangeFeeGrowth0, uint256 rangeFeeGrowth1) = rangeFeeGrowth(lower, upper);
+
+        amount0Fees = FullMath.mulDiv(
+            rangeFeeGrowth0 - position.feeGrowthInside0Last,
             position.liquidity,
             0x100000000000000000000000000000000
         );
 
-        amount1fees = FullMath.mulDiv(
-            growth1current - position.feeGrowthInside1Last,
+        amount1Fees = FullMath.mulDiv(
+            rangeFeeGrowth1 - position.feeGrowthInside1Last,
             position.liquidity,
             0x100000000000000000000000000000000
         );
-
-        oldLiquidity = position.liquidity;
 
         if (amount < 0) {
             position.liquidity -= uint128(-amount);
@@ -605,8 +537,8 @@ contract ConcentratedLiquidityPool is IPool {
             if (position.liquidity > MAX_TICK_LIQUIDITY) revert LiquidityOverflow();
         }
 
-        position.feeGrowthInside0Last = growth0current;
-        position.feeGrowthInside1Last = growth1current;
+        position.feeGrowthInside0Last = rangeFeeGrowth0;
+        position.feeGrowthInside1Last = rangeFeeGrowth1;
     }
 
     function _balance(address token) internal view returns (uint256 balance) {
@@ -689,20 +621,10 @@ contract ConcentratedLiquidityPool is IPool {
         feeGrowthInside1 = _feeGrowthGlobal1 - feeGrowthBelow1 - feeGrowthAbove1;
     }
 
-    function getAssets() public view override returns (address[] memory assets) {
+    function getAssets() public view returns (address[] memory assets) {
         assets = new address[](2);
         assets[0] = token0;
         assets[1] = token1;
-    }
-
-    /// @dev Reserved for IPool.
-    function getAmountOut(bytes calldata) public pure override returns (uint256) {
-        revert();
-    }
-
-    /// @dev Reserved for IPool.
-    function getAmountIn(bytes calldata) public pure override returns (uint256) {
-        revert();
     }
 
     function getImmutables()

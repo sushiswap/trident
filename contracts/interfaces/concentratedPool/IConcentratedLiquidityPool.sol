@@ -2,13 +2,18 @@
 
 pragma solidity >=0.8.0;
 
-import "./../IPool.sol";
 import "./../IBentoBoxMinimal.sol";
 import "./../IMasterDeployer.sol";
 import "../../libraries/concentratedPool/Ticks.sol";
 
 /// @notice Trident Concentrated Liquidity Pool interface.
-interface IConcentratedLiquidityPool is IPool {
+interface IConcentratedLiquidityPool {
+    struct Position {
+        uint128 liquidity;
+        uint256 feeGrowthInside0Last;
+        uint256 feeGrowthInside1Last;
+    }
+
     function price() external view returns (uint160);
 
     function token0() external view returns (address);
@@ -25,25 +30,27 @@ interface IConcentratedLiquidityPool is IPool {
 
     function setPrice(uint160 price) external;
 
-    function collect(
-        int24,
-        int24,
-        address,
-        bool
-    ) external returns (uint256 amount0fees, uint256 amount1fees);
+    function positions(
+        address owner,
+        int24 lower,
+        int24 upper
+    ) external view returns (Position memory);
 
-    function decreaseLiquidity(
+    function collect(int24 lower, int24 upper) external returns (uint256 amount0fees, uint256 amount1fees);
+
+    function mint(bytes memory data) external returns (uint256 liquidityMinted);
+
+    function burn(
         int24 lower,
         int24 upper,
-        uint128 amount,
-        address recipient,
-        bool unwrapBento
+        uint128 amount
     )
         external
         returns (
-            TokenAmount[] memory withdrawnAmounts,
-            TokenAmount[] memory feesWithdrawn,
-            uint256 oldLiquidity
+            uint256 token0Amount,
+            uint256 token1Amount,
+            uint256 token0Fees,
+            uint256 token1Fees
         );
 
     function getImmutables()
@@ -65,6 +72,8 @@ interface IConcentratedLiquidityPool is IPool {
     function getTokenProtocolFees() external view returns (uint128 _token0ProtocolFee, uint128 _token1ProtocolFee);
 
     function getReserves() external view returns (uint128 _reserve0, uint128 _reserve1);
+
+    function getAssets() external view returns (address[] memory tokens);
 
     function getSecondsGrowthAndLastObservation() external view returns (uint160 _secondGrowthGlobal, uint32 _lastObservation);
 }

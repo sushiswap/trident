@@ -2,11 +2,12 @@
 
 pragma solidity >=0.8.0;
 
-import "../../interfaces/concentratedPool/IConcentratedLiquidityPoolManager.sol";
-import "../../interfaces/concentratedPool/IPositionManager.sol";
 import "../../interfaces/IMasterDeployer.sol";
 import "../../interfaces/IBentoBoxMinimal.sol";
 import "../../interfaces/ITridentRouter.sol";
+import "../../interfaces/concentratedPool/IConcentratedLiquidityPoolManager.sol";
+import "../../interfaces/concentratedPool/IConcentratedLiquidityPool.sol";
+import "../../interfaces/concentratedPool/IPositionManager.sol";
 import "../../libraries/concentratedPool/FullMath.sol";
 import "../../libraries/concentratedPool/TickMath.sol";
 import "../../libraries/concentratedPool/DyDxMath.sol";
@@ -14,61 +15,101 @@ import "../../utils/TridentBatchable.sol";
 import "./TridentNFT.sol";
 
 /// @notice Trident Concentrated Liquidity Pool periphery contract that combines non-fungible position management and staking.
-contract ConcentratedLiquidityPoolManager is IPositionManager, IConcentratedLiquidityPoolManagerStruct, TridentNFT, TridentBatchable {
+contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerStruct, IPositionManager, TridentNFT, TridentBatchable {
     event IncreaseLiquidity(address indexed pool, address indexed owner, uint256 indexed positionId, uint128 liquidity);
     event DecreaseLiquidity(address indexed pool, address indexed owner, uint256 indexed positionId, uint128 liquidity);
 
+    address internal cachedMsgSender = address(1);
+    address internal cachedPool = address(1);
+
+    address internal immutable wETH;
     IBentoBoxMinimal public immutable bento;
     IMasterDeployer public immutable masterDeployer;
 
     mapping(uint256 => Position) public positions;
 
-    constructor(address _masterDeployer) {
+    constructor(address _masterDeployer, address _wETH) {
         masterDeployer = IMasterDeployer(_masterDeployer);
         IBentoBoxMinimal _bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
         _bento.registerProtocol();
         bento = _bento;
+        wETH = _wETH;
         _mint(address(0));
     }
 
-    function positionMintCallback(
-        address recipient,
+    function mint(
+        IConcentratedLiquidityPool pool,
+        int24 lowerOld,
         int24 lower,
+        int24 upperOld,
         int24 upper,
-        uint128 amount,
-        uint256 feeGrowthInside0,
-        uint256 feeGrowthInside1,
-        uint256 _positionId
-    ) external override returns (uint256 positionId) {
-        require(IMasterDeployer(masterDeployer).pools(msg.sender), "NOT_POOL");
+        uint128 amount0Desired,
+        uint128 amount1Desired,
+        bool native,
+        uint256 minLiquidity,
+        uint256 positionId
+    ) external payable returns (uint256 _positionId) {
+        cachedMsgSender = msg.sender;
+        cachedPool = address(pool);
 
-        if (_positionId == 0) {
+        uint128 liquidityMinted = uint128(pool.mint(abi.encode(lowerOld, lower, upperOld, upper, amount0Desired, amount1Desired, native)));
+        require(liquidityMinted >= minLiquidity, "TOO_LITTLE_RECEIVED");
+
+        (uint256 feeGrowthInside0, uint256 feeGrowthInside1) = pool.rangeFeeGrowth(lower, upper);
+
+        if (positionId == 0) {
             // We mint a new NFT.
             positions[totalSupply] = Position({
-                pool: IConcentratedLiquidityPool(msg.sender),
-                liquidity: amount,
+                pool: pool,
+                liquidity: liquidityMinted,
                 lower: lower,
                 upper: upper,
                 latestAddition: uint32(block.timestamp),
                 feeGrowthInside0: feeGrowthInside0,
                 feeGrowthInside1: feeGrowthInside1
             });
-            positionId = totalSupply;
-            _mint(recipient);
-            emit IncreaseLiquidity(msg.sender, recipient, positionId, amount);
-        } else if (amount > 0) {
+            _positionId = totalSupply;
+            _mint(msg.sender);
+        } else {
             // We increase liquidity for an existing NFT.
-            Position storage position = positions[_positionId];
-            require(_positionId < totalSupply, "INVALID_POSITION");
+            _positionId = positionId;
+            Position storage position = positions[positionId];
+            require(address(position.pool) == address(pool), "POOL_MIS_MATCH");
             require(position.lower == lower && position.upper == upper, "RANGE_MIS_MATCH");
-            require(position.feeGrowthInside0 == feeGrowthInside0 && position.feeGrowthInside1 == feeGrowthInside1, "UNCLAIMED");
-            position.liquidity += amount;
+            require(ownerOf[positionId] == msg.sender, "NOT_ID_OWNER");
+            // Fees should be claimed first.
+            position.feeGrowthInside0 = feeGrowthInside0;
+            position.feeGrowthInside1 = feeGrowthInside1;
+            position.liquidity += liquidityMinted;
             position.latestAddition = uint32(block.timestamp);
-            emit IncreaseLiquidity(msg.sender, recipient, positionId, amount);
         }
+
+        emit IncreaseLiquidity(address(pool), msg.sender, _positionId, liquidityMinted);
+
+        cachedMsgSender = address(1);
+        cachedPool = address(1);
     }
 
-    function decreaseLiquidity(
+    function mintCallback(
+        address token0,
+        address token1,
+        uint256 amount0,
+        uint256 amount1,
+        bool native
+    ) external override {
+        require(msg.sender == cachedPool, "UNAUTHORIZED_CALLBACK");
+        if (native) {
+            _depositFromUserToBentoBox(token0, cachedMsgSender, msg.sender, amount0);
+            _depositFromUserToBentoBox(token1, cachedMsgSender, msg.sender, amount1);
+        } else {
+            bento.transfer(token0, cachedMsgSender, msg.sender, amount0);
+            bento.transfer(token1, cachedMsgSender, msg.sender, amount1);
+        }
+        cachedMsgSender = address(1);
+        cachedPool = address(1);
+    }
+
+    function burn(
         uint256 tokenId,
         uint128 amount,
         address recipient,
@@ -77,41 +118,33 @@ contract ConcentratedLiquidityPoolManager is IPositionManager, IConcentratedLiqu
         require(msg.sender == ownerOf[tokenId], "NOT_ID_OWNER");
         Position storage position = positions[tokenId];
 
-        IPool.TokenAmount[] memory withdrawAmounts;
-        IPool.TokenAmount[] memory feeAmounts;
-        uint256 oldLiquidity;
+        (uint256 token0Fees, uint256 token1Fees, uint256 feeGrowthInside0, uint256 feeGrowthInside1) = positionFees(tokenId);
+
+        address[] memory tokens = position.pool.getAssets();
+
+        uint256 token0Amount;
+        uint256 token1Amount;
 
         if (amount < position.liquidity) {
-            (withdrawAmounts, feeAmounts, oldLiquidity) = position.pool.decreaseLiquidity(
-                position.lower,
-                position.upper,
-                amount,
-                address(this),
-                false
-            );
+            (token0Amount, token1Amount, , ) = position.pool.burn(position.lower, position.upper, amount);
 
-            (position.feeGrowthInside0, position.feeGrowthInside1) = position.pool.rangeFeeGrowth(position.lower, position.upper);
-
+            position.feeGrowthInside0 = feeGrowthInside0;
+            position.feeGrowthInside1 = feeGrowthInside1;
             position.liquidity -= amount;
         } else {
-            (withdrawAmounts, feeAmounts, oldLiquidity) = position.pool.decreaseLiquidity(
-                position.lower,
-                position.upper,
-                position.liquidity,
-                address(this),
-                false
-            );
+            (token0Amount, token1Amount, , ) = position.pool.burn(position.lower, position.upper, position.liquidity);
 
             delete positions[tokenId];
-
             _burn(tokenId);
         }
 
-        uint256 token0Amount = withdrawAmounts[0].amount + ((feeAmounts[0].amount * amount) / oldLiquidity);
-        uint256 token1Amount = withdrawAmounts[1].amount + ((feeAmounts[1].amount * amount) / oldLiquidity);
+        unchecked {
+            token0Amount += token0Fees;
+            token1Amount += token1Fees;
+        }
 
-        _transfer(withdrawAmounts[0].token, address(this), recipient, token0Amount, unwrapBento);
-        _transfer(withdrawAmounts[1].token, address(this), recipient, token1Amount, unwrapBento);
+        _transfer(tokens[0], address(this), recipient, token0Amount, unwrapBento);
+        _transfer(tokens[1], address(this), recipient, token1Amount, unwrapBento);
 
         emit DecreaseLiquidity(address(position.pool), msg.sender, tokenId, amount);
     }
@@ -134,12 +167,12 @@ contract ConcentratedLiquidityPoolManager is IPositionManager, IConcentratedLiqu
         uint256 balance1 = bento.balanceOf(token1, address(this));
 
         if (balance0 < token0amount || balance1 < token1amount) {
-            (uint256 amount0fees, uint256 amount1fees) = position.pool.collect(position.lower, position.upper, address(this), false);
+            (uint256 amount0fees, uint256 amount1fees) = position.pool.collect(position.lower, position.upper);
 
             uint256 newBalance0 = amount0fees + balance0;
             uint256 newBalance1 = amount1fees + balance1;
 
-            /// @dev Rounding errors due to frequent claiming of other users in the same position may cost us some wei units
+            // Rounding errors due to frequent claiming of other users in the same position may cost us some wei units.
             if (token0amount > newBalance0) token0amount = newBalance0;
             if (token1amount > newBalance1) token1amount = newBalance1;
         }
@@ -188,5 +221,21 @@ contract ConcentratedLiquidityPoolManager is IPositionManager, IConcentratedLiqu
         } else {
             bento.transfer(token, from, to, shares);
         }
+    }
+
+    function _depositFromUserToBentoBox(
+        address token,
+        address sender,
+        address recipient,
+        uint256 amount
+    ) internal {
+        if (token == wETH && address(this).balance > 0) {
+            uint256 ethAmount = bento.toAmount(token, amount, true);
+            if (ethAmount >= address(this).balance) {
+                bento.deposit{value: ethAmount}(address(0), sender, recipient, 0, amount);
+                return;
+            }
+        }
+        bento.deposit(token, sender, recipient, 0, amount);
     }
 }

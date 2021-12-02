@@ -20,12 +20,12 @@ contract ConcentratedLiquidityPoolStaker {
         uint32 startTime;
         uint32 endTime;
         uint32 expiry;
-        uint160 secondsClaimed; // @dev x128.
+        uint160 secondsClaimed; // x128.
         uint96 rewardsUnclaimed;
     }
 
     struct Stake {
-        uint160 secondsGrowthInsideLast; // @dev x128.
+        uint160 secondsGrowthInsideLast; // x128.
         uint32 timestamp;
     }
 

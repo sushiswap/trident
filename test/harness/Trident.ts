@@ -181,7 +181,10 @@ export class Trident {
     ConcentratedPoolHelper: ContractFactory,
     TickMath: ContractFactory
   ) {
-    this.concentratedPoolManager = (await ConcentratedPoolManager.deploy(this.masterDeployer.address)) as ConcentratedLiquidityPoolManager;
+    this.concentratedPoolManager = (await ConcentratedPoolManager.deploy(
+      this.masterDeployer.address,
+      this.tokens[0].address
+    )) as ConcentratedLiquidityPoolManager;
     this.concentratedPoolStaker = (await ConcentratedPoolStaker.deploy(
       this.concentratedPoolManager.address
     )) as ConcentratedLiquidityPoolStaker;

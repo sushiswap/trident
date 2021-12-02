@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
-import { addLiquidityViaRouter, getDx, getDy, getTickAtCurrentPrice, LinkedListHelper, swapViaRouter } from "../harness/Concentrated";
+import { addLiquidityViaManager, getDx, getDy, getTickAtCurrentPrice, LinkedListHelper, swapViaRouter } from "../harness/Concentrated";
 import { getBigNumber } from "../harness/helpers";
 import { Trident } from "../harness/Trident";
 import { createCLRPool } from "./helpers/createCLRPool";
@@ -48,7 +48,7 @@ describe("Concentrated Pool Routing", async () => {
         recipient: defaultAddress,
       };
 
-      await addLiquidityViaRouter(addLiquidityParams);
+      await addLiquidityViaManager(addLiquidityParams);
 
       const lowerPrice = await trident.tickMath.getSqrtRatioAtTick(lower);
       const currentPrice = (await pool.getPriceAndNearestTicks())._price;
@@ -113,7 +113,7 @@ describe("Concentrated Pool Routing", async () => {
         recipient: defaultAddress,
       };
 
-      await addLiquidityViaRouter(addLiquidityParams);
+      await addLiquidityViaManager(addLiquidityParams);
 
       const lowerPrice = await trident.tickMath.getSqrtRatioAtTick(lower);
       const currentPrice = (await pool.getPriceAndNearestTicks())._price;
@@ -178,13 +178,13 @@ describe("Concentrated Pool Routing", async () => {
         recipient: defaultAddress,
       };
 
-      await addLiquidityViaRouter(addLiquidityParams);
+      await addLiquidityViaManager(addLiquidityParams);
 
       addLiquidityParams = helper.setTicks(lower + 3 * step, upper + 5 * step, addLiquidityParams);
-      await addLiquidityViaRouter(addLiquidityParams);
+      await addLiquidityViaManager(addLiquidityParams);
 
       addLiquidityParams = helper.setTicks(lower - 10 * step, upper + 10 * step, addLiquidityParams);
-      await addLiquidityViaRouter(addLiquidityParams);
+      await addLiquidityViaManager(addLiquidityParams);
 
       // swap accross the range and back
       //                       ▼ - - - - - - -> ▼
@@ -254,12 +254,12 @@ describe("Concentrated Pool Routing", async () => {
         recipient: defaultAddress,
       };
 
-      await addLiquidityViaRouter(addLiquidityParams);
+      await addLiquidityViaManager(addLiquidityParams);
 
       addLiquidityParams.amount0Desired = addLiquidityParams.amount0Desired.mul(2);
       addLiquidityParams.amount1Desired = addLiquidityParams.amount1Desired.mul(2);
       addLiquidityParams = helper.setTicks(lower + 3 * step, upper + 3 * step, addLiquidityParams);
-      await addLiquidityViaRouter(addLiquidityParams);
+      await addLiquidityViaManager(addLiquidityParams);
 
       // swap accross a zero liquidity range and back
       //                       ▼ - - - - - - - - - -> ▼

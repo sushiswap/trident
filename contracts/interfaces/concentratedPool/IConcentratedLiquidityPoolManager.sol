@@ -6,7 +6,6 @@ import "./IConcentratedLiquidityPool.sol";
 import "./../ITridentNFT.sol";
 
 /// @notice Trident concentrated liquidity manager contract Struct.
-/// @dev Split out struct and function declarations due to solidity quirks.
 interface IConcentratedLiquidityPoolManagerStruct {
     struct Position {
         IConcentratedLiquidityPool pool;
