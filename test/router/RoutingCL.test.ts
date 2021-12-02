@@ -133,7 +133,7 @@ describe("Concentrated Pool Routing", async () => {
       const out = parseInt(swapTx.output.toString());
       // console.log("0 in", maxDx.toString(), 'out', out, "pred", predictedOutput[0],
       //   Math.abs(out/predictedOutput[0]-1));
-      expect(Math.abs(out / predictedOutput.out - 1)).lessThan(1e-12);
+      expect(Math.abs(out / predictedOutput.out - 1)).lessThan(1e-11);
 
       const routePool2 = await createCLRPool(pool);
       const predictedOutput2 = routePool2.calcOutByIn(parseInt(swapTx.output.toString()), false);
@@ -296,7 +296,7 @@ describe("Concentrated Pool Routing", async () => {
       const out2 = parseInt(swapTx2.output.toString());
       // console.log("1 in", out, 'out', out2, "pred", predictedOutput2[0],
       //   Math.abs(out2/predictedOutput2[0]-1));
-      expect(Math.abs(out2 / predictedOutput2.out - 1)).lessThan(1e-7);
+      expect(Math.abs(out2 / predictedOutput2.out - 1)).lessThan(1e-5);
     }
   });
 });

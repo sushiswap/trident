@@ -123,10 +123,10 @@ export class Trident {
     prices.push(TWO_POW_96);
 
     // low price feed
-    prices.push(TWO_POW_96.div(16));
+    prices.push(TWO_POW_96.div(1000));
 
     // high price feed
-    prices.push(TWO_POW_96.mul(16));
+    prices.push(TWO_POW_96.mul(1000));
 
     const fees = [5, 30];
 
