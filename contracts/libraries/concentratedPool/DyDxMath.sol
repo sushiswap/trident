@@ -4,6 +4,7 @@ pragma solidity >=0.8.0;
 
 import "./FullMath.sol";
 import "./UnsafeMath.sol";
+import "./SafeCast.sol";
 
 /// @notice Math library that facilitates ranged liquidity calculations.
 library DyDxMath {
@@ -74,14 +75,14 @@ library DyDxMath {
     ) internal pure returns (uint128 token0amount, uint128 token1amount) {
         if (priceUpper <= currentPrice) {
             // Only supply `token1` (`token1` is Y).
-            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, priceUpper, roundUp));
+            token1amount = SafeCast.toUint128(DyDxMath.getDy(liquidityAmount, priceLower, priceUpper, roundUp));
         } else if (currentPrice <= priceLower) {
             // Only supply `token0` (`token0` is X).
-            token0amount = uint128(DyDxMath.getDx(liquidityAmount, priceLower, priceUpper, roundUp));
+            token0amount = SafeCast.toUint128(DyDxMath.getDx(liquidityAmount, priceLower, priceUpper, roundUp));
         } else {
             // Supply both tokens.
-            token0amount = uint128(DyDxMath.getDx(liquidityAmount, currentPrice, priceUpper, roundUp));
-            token1amount = uint128(DyDxMath.getDy(liquidityAmount, priceLower, currentPrice, roundUp));
+            token0amount = SafeCast.toUint128(DyDxMath.getDx(liquidityAmount, currentPrice, priceUpper, roundUp));
+            token1amount = SafeCast.toUint128(DyDxMath.getDy(liquidityAmount, priceLower, currentPrice, roundUp));
         }
     }
 }

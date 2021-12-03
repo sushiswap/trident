@@ -108,6 +108,7 @@ export async function swapViaRouter(params: {
   const oldPrice = currentPrice;
   const tokens = [immutables._token0, immutables._token1];
   const swapFee = immutables._swapFee;
+  const tickSpacing = immutables._tickSpacing;
   const barFee = await pool.barFee();
   const feeGrowthGlobalOld = await (zeroForOne ? pool.feeGrowthGlobal1() : pool.feeGrowthGlobal0());
   const _oldProtocolFees = await pool.getTokenProtocolFees();
@@ -123,7 +124,6 @@ export async function swapViaRouter(params: {
     let cross = false;
     let stepOutput;
     let newPrice;
-
     if (zeroForOne) {
       const maxDx = await getDx(currentLiquidity, nextTickPrice, currentPrice, false);
 
@@ -171,14 +171,14 @@ export async function swapViaRouter(params: {
       const tickInfo = await pool.ticks(nextTickToCross);
       // TODO if we run out of liquidity (tick == min | tick =0 max tick) we need to throw an error here
       if (zeroForOne) {
-        if (nextTickToCross % 2 == 0) {
+        if ((nextTickToCross / tickSpacing) % 2 == 0) {
           currentLiquidity = currentLiquidity.sub(liquidityChange);
         } else {
           currentLiquidity = currentLiquidity.add(liquidityChange);
         }
         nextTickToCross = tickInfo.previousTick;
       } else {
-        if (nextTickToCross % 2 == 0) {
+        if ((nextTickToCross / tickSpacing) % 2 == 0) {
           currentLiquidity = currentLiquidity.add(liquidityChange);
         } else {
           currentLiquidity = currentLiquidity.sub(liquidityChange);
@@ -251,44 +251,48 @@ export async function removeLiquidityViaManager(params: {
   unwrapBento: boolean;
 }): Promise<{ token0: BigNumber; token1: BigNumber }> {
   const { pool, tokenId, liquidityAmount, recipient, unwrapBento } = params;
+  const manager = Trident.Instance.concentratedPoolManager;
   const oldOwner = await Trident.Instance.concentratedPoolManager.ownerOf(tokenId);
-  const [oldPoolAddress, oldUserLiquidity, oldLower, oldUpper, oldFeeGrowthInside0, oldFeeGrowthInside1] =
-    await Trident.Instance.concentratedPoolManager.positions(tokenId);
+  const [oldPoolAddress, oldUserLiquidity, oldLower, oldUpper, oldFeeGrowthInside0, oldFeeGrowthInside1] = await manager.positions(tokenId);
   const [oldCurrentPrice, oldPriceLower, oldPriceUpper] = await getPrices(pool, [oldLower, oldUpper]);
   const tokens = await Promise.all([(await pool.getImmutables())._token0, (await pool.getImmutables())._token1]);
   const oldUserBalances = await Trident.Instance.getTokenBalance(tokens, recipient, unwrapBento);
   const oldPoolBalances = await Trident.Instance.getTokenBalance(tokens, pool.address, false);
+  const oldManagerBalances = await Trident.Instance.getTokenBalance(tokens, manager.address, false);
   const oldLiquidity = await pool.liquidity();
-  const oldTotalSupply = await Trident.Instance.concentratedPoolManager.totalSupply();
+  const oldTotalSupply = await manager.totalSupply();
   const liquidityDecrease = oldPriceLower.lt(oldCurrentPrice) && oldCurrentPrice.lt(oldPriceUpper) ? liquidityAmount : ZERO;
   const { dy, dx } = getAmountForLiquidity(oldPriceLower, oldCurrentPrice, oldPriceUpper, liquidityAmount);
   const [oldLowerPreviousTick, oldLowerNextTick, oldLowerLiquidity] = await pool.ticks(oldLower);
   const [oldLowerSecondPreviousTick, oldLowerSecondNextTick, oldLowerSecondLiquidity] = await pool.ticks(oldLowerNextTick);
   const [oldUpperPreviousTick, oldUpperNextTick, oldUpperLiquidity] = await pool.ticks(oldUpper);
   const [oldUpperSecondPreviousTick, oldUpperSecondNextTick, oldUpperSecondLiquidity] = await pool.ticks(oldUpperPreviousTick);
-  const oldPositionState = await pool.positions(Trident.Instance.concentratedPoolManager.address, oldLower, oldUpper);
-  const oldUserNFTBalance = await Trident.Instance.concentratedPoolManager.balanceOf(oldOwner);
-  // const oldZeroAddressBalance = await Trident.Instance.concentratedPoolManager.balanceOf(ADDRESS_ZERO);
+  const oldPositionState = await pool.positions(manager.address, oldLower, oldUpper);
+  const oldUserNFTBalance = await manager.balanceOf(oldOwner);
 
-  await Trident.Instance.concentratedPoolManager.decreaseLiquidity(tokenId, liquidityAmount, recipient, unwrapBento);
-  // const newOwner = await Trident.Instance.concentratedPoolManager.ownerOf(tokenId);
+  const position = await manager.positions(tokenId);
+  const { feeGrowthInside0, feeGrowthInside1 } = await pool.rangeFeeGrowth(position.lower, position.upper);
+  const poolPositionLiquidity = (await pool.positions(manager.address, position.lower, position.upper)).liquidity;
+  const fees0 = feeGrowthInside0.sub(position.feeGrowthInside0).mul(position.liquidity).div(TWO_POW_128);
+  const fees1 = feeGrowthInside1.sub(position.feeGrowthInside1).mul(position.liquidity).div(TWO_POW_128);
 
-  const [newPoolAddress, newUserLiquidity, newLower, newUpper, newFeeGrowthInside0, newFeeGrowthInside1] =
-    await Trident.Instance.concentratedPoolManager.positions(tokenId);
+  await manager.decreaseLiquidity(tokenId, liquidityAmount, recipient, unwrapBento);
+
+  const [newPoolAddress, newUserLiquidity, newLower, newUpper, newFeeGrowthInside0, newFeeGrowthInside1] = await manager.positions(tokenId);
   const [newCurrentPrice, newPriceLower, newPriceUpper] = await getPrices(pool, [newLower, newUpper]);
 
   const newUserBalances = await Trident.Instance.getTokenBalance(tokens, recipient, unwrapBento);
   const newPoolBalances = await Trident.Instance.getTokenBalance(tokens, pool.address, false);
-
+  const newManagerBalances = await Trident.Instance.getTokenBalance(tokens, manager.address, false);
   const newLiquidity = await pool.liquidity();
-  const newTotalSupply = await Trident.Instance.concentratedPoolManager.totalSupply();
+  const newTotalSupply = await manager.totalSupply();
   const [newLowerPreviousTick, newLowerNextTick, newLowerLiquidity] = await pool.ticks(newLower);
   const [newLowerSecondPreviousTick, newLowerSecondNextTick, newLowerSecondLiquidity] = await pool.ticks(newLowerNextTick);
   const [newUpperPreviousTick, newUpperNextTick, newUpperLiquidity] = await pool.ticks(newUpper);
   const [newUpperSecondPreviousTick, newUpperSecondNextTick, newUpperSecondLiquidity] = await pool.ticks(newUpperPreviousTick);
-  const newPositionState = await pool.positions(Trident.Instance.concentratedPoolManager.address, newLower, newUpper);
-  // const newZeroAddressBalance = await Trident.Instance.concentratedPoolManager.balanceOf(ADDRESS_ZERO);
-  const newUserNFTBalance = await Trident.Instance.concentratedPoolManager.balanceOf(oldOwner);
+  const newPositionState = await pool.positions(manager.address, newLower, newUpper);
+  const newUserNFTBalance = await manager.balanceOf(oldOwner);
+  const managerBalanceChange = [newManagerBalances[0].sub(oldManagerBalances[0]), newManagerBalances[1].sub(oldManagerBalances[1])];
 
   if (liquidityAmount.gte(oldUserLiquidity)) {
     expect(newUserNFTBalance).to.be.eq(oldUserNFTBalance.sub(1));
@@ -339,10 +343,19 @@ export async function removeLiquidityViaManager(params: {
     expect(newUpperPreviousTick).to.be.eq(0, "Tick not reset proper");
     expect(newUpperSecondNextTick).to.be.eq(0, "Next tick pointer not updated");
   }
-  expectAlmostEqual(newUserBalances[0], oldUserBalances[0].add(dx), "Didn't receive correct amount of token0");
-  expectAlmostEqual(newUserBalances[1], oldUserBalances[1].add(dy), "Didn't receive correct amount of token0");
-  expectAlmostEqual(newPoolBalances[0], oldPoolBalances[0].sub(dx), "Didn't pay correct amount of token0");
-  expectAlmostEqual(newPoolBalances[1], oldPoolBalances[1].sub(dy), "Didn't pay correct amount of token0");
+
+  expectAlmostEqual(newUserBalances[0], oldUserBalances[0].add(dx).add(fees0), "Didn't receive correct amount of token0");
+  expectAlmostEqual(newUserBalances[1], oldUserBalances[1].add(dy).add(fees1), "Didn't receive correct amount of token1");
+  expectAlmostEqual(
+    newPoolBalances[0],
+    oldPoolBalances[0].sub(dx.add(fees0).add(managerBalanceChange[0])),
+    "Didn't pay correct amount of token0"
+  );
+  expectAlmostEqual(
+    newPoolBalances[1],
+    oldPoolBalances[1].sub(dy.add(fees1).add(managerBalanceChange[1])),
+    "Didn't pay correct amount of token1"
+  );
   return { token0: BigNumber.from(0), token1: BigNumber.from(1) };
 }
 
@@ -507,9 +520,9 @@ export function getTickPrice(tick) {
 }
 
 export function getLiquidityForAmount(priceLower: BigNumber, currentPrice: BigNumber, priceUpper: BigNumber, dy: BigNumber, dx: BigNumber) {
-  if (priceUpper.lt(currentPrice)) {
+  if (priceUpper.lte(currentPrice)) {
     return dy.mul("0x1000000000000000000000000").div(priceUpper.sub(priceLower));
-  } else if (currentPrice.lt(priceLower)) {
+  } else if (currentPrice.lte(priceLower)) {
     return dx.mul(priceLower.mul(priceUpper).div("0x1000000000000000000000000")).div(priceUpper.sub(priceLower));
   } else {
     const liquidity0 = dx.mul(priceUpper.mul(currentPrice).div("0x1000000000000000000000000")).div(priceUpper.sub(currentPrice));
@@ -561,6 +574,10 @@ export function getMintData(params: {
     ["int24", "int24", "int24", "int24", "uint256", "uint256", "bool", "bool", "address", "address", "uint256"],
     [lowerOld, lower, upperOld, upper, amount0Desired, amount1Desired, native0, native1, positionOwner, recipient, positionId || 0]
   );
+}
+
+export async function getPriceAtTick(tick: number) {
+  return Trident.Instance.tickMath.getSqrtRatioAtTick(tick);
 }
 
 export async function getTickAtCurrentPrice(pool: ConcentratedLiquidityPool) {

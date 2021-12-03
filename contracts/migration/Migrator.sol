@@ -40,10 +40,10 @@ contract Migrator {
         masterChef = _masterChef;
     }
 
-    /// @notice Method to migrate MasterChef's liquidity form the legacy SushiSwap AMM to the Trident constant product pool.
+    /// @notice Method to migrate MasterChef's liquidity from the legacy SushiSwap AMM to the Trident constant product pool.
     /// @param oldPool Legacy SushiSwap pool.
-    /// @dev Since MasterChef has a requierment to receive the same amount of "LP" tokens back after migration we use an
-    /// intermediary token so we can mint the desired balance. Anfer unstaking users can call redeem() on the intermediary
+    /// @dev Since MasterChef has a requirement to receive the same amount of "LP" tokens back after migration we use an
+    /// intermediary token so we can mint the desired balance. After unstaking users can call redeem() on the intermediary
     /// token to receive their share of the LP tokens of the new Trident constant product pool.
     function migrate(IUniswapV2Minimal oldPool) external returns (address) {
         require(msg.sender == address(masterChef), "ONLY_CHEF");
