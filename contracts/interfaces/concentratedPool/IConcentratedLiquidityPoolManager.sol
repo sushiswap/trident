@@ -5,8 +5,7 @@ pragma solidity >=0.8.0;
 import "./IConcentratedLiquidityPool.sol";
 import "./../ITridentNFT.sol";
 
-/// @notice Trident concentrated liquidity manager contract Struct.
-/// @dev Split out struct and function declarations due to solidity quirks.
+/// @notice Trident concentrated liquidity pool manager contract Structs.
 interface IConcentratedLiquidityPoolManagerStruct {
     struct Position {
         IConcentratedLiquidityPool pool;

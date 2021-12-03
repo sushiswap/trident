@@ -213,17 +213,19 @@ export class TridentPoolFactory {
       addLiquidityParams.amount1Desired,
       addLiquidityParams.amount0Desired
     );
-    const mintData = getMintData(addLiquidityParams);
+    // const mintData = getMintData(addLiquidityParams);
+    this.addLiquidityViaManager(pool, addLiquidityParams);
 
-    await this.TridentRouter.addLiquidityLazy(pool.address, liquidity, mintData);
+    // await this.TridentRouter.addLiquidityLazy(pool.address, liquidity, mintData);
 
     addLiquidityParams = helper.setTicks(lower - tickIncrement * step, upper + tickIncrement * step, addLiquidityParams);
-    await this.addLiquidityViaRouter(pool, addLiquidityParams);
+
+    await this.addLiquidityViaManager(pool, addLiquidityParams);
 
     return await createCLRPool(pool);
   }
 
-  private async addLiquidityViaRouter(
+  private async addLiquidityViaManager(
     pool: ConcentratedLiquidityPool,
     params: {
       lowerOld: number;
@@ -241,20 +243,18 @@ export class TridentPoolFactory {
     const { amount0Desired, amount1Desired, native0, native1, lowerOld, lower, upperOld, upper, positionOwner, recipient } = params;
     const [currentPrice, priceLower, priceUpper] = await this.getPrices(pool, [lower, upper]);
     const liquidity = getLiquidityForAmount(priceLower, currentPrice, priceUpper, amount1Desired, amount0Desired);
-    const mintData = getMintData({
+    await this.ConcentratedPoolManager.mint(
+      pool.address,
       lowerOld,
       lower,
       upperOld,
       upper,
       amount0Desired,
       amount1Desired,
-      native0: native0,
-      native1: native1,
-      positionOwner,
-      recipient: recipient,
-      positionId: 0,
-    });
-    await this.TridentRouter.addLiquidityLazy(pool.address, liquidity, mintData);
+      native0,
+      liquidity,
+      0
+    );
   }
 
   private async getPrices(pool: ConcentratedLiquidityPool, ticks: Array<BigNumber | number>) {
@@ -286,7 +286,10 @@ export class TridentPoolFactory {
 
     this.ConcentratedLiquidityPool = await ethers.getContractFactory("ConcentratedLiquidityPool", { libraries: clpLibs });
 
-    this.ConcentratedPoolManager = (await clPoolManagerFactory.deploy(this.MasterDeployer.address)) as ConcentratedLiquidityPoolManager;
+    this.ConcentratedPoolManager = (await clPoolManagerFactory.deploy(
+      this.MasterDeployer.address,
+      this.MasterDeployer.address
+    )) as ConcentratedLiquidityPoolManager;
     this.ConcentratedPoolFactory = (await clPoolFactory.deploy(this.MasterDeployer.address)) as ConcentratedLiquidityPoolFactory;
     this.TickMath = (await tickMath.deploy()) as TickMathTest;
 
@@ -297,6 +300,16 @@ export class TridentPoolFactory {
     await this.ConstantPoolFactory.deployed();
 
     await this.whitelistFactories();
+
+    const accounts = await ethers.getSigners();
+    await this.Bento.setMasterContractApproval(
+      accounts[0].address,
+      this.ConcentratedPoolManager.address,
+      true,
+      "0",
+      "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000000000000000000000000000"
+    );
   }
 
   private async whitelistFactories() {

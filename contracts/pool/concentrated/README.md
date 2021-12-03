@@ -9,9 +9,9 @@ This allows users to narrow down the liquidity provision range which amplifies t
 
 ## Representing global liquidity state
 
-We represent the state of a pool's liquidity by using a linked list which starts at price 0 and ends at infinity. For every new position we insert two elements into the linked list based on the range's start and end price. To make the list more managable we limit the prices of the range to be some power of `1.0001`. E.g. our range can start at tick zero with a price of one `1.0000 = 1.0001^0` and end at tick 23028 which corresponds roughly to a price of ten. `10.0010 = 1.0001^23028`. With this approach we can cover the whole `(0, inf)` price range by using just `int24` as the exponent type.
+We represent the state of a pool's liquidity by using a linked list which starts at price 0 and ends at infinity. For every new position we insert two elements into the linked list based on the range's start and end price. To make the list managable we limit the prices of the range to be some power of `1.0001`. E.g. our range can start at tick zero with a price of one `1.0000 = 1.0001^0` and end at tick 23028 which corresponds roughly to a price of ten. `10.0010 = 1.0001^23028`. With this approach we can cover the whole `(0, inf)` price range by using just `int24` values.
 
-The linked list is represented by a `int24 => Tick` mapping where the Tick struct holds a pointer to the previous and the next tick and the liquidity added amount amongst other things.
+The linked list is represented by a `int24 => Tick` mapping where the Tick struct holds a pointer to the previous and the next tick and the liquidity (and variables tracing fees and time spent inside of a range).
 
 > We add a requierment that each position must start on an even and end on an odd tick. When we cross a tick this tells us weather we need to increase or decrease the current liquidity.
 
@@ -38,7 +38,8 @@ Using the `feeGrowthAbove` of a range's upper tick and the `feeGrowthBelow` of t
 
 ## Pool Manager
 
-Users can chose for their liquidity position to be owned by the `ConcentratedLiquidityPoolManager` contract. Doing so will mint them an NFT position which will have the claim to the underlying tokens and to any accrued fees. The pool manager also acts as a staking contract for liquidity mining. Users can use their NFT positions to subscribe to several incentives with their NFT positions.
+The `ConcentratedLiquidityPool` contract does not conform to the `IPool` interface, except for the `swap(bytes memory data)` function so that trading can happen throught the `TridentRouter` contract.
+Users should mint their liquidity positions via the the `ConcentratedLiquidityPoolManager` contract instead. Doing so will mint them an NFT position which will have the claim to the underlying tokens and to any accrued fees by calling `burn` or `colllect` on the manager contract. Liquidity positions minted via the manager contract can also be staked in the `ConcentratedLiquidityPoolStaker` contract. Users can use their NFT position to subscribe to several incentives at once.
 
 ## Key state variables
 
@@ -70,15 +71,27 @@ After some time passes we can calculate the rewards belonging to a position by c
 
 Calculating price impact:
 
-- Δ√𝑃 = Δy / L
-- Δ(1/√𝑃) = Δx / L
+Based on the current liquidity and token1 input amount:
 
-> Where x is token0 and y is token1
+- Δ√𝑃 = Δy / L
+
+Based on the current liquidity and token0 input amount:
+
+- Δ(1/√𝑃) = Δx / L
 
 Calculating liquidity:
 
-- L = Δy / Δ√𝑃
+> E.g. calculating how much liquidity a user can mint based on their lower and upper range price and the token amounts.
+
+When a user adds some liquidity on a range, the price can be inside, below or above the range. If it is above the range the user only adds token0, if it is below the range they only add token1. If price is within the range the user needs to add both tokens and liquidity minted will be the minimum liquidity that we get from min
+
 - L = Δx / (1/Δ√𝑃)
+
+> Where √𝑃 is derrived from the price span that is above the current price.
+
+- L = Δy / Δ√𝑃
+
+> Where √𝑃 is derrived from the price span that is below the current price.
 
 Calculating amounts:
 

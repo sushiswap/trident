@@ -2,8 +2,8 @@ import { BigNumber } from "@ethersproject/bignumber";
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
 import {
-  addLiquidityViaRouter,
-  _addLiquidityViaRouter,
+  addLiquidityViaManager,
+  _addLiquidityViaManager,
   removeLiquidityViaManager,
   collectFees,
   collectProtocolFee,
@@ -72,32 +72,32 @@ describe("Concentrated Liquidity Product Pool", function () {
         };
 
         // normal mint
-        await addLiquidityViaRouter(addLiquidityParams);
+        await addLiquidityViaManager(addLiquidityParams);
 
         // same range mint, from bento
         addLiquidityParams.native = !addLiquidityParams.native;
-        await addLiquidityViaRouter(addLiquidityParams);
+        await addLiquidityViaManager(addLiquidityParams);
 
         // normal mint, narrower range
         addLiquidityParams = helper.setTicks(lower + step / 2, upper - step / 2, addLiquidityParams);
-        await addLiquidityViaRouter(addLiquidityParams);
+        await addLiquidityViaManager(addLiquidityParams);
 
         // mint on the same lower tick
         // @dev if a tick exists we dont' have to provide the tickOld param
         addLiquidityParams = helper.setTicks(lower, upper + step, addLiquidityParams);
-        await addLiquidityViaRouter(addLiquidityParams);
+        await addLiquidityViaManager(addLiquidityParams);
 
         // mint on the same upper tick
         addLiquidityParams = helper.setTicks(lower - step, upper, addLiquidityParams);
-        await addLiquidityViaRouter(addLiquidityParams);
+        await addLiquidityViaManager(addLiquidityParams);
 
         // mint below trading price
         addLiquidityParams = helper.setTicks(lower - 2 * step, upper - 2 * step, addLiquidityParams);
-        await addLiquidityViaRouter(addLiquidityParams);
+        await addLiquidityViaManager(addLiquidityParams);
 
         // mint above trading price
         addLiquidityParams = helper.setTicks(lower + 2 * step, upper + 2 * step, addLiquidityParams);
-        await addLiquidityViaRouter(addLiquidityParams);
+        await addLiquidityViaManager(addLiquidityParams);
       }
     });
 
@@ -126,7 +126,7 @@ describe("Concentrated Liquidity Product Pool", function () {
           recipient: defaultAddress,
         };
 
-        await addLiquidityViaRouter(addLiquidityParams);
+        await addLiquidityViaManager(addLiquidityParams);
       }
     });
 
@@ -156,7 +156,7 @@ describe("Concentrated Liquidity Product Pool", function () {
           positionId: 0,
         };
 
-        await addLiquidityViaRouter(addLiquidityParams);
+        await addLiquidityViaManager(addLiquidityParams);
 
         addLiquidityParams = {
           pool: pool,
@@ -172,7 +172,7 @@ describe("Concentrated Liquidity Product Pool", function () {
           positionId: 0,
         };
 
-        await addLiquidityViaRouter(addLiquidityParams);
+        await addLiquidityViaManager(addLiquidityParams);
       }
     });
 
@@ -202,7 +202,7 @@ describe("Concentrated Liquidity Product Pool", function () {
           positionId: 0,
         };
 
-        const mint = await addLiquidityViaRouter(addLiquidityParams);
+        const mint = await addLiquidityViaManager(addLiquidityParams);
 
         const userPositionMint1 = (await trident.concentratedPoolManager.positions(mint.tokenId)).liquidity;
 
@@ -219,7 +219,7 @@ describe("Concentrated Liquidity Product Pool", function () {
           recipient: defaultAddress,
           positionId: mint.tokenId.toNumber(),
         };
-        const mint2 = await addLiquidityViaRouter(addLiquidityParams);
+        const mint2 = await addLiquidityViaManager(addLiquidityParams);
 
         const userPositionMint2 = (await trident.concentratedPoolManager.positions(mint.tokenId)).liquidity;
 
@@ -254,7 +254,7 @@ describe("Concentrated Liquidity Product Pool", function () {
           recipient: defaultAddress,
         };
 
-        await addLiquidityViaRouter(addLiquidityParams);
+        await addLiquidityViaManager(addLiquidityParams);
 
         const lowerPrice = await trident.tickMath.getSqrtRatioAtTick(lower);
         const currentPrice = (await pool.getPriceAndNearestTicks())._price;
@@ -303,10 +303,11 @@ describe("Concentrated Liquidity Product Pool", function () {
           recipient: defaultAddress,
         };
 
-        await addLiquidityViaRouter(addLiquidityParams);
+        await addLiquidityViaManager(addLiquidityParams);
 
         addLiquidityParams = helper.setTicks(lower - 10 * step, upper + 10 * step, addLiquidityParams);
-        const lp = await addLiquidityViaRouter(addLiquidityParams);
+
+        const lp = await addLiquidityViaManager(addLiquidityParams);
 
         // swap accross the range and back
         //                       ▼ - - - - - - -> ▼
@@ -324,7 +325,6 @@ describe("Concentrated Liquidity Product Pool", function () {
           inAmount: maxDy.mul(2),
           recipient: defaultAddress,
         });
-
         swapTx = await swapViaRouter({
           pool: pool,
           unwrapBento: false,
@@ -332,7 +332,6 @@ describe("Concentrated Liquidity Product Pool", function () {
           inAmount: swapTx.output,
           recipient: defaultAddress,
         });
-
         // swap accross the range and back
         //                       ▼ - - - - - - -> ▼
         // ----------------|xxxxxxxxxxx|-----|xxxxxxxxxx|--------
@@ -345,7 +344,7 @@ describe("Concentrated Liquidity Product Pool", function () {
           unwrapBento: true,
         });
         addLiquidityParams = helper.setTicks(lower + 3 * step, upper + 5 * step, addLiquidityParams);
-        await addLiquidityViaRouter(addLiquidityParams);
+        await addLiquidityViaManager(addLiquidityParams);
 
         swapTx = await swapViaRouter({
           pool: pool,
@@ -390,12 +389,12 @@ describe("Concentrated Liquidity Product Pool", function () {
           recipient: defaultAddress,
         };
 
-        await addLiquidityViaRouter(addLiquidityParams);
+        await addLiquidityViaManager(addLiquidityParams);
 
         addLiquidityParams.amount0Desired = addLiquidityParams.amount0Desired.mul(2);
         addLiquidityParams.amount1Desired = addLiquidityParams.amount1Desired.mul(2);
         addLiquidityParams = helper.setTicks(lower + 3 * step, upper + 3 * step, addLiquidityParams);
-        await addLiquidityViaRouter(addLiquidityParams);
+        await addLiquidityViaManager(addLiquidityParams);
 
         // swap accross a zero liquidity range and back
         //                       ▼ - - - - - - - - - -> ▼
@@ -448,14 +447,14 @@ describe("Concentrated Liquidity Product Pool", function () {
           recipient: defaultAddress,
         };
 
-        const tokenIdA = (await addLiquidityViaRouter(addLiquidityParams)).tokenId;
+        const tokenIdA = (await addLiquidityViaManager(addLiquidityParams)).tokenId;
 
         addLiquidityParams.amount0Desired = addLiquidityParams.amount0Desired.mul(2);
         addLiquidityParams.amount1Desired = addLiquidityParams.amount1Desired.mul(2);
-        const tokenIdB = (await addLiquidityViaRouter(addLiquidityParams)).tokenId;
+        const tokenIdB = (await addLiquidityViaManager(addLiquidityParams)).tokenId;
 
         addLiquidityParams = helper.setTicks(lower - step * 2, upper - step * 2, addLiquidityParams);
-        const tokenIdC = (await addLiquidityViaRouter(addLiquidityParams)).tokenId;
+        const tokenIdC = (await addLiquidityViaManager(addLiquidityParams)).tokenId;
 
         // swap within tick
         const currentPrice = (await pool.getPriceAndNearestTicks())._price;
@@ -550,7 +549,7 @@ describe("Concentrated Liquidity Product Pool", function () {
         };
 
         // in range liquiditiy addition
-        (await addLiquidityViaRouter(addLiquidityParams)).tokenId;
+        (await addLiquidityViaManager(addLiquidityParams)).tokenId;
 
         addLiquidityParams = helper.setTicks(
           nearestEvenValidTick + step + tickSpacing + tickSpacing,
@@ -559,7 +558,7 @@ describe("Concentrated Liquidity Product Pool", function () {
         );
         addLiquidityParams.amount1Desired = getBigNumber("0");
         // out of range (1 sided) liq addition
-        (await addLiquidityViaRouter(addLiquidityParams)).tokenId;
+        (await addLiquidityViaManager(addLiquidityParams)).tokenId;
         // swap within tick
         const currentPrice = (await pool.getPriceAndNearestTicks())._price;
         const upperPrice = await trident.tickMath.getSqrtRatioAtTick(upper);
@@ -658,7 +657,7 @@ describe("Concentrated Liquidity Product Pool", function () {
           recipient: defaultAddress,
         };
 
-        await addLiquidityViaRouter(addLiquidityParams);
+        await addLiquidityViaManager(addLiquidityParams);
 
         const lowerPrice = await trident.tickMath.getSqrtRatioAtTick(lower);
         const currentPrice = (await pool.getPriceAndNearestTicks())._price;
@@ -721,7 +720,7 @@ describe("Concentrated Liquidity Product Pool", function () {
           recipient: defaultAddress,
         };
 
-        const mint = await addLiquidityViaRouter(addLiquidityParams);
+        const mint = await addLiquidityViaManager(addLiquidityParams);
         const userLiquidity = (await trident.concentratedPoolManager.positions(mint.tokenId)).liquidity;
         const userLiquidityPartial = userLiquidity.sub(userLiquidity.div(3));
 
@@ -766,11 +765,11 @@ describe("Concentrated Liquidity Product Pool", function () {
           positionOwner: trident.concentratedPoolManager.address,
           recipient: defaultAddress,
         };
-        const mintA = await addLiquidityViaRouter(addLiquidityParams);
+        const mintA = await addLiquidityViaManager(addLiquidityParams);
         addLiquidityParams = helper.setTicks(lowerB, upperB, addLiquidityParams);
-        const mintB = await addLiquidityViaRouter(addLiquidityParams);
+        const mintB = await addLiquidityViaManager(addLiquidityParams);
         addLiquidityParams = helper.setTicks(lowerC, upperC, addLiquidityParams);
-        const mintC = await addLiquidityViaRouter(addLiquidityParams);
+        const mintC = await addLiquidityViaManager(addLiquidityParams);
         const liquidityA = mintA.liquidity;
         const liquidityB = mintB.liquidity;
         const liquidityC = mintC.liquidity;
@@ -859,16 +858,16 @@ describe("Concentrated Liquidity Product Pool", function () {
         positionOwner: trident.concentratedPoolManager.address,
         recipient: defaultAddress,
       };
-      const mintA = await addLiquidityViaRouter(addLiquidityParams);
+      const mintA = await addLiquidityViaManager(addLiquidityParams);
 
       addLiquidityParams.amount0Desired = getBigNumber(200);
       addLiquidityParams.amount1Desired = getBigNumber(200);
-      const mintB = await addLiquidityViaRouter(addLiquidityParams);
+      const mintB = await addLiquidityViaManager(addLiquidityParams);
 
       addLiquidityParams.amount0Desired = getBigNumber(100);
       addLiquidityParams.amount1Desired = getBigNumber(100);
       addLiquidityParams = helper.setTicks(lower + 2 * step, upper + 4 * step, addLiquidityParams);
-      const mintC = await addLiquidityViaRouter(addLiquidityParams);
+      const mintC = await addLiquidityViaManager(addLiquidityParams);
 
       // 1 swap should happen before we start an incentive
       const currentPrice = (await pool.getPriceAndNearestTicks())._price;
@@ -990,62 +989,62 @@ describe("Concentrated Liquidity Product Pool", function () {
           recipient: trident.accounts[0].address,
         };
 
-        if (tickSpacing != 1) await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("InvalidTick"));
+        if (tickSpacing != 1) await expect(addLiquidityViaManager(addLiquidityParams)).to.be.revertedWith(customError("InvalidTick"));
         // LOWER_EVEN
         addLiquidityParams.lower = nearestEvenValidTick - step + tickSpacing;
         addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("LowerEven"));
+        await expect(addLiquidityViaManager(addLiquidityParams)).to.be.revertedWith(customError("LowerEven"));
 
         // INVALID_TICK (UPPER)
         addLiquidityParams.lower = nearestEvenValidTick - step;
         addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing + 1;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        if (tickSpacing != 1) await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("InvalidTick"));
+        if (tickSpacing != 1) await expect(addLiquidityViaManager(addLiquidityParams)).to.be.revertedWith(customError("InvalidTick"));
 
         // UPPER_ODD
         addLiquidityParams.lower = nearestEvenValidTick - step;
         addLiquidityParams.upper = nearestEvenValidTick + step;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("UpperOdd"));
+        await expect(addLiquidityViaManager(addLiquidityParams)).to.be.revertedWith(customError("UpperOdd"));
 
         // WRONG ORDER
         addLiquidityParams.lower = nearestEvenValidTick + 3 * step;
         addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("WRONG_ORDER");
+        await expect(_addLiquidityViaManager(addLiquidityParams)).to.be.revertedWith("WRONG_ORDER");
 
-        // LOWER_RANGE
+        /* // LOWER_RANGE
         addLiquidityParams.lower = -Math.floor(887272 / tickSpacing) * tickSpacing - tickSpacing;
         addLiquidityParams.upper = nearestEvenValidTick + tickSpacing;
         addLiquidityParams.lowerOld = lower;
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("TickOutOfBounds"));
+        await expect(_addLiquidityViaManager(addLiquidityParams)).to.be.revertedWith(customError("TickOutOfBounds")); */
 
-        // UPPER_RANGE
+        /* // UPPER_RANGE
         addLiquidityParams.lower = nearestEvenValidTick;
         addLiquidityParams.upper = Math.floor(887272 / tickSpacing) * tickSpacing + tickSpacing;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith(customError("TickOutOfBounds"));
+        await expect(_addLiquidityViaManager(addLiquidityParams)).to.be.revertedWith(customError("TickOutOfBounds")); */
 
         // LOWER_ORDER - TO DO
         //addLiquidityParams.lower = nearestEvenValidTick;
         //addLiquidityParams.upper = Math.floor(887272 / tickSpacing) * tickSpacing + tickSpacing;
         //addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         //addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        //await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("LOWER_ORDER");
+        //await expect(_addLiquidityViaManager(addLiquidityParams)).to.be.revertedWith("LOWER_ORDER");
 
         // UPPER_ORDER - TO DO
         //addLiquidityParams.lower = nearestEvenValidTick;
         //addLiquidityParams.upper = Math.floor(887272 / tickSpacing) * tickSpacing + tickSpacing;
         //addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         //addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        //await expect(_addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("UPPER_ORDER");
+        //await expect(_addLiquidityViaManager(addLiquidityParams)).to.be.revertedWith("UPPER_ORDER");
       }
     });
 
@@ -1075,7 +1074,7 @@ describe("Concentrated Liquidity Product Pool", function () {
           positionId: 0,
         };
 
-        const mint = await addLiquidityViaRouter(addLiquidityParams);
+        const mint = await addLiquidityViaManager(addLiquidityParams);
 
         const userPositionMint1 = (await trident.concentratedPoolManager.positions(mint.tokenId)).liquidity;
         const lowerPrice = await trident.tickMath.getSqrtRatioAtTick(lower);
@@ -1104,7 +1103,7 @@ describe("Concentrated Liquidity Product Pool", function () {
           recipient: defaultAddress,
           positionId: mint.tokenId.toNumber(),
         };
-        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("UNCLAIMED");
+        await addLiquidityViaManager(addLiquidityParams);
       }
     });
 
@@ -1134,7 +1133,7 @@ describe("Concentrated Liquidity Product Pool", function () {
           positionId: 0,
         };
 
-        const mint = await addLiquidityViaRouter(addLiquidityParams);
+        const mint = await addLiquidityViaManager(addLiquidityParams);
 
         const userPositionMint1 = (await trident.concentratedPoolManager.positions(mint.tokenId)).liquidity;
         const lowerPrice = await trident.tickMath.getSqrtRatioAtTick(lower);
@@ -1165,7 +1164,7 @@ describe("Concentrated Liquidity Product Pool", function () {
           positionId: ts,
         };
 
-        await expect(addLiquidityViaRouter(addLiquidityParams)).to.be.revertedWith("INVALID_POSITION");
+        await expect(addLiquidityViaManager(addLiquidityParams)).to.be.revertedWith("POOL_MIS_MATCH");
       }
     });
 
@@ -1194,18 +1193,16 @@ describe("Concentrated Liquidity Product Pool", function () {
         recipient: defaultAddress,
       };
 
-      await addLiquidityViaRouter(addLiquidityParams);
+      await addLiquidityViaManager(addLiquidityParams);
 
       lower = 609332;
       upper = lower + 1;
 
       const tokens = await pool.getAssets();
 
-      await expect(
-        pool
-          .connect(trident.accounts[4])
-          .decreaseLiquidity(lower, upper, BigNumber.from(`2`).pow(128).sub(`1`), trident.accounts[4].address, false)
-      ).to.be.revertedWith(customError("Overflow"));
+      await expect(pool.connect(trident.accounts[4]).burn(lower, upper, BigNumber.from(`2`).pow(128).sub(`1`))).to.be.revertedWith(
+        customError("Overflow")
+      );
     });
   });
 });

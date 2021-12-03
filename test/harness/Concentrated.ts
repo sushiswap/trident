@@ -1,12 +1,8 @@
-import { BigNumber, BigNumberish } from "@ethersproject/bignumber";
+import { BigNumber } from "@ethersproject/bignumber";
 import { ContractTransaction } from "@ethersproject/contracts";
-import { Transaction } from "@ethersproject/transactions";
-import { getBigNumber } from "@sushiswap/sdk";
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { ConcentratedLiquidityPool, ConcentratedLiquidityPoolManager, TridentRouter } from "../../types";
-import { ADDRESS_ZERO } from "../utilities";
-import { swap } from "./ConstantProduct";
+import { ConcentratedLiquidityPool } from "../../types";
 import { divRoundingUp, expectAlmostEqual, ZERO } from "./helpers";
 import { Trident } from "./Trident";
 
@@ -275,8 +271,7 @@ export async function removeLiquidityViaManager(params: {
   const poolPositionLiquidity = (await pool.positions(manager.address, position.lower, position.upper)).liquidity;
   const fees0 = feeGrowthInside0.sub(position.feeGrowthInside0).mul(position.liquidity).div(TWO_POW_128);
   const fees1 = feeGrowthInside1.sub(position.feeGrowthInside1).mul(position.liquidity).div(TWO_POW_128);
-
-  await manager.decreaseLiquidity(tokenId, liquidityAmount, recipient, unwrapBento);
+  await manager.burn(tokenId, liquidityAmount, recipient, unwrapBento, 0, 0);
 
   const [newPoolAddress, newUserLiquidity, newLower, newUpper, newFeeGrowthInside0, newFeeGrowthInside1] = await manager.positions(tokenId);
   const [newCurrentPrice, newPriceLower, newPriceUpper] = await getPrices(pool, [newLower, newUpper]);
@@ -359,7 +354,7 @@ export async function removeLiquidityViaManager(params: {
   return { token0: BigNumber.from(0), token1: BigNumber.from(1) };
 }
 
-export async function addLiquidityViaRouter(params: {
+export async function addLiquidityViaManager(params: {
   pool: ConcentratedLiquidityPool;
   amount0Desired: BigNumber;
   amount1Desired: BigNumber;
@@ -387,20 +382,23 @@ export async function addLiquidityViaRouter(params: {
   const [oldLowerPreviousTick, oldLowerNextTick, oldLowerLiquidity] = await pool.ticks(lower);
   const [oldUpperPreviousTick, oldUpperNextTick, oldUpperLiquidity] = await pool.ticks(upper);
   const oldPositionState = await pool.positions(positionOwner, lower, upper);
-  const mintData = getMintData({
+  const { feeGrowthInside0, feeGrowthInside1 } = await pool.rangeFeeGrowth(lower, upper);
+  const accumulatedFees0 = feeGrowthInside0.sub(oldPositionState.feeGrowthInside0Last).mul(oldPositionState.liquidity).div(TWO_POW_128);
+  const accumulatedFees1 = feeGrowthInside1.sub(oldPositionState.feeGrowthInside1Last).mul(oldPositionState.liquidity).div(TWO_POW_128);
+
+  await Trident.Instance.concentratedPoolManager.mint(
+    pool.address,
     lowerOld,
     lower,
     upperOld,
     upper,
     amount0Desired,
     amount1Desired,
-    native0: native,
-    native1: native,
-    positionOwner,
-    recipient: recipient,
-    positionId,
-  });
-  await Trident.Instance.router.addLiquidityLazy(pool.address, liquidity, mintData);
+    native,
+    liquidity,
+    positionId || 0
+  );
+
   const newLiquidity = await pool.liquidity();
   const priceAndTick = await pool.getPriceAndNearestTicks();
   const newPrice = priceAndTick._price;
@@ -420,8 +418,8 @@ export async function addLiquidityViaRouter(params: {
     oldPositionState.liquidity.add(liquidity).toString(),
     "didn't correctly update position's liquidity"
   );
-  expect(newPositionState.feeGrowthInside0Last.toString()).to.be.eq("0", "didn't reset position's fee0 growth");
-  expect(newPositionState.feeGrowthInside1Last.toString()).to.be.eq("0", "didn't reset position's fee1 growth");
+  expect(newPositionState.feeGrowthInside0Last.toString()).to.be.eq(feeGrowthInside0.toString(), "didn't reset position's fee0 growth");
+  expect(newPositionState.feeGrowthInside1Last.toString()).to.be.eq(feeGrowthInside1.toString(), "didn't reset position's fee1 growth");
 
   if (oldLowerLiquidity.gt(0)) {
     // existing tick, lowerOld shouldn't get updated
@@ -452,8 +450,14 @@ export async function addLiquidityViaRouter(params: {
   }
   expect(newUserBalances[0].toString()).to.be.eq(oldUserBalances[0].sub(dx).toString(), "Didn't pay correct amount of token0");
   expect(newUserBalances[1].toString()).to.be.eq(oldUserBalances[1].sub(dy).toString(), "Didn't pay correct amount of token1");
-  expect(newPoolBalances[0].toString()).to.be.eq(oldPoolBalances[0].add(dx).toString(), "Didn't receive correct amount of token0");
-  expect(newPoolBalances[1].toString()).to.be.eq(oldPoolBalances[1].add(dy).toString(), "Didn't receive correct amount of token1");
+  expect(newPoolBalances[0].toString()).to.be.eq(
+    oldPoolBalances[0].sub(accumulatedFees0).add(dx).toString(),
+    "Didn't receive correct amount of token0"
+  );
+  expect(newPoolBalances[1].toString()).to.be.eq(
+    oldPoolBalances[1].sub(accumulatedFees1).add(dy).toString(),
+    "Didn't receive correct amount of token1"
+  );
   const nftMinted = await Trident.Instance.concentratedPoolManager.nftCount();
 
   if (positionOwner === Trident.Instance.concentratedPoolManager.address) {
@@ -477,7 +481,7 @@ export async function addLiquidityViaRouter(params: {
   return { dy, dx, tokenId: nftMinted.minted.sub(1), liquidity };
 }
 
-export async function _addLiquidityViaRouter(params: {
+export async function _addLiquidityViaManager(params: {
   pool: ConcentratedLiquidityPool;
   amount0Desired: BigNumber;
   amount1Desired: BigNumber;
@@ -491,20 +495,18 @@ export async function _addLiquidityViaRouter(params: {
   positionId?: number;
 }) {
   const { pool, amount0Desired, amount1Desired, native, lowerOld, lower, upperOld, upper, positionOwner, recipient, positionId } = params;
-  const mintData = getMintData({
+  await Trident.Instance.concentratedPoolManager.mint(
+    pool.address,
     lowerOld,
     lower,
     upperOld,
     upper,
     amount0Desired,
     amount1Desired,
-    native0: native,
-    native1: native,
-    positionOwner,
-    recipient: recipient,
-    positionId,
-  });
-  await Trident.Instance.router.addLiquidityLazy(pool.address, BigNumber.from(0), mintData);
+    native,
+    0,
+    positionId || 0
+  );
 }
 
 // use solidity here for convenience

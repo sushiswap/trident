@@ -2,9 +2,9 @@
 
 pragma solidity >=0.8.0;
 
-import "../../interfaces/concentratedPool/IConcentratedLiquidityPool.sol";
 import "../../libraries/concentratedPool/Ticks.sol";
 import "../../interfaces/IBentoBoxMinimal.sol";
+import "../../interfaces/concentratedPool/IConcentratedLiquidityPool.sol";
 import {IConcentratedLiquidityPoolManager as IPoolManager} from "../../interfaces/concentratedPool/IConcentratedLiquidityPoolManager.sol";
 
 /// @notice Trident Concentrated Liquidity Pool periphery contract that combines non-fungible position management and staking.
@@ -20,12 +20,12 @@ contract ConcentratedLiquidityPoolStaker {
         uint32 startTime;
         uint32 endTime;
         uint32 expiry;
-        uint160 secondsClaimed; // @dev x128.
+        uint160 secondsClaimed; // x128.
         uint96 rewardsUnclaimed;
     }
 
     struct Stake {
-        uint160 secondsGrowthInsideLast; // @dev x128.
+        uint160 secondsGrowthInsideLast; // x128.
         uint32 timestamp;
     }
 
@@ -108,6 +108,7 @@ contract ConcentratedLiquidityPoolStaker {
             Incentive storage incentive = incentives[pool][incentiveIds[i]];
             Stake storage stake = stakes[positionId][incentiveIds[i]];
 
+            // After liquidity is increased on an NFT the owner needs to resubscribe to the incentive.
             require(stake.timestamp >= position.latestAddition, "MUST_RESUBSCRIBE");
 
             uint256 rewards;
@@ -153,8 +154,8 @@ contract ConcentratedLiquidityPoolStaker {
     ) public view returns (uint256 secondsInside) {
         (, int24 currentTick) = pool.getPriceAndNearestTicks();
 
-        Ticks.Tick memory lower = pool.ticks(lowerTick);
-        Ticks.Tick memory upper = pool.ticks(upperTick);
+        IConcentratedLiquidityPool.Tick memory upper = IConcentratedLiquidityPool(pool).ticks(upperTick);
+        IConcentratedLiquidityPool.Tick memory lower = IConcentratedLiquidityPool(pool).ticks(lowerTick);
 
         (uint256 secondsGrowthGlobal, ) = pool.getSecondsGrowthAndLastObservation();
         uint256 secondsBelow;

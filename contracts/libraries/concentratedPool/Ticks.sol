@@ -3,24 +3,16 @@
 pragma solidity >=0.8.0;
 
 import "./TickMath.sol";
+import "../../interfaces/concentratedPool/IConcentratedLiquidityPool.sol";
 
 /// @notice Tick management library for ranged liquidity.
 library Ticks {
-    struct Tick {
-        int24 previousTick;
-        int24 nextTick;
-        uint128 liquidity;
-        uint256 feeGrowthOutside0; // Per unit of liquidity.
-        uint256 feeGrowthOutside1;
-        uint160 secondsGrowthOutside;
-    }
-
     function getMaxLiquidity(uint24 _tickSpacing) public pure returns (uint128) {
         return type(uint128).max / uint128(uint24(TickMath.MAX_TICK) / (2 * uint24(_tickSpacing)));
     }
 
     function cross(
-        mapping(int24 => Tick) storage ticks,
+        mapping(int24 => IConcentratedLiquidityPoolStruct.Tick) storage ticks,
         int24 nextTickToCross,
         uint160 secondsGrowthGlobal,
         uint256 currentLiquidity,
@@ -33,20 +25,25 @@ library Ticks {
 
         if (zeroForOne) {
             // Moving forward through the linked list.
-            if ((nextTickToCross / int24(tickSpacing)) % 2 == 0) {
-                currentLiquidity -= ticks[nextTickToCross].liquidity; // todo wrap in unchecked {}
-            } else {
-                currentLiquidity += ticks[nextTickToCross].liquidity;
+            // Liquidity cannot overflow due to the MAX_TICK_LIQUIDITY requirement.
+            unchecked {
+                if ((nextTickToCross / int24(tickSpacing)) % 2 == 0) {
+                    currentLiquidity -= ticks[nextTickToCross].liquidity;
+                } else {
+                    currentLiquidity += ticks[nextTickToCross].liquidity;
+                }
             }
             ticks[nextTickToCross].feeGrowthOutside0 = feeGrowthGlobalB - ticks[nextTickToCross].feeGrowthOutside0;
             ticks[nextTickToCross].feeGrowthOutside1 = feeGrowthGlobalA - ticks[nextTickToCross].feeGrowthOutside1;
             nextTickToCross = ticks[nextTickToCross].previousTick;
         } else {
             // Moving backwards through the linked list.
-            if ((nextTickToCross / int24(tickSpacing)) % 2 == 0) {
-                currentLiquidity += ticks[nextTickToCross].liquidity;
-            } else {
-                currentLiquidity -= ticks[nextTickToCross].liquidity;
+            unchecked {
+                if ((nextTickToCross / int24(tickSpacing)) % 2 == 0) {
+                    currentLiquidity += ticks[nextTickToCross].liquidity;
+                } else {
+                    currentLiquidity -= ticks[nextTickToCross].liquidity;
+                }
             }
             ticks[nextTickToCross].feeGrowthOutside1 = feeGrowthGlobalB - ticks[nextTickToCross].feeGrowthOutside1;
             ticks[nextTickToCross].feeGrowthOutside0 = feeGrowthGlobalA - ticks[nextTickToCross].feeGrowthOutside0;
@@ -56,7 +53,7 @@ library Ticks {
     }
 
     function insert(
-        mapping(int24 => Tick) storage ticks,
+        mapping(int24 => IConcentratedLiquidityPoolStruct.Tick) storage ticks,
         uint256 feeGrowthGlobal0,
         uint256 feeGrowthGlobal1,
         uint160 secondsGrowthGlobal,
@@ -80,15 +77,22 @@ library Ticks {
                 ticks[lower].liquidity = currentLowerLiquidity + amount;
             } else {
                 // We are inserting a new tick.
-                Ticks.Tick storage old = ticks[lowerOld];
+                IConcentratedLiquidityPoolStruct.Tick storage old = ticks[lowerOld];
                 int24 oldNextTick = old.nextTick;
 
                 require((old.liquidity != 0 || lowerOld == TickMath.MIN_TICK) && lowerOld < lower && lower < oldNextTick, "LOWER_ORDER");
 
                 if (lower <= nearestTick) {
-                    ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsGrowthGlobal);
+                    ticks[lower] = IConcentratedLiquidityPoolStruct.Tick(
+                        lowerOld,
+                        oldNextTick,
+                        amount,
+                        feeGrowthGlobal0,
+                        feeGrowthGlobal1,
+                        secondsGrowthGlobal
+                    );
                 } else {
-                    ticks[lower] = Ticks.Tick(lowerOld, oldNextTick, amount, 0, 0, 0);
+                    ticks[lower] = IConcentratedLiquidityPoolStruct.Tick(lowerOld, oldNextTick, amount, 0, 0, 0);
                 }
 
                 old.nextTick = lower;
@@ -102,15 +106,22 @@ library Ticks {
             ticks[upper].liquidity = currentUpperLiquidity + amount;
         } else {
             // Inserting a new tick.
-            Ticks.Tick storage old = ticks[upperOld];
+            IConcentratedLiquidityPoolStruct.Tick storage old = ticks[upperOld];
             int24 oldNextTick = old.nextTick;
 
             require(old.liquidity != 0 && oldNextTick > upper && upperOld < upper, "UPPER_ORDER");
 
             if (upper <= nearestTick) {
-                ticks[upper] = Ticks.Tick(upperOld, oldNextTick, amount, feeGrowthGlobal0, feeGrowthGlobal1, secondsGrowthGlobal);
+                ticks[upper] = IConcentratedLiquidityPoolStruct.Tick(
+                    upperOld,
+                    oldNextTick,
+                    amount,
+                    feeGrowthGlobal0,
+                    feeGrowthGlobal1,
+                    secondsGrowthGlobal
+                );
             } else {
-                ticks[upper] = Ticks.Tick(upperOld, oldNextTick, amount, 0, 0, 0);
+                ticks[upper] = IConcentratedLiquidityPoolStruct.Tick(upperOld, oldNextTick, amount, 0, 0, 0);
             }
             old.nextTick = upper;
             ticks[oldNextTick].previousTick = upper;
@@ -128,18 +139,18 @@ library Ticks {
     }
 
     function remove(
-        mapping(int24 => Tick) storage ticks,
+        mapping(int24 => IConcentratedLiquidityPoolStruct.Tick) storage ticks,
         int24 lower,
         int24 upper,
         uint128 amount,
         int24 nearestTick
     ) public returns (int24) {
-        Ticks.Tick storage current = ticks[lower];
+        IConcentratedLiquidityPoolStruct.Tick storage current = ticks[lower];
 
         if (lower != TickMath.MIN_TICK && current.liquidity == amount) {
             // Delete lower tick.
-            Ticks.Tick storage previous = ticks[current.previousTick];
-            Ticks.Tick storage next = ticks[current.nextTick];
+            IConcentratedLiquidityPoolStruct.Tick storage previous = ticks[current.previousTick];
+            IConcentratedLiquidityPoolStruct.Tick storage next = ticks[current.nextTick];
 
             previous.nextTick = current.nextTick;
             next.previousTick = current.previousTick;
@@ -157,8 +168,8 @@ library Ticks {
 
         if (upper != TickMath.MAX_TICK && current.liquidity == amount) {
             // Delete upper tick.
-            Ticks.Tick storage previous = ticks[current.previousTick];
-            Ticks.Tick storage next = ticks[current.nextTick];
+            IConcentratedLiquidityPoolStruct.Tick storage previous = ticks[current.previousTick];
+            IConcentratedLiquidityPoolStruct.Tick storage next = ticks[current.nextTick];
 
             previous.nextTick = current.nextTick;
             next.previousTick = current.previousTick;
