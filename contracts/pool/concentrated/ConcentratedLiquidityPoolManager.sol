@@ -52,7 +52,20 @@ contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerSt
         cachedMsgSender = msg.sender;
         cachedPool = address(pool);
 
-        uint128 liquidityMinted = uint128(pool.mint(abi.encode(lowerOld, lower, upperOld, upper, amount0Desired, amount1Desired, native)));
+        uint128 liquidityMinted = uint128(
+            pool.mint(
+                IConcentratedLiquidityPoolStruct.MintParams({
+                    lowerOld: lowerOld,
+                    lower: lower,
+                    upperOld: upperOld,
+                    upper: upper,
+                    amount0Desired: amount0Desired,
+                    amount1Desired: amount1Desired,
+                    native: native
+                })
+            )
+        );
+
         require(liquidityMinted >= minLiquidity, "TOO_LITTLE_RECEIVED");
 
         (uint256 feeGrowthInside0, uint256 feeGrowthInside1) = pool.rangeFeeGrowth(lower, upper);

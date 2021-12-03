@@ -6,21 +6,54 @@ import "./../IBentoBoxMinimal.sol";
 import "./../IMasterDeployer.sol";
 import "../../libraries/concentratedPool/Ticks.sol";
 
-/// @notice Trident Concentrated Liquidity Pool interface.
-interface IConcentratedLiquidityPool {
+/// @notice Trident concentrated liquidity pool contract Structs.
+interface IConcentratedLiquidityPoolStruct {
+    struct Tick {
+        int24 previousTick;
+        int24 nextTick;
+        uint128 liquidity;
+        uint256 feeGrowthOutside0; // Per unit of liquidity.
+        uint256 feeGrowthOutside1;
+        uint160 secondsGrowthOutside;
+    }
     struct Position {
         uint128 liquidity;
         uint256 feeGrowthInside0Last;
         uint256 feeGrowthInside1Last;
     }
 
-    function price() external view returns (uint160);
+    struct MintParams {
+        int24 lowerOld;
+        int24 lower;
+        int24 upperOld;
+        int24 upper;
+        uint128 amount0Desired;
+        uint128 amount1Desired;
+        bool native;
+    }
 
-    function token0() external view returns (address);
+    struct SwapCache {
+        uint256 feeAmount;
+        uint256 totalFeeAmount;
+        uint256 protocolFee;
+        uint256 feeGrowthGlobalA;
+        uint256 feeGrowthGlobalB;
+        uint256 currentPrice;
+        uint256 currentLiquidity;
+        uint256 input;
+        int24 nextTickToCross;
+    }
+}
 
-    function token1() external view returns (address);
+/// @notice Trident Concentrated Liquidity Pool interface.
+interface IConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
+    function ticks(int24 _tick) external view returns (Tick memory);
 
-    function ticks(int24 _tick) external view returns (Ticks.Tick memory tick);
+    function positions(
+        address owner,
+        int24 lower,
+        int24 upper
+    ) external view returns (Position memory);
 
     function feeGrowthGlobal0() external view returns (uint256);
 
@@ -30,15 +63,9 @@ interface IConcentratedLiquidityPool {
 
     function setPrice(uint160 price) external;
 
-    function positions(
-        address owner,
-        int24 lower,
-        int24 upper
-    ) external view returns (Position memory);
-
     function collect(int24 lower, int24 upper) external returns (uint256 amount0fees, uint256 amount1fees);
 
-    function mint(bytes memory data) external returns (uint256 liquidityMinted);
+    function mint(MintParams memory data) external returns (uint256 liquidityMinted);
 
     function burn(
         int24 lower,

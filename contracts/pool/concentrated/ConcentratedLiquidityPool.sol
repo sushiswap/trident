@@ -7,6 +7,7 @@ import "../../interfaces/IMasterDeployer.sol";
 import "../../interfaces/ITridentCallee.sol";
 import "../../interfaces/ITridentRouter.sol";
 import "../../interfaces/concentratedPool/IPositionManager.sol";
+import "../../interfaces/concentratedPool/IConcentratedLiquidityPool.sol";
 import "../../libraries/concentratedPool/FullMath.sol";
 import "../../libraries/concentratedPool/TickMath.sol";
 import "../../libraries/concentratedPool/UnsafeMath.sol";
@@ -16,8 +17,8 @@ import "../../libraries/concentratedPool/Ticks.sol";
 
 /// @notice Trident Concentrated liquidity pool implementation.
 /// @dev Amounts are considered to be in Bentobox shared
-contract ConcentratedLiquidityPool {
-    using Ticks for mapping(int24 => Ticks.Tick);
+contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
+    using Ticks for mapping(int24 => Tick);
 
     event Mint(address indexed owner, uint256 amount0, uint256 amount1);
     event Burn(address indexed owner, uint256 amount0, uint256 amount1);
@@ -58,36 +59,8 @@ contract ConcentratedLiquidityPool {
 
     uint256 internal unlocked;
 
-    mapping(int24 => Ticks.Tick) public ticks;
+    mapping(int24 => Tick) public ticks;
     mapping(address => mapping(int24 => mapping(int24 => Position))) public positions;
-
-    struct Position {
-        uint128 liquidity;
-        uint256 feeGrowthInside0Last;
-        uint256 feeGrowthInside1Last;
-    }
-
-    struct SwapCache {
-        uint256 feeAmount;
-        uint256 totalFeeAmount;
-        uint256 protocolFee;
-        uint256 feeGrowthGlobalA;
-        uint256 feeGrowthGlobalB;
-        uint256 currentPrice;
-        uint256 currentLiquidity;
-        uint256 input;
-        int24 nextTickToCross;
-    }
-
-    struct MintParams {
-        int24 lowerOld;
-        int24 lower;
-        int24 upperOld;
-        int24 upper;
-        uint128 amount0Desired;
-        uint128 amount1Desired;
-        bool native;
-    }
 
     /// @dev Error list to optimize around pool requirements.
     error Locked();
@@ -131,8 +104,8 @@ contract ConcentratedLiquidityPool {
         barFee = _masterDeployer.barFee();
         masterDeployer = _masterDeployer;
         MAX_TICK_LIQUIDITY = Ticks.getMaxLiquidity(_tickSpacing);
-        ticks[TickMath.MIN_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
-        ticks[TickMath.MAX_TICK] = Ticks.Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
+        ticks[TickMath.MIN_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
+        ticks[TickMath.MAX_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
         nearestTick = TickMath.MIN_TICK;
         unlocked = 1;
     }
@@ -147,9 +120,7 @@ contract ConcentratedLiquidityPool {
     }
 
     /// @dev Mints LP tokens - should be called via the CL pool manager contract.
-    function mint(bytes calldata data) public lock returns (uint256 liquidityMinted) {
-        MintParams memory mintParams = abi.decode(data, (MintParams));
-
+    function mint(MintParams memory mintParams) public lock returns (uint256 liquidityMinted) {
         _ensureTickSpacing(mintParams.lower, mintParams.upper);
 
         uint256 priceLower = uint256(TickMath.getSqrtRatioAtTick(mintParams.lower));
@@ -182,9 +153,7 @@ contract ConcentratedLiquidityPool {
                 _transfer(token1, amount1Fees, msg.sender, false);
                 reserve1 -= uint128(amount1Fees);
             }
-        }
 
-        unchecked {
             if (priceLower <= currentPrice && currentPrice < priceUpper) liquidity += uint128(liquidityMinted);
         }
 
@@ -212,16 +181,14 @@ contract ConcentratedLiquidityPool {
 
         IPositionManager(msg.sender).mintCallback(token0, token1, amount0Actual, amount1Actual, mintParams.native);
 
-        unchecked {
-            if (amount0Actual != 0) {
-                if (amount0Actual + reserve0 > _balance(token0)) revert Token0Missing();
-                reserve0 += amount0Actual;
-            }
+        if (amount0Actual != 0) {
+            reserve0 += amount0Actual;
+            if (reserve0 > _balance(token0)) revert Token0Missing();
+        }
 
-            if (amount1Actual != 0) {
-                if (amount1Actual + reserve1 > _balance(token1)) revert Token1Missing();
-                reserve1 += amount1Actual;
-            }
+        if (amount1Actual != 0) {
+            reserve1 += amount1Actual;
+            if (reserve1 > _balance(token1)) revert Token1Missing();
         }
 
         emit Mint(msg.sender, amount0Actual, amount1Actual);
@@ -233,6 +200,7 @@ contract ConcentratedLiquidityPool {
         uint128 amount
     )
         public
+        lock
         returns (
             uint256 token0Amount,
             uint256 token1Amount,
@@ -240,23 +208,21 @@ contract ConcentratedLiquidityPool {
             uint256 token1Fees
         )
     {
-        {
-            uint160 priceLower = TickMath.getSqrtRatioAtTick(lower);
-            uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper);
-            uint160 currentPrice = price;
+        uint160 priceLower = TickMath.getSqrtRatioAtTick(lower);
+        uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper);
+        uint160 currentPrice = price;
 
-            unchecked {
-                if (priceLower <= currentPrice && currentPrice < priceUpper) liquidity -= amount;
-            }
-
-            (token0Amount, token1Amount) = DyDxMath.getAmountsForLiquidity(
-                uint256(priceLower),
-                uint256(priceUpper),
-                uint256(currentPrice),
-                uint256(amount),
-                false
-            );
+        unchecked {
+            if (priceLower <= currentPrice && currentPrice < priceUpper) liquidity -= amount;
         }
+
+        (token0Amount, token1Amount) = DyDxMath.getAmountsForLiquidity(
+            uint256(priceLower),
+            uint256(priceUpper),
+            uint256(currentPrice),
+            uint256(amount),
+            false
+        );
 
         // Ensure no overflow happens when we cast from uint128 to int128.
         if (amount > uint128(type(int128).max)) revert Overflow();
@@ -273,7 +239,7 @@ contract ConcentratedLiquidityPool {
             reserve1 -= uint128(amount1);
         }
 
-        _transferBothTokens(msg.sender, amount0, amount1, false);
+        _transferBothTokens(msg.sender, amount0, amount1);
 
         nearestTick = Ticks.remove(ticks, lower, upper, amount, nearestTick);
 
@@ -283,10 +249,10 @@ contract ConcentratedLiquidityPool {
     function collect(int24 lower, int24 upper) public lock returns (uint256 amount0fees, uint256 amount1fees) {
         (amount0fees, amount1fees) = _updatePosition(msg.sender, lower, upper, 0);
 
-        _transferBothTokens(msg.sender, amount0fees, amount1fees, false);
-
         reserve0 -= uint128(amount0fees);
         reserve1 -= uint128(amount1fees);
+
+        _transferBothTokens(msg.sender, amount0fees, amount1fees);
 
         emit Collect(msg.sender, amount0fees, amount1fees);
     }
@@ -561,16 +527,10 @@ contract ConcentratedLiquidityPool {
     function _transferBothTokens(
         address to,
         uint256 shares0,
-        uint256 shares1,
-        bool unwrapBento
+        uint256 shares1
     ) internal {
-        if (unwrapBento) {
-            bento.withdraw(token0, address(this), to, 0, shares0);
-            bento.withdraw(token1, address(this), to, 0, shares1);
-        } else {
-            bento.transfer(token0, address(this), to, shares0);
-            bento.transfer(token1, address(this), to, shares1);
-        }
+        bento.transfer(token0, address(this), to, shares0);
+        bento.transfer(token1, address(this), to, shares1);
     }
 
     /// @dev Generic formula for fee growth inside a range: (globalGrowth - growthBelow - growthAbove)
@@ -590,8 +550,8 @@ contract ConcentratedLiquidityPool {
     function rangeFeeGrowth(int24 lowerTick, int24 upperTick) public view returns (uint256 feeGrowthInside0, uint256 feeGrowthInside1) {
         int24 currentTick = nearestTick;
 
-        Ticks.Tick storage lower = ticks[lowerTick];
-        Ticks.Tick storage upper = ticks[upperTick];
+        Tick storage lower = ticks[lowerTick];
+        Tick storage upper = ticks[upperTick];
 
         // Calculate fee growth below & above.
         uint256 _feeGrowthGlobal0 = feeGrowthGlobal0;

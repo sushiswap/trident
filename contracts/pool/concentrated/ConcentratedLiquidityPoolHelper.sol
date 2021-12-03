@@ -16,7 +16,7 @@ contract ConcentratedLiquidityPoolHelper {
     function getTickState(IConcentratedLiquidityPool pool, uint24 tickCount) external view returns (SimpleTick[] memory) {
         SimpleTick[] memory ticks = new SimpleTick[](tickCount); // todo save tickCount in the core contract
 
-        Ticks.Tick memory tick;
+        IConcentratedLiquidityPool.Tick memory tick;
         uint24 i;
         int24 current = TickMath.MIN_TICK;
 
