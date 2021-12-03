@@ -210,11 +210,6 @@ export class TridentSwapParamsFactory {
         .reduce(function (a, b) {
           return a.add(b);
         });
-
-      //   amount = multiRoute.amountInBN.sub(sumIntialPathAmounts);
-      // } else {
-      //   amount = multiRoute.amountInBN.mul(getBigNumber(multiRoute.legs[legIndex].absolutePortion));
-      // }
       amount = getBigNumber(multiRoute.amountIn).sub(sumIntialPathAmounts);
     } else {
       amount = getBigNumber(multiRoute.amountIn * multiRoute.legs[legIndex].absolutePortion);
@@ -230,12 +225,8 @@ export class TridentSwapParamsFactory {
     if (pool instanceof HybridRPool || pool instanceof ConstantProductRPool) {
       data = ethers.utils.defaultAbiCoder.encode(["address", "address", "bool"], [leg.tokenFrom.address, recipent, unwrapBento]);
     } else if (pool instanceof CLRPool) {
-      const zeroForOne = pool.token0.address === multiRoute.fromToken.address;
-
-      data = ethers.utils.defaultAbiCoder.encode(
-        ["bool", "uint128", "address", "bool"],
-        [zeroForOne, getBigNumber(leg.assumedAmountIn), recipent, unwrapBento]
-      );
+      const zeroForOne = pool.token0.address === leg.tokenFrom.address;
+      data = ethers.utils.defaultAbiCoder.encode(["bool", "address", "bool"], [zeroForOne, recipent, unwrapBento]);
     }
 
     return data;

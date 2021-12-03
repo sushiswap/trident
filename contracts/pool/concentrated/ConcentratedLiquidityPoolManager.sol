@@ -34,7 +34,7 @@ contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerSt
         _bento.registerProtocol();
         bento = _bento;
         wETH = _wETH;
-        _mint(address(0));
+        mint(address(this));
     }
 
     function mint(
@@ -49,6 +49,8 @@ contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerSt
         uint256 minLiquidity,
         uint256 positionId
     ) external payable returns (uint256 _positionId) {
+        require(masterDeployer.pools(address(pool)), "INVALID_POOL");
+
         cachedMsgSender = msg.sender;
         cachedPool = address(pool);
 
@@ -72,7 +74,8 @@ contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerSt
 
         if (positionId == 0) {
             // We mint a new NFT.
-            positions[totalSupply] = Position({
+            _positionId = nftCount.minted;
+            positions[_positionId] = Position({
                 pool: pool,
                 liquidity: liquidityMinted,
                 lower: lower,
@@ -81,15 +84,14 @@ contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerSt
                 feeGrowthInside0: feeGrowthInside0,
                 feeGrowthInside1: feeGrowthInside1
             });
-            _positionId = totalSupply;
-            _mint(msg.sender);
+            mint(msg.sender);
         } else {
             // We increase liquidity for an existing NFT.
             _positionId = positionId;
-            Position storage position = positions[positionId];
+            Position storage position = positions[_positionId];
             require(address(position.pool) == address(pool), "POOL_MIS_MATCH");
             require(position.lower == lower && position.upper == upper, "RANGE_MIS_MATCH");
-            require(ownerOf[positionId] == msg.sender, "NOT_ID_OWNER");
+            require(ownerOf(positionId) == msg.sender, "NOT_ID_OWNER");
             // Fees should be claimed first.
             position.feeGrowthInside0 = feeGrowthInside0;
             position.feeGrowthInside1 = feeGrowthInside1;
@@ -128,7 +130,7 @@ contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerSt
         address recipient,
         bool unwrapBento
     ) external {
-        require(msg.sender == ownerOf[tokenId], "NOT_ID_OWNER");
+        require(msg.sender == ownerOf(tokenId), "NOT_ID_OWNER");
         Position storage position = positions[tokenId];
 
         (uint256 token0Fees, uint256 token1Fees, uint256 feeGrowthInside0, uint256 feeGrowthInside1) = positionFees(tokenId);
@@ -148,7 +150,7 @@ contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerSt
             (token0Amount, token1Amount, , ) = position.pool.burn(position.lower, position.upper, position.liquidity);
 
             delete positions[tokenId];
-            _burn(tokenId);
+            burn(tokenId);
         }
 
         unchecked {
@@ -167,7 +169,7 @@ contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerSt
         address recipient,
         bool unwrapBento
     ) public returns (uint256 token0amount, uint256 token1amount) {
-        require(msg.sender == ownerOf[tokenId], "NOT_ID_OWNER");
+        require(msg.sender == ownerOf(tokenId), "NOT_ID_OWNER");
         Position storage position = positions[tokenId];
 
         address[] memory tokens = position.pool.getAssets();
