@@ -25,20 +25,25 @@ library Ticks {
 
         if (zeroForOne) {
             // Moving forward through the linked list.
-            if ((nextTickToCross / int24(tickSpacing)) % 2 == 0) {
-                currentLiquidity -= ticks[nextTickToCross].liquidity; // todo wrap in unchecked {}
-            } else {
-                currentLiquidity += ticks[nextTickToCross].liquidity;
+            // Liquidity cannot overflow due to the MAX_TICK_LIQUIDITY requirement.
+            unchecked {
+                if ((nextTickToCross / int24(tickSpacing)) % 2 == 0) {
+                    currentLiquidity -= ticks[nextTickToCross].liquidity;
+                } else {
+                    currentLiquidity += ticks[nextTickToCross].liquidity;
+                }
             }
             ticks[nextTickToCross].feeGrowthOutside0 = feeGrowthGlobalB - ticks[nextTickToCross].feeGrowthOutside0;
             ticks[nextTickToCross].feeGrowthOutside1 = feeGrowthGlobalA - ticks[nextTickToCross].feeGrowthOutside1;
             nextTickToCross = ticks[nextTickToCross].previousTick;
         } else {
             // Moving backwards through the linked list.
-            if ((nextTickToCross / int24(tickSpacing)) % 2 == 0) {
-                currentLiquidity += ticks[nextTickToCross].liquidity;
-            } else {
-                currentLiquidity -= ticks[nextTickToCross].liquidity;
+            unchecked {
+                if ((nextTickToCross / int24(tickSpacing)) % 2 == 0) {
+                    currentLiquidity += ticks[nextTickToCross].liquidity;
+                } else {
+                    currentLiquidity -= ticks[nextTickToCross].liquidity;
+                }
             }
             ticks[nextTickToCross].feeGrowthOutside1 = feeGrowthGlobalB - ticks[nextTickToCross].feeGrowthOutside1;
             ticks[nextTickToCross].feeGrowthOutside0 = feeGrowthGlobalA - ticks[nextTickToCross].feeGrowthOutside0;

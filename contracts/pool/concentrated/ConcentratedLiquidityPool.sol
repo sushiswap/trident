@@ -449,13 +449,17 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
             uint128 newBalance = reserve0 + inAmount;
             if (uint256(newBalance) > balance0) revert Token0Missing();
             reserve0 = newBalance;
-            reserve1 -= uint128(amountOut); // todo wrap in unchecked {}
+            unchecked {
+                reserve1 -= uint128(amountOut);
+            }
         } else {
             uint256 balance1 = _balance(token1);
             uint128 newBalance = reserve1 + inAmount;
             if (uint256(newBalance) > balance1) revert Token1Missing();
             reserve1 = newBalance;
-            reserve0 -= uint128(amountOut);
+            unchecked {
+                reserve0 -= uint128(amountOut);
+            }
         }
     }
 
