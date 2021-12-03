@@ -129,38 +129,36 @@ contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerSt
         uint256 tokenId,
         uint128 amount,
         address recipient,
-        bool unwrapBento
-    ) external {
+        bool unwrapBento,
+        uint256 minimumOut0,
+        uint256 minimumOut1
+    ) external returns (uint256 token0Amount, uint256 token1Amount) {
         require(msg.sender == ownerOf(tokenId), "NOT_ID_OWNER");
-        Position storage position = positions[tokenId];
+
+        Position memory position = positions[tokenId];
 
         (uint256 token0Fees, uint256 token1Fees, uint256 feeGrowthInside0, uint256 feeGrowthInside1) = positionFees(tokenId);
-
-        address[] memory tokens = position.pool.getAssets();
-
-        uint256 token0Amount;
-        uint256 token1Amount;
 
         if (amount < position.liquidity) {
             (token0Amount, token1Amount, , ) = position.pool.burn(position.lower, position.upper, amount);
 
-            position.feeGrowthInside0 = feeGrowthInside0;
-            position.feeGrowthInside1 = feeGrowthInside1;
-            position.liquidity -= amount;
+            positions[tokenId].feeGrowthInside0 = feeGrowthInside0;
+            positions[tokenId].feeGrowthInside1 = feeGrowthInside1;
+            positions[tokenId].liquidity -= amount;
         } else {
             (token0Amount, token1Amount, , ) = position.pool.burn(position.lower, position.upper, position.liquidity);
-
-            delete positions[tokenId];
             burn(tokenId);
+            delete positions[tokenId];
         }
+
+        require(token0Amount >= minimumOut0 && token1Amount >= minimumOut1, "TOO_LITTLE_RECEIVED");
 
         unchecked {
             token0Amount += token0Fees;
             token1Amount += token1Fees;
         }
 
-        _transfer(tokens[0], address(this), recipient, token0Amount, unwrapBento);
-        _transfer(tokens[1], address(this), recipient, token1Amount, unwrapBento);
+        _transferBoth(position.pool, recipient, token0Amount, token1Amount, unwrapBento);
 
         emit DecreaseLiquidity(address(position.pool), msg.sender, tokenId, amount);
     }
@@ -173,9 +171,7 @@ contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerSt
         require(msg.sender == ownerOf(tokenId), "NOT_ID_OWNER");
         Position storage position = positions[tokenId];
 
-        address[] memory tokens = position.pool.getAssets();
-        address token0 = tokens[0];
-        address token1 = tokens[1];
+        (, , , , , , address token0, address token1) = position.pool.getImmutables();
 
         (token0amount, token1amount, position.feeGrowthInside0, position.feeGrowthInside1) = positionFees(tokenId);
 
@@ -193,8 +189,8 @@ contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerSt
             if (token1amount > newBalance1) token1amount = newBalance1;
         }
 
-        _transfer(token0, address(this), recipient, token0amount, unwrapBento);
-        _transfer(token1, address(this), recipient, token1amount, unwrapBento);
+        _transferOut(token0, recipient, token0amount, unwrapBento);
+        _transferOut(token1, recipient, token1amount, unwrapBento);
     }
 
     /// @notice Returns the claimable fees and the fee growth accumulators of a given position.
@@ -225,17 +221,28 @@ contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerSt
         );
     }
 
-    function _transfer(
+    function _transferBoth(
+        IConcentratedLiquidityPool pool,
+        address to,
+        uint256 token0Amount,
+        uint256 token1Amount,
+        bool unwrapBento
+    ) internal {
+        (, , , , , , address token0, address token1) = pool.getImmutables();
+        _transferOut(token0, to, token0Amount, unwrapBento);
+        _transferOut(token1, to, token1Amount, unwrapBento);
+    }
+
+    function _transferOut(
         address token,
-        address from,
         address to,
         uint256 shares,
         bool unwrapBento
     ) internal {
         if (unwrapBento) {
-            bento.withdraw(token, from, to, 0, shares);
+            bento.withdraw(token, address(this), to, 0, shares);
         } else {
-            bento.transfer(token, from, to, shares);
+            bento.transfer(token, address(this), to, shares);
         }
     }
 
@@ -246,6 +253,7 @@ contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerSt
         uint256 amount
     ) internal {
         if (token == wETH && address(this).balance > 0) {
+            // 'amount' is in BentoBox share units.
             uint256 ethAmount = bento.toAmount(token, amount, true);
             if (ethAmount >= address(this).balance) {
                 bento.deposit{value: ethAmount}(address(0), sender, recipient, 0, amount);

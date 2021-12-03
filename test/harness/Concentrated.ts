@@ -3,7 +3,6 @@ import { ContractTransaction } from "@ethersproject/contracts";
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { ConcentratedLiquidityPool } from "../../types";
-import { ADDRESS_ZERO } from "../utilities";
 import { divRoundingUp, expectAlmostEqual, ZERO } from "./helpers";
 import { Trident } from "./Trident";
 
@@ -272,8 +271,7 @@ export async function removeLiquidityViaManager(params: {
   const poolPositionLiquidity = (await pool.positions(manager.address, position.lower, position.upper)).liquidity;
   const fees0 = feeGrowthInside0.sub(position.feeGrowthInside0).mul(position.liquidity).div(TWO_POW_128);
   const fees1 = feeGrowthInside1.sub(position.feeGrowthInside1).mul(position.liquidity).div(TWO_POW_128);
-
-  await manager.burn(tokenId, liquidityAmount, recipient, unwrapBento);
+  await manager.burn(tokenId, liquidityAmount, recipient, unwrapBento, 0, 0);
 
   const [newPoolAddress, newUserLiquidity, newLower, newUpper, newFeeGrowthInside0, newFeeGrowthInside1] = await manager.positions(tokenId);
   const [newCurrentPrice, newPriceLower, newPriceUpper] = await getPrices(pool, [newLower, newUpper]);
