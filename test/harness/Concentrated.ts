@@ -269,7 +269,6 @@ export async function removeLiquidityViaManager(params: {
   const [oldUpperSecondPreviousTick, oldUpperSecondNextTick, oldUpperSecondLiquidity] = await pool.ticks(oldUpperPreviousTick);
   const oldPositionState = await pool.positions(manager.address, oldLower, oldUpper);
   const oldUserNFTBalance = await manager.balanceOf(oldOwner);
-  const oldZeroAddressBalance = await manager.balanceOf(ADDRESS_ZERO);
 
   const position = await manager.positions(tokenId);
   const { feeGrowthInside0, feeGrowthInside1 } = await pool.rangeFeeGrowth(position.lower, position.upper);
@@ -279,9 +278,9 @@ export async function removeLiquidityViaManager(params: {
 
   await manager.decreaseLiquidity(tokenId, liquidityAmount, recipient, unwrapBento);
 
-  const newOwner = await manager.ownerOf(tokenId);
   const [newPoolAddress, newUserLiquidity, newLower, newUpper, newFeeGrowthInside0, newFeeGrowthInside1] = await manager.positions(tokenId);
   const [newCurrentPrice, newPriceLower, newPriceUpper] = await getPrices(pool, [newLower, newUpper]);
+
   const newUserBalances = await Trident.Instance.getTokenBalance(tokens, recipient, unwrapBento);
   const newPoolBalances = await Trident.Instance.getTokenBalance(tokens, pool.address, false);
   const newManagerBalances = await Trident.Instance.getTokenBalance(tokens, manager.address, false);
@@ -292,25 +291,26 @@ export async function removeLiquidityViaManager(params: {
   const [newUpperPreviousTick, newUpperNextTick, newUpperLiquidity] = await pool.ticks(newUpper);
   const [newUpperSecondPreviousTick, newUpperSecondNextTick, newUpperSecondLiquidity] = await pool.ticks(newUpperPreviousTick);
   const newPositionState = await pool.positions(manager.address, newLower, newUpper);
-  const newZeroAddressBalance = await manager.balanceOf(ADDRESS_ZERO);
   const newUserNFTBalance = await manager.balanceOf(oldOwner);
   const managerBalanceChange = [newManagerBalances[0].sub(oldManagerBalances[0]), newManagerBalances[1].sub(oldManagerBalances[1])];
 
   if (liquidityAmount.gte(oldUserLiquidity)) {
     expect(newUserNFTBalance).to.be.eq(oldUserNFTBalance.sub(1));
-    expect(newZeroAddressBalance).to.be.eq(oldZeroAddressBalance.add(1));
-    expect(newOwner).to.be.eq(ADDRESS_ZERO);
+    // expect(newZeroAddressBalance).to.be.eq(oldZeroAddressBalance.add(1));
+    // expect(newOwner).to.be.eq(ADDRESS_ZERO);
   } else {
     expect(newUserNFTBalance).to.be.eq(oldUserNFTBalance);
-    expect(newZeroAddressBalance).to.be.eq(oldZeroAddressBalance);
-    expect(newOwner).to.be.eq(oldOwner);
+    // expect(newZeroAddressBalance).to.be.eq(oldZeroAddressBalance);
+    // expect(newOwner).to.be.eq(oldOwner);
   }
+
   expect(newCurrentPrice).to.be.eq(oldCurrentPrice, "price changed by mistake");
   expect(newLiquidity).to.be.eq(oldLiquidity.sub(liquidityDecrease), "Liquidity didn't update correctly");
   expect(newPositionState.liquidity.toString()).to.be.eq(
     oldPositionState.liquidity.sub(liquidityAmount).toString(),
     "didn't correctly update position's liquidity"
   );
+
   expect(newPositionState.feeGrowthInside0Last).to.be.eq(oldPositionState.feeGrowthInside0Last, "didn't reset position's fee0 growth");
   expect(newPositionState.feeGrowthInside1Last).to.be.eq(oldPositionState.feeGrowthInside1Last, "didn't reset position's fee1 growth");
 
@@ -454,17 +454,17 @@ export async function addLiquidityViaRouter(params: {
   expect(newUserBalances[1].toString()).to.be.eq(oldUserBalances[1].sub(dy).toString(), "Didn't pay correct amount of token1");
   expect(newPoolBalances[0].toString()).to.be.eq(oldPoolBalances[0].add(dx).toString(), "Didn't receive correct amount of token0");
   expect(newPoolBalances[1].toString()).to.be.eq(oldPoolBalances[1].add(dy).toString(), "Didn't receive correct amount of token1");
+  const nftMinted = await Trident.Instance.concentratedPoolManager.nftCount();
+
   if (positionOwner === Trident.Instance.concentratedPoolManager.address) {
     if (positionId == 0) {
       expect(oldTotalSupply.add(1).toString()).to.be.eq(newTotalSupply.toString(), "nft wasn't minted");
     }
     const [_pool, _liquidity, _lower, _upper, _feeGrowth0, _feeGrowth1] = await Trident.Instance.concentratedPoolManager.positions(
-      positionId == 0 || positionId == undefined ? oldTotalSupply : positionId || 0
+      nftMinted.minted.sub(1)
     );
 
-    const nftOwner = await Trident.Instance.concentratedPoolManager.ownerOf(
-      positionId == 0 || positionId == undefined ? oldTotalSupply : positionId || 0
-    );
+    const nftOwner = await Trident.Instance.concentratedPoolManager.ownerOf(nftMinted.minted.sub(1));
 
     expect(nftOwner).to.be.eq(recipient, "owner doesn't receive the nft position");
     expect(_pool).to.be.eq(pool.address, "position isn't of the correct pool");
@@ -474,7 +474,7 @@ export async function addLiquidityViaRouter(params: {
     // TODO check pool reserve change is correct!
     // TODO add function to calculate range fee growth here and ensure that positionManager saved the correct value
   }
-  return { dy, dx, tokenId: oldTotalSupply.gt(positionId || 0) ? oldTotalSupply : BigNumber.from(positionId), liquidity };
+  return { dy, dx, tokenId: nftMinted.minted.sub(1), liquidity };
 }
 
 export async function _addLiquidityViaRouter(params: {

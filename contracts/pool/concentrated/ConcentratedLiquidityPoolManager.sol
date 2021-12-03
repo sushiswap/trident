@@ -28,7 +28,7 @@ contract ConcentratedLiquidityPoolManager is IPositionManager, IConcentratedLiqu
         IBentoBoxMinimal _bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
         _bento.registerProtocol();
         bento = _bento;
-        _mint(address(0));
+        mint(address(this));
     }
 
     function positionMintCallback(
@@ -44,7 +44,7 @@ contract ConcentratedLiquidityPoolManager is IPositionManager, IConcentratedLiqu
 
         if (_positionId == 0) {
             // We mint a new NFT.
-            positions[totalSupply] = Position({
+            positions[nftCount.minted] = Position({
                 pool: IConcentratedLiquidityPool(msg.sender),
                 liquidity: amount,
                 lower: lower,
@@ -53,13 +53,13 @@ contract ConcentratedLiquidityPoolManager is IPositionManager, IConcentratedLiqu
                 feeGrowthInside0: feeGrowthInside0,
                 feeGrowthInside1: feeGrowthInside1
             });
-            positionId = totalSupply;
-            _mint(recipient);
+            positionId = nftCount.minted;
+            mint(recipient);
             emit IncreaseLiquidity(msg.sender, recipient, positionId, amount);
         } else if (amount > 0) {
             // We increase liquidity for an existing NFT.
             Position storage position = positions[_positionId];
-            require(_positionId < totalSupply, "INVALID_POSITION");
+            require(_positionId < nftCount.minted, "INVALID_POSITION");
             require(position.lower == lower && position.upper == upper, "RANGE_MIS_MATCH");
             require(position.feeGrowthInside0 == feeGrowthInside0 && position.feeGrowthInside1 == feeGrowthInside1, "UNCLAIMED");
             position.liquidity += amount;
@@ -74,7 +74,7 @@ contract ConcentratedLiquidityPoolManager is IPositionManager, IConcentratedLiqu
         address recipient,
         bool unwrapBento
     ) external {
-        require(msg.sender == ownerOf[tokenId], "NOT_ID_OWNER");
+        require(msg.sender == ownerOf(tokenId), "NOT_ID_OWNER");
         Position storage position = positions[tokenId];
 
         IPool.TokenAmount[] memory withdrawAmounts;
@@ -103,8 +103,7 @@ contract ConcentratedLiquidityPoolManager is IPositionManager, IConcentratedLiqu
             );
 
             delete positions[tokenId];
-
-            _burn(tokenId);
+            burn(tokenId);
         }
 
         uint256 token0Amount = withdrawAmounts[0].amount + ((feeAmounts[0].amount * amount) / oldLiquidity);
@@ -121,7 +120,7 @@ contract ConcentratedLiquidityPoolManager is IPositionManager, IConcentratedLiqu
         address recipient,
         bool unwrapBento
     ) public returns (uint256 token0amount, uint256 token1amount) {
-        require(msg.sender == ownerOf[tokenId], "NOT_ID_OWNER");
+        require(msg.sender == ownerOf(tokenId), "NOT_ID_OWNER");
         Position storage position = positions[tokenId];
 
         address[] memory tokens = position.pool.getAssets();
