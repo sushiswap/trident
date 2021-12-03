@@ -96,6 +96,7 @@ contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerSt
             position.feeGrowthInside0 = feeGrowthInside0;
             position.feeGrowthInside1 = feeGrowthInside1;
             position.liquidity += liquidityMinted;
+            // Incentives should be claimed first.
             position.latestAddition = uint32(block.timestamp);
         }
 

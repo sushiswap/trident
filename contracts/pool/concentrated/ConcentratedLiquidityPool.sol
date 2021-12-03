@@ -257,10 +257,7 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
         emit Collect(msg.sender, amount0fees, amount1fees);
     }
 
-    /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage
-    /// - price is √(y/x)
-    /// - x is token0
-    /// - zero for one -> price will move down.
+    /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
     function swap(bytes memory data) public lock returns (uint256 amountOut) {
         (bool zeroForOne, address recipient, bool unwrapBento) = abi.decode(data, (bool, address, bool));
 

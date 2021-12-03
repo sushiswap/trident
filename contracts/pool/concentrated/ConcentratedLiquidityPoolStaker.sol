@@ -108,6 +108,7 @@ contract ConcentratedLiquidityPoolStaker {
             Incentive storage incentive = incentives[pool][incentiveIds[i]];
             Stake storage stake = stakes[positionId][incentiveIds[i]];
 
+            // After liquidity is increased on an NFT the owner needs to resubscribe to the incentive.
             require(stake.timestamp >= position.latestAddition, "MUST_RESUBSCRIBE");
 
             uint256 rewards;
