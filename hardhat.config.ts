@@ -79,7 +79,7 @@ const config: HardhatUserConfig = {
       // Solidity-coverage overrides gasPrice to 1 which is not compatible with EIP1559
       hardfork: process.env.CODE_COVERAGE ? "berlin" : "london",
     },
-    mainnet: {
+    ethereum: {
       url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
       live: true,
       chainId: 1,
