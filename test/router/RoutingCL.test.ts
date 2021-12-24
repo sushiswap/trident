@@ -226,8 +226,14 @@ describe("Concentrated Pool Routing", async () => {
     }
   });
 
-  it("Swap with crossing through empty space", async () => {
+  it.only("Swap with crossing through empty space", async () => {
+    debugger;
+    let i = 0;
     for (const pool of trident.concentratedPools) {
+      ++i;
+      if (i != 3) continue;
+      console.log(i);
+
       helper.reset();
 
       const tickSpacing = (await pool.getImmutables())._tickSpacing;
@@ -296,6 +302,8 @@ describe("Concentrated Pool Routing", async () => {
       const out2 = parseInt(swapTx2.output.toString());
       // console.log("1 in", out, 'out', out2, "pred", predictedOutput2[0],
       //   Math.abs(out2/predictedOutput2[0]-1));
+      console.log(out2, predictedOutput2.out);
+
       expect(Math.abs(out2 / predictedOutput2.out - 1)).lessThan(1e-5);
     }
   });
