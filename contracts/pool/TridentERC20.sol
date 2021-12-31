@@ -34,12 +34,12 @@ abstract contract TridentERC20 {
         _DOMAIN_SEPARATOR = _calculateDomainSeparator();
     }
 
-    function _calculateDomainSeparator() internal view returns (bytes32 domainSeperator) {
-        domainSeperator = keccak256(
+    function _calculateDomainSeparator() internal view returns (bytes32 domainSeparator) {
+        domainSeparator = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
                 keccak256(bytes(name)),
-                keccak256(bytes("1")),
+                keccak256("1"),
                 block.chainid,
                 address(this)
             )
@@ -47,8 +47,8 @@ abstract contract TridentERC20 {
     }
 
     /// @notice EIP-712 typehash for this contract's domain.
-    function DOMAIN_SEPARATOR() public view returns (bytes32 domainSeperator) {
-        domainSeperator = block.chainid == DOMAIN_SEPARATOR_CHAIN_ID ? _DOMAIN_SEPARATOR : _calculateDomainSeparator();
+    function DOMAIN_SEPARATOR() public view returns (bytes32 domainSeparator) {
+        domainSeparator = block.chainid == DOMAIN_SEPARATOR_CHAIN_ID ? _DOMAIN_SEPARATOR : _calculateDomainSeparator();
     }
 
     /// @notice Approves `amount` from `msg.sender` to be spent by `spender`.
