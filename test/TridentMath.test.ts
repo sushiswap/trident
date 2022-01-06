@@ -6,23 +6,12 @@ describe("TridentMath", function () {
   let tridentMathContract;
 
   before(async function () {
-    const TridentMathContract = await ethers.getContractFactory(
-      "TridentMathConsumerMock"
-    );
+    const TridentMathContract = await ethers.getContractFactory("TridentMathConsumerMock");
     tridentMathContract = await TridentMathContract.deploy();
   });
 
   // Input values
-  var arr_input = [
-    "0x2",
-    "0x4",
-    "0x10",
-    "0x100",
-    "0x10000",
-    "0x100000000",
-    "0x10000000000000000",
-    "0x100000000000000000000000000000000",
-  ];
+  var arr_input = ["0x2", "0x4", "0x10", "0x100", "0x10000", "0x100000000", "0x10000000000000000", "0x100000000000000000000000000000000"];
   // Expected values
   var arr_out = [
     "0x1",
@@ -55,9 +44,7 @@ describe("TridentMath", function () {
       var expectedValueMinus1 = BigNumber.from(arr_out_minus1[i]);
 
       // 2^(2^i) - 1
-      var calculatedValueMinus1 = await tridentMathContract.sqrt(
-        testInput.add(-1)
-      );
+      var calculatedValueMinus1 = await tridentMathContract.sqrt(testInput.add(-1));
       await expect(calculatedValueMinus1).eq(expectedValueMinus1);
 
       // 2 ^(2^i)
@@ -65,22 +52,16 @@ describe("TridentMath", function () {
       await expect(calculatedValue).eq(expectedValue);
 
       // 2 ^(2^i) + 1
-      var calculatedValuePlus1 = await tridentMathContract.sqrt(
-        testInput.add(1)
-      );
+      var calculatedValuePlus1 = await tridentMathContract.sqrt(testInput.add(1));
       await expect(calculatedValuePlus1).eq(expectedValue);
     }
-    var maxTestInput = BigNumber.from(
-      "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-    );
+    var maxTestInput = BigNumber.from("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
     var calculatedValue = await tridentMathContract.sqrt(maxTestInput);
     expect(calculatedValue).eq(arr_out_minus1[8]);
 
     // Value suggest by Ilya
     // input = 2**254 + 1
-    var input = BigNumber.from(
-      "0x4000000000000000000000000000000000000000000000000000000000000001"
-    );
+    var input = BigNumber.from("0x4000000000000000000000000000000000000000000000000000000000000001");
     // correct_res = 2**127
     var correctValue = BigNumber.from("0x80000000000000000000000000000000");
 

@@ -5,12 +5,12 @@ pragma solidity >=0.8.0;
 import "../../interfaces/IMasterDeployer.sol";
 import "../../interfaces/IBentoBoxMinimal.sol";
 import "../../interfaces/ITridentRouter.sol";
-import "../../interfaces/concentratedPool/IConcentratedLiquidityPoolManager.sol";
-import "../../interfaces/concentratedPool/IConcentratedLiquidityPool.sol";
-import "../../interfaces/concentratedPool/IPositionManager.sol";
-import "../../libraries/concentratedPool/FullMath.sol";
-import "../../libraries/concentratedPool/TickMath.sol";
-import "../../libraries/concentratedPool/DyDxMath.sol";
+import "../../interfaces/IConcentratedLiquidityPoolManager.sol";
+import "../../interfaces/IConcentratedLiquidityPool.sol";
+import "../../interfaces/IPositionManager.sol";
+import "../../libraries/FullMath.sol";
+import "../../libraries/TickMath.sol";
+import "../../libraries/DyDxMath.sol";
 import "../../utils/TridentBatchable.sol";
 import "./TridentNFT.sol";
 

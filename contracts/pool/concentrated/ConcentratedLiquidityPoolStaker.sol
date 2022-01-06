@@ -2,10 +2,10 @@
 
 pragma solidity >=0.8.0;
 
-import "../../libraries/concentratedPool/Ticks.sol";
+import "../../libraries/Ticks.sol";
 import "../../interfaces/IBentoBoxMinimal.sol";
-import "../../interfaces/concentratedPool/IConcentratedLiquidityPool.sol";
-import {IConcentratedLiquidityPoolManager as IPoolManager} from "../../interfaces/concentratedPool/IConcentratedLiquidityPoolManager.sol";
+import "../../interfaces/IConcentratedLiquidityPool.sol";
+import { IConcentratedLiquidityPoolManager as IPoolManager } from "../../interfaces/IConcentratedLiquidityPoolManager.sol";
 
 /// @notice Trident Concentrated Liquidity Pool periphery contract that combines non-fungible position management and staking.
 contract ConcentratedLiquidityPoolStaker {

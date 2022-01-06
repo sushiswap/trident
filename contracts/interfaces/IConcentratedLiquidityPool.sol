@@ -2,9 +2,9 @@
 
 pragma solidity >=0.8.0;
 
-import "./../IBentoBoxMinimal.sol";
-import "./../IMasterDeployer.sol";
-import "../../libraries/concentratedPool/Ticks.sol";
+import "./IBentoBoxMinimal.sol";
+import "./IMasterDeployer.sol";
+import "../libraries/Ticks.sol";
 
 /// @notice Trident concentrated liquidity pool contract Structs.
 interface IConcentratedLiquidityPoolStruct {

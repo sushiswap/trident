@@ -6,14 +6,14 @@ import "../../interfaces/IBentoBoxMinimal.sol";
 import "../../interfaces/IMasterDeployer.sol";
 import "../../interfaces/ITridentCallee.sol";
 import "../../interfaces/ITridentRouter.sol";
-import "../../interfaces/concentratedPool/IPositionManager.sol";
-import "../../interfaces/concentratedPool/IConcentratedLiquidityPool.sol";
-import "../../libraries/concentratedPool/FullMath.sol";
-import "../../libraries/concentratedPool/TickMath.sol";
-import "../../libraries/concentratedPool/UnsafeMath.sol";
-import "../../libraries/concentratedPool/DyDxMath.sol";
-import "../../libraries/concentratedPool/SwapLib.sol";
-import "../../libraries/concentratedPool/Ticks.sol";
+import "../../interfaces/IPositionManager.sol";
+import "../../interfaces/IConcentratedLiquidityPool.sol";
+import "../../libraries/FullMath.sol";
+import "../../libraries/TickMath.sol";
+import "../../libraries/UnsafeMath.sol";
+import "../../libraries/DyDxMath.sol";
+import "../../libraries/SwapLib.sol";
+import "../../libraries/Ticks.sol";
 
 /// @notice Trident Concentrated liquidity pool implementation.
 /// @dev Amounts are considered to be in Bentobox shared
