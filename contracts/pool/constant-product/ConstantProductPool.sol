@@ -2,12 +2,12 @@
 
 pragma solidity >=0.8.0;
 
-import "../interfaces/IBentoBoxMinimal.sol";
-import "../interfaces/IMasterDeployer.sol";
-import "../interfaces/IPool.sol";
-import "../interfaces/ITridentCallee.sol";
-import "../libraries/TridentMath.sol";
-import "./TridentERC20.sol";
+import "../../interfaces/IBentoBoxMinimal.sol";
+import "../../interfaces/IMasterDeployer.sol";
+import "../../interfaces/IPool.sol";
+import "../../interfaces/ITridentCallee.sol";
+import "../../libraries/TridentMath.sol";
+import "../TridentERC20.sol";
 
 /// @notice Trident exchange pool template with constant product formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares.

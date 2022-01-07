@@ -2,9 +2,9 @@
 
 pragma solidity >=0.8.0;
 
-import "../../interfaces/concentratedPool/IConcentratedLiquidityPool.sol";
-import "../../libraries/concentratedPool/TickMath.sol";
-import "../../libraries/concentratedPool/Ticks.sol";
+import "../../interfaces/IConcentratedLiquidityPool.sol";
+import "../../libraries/TickMath.sol";
+import "../../libraries/Ticks.sol";
 
 /// @notice Trident Concentrated Liquidity Pool periphery contract to read state.
 contract ConcentratedLiquidityPoolHelper {

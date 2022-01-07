@@ -3,7 +3,7 @@
 pragma solidity >=0.8.0;
 
 import "./IConcentratedLiquidityPool.sol";
-import "./../ITridentNFT.sol";
+import "./ITridentNFT.sol";
 
 /// @notice Trident concentrated liquidity pool manager contract Structs.
 interface IConcentratedLiquidityPoolManagerStruct {

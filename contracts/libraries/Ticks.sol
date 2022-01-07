@@ -3,7 +3,7 @@
 pragma solidity >=0.8.0;
 
 import "./TickMath.sol";
-import "../../interfaces/concentratedPool/IConcentratedLiquidityPool.sol";
+import "../interfaces/IConcentratedLiquidityPool.sol";
 
 /// @notice Tick management library for ranged liquidity.
 library Ticks {
