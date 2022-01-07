@@ -43,4 +43,4 @@ jobs:
       uses: coverallsapp/github-action@master
       continue-on-error: true
       with:
-        github-token: ${{ secrets.github_token }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
