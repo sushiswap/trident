@@ -9,7 +9,7 @@ import {
   HybridPool,
   HybridPoolFactory,
   MasterDeployer,
-  TickMathTest,
+  TickMathMock,
   TridentRouter,
 } from "../../../types";
 
@@ -37,7 +37,7 @@ export class TridentPoolFactory {
 
   private ConcentratedPoolFactory!: ConcentratedLiquidityPoolFactory;
   private ConcentratedPoolManager!: ConcentratedLiquidityPoolManager;
-  private TickMath!: TickMathTest;
+  private TickMath!: TickMathMock;
 
   private MIN_POOL_RESERVE = 1e12;
   private MAX_POOL_RESERVE = 1e23;
@@ -267,7 +267,7 @@ export class TridentPoolFactory {
     //get contract factories for concentrated pool factory, manager
     const ticksContractFactory = await ethers.getContractFactory("Ticks");
     const clPoolManagerFactory = await ethers.getContractFactory("ConcentratedLiquidityPoolManager");
-    const tickMath = await ethers.getContractFactory("TickMathTest");
+    const tickMath = await ethers.getContractFactory("TickMathMock");
     const dyDxMath = await ethers.getContractFactory("DyDxMath");
 
     const hybridPoolFactory = await ethers.getContractFactory("HybridPoolFactory");
@@ -291,7 +291,7 @@ export class TridentPoolFactory {
       this.MasterDeployer.address
     )) as ConcentratedLiquidityPoolManager;
     this.ConcentratedPoolFactory = (await clPoolFactory.deploy(this.MasterDeployer.address)) as ConcentratedLiquidityPoolFactory;
-    this.TickMath = (await tickMath.deploy()) as TickMathTest;
+    this.TickMath = (await tickMath.deploy()) as TickMathMock;
 
     this.HybridPoolFactory = (await hybridPoolFactory.deploy(this.MasterDeployer.address)) as HybridPoolFactory;
     await this.HybridPoolFactory.deployed();

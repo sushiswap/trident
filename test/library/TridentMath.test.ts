@@ -2,11 +2,11 @@ import { BigNumber } from "@ethersproject/bignumber";
 import { ethers } from "hardhat";
 import { expect } from "chai";
 
-describe("TridentMath", function () {
+describe("Trident Math", function () {
   let tridentMathContract;
 
   before(async function () {
-    const TridentMathContract = await ethers.getContractFactory("TridentMathConsumerMock");
+    const TridentMathContract = await ethers.getContractFactory("TridentMathMock");
     tridentMathContract = await TridentMathContract.deploy();
   });
 

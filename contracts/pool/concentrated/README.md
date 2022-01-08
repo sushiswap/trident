@@ -3,9 +3,9 @@
 Concentrated liquidity pools are a generalization of the traditional `xy = k` pool. With the traditional model all users provide liquidity on a `(0, inf)` price range where as in concentrated liquidity pools each user can pick their own range to provide liquidity on.
 This allows users to narrow down the liquidity provision range which amplifies their liquidity - meaning traders experience lesser price impact and liquidity providers accrue more fees. The biggest tradeoff being liquidity providers experience greater impermanent loss.
 
-![Regular liquidity positions](../../../pictures/regularLiquidity.png)
+![Regular liquidity positions](../../../pictures/regular-liquidity.png)
 
-![Concentrated liquidity positions](../../../pictures/concentratedLiquidity.png)
+![Concentrated liquidity positions](../../../pictures/concentrated-liquidity.png)
 
 ## Representing global liquidity state
 

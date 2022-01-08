@@ -12,7 +12,7 @@ import {
   ConcentratedLiquidityPoolStaker,
   DyDxMath,
   MasterDeployer,
-  TickMathTest,
+  TickMathMock,
   TridentRouter,
 } from "../../types";
 import { ERC20Mock } from "../../types/ERC20Mock";
@@ -38,7 +38,7 @@ export class Trident {
   public concentratedPoolFactory!: ConcentratedLiquidityPoolFactory;
   public concentratedPoolHelper!: ConcentratedLiquidityPoolHelper;
   public concentratedPools!: ConcentratedLiquidityPool[];
-  public tickMath!: TickMathTest;
+  public tickMath!: TickMathMock;
   public dyDxMath!: DyDxMath;
 
   public static get Instance() {
@@ -68,7 +68,7 @@ export class Trident {
         "ConcentratedLiquidityPoolManager",
         "ConcentratedLiquidityPoolStaker",
         "ConcentratedLiquidityPoolHelper",
-        "TickMathTest",
+        "TickMathMock",
         "Ticks",
         "DyDxMath",
       ])
@@ -191,7 +191,7 @@ export class Trident {
     this.concentratedPoolFactory = (await ConcentratedPoolFactory.deploy(this.masterDeployer.address)) as ConcentratedLiquidityPoolFactory;
     // for testing
     this.concentratedPoolHelper = (await ConcentratedPoolHelper.deploy()) as ConcentratedLiquidityPoolHelper;
-    this.tickMath = (await TickMath.deploy()) as TickMathTest;
+    this.tickMath = (await TickMath.deploy()) as TickMathMock;
   }
 
   private async addFactoriesToWhitelist() {
