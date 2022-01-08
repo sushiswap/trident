@@ -1,0 +1,9 @@
+{
+    "recommendations": [
+      "dbaeumer.vscode-eslint",
+      "esbenp.prettier-vscode",
+      "hbenl.vscode-mocha-test-adapter",
+      "juanblanco.solidity",
+      "tintinweb.solidity-visual-auditor"
+    ]
+  }
