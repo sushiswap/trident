@@ -6,7 +6,7 @@ import { BigNumber, Contract, ContractFactory } from "ethers";
 import seedrandom from "seedrandom";
 import { getBigNumber } from "../utilities";
 import { ConstantProductPool, ERC20Mock, BentoBoxV1, MasterDeployer, TridentRouter, ConstantProductPoolFactory } from "../../types";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import { ConstantProductRPool } from "@sushiswap/tines";
 
 interface ExactInputSingleParams {

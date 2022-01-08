@@ -1,15 +1,12 @@
 import { expect } from "chai";
 import seedrandom from "seedrandom";
 import { Contract } from "@ethersproject/contracts";
-
-import { closeValues, getBigNumber, RouteStatus, RToken } from "@sushiswap/tines";
-
+import { closeValues, RouteStatus, RToken } from "@sushiswap/tines";
 import * as testHelper from "./helpers";
 import { getIntegerRandomValue } from "../utilities";
 import { Topology, TridentRoute } from "./helpers";
 import { TopologyFactory } from "./helpers/TopologyFactory";
 import { TridentSwapParamsFactory } from "./helpers/TridentSwapParamsFactory";
-import * as tines from "@sushiswap/tines";
 
 let topologyFactory: TopologyFactory;
 let swapParamsFactory: TridentSwapParamsFactory;
