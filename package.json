@@ -4,6 +4,7 @@
   "files": [
     "artifacts",
     "contracts",
+    "deploy",
     "deployments",
     "exports",
     "types"
