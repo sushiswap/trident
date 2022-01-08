@@ -1,5 +1,5 @@
 import { RToken, MultiRoute, findMultiRouteExactIn } from "@sushiswap/tines";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import { BigNumber, Contract } from "ethers";
 
 import { Topology, TridentRoute } from "./interfaces";
