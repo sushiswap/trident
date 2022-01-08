@@ -3,8 +3,7 @@ import * as sdk from "@sushiswap/sdk";
 import { getIntegerRandomValueWithMin } from ".";
 import seedrandom from "seedrandom";
 import { ethers } from "hardhat";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
-
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 const testSeed = "7";
 const rnd = seedrandom(testSeed);
 
