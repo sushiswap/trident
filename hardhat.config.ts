@@ -32,7 +32,7 @@ const config: HardhatUserConfig = {
     coinmarketcap: process.env.COINMARKETCAP_API_KEY,
     currency: "USD",
     enabled: process.env.REPORT_GAS === "true",
-    outputFile: "gas.json",
+    // outputFile: "gas.json",
     excludeContracts: ["BentoBoxV1", "ERC20Mock", "ERC20", "WETH9"],
   },
   namedAccounts: {
