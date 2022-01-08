@@ -1,8 +1,9 @@
 import { BigNumber } from "@ethersproject/bignumber";
 import { ContractFactory } from "@ethersproject/contracts";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import { utils } from "ethers";
 import { ethers } from "hardhat";
+
 import {
   BentoBoxV1,
   ConcentratedLiquidityPool,
