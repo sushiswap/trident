@@ -8,21 +8,11 @@ describe("Constant Product Pool", function () {
     await initialize();
   });
 
-  describe("Add liquidity", function () {
-    it("Balanced liquidity to a balanced pool", async function () {
-      const amount = getBigNumber(randBetween(10, 100));
-      await addLiquidity(0, amount, amount);
-    });
-    it("Add liquidity in 16 different ways before swap fees", async function () {
-      await addLiquidityInMultipleWays();
-    });
-    it("Add liquidity in 16 different ways after swap fees", async function () {
-      await swap(2, getBigNumber(randBetween(100, 200)));
-      await addLiquidityInMultipleWays();
-    });
+  beforeEach(async function () {
+    //
   });
 
-  describe("Swaps", function () {
+  describe("#swap", function () {
     const maxHops = 3;
     it(`Should do ${maxHops * 8} types of swaps`, async function () {
       for (let i = 1; i <= maxHops; i++) {
@@ -38,7 +28,25 @@ describe("Constant Product Pool", function () {
     });
   });
 
-  describe("Burn Liquidity", function () {
+  describe("#flashSwap", function () {
+    //
+  });
+
+  describe("#mint", function () {
+    it("Balanced liquidity to a balanced pool", async function () {
+      const amount = getBigNumber(randBetween(10, 100));
+      await addLiquidity(0, amount, amount);
+    });
+    it("Add liquidity in 16 different ways before swap fees", async function () {
+      await addLiquidityInMultipleWays();
+    });
+    it("Add liquidity in 16 different ways after swap fees", async function () {
+      await swap(2, getBigNumber(randBetween(100, 200)));
+      await addLiquidityInMultipleWays();
+    });
+  });
+
+  describe("#burn", function () {
     it(`Remove liquidity in 12 different ways`, async function () {
       for (let i = 0; i < 3; i++) {
         for (let j = 0; j < 2; j++) {
@@ -52,6 +60,30 @@ describe("Constant Product Pool", function () {
       }
     });
   });
+});
+
+describe("#burnSingle", function () {
+  //
+});
+
+describe("#poolIdentifier", function () {
+  //
+});
+
+describe("#getAssets", function () {
+  //
+});
+
+describe("#getAmountOut", function () {
+  //
+});
+
+describe("#getAmountIn", function () {
+  //
+});
+
+describe("#getNativeReserves", function () {
+  //
 });
 
 async function addLiquidityInMultipleWays() {
