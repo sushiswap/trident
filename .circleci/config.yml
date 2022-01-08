@@ -1,0 +1,46 @@
+version: 2.1
+
+jobs:
+  test:
+    docker:
+      - image: circleci/node:14.15.1-stretch
+    parallelism: 8
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: Run tests
+          command: |
+            circleci tests glob 'test/**/*.spec.ts' |
+            circleci tests split |
+            xargs npx hardhat test
+      - run:
+          name: Save gas report
+          command: |
+            mv gasReporterOutput.json ./gasReporterOutput-$CIRCLE_NODE_INDEX.json
+      - persist_to_workspace:
+          root: .
+          paths:
+            - gasReporterOutput-*.json
+  test-gas-report:
+    docker:
+      - image: circleci/node:14.15.1-stretch
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Upload gas reports
+          command: |
+            npx hardhat gas-reporter:merge gasReporterOutput-*.json
+            npx codechecks codechecks.unit.yml
+      - store_artifacts:
+          path: gasReporterOutput.json
+
+workflows:
+  workflow-all:
+    jobs:
+      - test
+      - test-gas-report:
+          requires:
+            - test
