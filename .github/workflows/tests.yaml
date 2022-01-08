@@ -6,12 +6,12 @@ on: [push, pull_request]
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
 
-    - name: Use Node.js 14 LTS
+    - name: Use Node.js 14
       uses: actions/setup-node@v2
       with:
         node-version: '14'
@@ -31,16 +31,7 @@ jobs:
     - name: Installing dependencies
       run: yarn install --frozen-lockfile
 
-    - name: Compile
-      run: yarn build
-
-    - name: Test coverage
-      run: yarn test:coverage
+    - name: Test
+      run: yarn test
       env:
         ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
-
-    - name: Coveralls
-      uses: coverallsapp/github-action@master
-      continue-on-error: true
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
