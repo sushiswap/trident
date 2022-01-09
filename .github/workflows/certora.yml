@@ -67,7 +67,6 @@ jobs:
           spec/scripts/verifyConstantProductPool.sh
           spec/scripts/verifyHybridPool.sh
           spec/scripts/verifyTridentMath.sh
-          spec/scripts/verifyTridentRouter.sh
           spec/scripts/verifyTridentRouterSimple.sh
         env:
           CERTORAKEY: ${{ secrets.CERTORAKEY }}
