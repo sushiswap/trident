@@ -4,11 +4,11 @@ import { ConstantProductPoolFactory, MasterDeployer, ConstantProductPool } from 
 
 describe("Constant Product Pool Factory", function () {
   before(async function () {
-    await deployments.fixture(["ConstantProductPoolFactory"]);
+    //
   });
 
   beforeEach(async function () {
-    //
+    await deployments.fixture(["ConstantProductPoolFactory"]);
   });
 
   describe("#deployPool", function () {
