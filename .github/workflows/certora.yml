@@ -61,7 +61,7 @@ jobs:
       - name: Prepare
         run: |
           chmod +x spec/scripts/*.sh
-          ./spec/scripts/applyHarnesses.sh
+          spec/scripts/applyHarnesses.sh
       - name: Verify Trident Router with Certora
         run: |
           spec/scripts/sanityConstantProductPool.sh
