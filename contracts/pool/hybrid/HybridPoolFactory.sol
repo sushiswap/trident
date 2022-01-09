@@ -3,7 +3,7 @@
 pragma solidity >=0.8.0;
 
 import "./HybridPool.sol";
-import "../PoolDeployer.sol";
+import "../../deployer/PoolDeployer.sol";
 
 /// @notice Contract for deploying Trident exchange Hybrid Pool with configurations.
 /// @author Mudit Gupta.

@@ -11,11 +11,11 @@ import "../../interfaces/IPositionManager.sol";
 import "../../libraries/FullMath.sol";
 import "../../libraries/TickMath.sol";
 import "../../libraries/DyDxMath.sol";
-import "../../utils/TridentBatchable.sol";
-import "./TridentNFT.sol";
+import "../../TridentBatchable.sol";
+import "../../TridentERC721.sol";
 
 /// @notice Trident Concentrated Liquidity Pool periphery contract that combines non-fungible position management and staking.
-contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerStruct, IPositionManager, TridentNFT, TridentBatchable {
+contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerStruct, IPositionManager, TridentERC721, TridentBatchable {
     event IncreaseLiquidity(address indexed pool, address indexed owner, uint256 indexed positionId, uint128 liquidity);
     event DecreaseLiquidity(address indexed pool, address indexed owner, uint256 indexed positionId, uint128 liquidity);
 

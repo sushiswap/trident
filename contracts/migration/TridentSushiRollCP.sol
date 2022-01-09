@@ -2,8 +2,8 @@
 
 pragma solidity >= 0.8.0;
 
-import "../utils/TridentBatchable.sol";
-import "../utils/TridentPermit.sol";
+import "../TridentBatchable.sol";
+import "../TridentPermit.sol";
 import "../interfaces/IBentoBoxMinimal.sol";
 import "../interfaces/ITridentRouter.sol";
 import "../interfaces/IMasterDeployer.sol";

@@ -3,7 +3,7 @@
 pragma solidity >=0.8.0;
 
 import "../interfaces/IPoolFactory.sol";
-import "../utils/TridentOwnable.sol";
+import "../TridentOwnable.sol";
 
 /// @notice Trident pool deployer contract with template factory whitelist.
 /// @author Mudit Gupta.

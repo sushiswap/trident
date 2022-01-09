@@ -2,7 +2,7 @@
 
 pragma solidity >=0.8.0;
 
-import "../pool/TridentERC20.sol";
+import "../TridentERC20.sol";
 import "../interfaces/IERC20.sol";
 
 /// @notice Intermediary token users who are staked in MasterChef will receive after migration.
