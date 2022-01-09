@@ -11,4 +11,4 @@ certoraRun spec/harness/TridentRouterHarness.sol spec/harness/SimpleBentoBox.sol
 	--staging --msg "Trident Router: $1"
 
 
-# contracts/pool/ConstantProductPool.sol ConstantProductPool=solc8.2  ConstantProductPool:bento=SimpleBentoBox
+# contracts/pool/constant-product/ConstantProductPool.sol ConstantProductPool=solc8.2  ConstantProductPool:bento=SimpleBentoBox

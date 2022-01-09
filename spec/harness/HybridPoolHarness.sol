@@ -1,6 +1,6 @@
 pragma solidity ^0.8.2;
 
-import "../../contracts/pool/HybridPool.sol";
+import "../../contracts/pool/hybrid/HybridPool.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract HybridPoolHarness is HybridPool {

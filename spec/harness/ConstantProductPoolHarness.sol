@@ -1,6 +1,6 @@
 pragma solidity ^0.8.2;
 
-import "../../contracts/pool/ConstantProductPool.sol";
+import "../../contracts/pool/constant-product/ConstantProductPool.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract ConstantProductPoolHarness is ConstantProductPool {

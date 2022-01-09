@@ -10,7 +10,7 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../../contracts/interfaces/IPool.sol";
 import "../../contracts/interfaces/IBentoBoxMinimal.sol";
-import "../../contracts/pool/TridentERC20.sol";
+import "../../contracts/TridentERC20.sol";
 import "../../contracts/interfaces/ITridentCallee.sol";
 
 contract SymbolicPool is IPool, TridentERC20 {
