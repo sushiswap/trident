@@ -11,10 +11,10 @@
   "include": [
     "./scripts",
     "./test",
-    "./test/harness",
     "./deploy"
   ],
   "files": [
+    "./cli.ts",
     "./hardhat.config.ts"
   ]
 }
