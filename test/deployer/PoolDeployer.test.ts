@@ -34,6 +34,6 @@ describe("Pool Deployer", function () {
       ["address", "address"],
       ["0x0000000000000000000000000000000000000002", "0x0000000000000000000000000000000000000001"]
     );
-    await expect(poolFactory.deployPool(deployData)).to.be.revertedWith(customError("InvalidTokenOrder"));
+    await expect(masterDeployer.deployPool(poolFactory.address, deployData)).to.be.revertedWith(customError("InvalidTokenOrder"));
   });
 });
