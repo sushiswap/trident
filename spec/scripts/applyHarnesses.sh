@@ -63,7 +63,7 @@ perl -0777 -i -pe 's/calldata/memory/g' contracts/TridentRouter.sol
 #               ConstantProductPool              #
 ##################################################
 # add import for MasterDeployer, Simplifications, IBentoBoxMinimal, and simplifications object in ConstantProductPool
-perl -0777 -i -pe 's/import \".\/TridentERC20.sol\";/import \".\/TridentERC20.sol\";\nimport \"..\/deployer\/MasterDeployer.sol\";\nimport \"..\/..\/spec\/harness\/Simplifications.sol\";\nimport \"..\/interfaces\/IBentoBoxMinimal.sol\";/g' contracts/pool/constant-product/ConstantProductPool.sol
+perl -0777 -i -pe 's/import \"..\/..\/TridentERC20.sol\";/import \"..\/..\/TridentERC20.sol\";\nimport \"..\/..\/deployer\/MasterDeployer.sol\";\nimport \"..\/..\/..\/spec\/harness\/Simplifications.sol\";\nimport \"..\/..\/interfaces\/IBentoBoxMinimal.sol\";/g' contracts/pool/constant-product/ConstantProductPool.sol
 perl -0777 -i -pe 's/address public immutable barFeeTo;/address public immutable barFeeTo;\n    Simplifications public simplified;/g' contracts/pool/constant-product/ConstantProductPool.sol
 
 # simplifying sqrt TridentMath.sqrt(balance0 * balance1) in ConstantProductPool
