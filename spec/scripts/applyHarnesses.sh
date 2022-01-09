@@ -141,7 +141,7 @@ perl -0777 -i -pe 's/uint256 internal unlocked/uint256 public unlocked/g' contra
 #                    HybridPool                  #
 ##################################################
 # add import for MasterDeployer
-perl -0777 -i -pe 's/import \".\/TridentERC20.sol\";/import \".\/TridentERC20.sol\";\nimport \"..\/deployer\/MasterDeployer.sol\";\nimport \"..\/..\/spec\/harness\/DummyERC20A.sol\";\nimport \"..\/..\/spec\/harness\/DummyERC20B.sol\";/g' contracts/pool/hybrid/HybridPool.sol
+perl -0777 -i -pe 's/import \"..\/..\/TridentERC20.sol\";/import \"..\/..\/TridentERC20.sol\";\nimport \"..\/..\/deployer\/MasterDeployer.sol\";\nimport \"..\/..\/..\/spec\/harness\/DummyERC20A.sol\";\nimport \"..\/..\/..\/spec\/harness\/DummyERC20B.sol\";/g' contracts/pool/hybrid/HybridPool.sol
 
 # removing the "immutable" keyword since it is not supported for constructors at the moment
 perl -0777 -i -pe 's/address public immutable token0;/address public token0;/g' contracts/pool/hybrid/HybridPool.sol
