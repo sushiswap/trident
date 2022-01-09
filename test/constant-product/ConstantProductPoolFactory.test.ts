@@ -26,8 +26,38 @@ describe("Constant Product Pool Factory", function () {
 
       const constantProductPool = await ethers.getContractAt<ConstantProductPool>("ConstantProductPool", tx.events?.[0]?.args?.pool);
 
-      expect(await constantProductPool.token0(), token1);
-      expect(await constantProductPool.token1(), token2);
+      expect(await constantProductPool.token0()).to.equal(token1);
+      expect(await constantProductPool.token1()).to.equal(token2);
+    });
+
+    it("has pool count of 0", async function () {
+      const constantProductPoolFactory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
+      expect(
+        await constantProductPoolFactory.poolsCount(
+          "0x0000000000000000000000000000000000000001",
+          "0x0000000000000000000000000000000000000002"
+        )
+      ).to.equal(0);
+    });
+
+    it("has pool count of 1 after pool deployed", async function () {
+      const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
+
+      const constantProductPoolFactory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
+
+      const deployData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "uint256", "bool"],
+        ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000002", 30, false]
+      );
+
+      await masterDeployer.deployPool(constantProductPoolFactory.address, deployData);
+
+      expect(
+        await constantProductPoolFactory.poolsCount(
+          "0x0000000000000000000000000000000000000001",
+          "0x0000000000000000000000000000000000000002"
+        )
+      ).to.equal(1);
     });
   });
 
