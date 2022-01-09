@@ -45,6 +45,9 @@ jobs:
 
       - name: Install dependencies
         run: |
+          wget https://github.com/ethereum/solidity/releases/download/v0.8.4/solc-static-linux
+          chmod +x solc-static-linux
+          sudo mv solc-static-linux /usr/local/bin/solc8.4
           wget https://github.com/ethereum/solidity/releases/download/v0.8.2/solc-static-linux
           chmod +x solc-static-linux
           sudo mv solc-static-linux /usr/local/bin/solc8.2
@@ -58,6 +61,14 @@ jobs:
           ./spec/scripts/applyHarnesses.sh
       - name: Verify Trident Router with Certora
         run: |
-          spec/scripts/verifyTridentRouter.sh
+          spec/scripts/sanityConstantProductPool.sh
+          spec/scripts/sanityHybridPool.sh
+          spec/scripts/sanityMasterDeployer.sh
+          spec/scripts/sanitySymbolicPool.sh
+          spec/scripts/sanityTridentRouter.sh
+          spec/scripts/verifyConstantProductPool.sh
+          spec/scripts/verifyHybridPool.sh
+          spec/scripts/verifyTridentMath.sh
+          spec/scripts/verifyTridentRouterSimple.sh
         env:
           CERTORAKEY: ${{ secrets.CERTORAKEY }}
