@@ -1,7 +1,12 @@
 name: Test
 
 # Controls when the action will run.
-on: [push, pull_request]
+on: 
+  # push:
+  #   branches: [canary]
+  # pull_request:
+  #   branches: [canary]
+  workflow_dispatch:
 
 jobs:
   build:
