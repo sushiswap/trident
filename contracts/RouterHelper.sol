@@ -93,14 +93,4 @@ contract RouterHelper is TridentPermit, TridentBatchable {
         (bool success, ) = recipient.call{value: amount}("");
         require(success, "ETH_TRANSFER_FAILED");
     }
-
-    /**
-     * @notice function to extract the selector of a bytes calldata
-     * @param _data the calldata bytes
-     */
-    function getSelector(bytes memory _data) internal pure returns (bytes4 sig) {
-        assembly {
-            sig := mload(add(_data, 32))
-        }
-    }
 }
