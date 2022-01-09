@@ -30,4 +30,5 @@ tenderly.yaml
 .last_confs
 .certora_build.json
 .certora_metadata.json
+.certora_recent_jobs.json
 .certora_verify.json
