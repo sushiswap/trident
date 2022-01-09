@@ -64,11 +64,6 @@ jobs:
           spec/scripts/applyHarnesses.sh
       - name: Verify Trident Router with Certora
         run: |
-          spec/scripts/sanityConstantProductPool.sh
-          spec/scripts/sanityHybridPool.sh
-          spec/scripts/sanityMasterDeployer.sh
-          spec/scripts/sanitySymbolicPool.sh
-          spec/scripts/sanityTridentRouter.sh
           spec/scripts/verifyConstantProductPool.sh
           spec/scripts/verifyHybridPool.sh
           spec/scripts/verifyTridentMath.sh
