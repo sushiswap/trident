@@ -24,3 +24,10 @@ coverage.json
 local/
 
 tenderly.yaml
+
+# Certora
+.certora_config
+.last_confs
+.certora_build.json
+.certora_metadata.json
+.certora_verify.json
