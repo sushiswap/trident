@@ -3,7 +3,7 @@
 import { BigNumber } from "@ethersproject/bignumber";
 import { ethers } from "hardhat";
 import { expect } from "chai";
-import { getBigNumber } from "./utilities";
+import { getBigNumber } from "../utilities";
 
 describe("Router", function () {
   let alice, aliceEncoded, feeTo, weth, usdc, bento, masterDeployer, tridentPoolFactory, router, dai, daiUsdcPool, pool;

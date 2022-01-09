@@ -1,7 +1,7 @@
 // @ts-nocheck
 
-import { initialize, addLiquidity, swap, burnLiquidity } from "./harness/ConstantProduct";
-import { getBigNumber, randBetween, ZERO } from "./harness/helpers";
+import { initialize, addLiquidity, swap, burnLiquidity } from "../harness/ConstantProduct";
+import { getBigNumber, randBetween, ZERO } from "../harness/helpers";
 
 describe("Constant Product Pool", function () {
   before(async function () {

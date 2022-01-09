@@ -1,4 +1,4 @@
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/src/signers";
 import { RPool, RToken } from "@sushiswap/tines";
 import { BigNumber, Contract, ContractFactory } from "ethers";
 import { MasterDeployer } from "../../../types";

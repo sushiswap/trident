@@ -1,5 +1,5 @@
 import { ContractFactory } from "@ethersproject/contracts";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BentoBoxV1, MasterDeployer, TridentRouter } from "../../../types";
 import { ethers } from "hardhat";
 import { getBigNumber } from "@sushiswap/tines";

@@ -13,10 +13,10 @@ import {
   LinkedListHelper,
   swapViaRouter,
   TWO_POW_128,
-} from "./harness/Concentrated";
-import { getBigNumber } from "./harness/helpers";
-import { Trident } from "./harness/Trident";
-import { customError } from "./utilities/pools";
+} from "../harness/Concentrated";
+import { getBigNumber } from "../harness/helpers";
+import { Trident } from "../harness/Trident";
+import { customError } from "../utilities";
 
 describe("Concentrated Liquidity Product Pool", function () {
   let _snapshotId: string;

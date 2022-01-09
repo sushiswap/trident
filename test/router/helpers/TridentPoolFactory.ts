@@ -1,4 +1,4 @@
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import {
   BentoBoxV1,
   ConcentratedLiquidityPool,
@@ -13,7 +13,7 @@ import {
   TridentRouter,
 } from "../../../types";
 
-import { choice, getRandom } from "./random";
+import { choice, getRandom } from "../../utilities/random";
 import { ethers } from "hardhat";
 import { ContractFactory } from "@ethersproject/contracts";
 import { ConstantProductRPool, getBigNumber, HybridRPool, RPool } from "@sushiswap/tines";

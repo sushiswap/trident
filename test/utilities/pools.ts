@@ -3,7 +3,7 @@ import * as sdk from "@sushiswap/sdk";
 import { getIntegerRandomValueWithMin } from ".";
 import seedrandom from "seedrandom";
 import { ethers } from "hardhat";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 const testSeed = "7";
 const rnd = seedrandom(testSeed);
 
@@ -95,8 +95,4 @@ export async function createConstantProductPool(
   });
 
   return [constantProductPool, cpPoolInfo];
-}
-
-export function customError(errorName: string): string {
-  return `VM Exception while processing transaction: reverted with custom error '${errorName}()'`;
 }

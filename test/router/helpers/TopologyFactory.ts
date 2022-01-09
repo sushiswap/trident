@@ -2,9 +2,9 @@ import { ContractFactory } from "@ethersproject/contracts";
 import { BigNumber, Contract } from "ethers";
 import { BentoBoxV1 } from "../../../types";
 import { Topology } from "./interfaces";
-import { getRandom } from "./random";
+import { getRandom } from "../../utilities/random";
 import { TridentPoolFactory } from "./TridentPoolFactory";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signers";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { ConstantProductRPool, getBigNumber, HybridRPool, RPool, RToken } from "@sushiswap/tines";
 
 export class TopologyFactory {
