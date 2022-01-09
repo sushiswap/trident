@@ -5,7 +5,7 @@ certoraRun spec/harness/TridentRouterHarness.sol spec/harness/SimpleBentoBox.sol
 	--packages @openzeppelin=$PWD/node_modules/@openzeppelin \
 	--solc_map TridentRouterHarness=solc8.2,DummyERC20A=solc8.2,SimpleBentoBox=solc6.12,SymbolicPool=solc8.2,DummyERC20B=solc8.2,Receiver=solc8.2,DummyWeth=solc8.2 \
 	--settings -ignoreViewFunctions,-postProcessCounterExamples=true,-solvers=z3,-t=600,-depth=12 \
-	--rule $1 \
+	# --rule $1 \
 	--cache Trident --short_output \
 	--javaArgs '"-Dcvt.default.parallelism=4"' \
 	--staging --msg "Trident Router: $1"
