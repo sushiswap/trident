@@ -131,6 +131,4 @@ describe("MasterDeployer", function () {
       expect(await this.masterDeployer.barFee()).to.equal(0);
     });
   });
-
-  describe("#poolsCount", async function () {});
 });
