@@ -1,6 +1,18 @@
 {
   "name": "@sushiswap/trident",
   "version": "1.0.0-canary.28",
+  "description": "Trident",
+  "keywords": [
+    "trident",
+    "amm",
+    "framework"
+  ],
+  "homepage": "https://github.com/sushiswap/trident",
+  "bugs": {
+    "url": "https://github.com/sushiswap/trident/issues",
+    "email": "bugs@sushi.com"
+  },
+  "license": "GPL-3.0",
   "files": [
     "artifacts",
     "contracts",
@@ -9,6 +21,9 @@
     "exports",
     "types"
   ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "scripts": {
     "build": "hardhat compile",
     "console": "hardhat console",
