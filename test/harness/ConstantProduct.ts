@@ -31,7 +31,6 @@ export async function initialize() {
     promises.push(ERC20Factory.deploy("Token" + i, "TOK" + i, getBigNumber(1000000)));
   }
   tokens = await Promise.all(promises);
-  await Promise.all(tokens.map((token) => token.deployed));
 
   const Bento = await ethers.getContractFactory("BentoBoxV1");
   const Deployer = await ethers.getContractFactory("MasterDeployer");

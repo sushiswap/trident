@@ -4,7 +4,7 @@ import { expect } from "chai";
 
 describe("Constant Product Pool", () => {
   before(async () => {
-    await deployments.fixture(["MasterDeployer"], { fallbackToGlobal: false, keepExistingDeployments: false });
+    await deployments.fixture(["MasterDeployer"]);
   });
 
   beforeEach(async () => {

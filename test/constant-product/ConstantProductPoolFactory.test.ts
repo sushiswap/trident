@@ -3,11 +3,11 @@ import { expect } from "chai";
 import { ConstantProductPoolFactory, MasterDeployer, ConstantProductPool } from "../../types";
 
 describe("Constant Product Pool Factory", function () {
-  before(async function () {
+  before(async () => {
     //
   });
 
-  beforeEach(async function () {
+  beforeEach(async () => {
     await deployments.fixture(["ConstantProductPoolFactory"]);
   });
 
