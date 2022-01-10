@@ -106,10 +106,39 @@ describe("Constant Product Pool", () => {
 
   describe("#getAmountOut", function () {
     //
+    it("reverts if tokenIn is equal to token1", async () => {
+      const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
+      const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
+      const deployData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "uint256", "bool"],
+        ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000002", 30, false]
+      );
+      const constantProductPool = await ConstantProductPool.deploy(deployData, masterDeployer.address);
+      await constantProductPool.deployed();
+      await expect(
+        constantProductPool.getAmountOut(
+          ethers.utils.defaultAbiCoder.encode(["address", "uint256"], ["0x0000000000000000000000000000000000000003", 0])
+        )
+      ).to.be.revertedWith("INVALID_INPUT_TOKEN");
+    });
   });
 
   describe("#getAmountIn", function () {
-    //
+    it("reverts if tokenOut is equal to token0", async () => {
+      const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
+      const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
+      const deployData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "uint256", "bool"],
+        ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000002", 30, false]
+      );
+      const constantProductPool = await ConstantProductPool.deploy(deployData, masterDeployer.address);
+      await constantProductPool.deployed();
+      await expect(
+        constantProductPool.getAmountIn(
+          ethers.utils.defaultAbiCoder.encode(["address", "uint256"], ["0x0000000000000000000000000000000000000003", 0])
+        )
+      ).to.be.revertedWith("INVALID_OUTPUT_TOKEN");
+    });
   });
 
   describe("#getNativeReserves", function () {
