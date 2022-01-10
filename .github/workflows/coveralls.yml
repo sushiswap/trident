@@ -5,17 +5,11 @@ on: [push, pull_request]
 
 jobs:
   build:
-    name: Build
+    name: Coveralls
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
-
-    - name: Use Node.js 14 LTS
-      uses: actions/setup-node@v2
-      with:
-        node-version: '14'
-
     - name: Get yarn cache directory path
       id: yarn-cache-dir-path
       run: echo "::set-output name=dir::$(yarn cache dir)"
@@ -27,6 +21,13 @@ jobs:
         key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
         restore-keys: |
           ${{ runner.os }}-yarn-
+
+    - uses: actions/setup-node@v2
+      with:
+        node-version: '16.x'
+        registry-url: 'https://npm.pkg.github.com'
+        # Defaults to the user or organization that owns the workflow file
+        # scope: '@sushiswap'
 
     - name: Installing dependencies
       run: yarn
