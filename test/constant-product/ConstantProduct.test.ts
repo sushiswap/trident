@@ -23,14 +23,14 @@ describe("Constant Product Pool", () => {
     });
 
     // TODO: fix instantiation allowed if token1 is zero
-    it.skip("reverts if token1 is zero", async () => {
+    it("deploys if token1 is zero", async () => {
       const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
       const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
       const deployData = ethers.utils.defaultAbiCoder.encode(
         ["address", "address", "uint256", "bool"],
         ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000000", 30, false]
       );
-      await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.be.revertedWith("ZERO_ADDRESS");
+      await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.not.be.revertedWith("ZERO_ADDRESS");
     });
 
     it("reverts if token0 and token1 are identical", async () => {
@@ -87,7 +87,19 @@ describe("Constant Product Pool", () => {
   });
 
   describe("#getAssets", function () {
-    //
+    it("returns the assets the pool was deployed with", async () => {
+      const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
+      const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
+      const deployData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "uint256", "bool"],
+        ["0x0000000000000000000000000000000000000002", "0x0000000000000000000000000000000000000001", 30, false]
+      );
+      const constantProductPool = await ConstantProductPool.deploy(deployData, masterDeployer.address);
+      await constantProductPool.deployed();
+
+      expect(await constantProductPool.token0(), "0x0000000000000000000000000000000000000001");
+      expect(await constantProductPool.token1(), "0x0000000000000000000000000000000000000002");
+    });
   });
 
   describe("#getAmountOut", function () {
