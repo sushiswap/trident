@@ -29,16 +29,17 @@ jobs:
         # Defaults to the user or organization that owns the workflow file
         # scope: '@sushiswap'
 
-    - name: Installing dependencies
+    - name: Yarn
       run: yarn
 
     - name: Compile
       run: yarn build
 
-    - name: Test coverage
+    - name: Test
       run: yarn test:coverage
       env:
         ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
 
     - name: Coveralls
       uses: coverallsapp/github-action@master
