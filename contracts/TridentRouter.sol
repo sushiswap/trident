@@ -15,6 +15,14 @@ contract TridentRouter is ITridentRouter, RouterHelper {
 
     mapping(address => bool) internal whitelistedPools;
 
+    // Custom Errors
+    error TooLittleReceived();
+    error NotEnoughLiquidityMinted();
+    error IncorrectTokenWithdrawn();
+    error UnauthorizedCallback();
+    error InsufficientWETH();
+    error InvalidPool();
+
     constructor(
         IBentoBoxMinimal bento,
         IMasterDeployer masterDeployer,
@@ -35,7 +43,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         // @dev Trigger the swap in the pool.
         amountOut = IPool(params.pool).swap(params.data);
         // @dev Ensure that the slippage wasn't too much. This assumes that the pool is honest.
-        require(amountOut >= params.amountOutMinimum, "TOO_LITTLE_RECEIVED");
+        if (amountOut < params.amountOutMinimum) revert TooLittleReceived();
     }
 
     /// @notice Swaps token A to token B indirectly by using multiple hops.
@@ -56,7 +64,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
             amountOut = IPool(params.path[i].pool).swap(params.path[i].data);
         }
         // @dev Ensure that the slippage wasn't too much. This assumes that the pool is honest.
-        require(amountOut >= params.amountOutMinimum, "TOO_LITTLE_RECEIVED");
+        if (amountOut < params.amountOutMinimum) revert TooLittleReceived();
     }
 
     /// @notice Swaps token A to token B by using callbacks.
@@ -80,7 +88,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         // `1` is used as the default value to avoid the storage slot being released.
         cachedMsgSender = address(1);
         cachedPool = address(1);
-        require(amountOut >= amountOutMinimum, "TOO_LITTLE_RECEIVED");
+        if (amountOut < amountOutMinimum) revert TooLittleReceived();
     }
 
     /// @notice Swaps token A to token B directly. It's the same as `exactInputSingle` except
@@ -94,7 +102,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         // @dev Trigger the swap in the pool.
         amountOut = IPool(params.pool).swap(params.data);
         // @dev Ensure that the slippage wasn't too much. This assumes that the pool is honest.
-        require(amountOut >= params.amountOutMinimum, "TOO_LITTLE_RECEIVED");
+        if (amountOut < params.amountOutMinimum) revert TooLittleReceived();
     }
 
     /// @notice Swaps token A to token B indirectly by using multiple hops. It's the same as `exactInput` except
@@ -113,7 +121,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
             amountOut = IPool(params.path[i].pool).swap(params.path[i].data);
         }
         // @dev Ensure that the slippage wasn't too much. This assumes that the pool is honest.
-        require(amountOut >= params.amountOutMinimum, "TOO_LITTLE_RECEIVED");
+        if (amountOut < params.amountOutMinimum) revert TooLittleReceived();
     }
 
     /// @notice Swaps multiple input tokens to multiple output tokens using multiple paths, in different percentages.
@@ -144,7 +152,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         // @dev Do all the final swaps. Input comes from previous pools - output goes to the user.
         for (uint256 i; i < params.output.length; i++) {
             uint256 balanceShares = bento.balanceOf(params.output[i].token, address(this));
-            require(balanceShares >= params.output[i].minAmount, "TOO_LITTLE_RECEIVED");
+            if (balanceShares < params.output[i].minAmount) revert TooLittleReceived();
             if (params.output[i].unwrapBento) {
                 bento.withdraw(params.output[i].token, address(this), params.output[i].to, 0, balanceShares);
             } else {
@@ -174,7 +182,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
             }
         }
         liquidity = IPool(pool).mint(data);
-        require(liquidity >= minLiquidity, "NOT_ENOUGH_LIQUIDITY_MINTED");
+        if (liquidity < minLiquidity) revert NotEnoughLiquidityMinted();
     }
 
     /// @notice Add liquidity to a pool using callbacks - same as `addLiquidity`, but now with callbacks.
@@ -190,7 +198,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         liquidity = IPool(pool).mint(data);
         cachedMsgSender = address(1);
         cachedPool = address(1);
-        require(liquidity >= minLiquidity, "NOT_ENOUGH_LIQUIDITY_MINTED");
+        if (liquidity < minLiquidity) revert NotEnoughLiquidityMinted();
     }
 
     /// @notice Burn liquidity tokens to get back `bento` tokens.
@@ -211,12 +219,12 @@ contract TridentRouter is ITridentRouter, RouterHelper {
             uint256 j;
             for (; j < withdrawnLiquidity.length; j++) {
                 if (withdrawnLiquidity[j].token == minWithdrawals[i].token) {
-                    require(withdrawnLiquidity[j].amount >= minWithdrawals[i].amount, "TOO_LITTLE_RECEIVED");
+                    if (withdrawnLiquidity[j].amount < minWithdrawals[i].amount) revert TooLittleReceived();
                     break;
                 }
             }
             // @dev A token that is present in `minWithdrawals` is missing from `withdrawnLiquidity`.
-            require(j < withdrawnLiquidity.length, "INCORRECT_TOKEN_WITHDRAWN");
+            if (j >= withdrawnLiquidity.length) revert IncorrectTokenWithdrawn();
         }
     }
 
@@ -236,12 +244,12 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         // @dev Use 'liquidity = 0' for prefunding.
         safeTransferFrom(pool, msg.sender, pool, liquidity);
         uint256 withdrawn = IPool(pool).burnSingle(data);
-        require(withdrawn >= minWithdrawal, "TOO_LITTLE_RECEIVED");
+        if (withdrawn < minWithdrawal) revert TooLittleReceived();
     }
 
     /// @notice Used by the pool 'flashSwap' functionality to take input tokens from the user.
     function tridentSwapCallback(bytes calldata data) external {
-        require(msg.sender == cachedPool, "UNAUTHORIZED_CALLBACK");
+        if (msg.sender != cachedPool) revert UnauthorizedCallback();
         TokenInput memory tokenInput = abi.decode(data, (TokenInput));
         // @dev Transfer the requested tokens to the pool.
         // TODO: Refactor redudency
@@ -256,7 +264,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
 
     /// @notice Can be used by the pool 'mint' functionality to take tokens from the user.
     function tridentMintCallback(bytes calldata data) external {
-        require(msg.sender == cachedPool, "UNAUTHORIZED_CALLBACK");
+        if (msg.sender != cachedPool) revert UnauthorizedCallback();
         TokenInput[] memory tokenInput = abi.decode(data, (TokenInput[]));
         // @dev Transfer the requested tokens to the pool.
         for (uint256 i; i < tokenInput.length; i++) {
@@ -297,7 +305,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
     /// @notice Unwrap this contract's `wETH` into ETH
     function unwrapWETH(uint256 amountMinimum, address recipient) external {
         uint256 balanceWETH = balanceOfThis(wETH);
-        require(balanceWETH >= amountMinimum, "INSUFFICIENT_WETH");
+        if (balanceWETH < amountMinimum) revert InsufficientWETH();
         if (balanceWETH != 0) {
             withdrawFromWETH(balanceWETH);
             safeTransferETH(recipient, balanceWETH);
@@ -326,11 +334,11 @@ contract TridentRouter is ITridentRouter, RouterHelper {
 
     function isWhiteListed(address pool) internal {
         if (!whitelistedPools[pool]) {
-            require(masterDeployer.pools(pool), "INVALID POOL");
+            if (!masterDeployer.pools(pool)) revert InvalidPool();
             whitelistedPools[pool] = true;
         }
     }
 
     // LIBRARY FUNCTIONS
-    // https://github.com/Uniswap/v2-periphery/blob/master/contracts/UniswapV2Router02.sol#L402    
+    // https://github.com/Uniswap/v2-periphery/blob/master/contracts/UniswapV2Router02.sol#L402
 }
