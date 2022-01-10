@@ -87,7 +87,7 @@ describe("Constant Product Pool", () => {
   });
 
   describe("#getAssets", function () {
-    it("returns the assets the pool was deployed with", async () => {
+    it("returns the assets the pool was deployed with, and in the correct order", async () => {
       const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
       const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
       const deployData = ethers.utils.defaultAbiCoder.encode(
@@ -97,8 +97,10 @@ describe("Constant Product Pool", () => {
       const constantProductPool = await ConstantProductPool.deploy(deployData, masterDeployer.address);
       await constantProductPool.deployed();
 
-      expect(await constantProductPool.token0(), "0x0000000000000000000000000000000000000001");
-      expect(await constantProductPool.token1(), "0x0000000000000000000000000000000000000002");
+      const assets = await constantProductPool.getAssets();
+
+      await expect(assets[0], "0x0000000000000000000000000000000000000001");
+      await expect(assets[1], "0x0000000000000000000000000000000000000002");
     });
   });
 
