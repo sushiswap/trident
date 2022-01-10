@@ -10,6 +10,10 @@ describe("Rebasing", () => {
     await mock.deployed();
   });
 
+  beforeEach(async () => {
+    await mock.reset();
+  });
+
   it("base is initially 0", async () => {
     const total = await mock.total();
     await expect(total.base).to.equal(0);
@@ -24,11 +28,21 @@ describe("Rebasing", () => {
     it("has base:elastic ratio of 1:1 initially", async () => {
       expect(await mock.toBase(100)).to.equal(100);
     });
+    it("has base:elastic ratio of 1:2 after setting total to elatic 1000 and base 500", async () => {
+      await mock.set(1000, 500);
+      expect(await mock.toBase(10)).to.equal(5);
+    });
   });
 
   describe("#toelastic", async () => {
     it("has elastic:base ratio of 1:1 initially", async () => {
       expect(await mock.toElastic(100)).to.equal(100);
     });
+    it("has elastic:base ratio of 2:1 after setting total to elatic 1000 and base 500", async () => {
+      await mock.set(1000, 500);
+      expect(await mock.toElastic(10)).to.equal(20);
+    });
   });
+
+  // TODO: Flesh these out a little more...
 });
