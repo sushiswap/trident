@@ -19,7 +19,7 @@ module.exports = {
     "pool/franchised",
     "pool/hybrid",
     "pool/index",
-    "pool/TridentERC721",
+    "TridentERC721",
     // Covered elsewhere
     "TridentBatchable",
     "TridentOwnable",
