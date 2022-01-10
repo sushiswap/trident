@@ -1,6 +1,7 @@
 import { deployments, ethers } from "hardhat";
 import { ConstantProductPool__factory, MasterDeployer } from "../../types";
 import { expect } from "chai";
+import { initializedConstantProductPool } from "../fixtures";
 
 describe("Constant Product Pool", () => {
   before(async () => {
@@ -105,7 +106,12 @@ describe("Constant Product Pool", () => {
   });
 
   describe("#getAmountOut", function () {
-    //
+    it("returns amount out expected for 1000000000 in", async () => {
+      const pool = await initializedConstantProductPool();
+      expect(
+        await pool.getAmountOut(ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token1(), "1000000000"]))
+      ).to.equal("996999999");
+    });
     it("reverts if tokenIn is not equal to token0 and token1", async () => {
       const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
       const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
@@ -121,6 +127,12 @@ describe("Constant Product Pool", () => {
   });
 
   describe("#getAmountIn", function () {
+    it("returns amount in expected for 1000000000 out", async () => {
+      const pool = await initializedConstantProductPool();
+      expect(
+        await pool.getAmountIn(ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token1(), "1000000000"]))
+      ).to.equal("1003009029");
+    });
     it("reverts if tokenOut is not equal to token 1 and token0", async () => {
       const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
       const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
