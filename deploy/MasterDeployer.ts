@@ -7,12 +7,15 @@ const deployFunction: DeployFunction = async function ({ ethers, deployments, ge
   console.log("Running MasterDeployer deploy script");
   const { deploy } = deployments;
 
-  const { deployer } = await getNamedAccounts();
+  const barFee = 17;
+
+  const { deployer, barFeeTo } = await getNamedAccounts();
 
   const chainId = Number(await getChainId());
 
   let bentoBoxV1Address;
 
+  // TODO: Messy, can share deployment from @sushiswap/bentobox
   if (chainId === 31337) {
     // for testing purposes we use a redeployed bentobox address
     bentoBoxV1Address = (await ethers.getContract("BentoBoxV1")).address;
@@ -27,7 +30,7 @@ const deployFunction: DeployFunction = async function ({ ethers, deployments, ge
 
   const { address } = await deploy("MasterDeployer", {
     from: deployer,
-    args: [17, deployer, bentoBoxV1Address],
+    args: [barFee, barFeeTo, bentoBoxV1Address],
     deterministicDeployment: false,
   });
 
