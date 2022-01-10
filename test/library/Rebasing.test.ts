@@ -34,7 +34,7 @@ describe("Rebasing", () => {
     });
   });
 
-  describe("#toelastic", async () => {
+  describe("#toElastic", async () => {
     it("has elastic:base ratio of 1:1 initially", async () => {
       expect(await mock.toElastic(100)).to.equal(100);
     });
