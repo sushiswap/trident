@@ -4,7 +4,7 @@ import { expect } from "chai";
 
 describe("Constant Product Pool", () => {
   before(async () => {
-    await deployments.fixture(["MasterDeployer"]);
+    await deployments.fixture(["MasterDeployer"], { fallbackToGlobal: false, keepExistingDeployments: false });
   });
 
   beforeEach(async () => {
@@ -21,6 +21,7 @@ describe("Constant Product Pool", () => {
       );
       await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.be.revertedWith("ZERO_ADDRESS");
     });
+
     // TODO: fix instantiation allowed if token1 is zero
     it.skip("reverts if token1 is zero", async () => {
       const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
@@ -40,13 +41,6 @@ describe("Constant Product Pool", () => {
         ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000001", 30, false]
       );
       await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.be.revertedWith("IDENTICAL_ADDRESSES");
-    });
-
-    it("reverts if token0 is the computed address of the pool? whut?", async () => {
-      //
-    });
-    it("reverts if token1 is the computed address of the pool? whut?", async () => {
-      //
     });
     it("reverts if swap fee more than the max fee", async () => {
       const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
