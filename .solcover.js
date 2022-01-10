@@ -20,5 +20,8 @@ module.exports = {
     "pool/hybrid",
     "pool/index",
     "pool/TridentERC721",
+    // Covered elsewhere
+    "TridentBatchable",
+    "TridentOwnable",
   ],
 };
