@@ -105,6 +105,26 @@ describe("Constant Product Pool", () => {
     });
   });
 
+  describe("#updateBarFee", () => {
+    it("mutates bar fee if changed on master deployer", async () => {
+      const pool = await initializedConstantProductPool();
+
+      const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
+
+      expect(await pool.barFee()).equal(17);
+
+      await masterDeployer.setBarFee(10).then((tx) => tx.wait());
+
+      expect(await masterDeployer.barFee()).equal(10);
+
+      expect(await pool.barFee()).equal(17);
+
+      await pool.updateBarFee().then((tx) => tx.wait());
+
+      expect(await pool.barFee()).equal(10);
+    });
+  });
+
   describe("#getAmountOut", function () {
     it("returns amount out expected for 1000000000 in", async () => {
       const pool = await initializedConstantProductPool();
