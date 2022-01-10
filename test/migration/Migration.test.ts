@@ -1,6 +1,6 @@
 import { ethers, network } from "hardhat";
 import { expect } from "chai";
-import { customError } from "../utilities/pools";
+import { customError } from "../utilities";
 
 describe("Migration", function () {
   let _owner, owner, chef, migrator, usdcWethLp, usdc, weth, masterDeployer, factory, Pool, snapshotId, ERC20, manualMigrator;

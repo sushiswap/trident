@@ -1,8 +1,13 @@
-name: Test
+name: Gas
 
 # Controls when the action will run.
-on: [push, pull_request]
-
+on: 
+  # push:
+  #   branches: [canary]
+  # pull_request:
+  #   branches: [canary]
+  workflow_dispatch:
+  
 jobs:
   build:
     name: Build
@@ -31,7 +36,7 @@ jobs:
     - name: Installing dependencies
       run: yarn install --frozen-lockfile
 
-    - name: Test
-      run: yarn test
+    - name: Test gas
+      run: yarn test:gas
       env:
         ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}

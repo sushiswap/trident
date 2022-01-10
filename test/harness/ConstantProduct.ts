@@ -1,16 +1,20 @@
 // @ts-nocheck
 
 import { BigNumber, utils } from "ethers";
-import { ethers } from "hardhat";
+import { ethers, deployments } from "hardhat";
 import { expect } from "chai";
 import { encodedSwapData, getBigNumber, randBetween, sqrt, printHumanReadable, ZERO, TWO, MAX_FEE } from "./helpers";
+import { BentoBoxV1, ERC20Mock__factory, IConstantProductPool, MasterDeployer, TridentRouter } from "../../types";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
-let accounts = [];
+let accounts: SignerWithAddress[] = [];
 // First token is used as weth
-let tokens = [];
-let pools = [];
-let bento, masterDeployer, router;
-let aliceEncoded;
+let tokens: ERC20Mock[] = [];
+let pools: IConstantProductPool[] = [];
+let bento: BentoBoxV1;
+let masterDeployer: MasterDeployer;
+let router: TridentRouter;
+let aliceEncoded: string;
 
 export async function initialize() {
   if (accounts.length > 0) {
@@ -19,30 +23,37 @@ export async function initialize() {
   accounts = await ethers.getSigners();
   aliceEncoded = utils.defaultAbiCoder.encode(["address"], [accounts[0].address]);
 
-  const ERC20 = await ethers.getContractFactory("ERC20Mock");
+  const ERC20Factory = await ethers.getContractFactory<ERC20Mock__factory>("ERC20Mock");
+
+  let promises = [];
+
+  for (let i = 0; i < 10; i++) {
+    promises.push(ERC20Factory.deploy("Token" + i, "TOK" + i, getBigNumber(1000000)));
+  }
+  tokens = await Promise.all(promises);
+
   const Bento = await ethers.getContractFactory("BentoBoxV1");
   const Deployer = await ethers.getContractFactory("MasterDeployer");
   const PoolFactory = await ethers.getContractFactory("ConstantProductPoolFactory");
   const TridentRouter = await ethers.getContractFactory("TridentRouter");
   const Pool = await ethers.getContractFactory("ConstantProductPool");
 
-  let promises = [];
-  for (let i = 0; i < 10; i++) {
-    promises.push(ERC20.deploy("Token" + i, "TOK" + i, getBigNumber(1000000)));
-  }
-  tokens = await Promise.all(promises);
-
   bento = await Bento.deploy(tokens[0].address);
-  masterDeployer = await Deployer.deploy(randBetween(1, 9999), accounts[1].address, bento.address);
-  router = await TridentRouter.deploy(bento.address, masterDeployer.address, tokens[0].address);
-  const poolFactory = await PoolFactory.deploy(masterDeployer.address);
+  await bento.deployed();
 
-  await Promise.all([
-    // Whitelist pool factory in master deployer
-    masterDeployer.addToWhitelist(poolFactory.address),
-    // Whitelist Router on BentoBox
-    bento.whitelistMasterContract(router.address, true),
-  ]);
+  masterDeployer = await Deployer.deploy(randBetween(1, 9999), accounts[1].address, bento.address);
+  await masterDeployer.deployed();
+
+  router = await TridentRouter.deploy(bento.address, masterDeployer.address, tokens[0].address);
+  await router.deployed();
+
+  // Whitelist Router on BentoBox
+  await bento.whitelistMasterContract(router.address, true);
+
+  const poolFactory = await PoolFactory.deploy(masterDeployer.address);
+  await poolFactory.deployed();
+  // Whitelist pool factory in master deployer
+  await masterDeployer.addToWhitelist(poolFactory.address);
 
   // Approve BentoBox token deposits and deposit tokens in bentobox
   promises = [];
@@ -83,7 +94,7 @@ export async function initialize() {
     const initCodeHash = utils.keccak256(Pool.bytecode + constructorParams);
     const poolAddress = utils.getCreate2Address(poolFactory.address, salt, initCodeHash);
     pools.push(Pool.attach(poolAddress));
-    await masterDeployer.deployPool(poolFactory.address, deployData);
+    await masterDeployer.deployPool(poolFactory.address, deployData).then((tx) => tx.wait());
     const deployedPoolAddress = (await poolFactory.getPools(token0.address, token1.address, 0, 1))[0];
     expect(poolAddress).eq(deployedPoolAddress);
   }

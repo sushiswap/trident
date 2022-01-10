@@ -2,13 +2,13 @@
 
 pragma solidity >=0.8.0;
 
-import "../interfaces/IBentoBoxMinimal.sol";
-import "../interfaces/IMasterDeployer.sol";
-import "../TridentRouter.sol";
+import "./interfaces/IBentoBoxMinimal.sol";
+import "./interfaces/IMasterDeployer.sol";
 import "./TridentPermit.sol";
+import "./TridentBatchable.sol";
 
 /// @notice Trident router helper contract.
-contract RouterHelper is TridentPermit {
+contract RouterHelper is TridentPermit, TridentBatchable {
     /// @notice BentoBox token vault.
     IBentoBoxMinimal public immutable bento;
     /// @notice Trident AMM master deployer contract.
@@ -27,40 +27,6 @@ contract RouterHelper is TridentPermit {
         masterDeployer = _masterDeployer;
         wETH = _wETH;
         _bento.registerProtocol();
-    }
-
-    /// @notice Provides batch function calls for this contract and returns the data from all of them if they all succeed.
-    /// Adapted from https://github.com/Uniswap/uniswap-v3-periphery/blob/main/contracts/base/Multicall.sol, License-Identifier: GPL-2.0-or-later.
-    /// @dev The `msg.value` should not be trusted for any method callable from this function.
-    /// @dev Uses a modified version of the batch function - preventing multiple calls of the single input swap functions
-    /// @param data ABI-encoded params for each of the calls to make to this contract.
-    /// @return results The results from each of the calls passed in via `data`.
-    function batch(bytes[] calldata data) external payable returns (bytes[] memory results) {
-        results = new bytes[](data.length);
-        // We only allow one exactInputSingle call to be made in a single batch call.
-        // This is not really needed but we want to save users from signing malicious payloads.
-        // We also don't want nested batch calls.
-        bool swapCalled;
-        for (uint256 i = 0; i < data.length; i++) {
-            bytes4 selector = getSelector(data[i]);
-            if (selector == TridentRouter.exactInputSingle.selector || selector == TridentRouter.exactInputSingleWithNativeToken.selector) {
-                require(!swapCalled, "Swap called twice");
-                swapCalled = true;
-            } else {
-                require(selector != this.batch.selector, "Nested Batch");
-            }
-
-            (bool success, bytes memory result) = address(this).delegatecall(data[i]);
-            if (!success) {
-                // Next 5 lines from https://ethereum.stackexchange.com/a/83577.
-                if (result.length < 68) revert();
-                assembly {
-                    result := add(result, 0x04)
-                }
-                revert(abi.decode(result, (string)));
-            }
-            results[i] = result;
-        }
     }
 
     function deployPool(address factory, bytes calldata deployData) external payable returns (address) {
@@ -126,15 +92,5 @@ contract RouterHelper is TridentPermit {
     function safeTransferETH(address recipient, uint256 amount) internal {
         (bool success, ) = recipient.call{value: amount}("");
         require(success, "ETH_TRANSFER_FAILED");
-    }
-
-    /**
-     * @notice function to extract the selector of a bytes calldata
-     * @param _data the calldata bytes
-     */
-    function getSelector(bytes memory _data) internal pure returns (bytes4 sig) {
-        assembly {
-            sig := mload(add(_data, 32))
-        }
     }
 }

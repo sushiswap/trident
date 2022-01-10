@@ -1,7 +1,8 @@
-export/
-deployments/
 artifacts/
 cache/
 coverage/
+deployments/
+export/
+spec/
 node_modules/
 types/

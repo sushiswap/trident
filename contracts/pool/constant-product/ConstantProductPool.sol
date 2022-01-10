@@ -7,7 +7,7 @@ import "../../interfaces/IMasterDeployer.sol";
 import "../../interfaces/IPool.sol";
 import "../../interfaces/ITridentCallee.sol";
 import "../../libraries/TridentMath.sol";
-import "../TridentERC20.sol";
+import "../../TridentERC20.sol";
 
 /// @notice Trident exchange pool template with constant product formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares.
@@ -59,8 +59,6 @@ contract ConstantProductPool is IPool, TridentERC20 {
         // @dev Factory ensures that the tokens are sorted.
         require(_token0 != address(0), "ZERO_ADDRESS");
         require(_token0 != _token1, "IDENTICAL_ADDRESSES");
-        require(_token0 != address(this), "INVALID_TOKEN");
-        require(_token1 != address(this), "INVALID_TOKEN");
         require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
 
         token0 = _token0;

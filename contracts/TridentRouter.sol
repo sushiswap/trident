@@ -2,9 +2,9 @@
 
 pragma solidity >=0.8.0;
 
+import "./RouterHelper.sol";
 import "./interfaces/IPool.sol";
 import "./interfaces/ITridentRouter.sol";
-import "./utils/RouterHelper.sol";
 
 /// @notice Router contract that helps in swapping across Trident pools.
 contract TridentRouter is ITridentRouter, RouterHelper {
@@ -244,6 +244,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         require(msg.sender == cachedPool, "UNAUTHORIZED_CALLBACK");
         TokenInput memory tokenInput = abi.decode(data, (TokenInput));
         // @dev Transfer the requested tokens to the pool.
+        // TODO: Refactor redudency
         if (tokenInput.native) {
             _depositFromUserToBentoBox(tokenInput.token, cachedMsgSender, msg.sender, tokenInput.amount);
         } else {
@@ -259,6 +260,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         TokenInput[] memory tokenInput = abi.decode(data, (TokenInput[]));
         // @dev Transfer the requested tokens to the pool.
         for (uint256 i; i < tokenInput.length; i++) {
+            // TODO: Refactor redudency
             if (tokenInput[i].native) {
                 _depositFromUserToBentoBox(tokenInput[i].token, cachedMsgSender, msg.sender, tokenInput[i].amount);
             } else {
@@ -328,4 +330,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
             whitelistedPools[pool] = true;
         }
     }
+
+    // LIBRARY FUNCTIONS
+    // https://github.com/Uniswap/v2-periphery/blob/master/contracts/UniswapV2Router02.sol#L402    
 }

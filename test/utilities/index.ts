@@ -38,4 +38,7 @@ export function areCloseValues(v1: any, v2: any, threshold: any) {
   return Math.abs(v1 / v2 - 1) < threshold;
 }
 
+export * from "./error";
+export * from "./pools";
+export * from "./random";
 export * from "./time";

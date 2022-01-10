@@ -1,20 +1,20 @@
 // @ts-nocheck
 
-import { initialize, addLiquidity, swap, burnLiquidity } from "./harness/ConstantProduct";
-import { getBigNumber, randBetween, ZERO } from "./harness/helpers";
+import { initialize, addLiquidity, swap, burnLiquidity } from "../harness/ConstantProduct";
+import { getBigNumber, randBetween, ZERO } from "../harness/helpers";
 
-describe("Constant Product Pool", function () {
-  before(async function () {
+describe("Constant Product Pool Old", function () {
+  before(async () => {
     await initialize();
   });
 
-  beforeEach(async function () {
+  beforeEach(async () => {
     //
   });
 
-  describe("#swap", function () {
+  describe("#swap", () => {
     const maxHops = 3;
-    it(`Should do ${maxHops * 8} types of swaps`, async function () {
+    it(`Should do ${maxHops * 8} types of swaps`, async () => {
       for (let i = 1; i <= maxHops; i++) {
         // We need to generate all permutations of [bool, bool, bool]. This loop goes from 0 to 7 and then
         // we use the binary representation of `j` to get the actual values. 0 in binary = false, 1 = true.
@@ -28,26 +28,22 @@ describe("Constant Product Pool", function () {
     });
   });
 
-  describe("#flashSwap", function () {
-    //
-  });
-
-  describe("#mint", function () {
-    it("Balanced liquidity to a balanced pool", async function () {
+  describe("#mint", () => {
+    it("Balanced liquidity to a balanced pool", async () => {
       const amount = getBigNumber(randBetween(10, 100));
       await addLiquidity(0, amount, amount);
     });
-    it("Add liquidity in 16 different ways before swap fees", async function () {
+    it("Add liquidity in 16 different ways before swap fees", async () => {
       await addLiquidityInMultipleWays();
     });
-    it("Add liquidity in 16 different ways after swap fees", async function () {
+    it("Add liquidity in 16 different ways after swap fees", async () => {
       await swap(2, getBigNumber(randBetween(100, 200)));
       await addLiquidityInMultipleWays();
     });
   });
 
-  describe("#burn", function () {
-    it(`Remove liquidity in 12 different ways`, async function () {
+  describe("#burn", () => {
+    it(`Remove liquidity in 12 different ways`, async () => {
       for (let i = 0; i < 3; i++) {
         for (let j = 0; j < 2; j++) {
           // when fee is pending
@@ -62,31 +58,7 @@ describe("Constant Product Pool", function () {
   });
 });
 
-describe("#burnSingle", function () {
-  //
-});
-
-describe("#poolIdentifier", function () {
-  //
-});
-
-describe("#getAssets", function () {
-  //
-});
-
-describe("#getAmountOut", function () {
-  //
-});
-
-describe("#getAmountIn", function () {
-  //
-});
-
-describe("#getNativeReserves", function () {
-  //
-});
-
-async function addLiquidityInMultipleWays() {
+const addLiquidityInMultipleWays = async () => {
   // The first loop selects the liquidity amounts to add - [0, x], [x, 0], [x, x], [x, y]
   for (let i = 0; i < 4; i++) {
     const amount0 = i == 0 ? ZERO : getBigNumber(randBetween(10, 100));
@@ -101,4 +73,4 @@ async function addLiquidityInMultipleWays() {
       await addLiquidity(0, amount0, amount1, binaryJ[0] == 1, binaryJ[1] == 1);
     }
   }
-}
+};

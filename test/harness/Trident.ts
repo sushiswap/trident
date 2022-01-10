@@ -3,7 +3,6 @@ import { ContractFactory } from "@ethersproject/contracts";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import { utils } from "ethers";
 import { ethers } from "hardhat";
-
 import {
   BentoBoxV1,
   ConcentratedLiquidityPool,
@@ -14,9 +13,9 @@ import {
   DyDxMath,
   MasterDeployer,
   TickMathMock,
+  ERC20Mock,
   TridentRouter,
 } from "../../types";
-import { ERC20Mock } from "../../types/ERC20Mock";
 import { getBigNumber, getFactories, randBetween, sortTokens } from "./helpers";
 
 export const TWO_POW_96 = BigNumber.from(2).pow(96);

@@ -1,5 +1,5 @@
 import { RToken, MultiRoute, findMultiRouteExactIn } from "@sushiswap/tines";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumber, Contract } from "ethers";
 
 import { Topology, TridentRoute } from "./interfaces";
@@ -70,6 +70,6 @@ export async function executeTridentRoute(tridentRouteParams: TridentRoute, toTo
   return outputBalanceAfter.sub(outputBalanceBefore);
 }
 
-export * from "./random";
+export * from "../../utilities/random";
 export * from "./RouteType";
 export * from "./interfaces";

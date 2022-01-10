@@ -4,7 +4,7 @@ pragma solidity >=0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
-abstract contract TridentNFT is ERC721 {
+abstract contract TridentERC721 is ERC721 {
     bytes32 public constant PERMIT_TYPEHASH = keccak256("Permit(address spender,uint256 tokenId,uint256 nonce,uint256 deadline)");
 
     bytes32 public constant PERMIT_ALL_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 nonce,uint256 deadline)");

@@ -3,18 +3,18 @@
 import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 import { expect } from "chai";
-import { getBigNumber } from "./utilities";
+import { getBigNumber } from "../utilities";
 
 let alice, aliceEncoded, feeTo, weth, usdc, bento, masterDeployer, tridentPoolFactory, router, pool;
 
-describe("Franchised constant product pool", function () {
+describe("Franchised hybrid pool", function () {
   before(async function () {
     await initialize();
   });
 
   it("Should add liquidity", async function () {
     const amount = BigNumber.from(10).pow(18);
-    const expectedLiquidity = amount.sub(1000);
+    const expectedLiquidity = amount.mul(2).sub(1000);
     let liquidityInput = [
       {
         token: weth.address,
@@ -36,7 +36,7 @@ describe("Franchised constant product pool", function () {
     let wethPoolBalance = await bento.balanceOf(weth.address, pool.address);
     let usdcPoolBalance = await bento.balanceOf(usdc.address, pool.address);
 
-    expect(totalSupply).eq(amount);
+    expect(totalSupply).eq(amount.mul(2));
     expect(wethPoolBalance).eq(amount);
     expect(usdcPoolBalance).eq(amount);
   });
@@ -63,9 +63,9 @@ export async function initialize() {
   const ERC20 = await ethers.getContractFactory("ERC20Mock");
   const Bento = await ethers.getContractFactory("BentoBoxV1");
   const Deployer = await ethers.getContractFactory("MasterDeployer");
-  const PoolFactory = await ethers.getContractFactory("FranchisedConstantProductPoolFactory");
+  const PoolFactory = await ethers.getContractFactory("FranchisedHybridPoolFactory");
   const TridentRouter = await ethers.getContractFactory("TridentRouter");
-  const Pool = await ethers.getContractFactory("FranchisedConstantProductPool");
+  const Pool = await ethers.getContractFactory("FranchisedHybridPool");
   const WhiteListManager = await ethers.getContractFactory("WhiteListManager");
   const whiteListManager = await WhiteListManager.deploy();
 
@@ -108,8 +108,8 @@ export async function initialize() {
   // Pool deploy data
   let addresses = [weth.address, usdc.address].sort();
   const deployData = ethers.utils.defaultAbiCoder.encode(
-    ["address", "address", "uint256", "bool", "address", "address", "bool"],
-    [addresses[0], addresses[1], 30, false, whiteListManager.address, alice.address, false]
+    ["address", "address", "uint256", "uint256", "address", "address", "bool"],
+    [addresses[0], addresses[1], 30, 200, whiteListManager.address, alice.address, false]
   );
 
   whiteListManager.whitelistAccount(alice.address, true);

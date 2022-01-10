@@ -1,12 +1,12 @@
 import { keccak256, pack } from "@ethersproject/solidity";
 
-import { MAX_FEE } from "./utilities";
-import { bytecode as constantProductPoolBytecode } from "../artifacts/contracts/pool/constant-product/ConstantProductPool.sol/ConstantProductPool.json";
+import { MAX_FEE } from "../utilities";
+import { bytecode as constantProductPoolBytecode } from "../../artifacts/contracts/pool/constant-product/ConstantProductPool.sol/ConstantProductPool.json";
 import { defaultAbiCoder } from "@ethersproject/abi";
 import { ethers } from "hardhat";
 import { expect } from "chai";
 import { getCreate2Address } from "@ethersproject/address";
-import { customError } from "./utilities/pools";
+import { customError } from "../utilities";
 
 describe("MasterDeployer", function () {
   before(async function () {
@@ -131,6 +131,4 @@ describe("MasterDeployer", function () {
       expect(await this.masterDeployer.barFee()).to.equal(0);
     });
   });
-
-  describe("#poolsCount", async function () {});
 });
