@@ -13,7 +13,7 @@ describe("Pool Deployer", function () {
     await expect(PoolFactory.deploy("0x0000000000000000000000000000000000000000")).to.be.revertedWith(customError("ZeroAddress"));
   });
 
-  it("reverts when deploying directly rather than through master deployer", async function () {
+  it("reverts when deploying directly rather than master deployer", async function () {
     const PoolFactory = await ethers.getContractFactory<PoolFactoryMock__factory>("PoolFactoryMock");
     const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
     const poolFactory = await PoolFactory.deploy(masterDeployer.address);
