@@ -1,4 +1,6 @@
 module.exports = {
+  testCommand: "yarn test",
+  compileCommand: "yarn build",
   skipFiles: [
     "interfaces",
     "examples",
