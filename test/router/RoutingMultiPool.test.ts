@@ -3,7 +3,7 @@ import seedrandom from "seedrandom";
 import { Contract } from "@ethersproject/contracts";
 import { closeValues, RToken } from "@sushiswap/tines";
 import * as testHelper from "./helpers";
-import { getIntegerRandomValue } from "../utilities";
+import { getIntegerRandomValue, customError } from "../utilities";
 import { RouteType, Topology } from "./helpers";
 
 describe("MultiPool Routing Tests - Fixed Topology", function () {
@@ -130,7 +130,7 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
 
     expect(routerParams.routeType).equal(RouteType.SinglePath);
 
-    await expect(testHelper.executeTridentRoute(routerParams, toToken.address)).to.be.revertedWith("TOO_LITTLE_RECEIVED");
+    await expect(testHelper.executeTridentRoute(routerParams, toToken.address)).to.be.revertedWith(customError("TooLittleReceived"));
   });
 
   it("Should Test Normal Values with 2 Parallel Pools", async function () {
