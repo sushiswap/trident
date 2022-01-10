@@ -42,10 +42,10 @@ describe("Constant Product Pool", () => {
       await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.be.revertedWith("IDENTICAL_ADDRESSES");
     });
 
-    it("reverts if token0 is the computed address of the pool", async () => {
+    it("reverts if token0 is the computed address of the pool? whut?", async () => {
       //
     });
-    it("reverts if token0 is the computed address of the pool", async () => {
+    it("reverts if token1 is the computed address of the pool? whut?", async () => {
       //
     });
     it("reverts if swap fee more than the max fee", async () => {
@@ -119,8 +119,8 @@ describe("Constant Product Pool", function () {
         // 000 -> false, false, false.
         // 010 -> false, true, false.
         for (let j = 0; j < 8; j++) {
-          const binaryJ = j.toString(2).padStart(3, "0");
-          await swap(i, getBigNumber(randBetween(1, 100)), binaryJ[0] == 1, binaryJ[1] == 1, binaryJ[2] == 1);
+          const binaryJ = parseInt(j.toString(2).padStart(3, "0"));
+          await swap(i, getBigNumber(randBetween(1, 100)), binaryJ[0] === 1, binaryJ[1] === 1, binaryJ[2] === 1);
         }
       }
     });
@@ -149,9 +149,9 @@ describe("Constant Product Pool", function () {
       for (let i = 0; i < 3; i++) {
         for (let j = 0; j < 2; j++) {
           // when fee is pending
-          await burnLiquidity(0, getBigNumber(randBetween(5, 10)), i, j == 0);
+          await burnLiquidity(0, getBigNumber(randBetween(5, 10)), i, j === 0);
           // when no fee is pending
-          await burnLiquidity(0, getBigNumber(randBetween(5, 10)), i, j == 0);
+          await burnLiquidity(0, getBigNumber(randBetween(5, 10)), i, j === 0);
           // generate fee
           await swap(2, getBigNumber(randBetween(100, 200)));
         }
@@ -196,7 +196,7 @@ async function addLiquidityInMultipleWays() {
     // 01 -> false, true
     for (let j = 0; j < 4; j++) {
       const binaryJ = parseInt(j.toString(2).padStart(2, "0"));
-      await addLiquidity(0, amount0, amount1, binaryJ[0] == 1, binaryJ[1] == 1);
+      await addLiquidity(0, amount0, amount1, binaryJ[0] === 1, binaryJ[1] === 1);
     }
   }
 }
