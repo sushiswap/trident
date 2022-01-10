@@ -34,6 +34,7 @@ const config: HardhatUserConfig = {
     enabled: process.env.REPORT_GAS === "true",
     // outputFile: "gas.json",
     excludeContracts: ["BentoBoxV1", "ERC20Mock", "ERC20", "WETH9"],
+    // onlyCalledMethods: false,
   },
   namedAccounts: {
     deployer: {
@@ -57,8 +58,11 @@ const config: HardhatUserConfig = {
     eve: {
       default: 6,
     },
-    feeTo: {
+    swapFeeTo: {
       default: 7,
+    },
+    barFeeTo: {
+      default: 8,
     },
   },
   networks: {
