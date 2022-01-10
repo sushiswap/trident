@@ -59,8 +59,6 @@ contract ConstantProductPool is IPool, TridentERC20 {
         // @dev Factory ensures that the tokens are sorted.
         require(_token0 != address(0), "ZERO_ADDRESS");
         require(_token0 != _token1, "IDENTICAL_ADDRESSES");
-        require(_token0 != address(this), "INVALID_TOKEN");
-        require(_token1 != address(this), "INVALID_TOKEN");
         require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
 
         token0 = _token0;
