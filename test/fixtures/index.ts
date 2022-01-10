@@ -1,22 +1,46 @@
 import { ethers, deployments } from "hardhat";
 import { BentoBoxV1, ConstantProductPoolFactory, ConstantProductPool__factory, ERC20Mock__factory, MasterDeployer } from "../../types";
 
-export const uninitializedConstantProductPool = deployments.createFixture(async ({ deployments, getNamedAccounts, ethers }, options) => {
-  await deployments.fixture(["ConstantProductPoolFactory"]); // ensure you start from a fresh deployments
+export const uninitializedConstantProductPool = deployments.createFixture(
+  async (
+    {
+      deployments,
+      ethers: {
+        getNamedSigners,
+        constants: { MaxUint256 },
+      },
+    },
+    options
+  ) => {
+    await deployments.fixture(["ConstantProductPoolFactory"]); // ensure you start from a fresh deployments
+    const { alice } = await getNamedSigners();
 
-  const constantProductPoolFactory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
+    const ERC20 = await ethers.getContractFactory<ERC20Mock__factory>("ERC20Mock");
 
-  const deployData = ethers.utils.defaultAbiCoder.encode(
-    ["address", "address", "uint256", "bool"],
-    ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000002", 30, false]
-  );
+    const token0 = await ERC20.connect(alice).deploy("Token 0", "TOKEN0", MaxUint256);
+    await token0.deployed();
 
-  const contractReceipt = await constantProductPoolFactory.deployPool(deployData).then((tx) => tx.wait());
+    const token1 = await ERC20.connect(alice).deploy("Token 1", "TOKEN1", MaxUint256);
+    await token1.deployed();
 
-  const Pool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
+    const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
 
-  return Pool.attach(contractReceipt.events?.[0].args?.pool);
-});
+    const constantProductPoolFactory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
+
+    const deployData = ethers.utils.defaultAbiCoder.encode(
+      ["address", "address", "uint256", "bool"],
+      [token0.address, token1.address, 30, false]
+    );
+
+    const contractReceipt = await masterDeployer.deployPool(constantProductPoolFactory.address, deployData).then((tx) => tx.wait());
+
+    const Pool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
+
+    const pool = Pool.attach(contractReceipt.events?.[0].args?.pool);
+
+    return pool;
+  }
+);
 
 export const initializedConstantProductPool = deployments.createFixture(
   async (

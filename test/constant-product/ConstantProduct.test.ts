@@ -1,7 +1,7 @@
 import { deployments, ethers } from "hardhat";
 import { ConstantProductPool__factory, MasterDeployer } from "../../types";
 import { expect } from "chai";
-import { initializedConstantProductPool } from "../fixtures";
+import { initializedConstantProductPool, uninitializedConstantProductPool } from "../fixtures";
 
 describe("Constant Product Pool", () => {
   before(async () => {
@@ -54,10 +54,26 @@ describe("Constant Product Pool", () => {
     });
   });
 
-  describe("#swap", function () {});
+  describe("#swap", function () {
+    it("reverts on uninitialized", async () => {
+      const pool = await uninitializedConstantProductPool();
+      const data = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [await pool.token0(), "0x0000000000000000000000000000000000000000", false]
+      );
+      await expect(pool.swap(data)).to.be.revertedWith("POOL_UNINITIALIZED");
+    });
+  });
 
   describe("#flashSwap", function () {
-    //
+    it("reverts on uninitialized", async () => {
+      const pool = await uninitializedConstantProductPool();
+      const data = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool", "uint256", "bytes"],
+        [await pool.token0(), "0x0000000000000000000000000000000000000000", false, 0, "0x"]
+      );
+      await expect(pool.flashSwap(data)).to.be.revertedWith("POOL_UNINITIALIZED");
+    });
   });
 
   describe("#mint", function () {
