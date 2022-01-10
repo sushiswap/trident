@@ -30,6 +30,32 @@ describe("Constant Product Pool Factory", function () {
       expect(await constantProductPool.token1()).to.equal(token2);
     });
 
+    it("reverts when token0 is zero", async function () {
+      const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
+
+      const constantProductPoolFactory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
+
+      const deployData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "uint256", "bool"],
+        ["0x0000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000001", 30, false]
+      );
+
+      await expect(masterDeployer.deployPool(constantProductPoolFactory.address, deployData)).to.be.revertedWith("ZERO_ADDRESS");
+    });
+
+    it("reverts when token1 is zero", async function () {
+      const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
+
+      const constantProductPoolFactory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
+
+      const deployData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "uint256", "bool"],
+        ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000000", 30, false]
+      );
+
+      await expect(masterDeployer.deployPool(constantProductPoolFactory.address, deployData)).to.be.revertedWith("ZERO_ADDRESS");
+    });
+
     it("has pool count of 0", async function () {
       const constantProductPoolFactory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
       expect(
