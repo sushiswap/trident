@@ -40,6 +40,7 @@ jobs:
       run: yarn test:gas
       env:
         ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        COINMARKETCAP_API_KEY: ${{ secrets.COINMARKETCAP_API_KEY }}
 
     - name: Codechecks
       env:
