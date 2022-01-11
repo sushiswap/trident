@@ -7,7 +7,7 @@ const deployFunction: DeployFunction = async function ({ ethers, deployments, ge
   console.log("Running MasterDeployer deploy script");
   const { deploy } = deployments;
 
-  const barFee = 17;
+  const barFee = 0;
 
   const { deployer, barFeeTo } = await getNamedAccounts();
 
@@ -19,12 +19,11 @@ const deployFunction: DeployFunction = async function ({ ethers, deployments, ge
   if (chainId === 31337) {
     // for testing purposes we use a redeployed bentobox address
     bentoBoxV1Address = (await ethers.getContract("BentoBoxV1")).address;
+  } else if (!(chainId in WNATIVE)) {
+    throw Error(`No WETH on chain #${chainId}!`);
+  } else if (!(chainId in BENTOBOX_ADDRESS)) {
+    throw Error(`No BENTOBOX on chain #${chainId}!`);
   } else {
-    if (!(chainId in WNATIVE)) {
-      throw Error(`No WETH on chain #${chainId}!`);
-    } else if (!(chainId in BENTOBOX_ADDRESS)) {
-      throw Error(`No BENTOBOX on chain #${chainId}!`);
-    }
     bentoBoxV1Address = BENTOBOX_ADDRESS[chainId as ChainId];
   }
 
