@@ -9,17 +9,17 @@ on:
   workflow_dispatch:
   
 jobs:
-  build:
-    name: Build
+  gas:
+    name: Gas
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
 
-    - name: Use Node.js 14
+    - name: Use Node.js 16
       uses: actions/setup-node@v2
       with:
-        node-version: '14'
+        node-version: '16'
 
     - name: Get yarn cache directory path
       id: yarn-cache-dir-path
@@ -40,3 +40,9 @@ jobs:
       run: yarn test:gas
       env:
         ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+
+    - name: Codechecks
+      env:
+        CC_SECRET: ${{ secrets.CC_SECRET }}
+        COINMARKETCAP_API_KEY: ${{ secrets.COINMARKETCAP_API_KEY }}
+      run: npx codechecks
