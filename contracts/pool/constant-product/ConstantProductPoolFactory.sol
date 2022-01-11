@@ -3,7 +3,7 @@
 pragma solidity >=0.8.0;
 
 import "./ConstantProductPool.sol";
-import "../../deployer/PoolDeployer.sol";
+import "../../abstract/PoolDeployer.sol";
 
 /// @notice Contract for deploying Trident exchange Constant Product Pool with configurations.
 /// @author Mudit Gupta.
