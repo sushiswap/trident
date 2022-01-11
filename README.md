@@ -1,6 +1,7 @@
 # Trident: SushiSwap Next Generation Exchange
 
 [![Coverage Status](https://coveralls.io/repos/github/sushiswap/trident/badge.svg?branch=master&service=github)](https://coveralls.io/github/sushiswap/trident?branch=master)
+[![Codechecks](https://raw.githubusercontent.com/codechecks/docs/master/images/badges/badge-default.svg?sanitize=true)](https://codechecks.io)
 
 
 TRIDENT 🔱 is a newly developed AMM and routing system from [SushiSwap](https://sushi.com/) (Sushi). As a system, Trident is not a fork of any existing AMM, though to start, it incorporates popular AMM concepts into a single, upgradeable framework. The Sushi core team began development with [Andre Cronje](https://github.com/andrecronje) as [Deriswap](https://andrecronje.medium.com/deriswap-capital-efficient-swaps-futures-options-and-loans-ea424b24a41c). This development continued on as [Mirin](https://github.com/sushiswap/mirin) developed by [LevX](https://github.com/levx-io). On May 12th, 2021, Sushi began building Trident in earnest on the Mirin/Deriswap foundation.
