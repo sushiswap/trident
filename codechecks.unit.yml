@@ -1,0 +1,9 @@
+checks:
+  - name: eth-gas-reporter/codechecks
+    options:
+      name: unit-test-gas-report-unoptimized
+settings:
+  branches:
+    - canary
+    - coverage
+    - master
