@@ -3,16 +3,18 @@ import "@nomiclabs/hardhat-etherscan";
 import "@nomiclabs/hardhat-solhint";
 import "@nomiclabs/hardhat-waffle";
 import "@nomiclabs/hardhat-ethers";
+import "@tenderly/hardhat-tenderly";
+import "@typechain/hardhat";
 import "hardhat-contract-sizer";
 import "hardhat-deploy";
+import "hardhat-docgen";
 import "hardhat-gas-reporter";
 import "hardhat-interface-generator";
 import "hardhat-spdx-license-identifier";
+import "hardhat-tracer";
 import "hardhat-watcher";
 import "solidity-coverage";
-import "@tenderly/hardhat-tenderly";
-import "@typechain/hardhat";
-import "hardhat-tracer";
+
 import "./tasks";
 
 import { HardhatUserConfig } from "hardhat/config";

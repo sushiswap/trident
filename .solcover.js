@@ -24,4 +24,8 @@ module.exports = {
     "TridentBatchable",
     "TridentOwnable",
   ],
+  mocha: {
+    fgrep: "[skip-on-coverage]",
+    invert: true,
+  },
 };
