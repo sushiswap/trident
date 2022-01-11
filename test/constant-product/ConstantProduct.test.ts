@@ -86,7 +86,8 @@ describe("Constant Product Pool", () => {
       );
       const constantProductPool = await ConstantProductPool.deploy(deployData, masterDeployer.address);
       await constantProductPool.deployed();
-      const mintData = ethers.utils.defaultAbiCoder.encode(["address"], ["0x8f54C8c2df62c94772ac14CcFc85603742976312"]);
+      const newLocal = "0x0000000000000000000000000000000000000003";
+      const mintData = ethers.utils.defaultAbiCoder.encode(["address"], [newLocal]);
       await expect(constantProductPool.mint(mintData)).to.be.revertedWith("INVALID_AMOUNTS");
     });
   });
@@ -127,26 +128,52 @@ describe("Constant Product Pool", () => {
 
       const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
 
-      expect(await pool.barFee()).equal(17);
+      expect(await pool.barFee()).equal(0);
 
       await masterDeployer.setBarFee(10).then((tx) => tx.wait());
 
       expect(await masterDeployer.barFee()).equal(10);
 
-      expect(await pool.barFee()).equal(17);
+      expect(await pool.barFee()).equal(0);
 
       await pool.updateBarFee().then((tx) => tx.wait());
 
       expect(await pool.barFee()).equal(10);
+
+      // reset
+
+      await masterDeployer.setBarFee(0).then((tx) => tx.wait());
+
+      expect(await masterDeployer.barFee()).equal(0);
+
+      await pool.updateBarFee().then((tx) => tx.wait());
+
+      expect(await pool.barFee()).equal(0);
     });
   });
 
   describe("#getAmountOut", function () {
-    it("returns amount out expected for 1000000000 in", async () => {
+    it("returns 1000000000 given input of token0 in 1e18:1e18 pool, with bar fee 0 & swap fee 0", async () => {
       const pool = await initializedConstantProductPool();
+      const reserves = await pool.getReserves();
+      console.log({
+        reserve0: reserves[0].toString(),
+        reserve1: reserves[1].toString(),
+      });
+      expect(
+        await pool.getAmountOut(ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token0(), "1000000000"]))
+      ).to.equal("999999999"); // 999999999
+    });
+    it("returns 1000000000 given input of token1 in 1e18:1e18 pool, with bar fee 0 & swap fee 0", async () => {
+      const pool = await initializedConstantProductPool();
+      const reserves = await pool.getReserves();
+      console.log({
+        reserve0: reserves[0].toString(),
+        reserve1: reserves[1].toString(),
+      });
       expect(
         await pool.getAmountOut(ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token1(), "1000000000"]))
-      ).to.equal("996999999");
+      ).to.equal("999999999"); // 999999999
     });
     it("reverts if tokenIn is not equal to token0 and token1", async () => {
       const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
@@ -163,11 +190,18 @@ describe("Constant Product Pool", () => {
   });
 
   describe("#getAmountIn", function () {
-    it("returns amount in expected for 1000000000 out", async () => {
+    it("returns 1000000000 given output of token0 in 1e18:1e18 pool, with bar fee 0 & swap fee 0", async () => {
+      const pool = await initializedConstantProductPool();
+      expect(
+        await pool.getAmountIn(ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token0(), "1000000000"]))
+      ).to.equal("1000000001"); // 1000000002
+    });
+
+    it("returns 1000000000 given output of token1 in 1e18:1e18 pool, with bar fee 0 & swap fee 0", async () => {
       const pool = await initializedConstantProductPool();
       expect(
         await pool.getAmountIn(ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token1(), "1000000000"]))
-      ).to.equal("1003009029");
+      ).to.equal("1000000001"); // 1000000002
     });
     it("reverts if tokenOut is not equal to token 1 and token0", async () => {
       const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
