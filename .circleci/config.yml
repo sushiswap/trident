@@ -17,11 +17,11 @@ jobs:
       - run:
           name: Save gas report
           command: |
-            mv gasReporterOutput.json ./gasReporterOutput-$CIRCLE_NODE_INDEX.json
+            mv gas.json ./gas-$CIRCLE_NODE_INDEX.json
       - persist_to_workspace:
           root: .
           paths:
-            - gasReporterOutput-*.json
+            - gas-*.json
   test-gas-report:
     docker:
       - image: circleci/node:14.15.1-stretch
@@ -32,10 +32,10 @@ jobs:
       - run:
           name: Upload gas reports
           command: |
-            npx hardhat gas-reporter:merge gasReporterOutput-*.json
+            npx hardhat gas-reporter:merge gas-*.json
             npx codechecks codechecks.unit.yml
       - store_artifacts:
-          path: gasReporterOutput.json
+          path: gas.json
 
 workflows:
   workflow-all:
