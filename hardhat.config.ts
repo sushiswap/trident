@@ -34,7 +34,7 @@ const config: HardhatUserConfig = {
     enabled: process.env.REPORT_GAS === "true",
     // outputFile: `gas-${Date.now()}.json`,
     // outputFile: "gas.json",
-    excludeContracts: ["BentoBoxV1", "ERC20Mock", "ERC20", "WETH9"],
+    excludeContracts: ["examples", "flat", "mocks", "pool/concentrated", "pool/franchised", "pool/hybrid", "pool/index", "TridentERC721"],
     // onlyCalledMethods: true,
     // showTimeSpent: true,
   },
