@@ -4,5 +4,6 @@ checks:
       name: unit-test-gas-report-unoptimized
 settings:
   branches:
-    - develop
+    - coverage
+    - canary
     - master
