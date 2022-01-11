@@ -1,0 +1,45 @@
+name: Release
+on:
+  push:
+    branches:
+      - canary
+      
+jobs:
+  release-canary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+
+      - uses: actions/cache@v2
+        id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@sushiswap'
+      - run: yarn
+      - run: yarn build
+      - run: yarn kovan:deploy
+        env:
+          MNEMONIC: ${{ secrets.TESTNET_MNEMONIC }}
+          INFURA_API_KEY: ${{ secrets.INFURA_API_KEY }}
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+      - run: yarn export:all
+      - run: |
+          git config user.name GitHub Actions
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          yarn version --prerelease --preid=canary
+          yarn publish --access public --tag canary
+          git add .
+          git push
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

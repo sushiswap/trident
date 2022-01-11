@@ -1,5 +1,7 @@
 # Trident: SushiSwap Next Generation Exchange
 
+[![Codechecks](https://raw.githubusercontent.com/codechecks/docs/master/images/badges/badge-default.svg?sanitize=true)](https://codechecks.io)
+
 [![Coverage Status](https://coveralls.io/repos/github/sushiswap/trident/badge.svg?branch=master&service=github)](https://coveralls.io/github/sushiswap/trident?branch=master)
 
 

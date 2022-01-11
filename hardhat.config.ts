@@ -3,17 +3,19 @@ import "@nomiclabs/hardhat-etherscan";
 import "@nomiclabs/hardhat-solhint";
 import "@nomiclabs/hardhat-waffle";
 import "@nomiclabs/hardhat-ethers";
+import "@tenderly/hardhat-tenderly";
+import "@typechain/hardhat";
 import "hardhat-contract-sizer";
 import "hardhat-deploy";
+import "hardhat-docgen";
 import "hardhat-gas-reporter";
 import "hardhat-interface-generator";
 import "hardhat-spdx-license-identifier";
+import "hardhat-tracer";
 import "hardhat-watcher";
 import "solidity-coverage";
-import "@tenderly/hardhat-tenderly";
-import "@typechain/hardhat";
-import "hardhat-tracer";
-import "./cli";
+
+import "./tasks";
 
 import { HardhatUserConfig } from "hardhat/config";
 import { removeConsoleLog } from "hardhat-preprocessor";
@@ -32,8 +34,11 @@ const config: HardhatUserConfig = {
     coinmarketcap: process.env.COINMARKETCAP_API_KEY,
     currency: "USD",
     enabled: process.env.REPORT_GAS === "true",
+    // outputFile: `gas-${Date.now()}.json`,
     // outputFile: "gas.json",
-    excludeContracts: ["BentoBoxV1", "ERC20Mock", "ERC20", "WETH9"],
+    excludeContracts: ["examples", "flat", "mocks", "pool/concentrated", "pool/franchised", "pool/hybrid", "pool/index", "TridentERC721"],
+    // onlyCalledMethods: true,
+    // showTimeSpent: true,
   },
   namedAccounts: {
     deployer: {
@@ -59,6 +64,9 @@ const config: HardhatUserConfig = {
     },
     feeTo: {
       default: 7,
+    },
+    barFeeTo: {
+      default: 8,
     },
   },
   networks: {
@@ -294,6 +302,15 @@ const config: HardhatUserConfig = {
           optimizer: {
             enabled: true,
             runs: 99999,
+          },
+        },
+      },
+      {
+        version: "0.5.17",
+        settings: {
+          optimizer: {
+            enabled: false,
+            runs: 200,
           },
         },
       },

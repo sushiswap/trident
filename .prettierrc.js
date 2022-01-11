@@ -1,24 +1,18 @@
+const config = require('@sushiswap/prettier-config')
+
 module.exports = {
-  ...require("@sushiswap/prettier-config"),
-  // TODO: If a non-default solidity config is needed, we could add this to our
-  // config repo and import as @sushiswap/prettier-config/solidity. Also, feel
-  // free to add to the default config which is required above.
+  ...config.default,
   overrides: [
     {
-      files: "*.sol",
+      files: '*.sol',
       options: {
         printWidth: 140,
         tabWidth: 4,
         singleQuote: false,
         bracketSpacing: false,
-        explicitTypes: "always",
+        explicitTypes: 'always',
+        endOfLine: 'lf',
       },
     },
-    {
-      files: "*.ts",
-      options: {
-        printWidth: 140
-      }
-    }
   ],
-};
+}

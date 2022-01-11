@@ -2,7 +2,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 const deployFunction: DeployFunction = async function ({ ethers, deployments, getNamedAccounts, getChainId }: HardhatRuntimeEnvironment) {
-  console.log("Running BentoBox deploy script");
+  // console.log("Running BentoBox deploy script");
 
   const { deploy } = deployments;
 
@@ -22,7 +22,7 @@ const deployFunction: DeployFunction = async function ({ ethers, deployments, ge
     deterministicDeployment: false,
   });
 
-  console.log("BentoBoxV1 deployed at ", address);
+  // console.log("BentoBoxV1 deployed at ", address);
 };
 
 export default deployFunction;

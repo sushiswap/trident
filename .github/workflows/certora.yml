@@ -1,23 +1,23 @@
 name: Certora
 
-on:
-  # push:
-  #   branches: [canary]
-  # pull_request:
-  #   branches: [canary]
+on: 
   workflow_dispatch:
 
+concurrency: 
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  verify_trident:
+  verify:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
 
-      - name: Use Node.js 14 LTS
+      - name: Use Node.js 16
         uses: actions/setup-node@v2
         with:
-          node-version: '14'
+          node-version: '16'
 
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
@@ -30,6 +30,7 @@ jobs:
           key: ${{ runner.os }}-yarnv1-dist-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-yarnv1-dist-
+
       - name: Installing dependencies
         run: yarn install --frozen-lockfile
 
@@ -37,7 +38,9 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: 3.6
-      - uses: actions/setup-java@v1
+
+      - name: Set up JRE 11
+        uses: actions/setup-java@v1
         with:
           java-version: "11"
           java-package: jre
@@ -57,21 +60,32 @@ jobs:
           chmod +x solc-static-linux
           sudo mv solc-static-linux /usr/local/bin/solc6.12    
           pip3 install certora-cli
-      - name: Prepare
+
+      - name: Apply harnesses
         run: |
           chmod +x spec/scripts/*.sh
           spec/scripts/applyHarnesses.sh
-      - name: Verify Trident Router with Certora
+
+      - name: Sanity Trident with Certora
         run: |
           # spec/scripts/sanityConstantProductPool.sh
           # spec/scripts/sanityHybridPool.sh
           # spec/scripts/sanityMasterDeployer.sh
           # spec/scripts/sanitySymbolicPool.sh
           # spec/scripts/sanityTridentRouter.sh
-          spec/scripts/verifyConstantProductPool.sh
-          spec/scripts/verifyHybridPool.sh
-          spec/scripts/verifyTridentMath.sh
-          spec/scripts/verifyTridentRouter.sh
+
+      - name: Verify Trident Router with Certora
+        run: |
           spec/scripts/verifyTridentRouterSimple.sh
+          spec/scripts/verifyTridentRouter.sh
+      - name: Verify Constant Product Pool with Certora
+        run: |
+          spec/scripts/verifyConstantProductPool.sh
+      - name: Verify Hybrid Pool with Certora
+        run: |
+          spec/scripts/verifyHybridPool.sh
+      - name: Verify Trident Libraries with Certora
+        run: |
+           spec/scripts/verifyTridentMath.sh
         env:
           CERTORAKEY: ${{ secrets.CERTORAKEY }}

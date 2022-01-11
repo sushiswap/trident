@@ -3,7 +3,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 const deployFunction: DeployFunction = async function ({ ethers, deployments, getNamedAccounts, getChainId }: HardhatRuntimeEnvironment) {
-  console.log("Running TridentRouter deploy script");
+  // console.log("Running TridentRouter deploy script");
   const { deploy } = deployments;
 
   const { deployer } = await getNamedAccounts();
@@ -35,7 +35,7 @@ const deployFunction: DeployFunction = async function ({ ethers, deployments, ge
     deterministicDeployment: false,
   });
 
-  console.log("TridentRouter deployed at ", address);
+  // console.log("TridentRouter deployed at ", address);
 };
 
 export default deployFunction;

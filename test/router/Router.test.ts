@@ -1,6 +1,6 @@
 // @ts-nocheck
 
-import { ADDRESS_ZERO, getBigNumber } from "./utilities";
+import { ADDRESS_ZERO, getBigNumber } from "../utilities";
 import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 import { expect } from "chai";
