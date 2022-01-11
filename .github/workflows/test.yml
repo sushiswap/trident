@@ -7,42 +7,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-gas:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-node@v2
-      with:
-        node-version: '16'
-        registry-url: 'https://npm.pkg.github.com'
-        scope: '@sushiswap'
-        cache: 'yarn'
-    - name: Yarn
-      run: yarn --frozen-lockfile
-    - name: Compile
-      run: yarn build
-    - name: Test Gas
-      run: yarn test
-      env:
-        CI: true
-        REPORT_GAS: true
-        ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
-        COINMARKETCAP_API_KEY: ${{ secrets.COINMARKETCAP_API_KEY }}
-        
-    - name: Codechecks
-      run: npx codechecks
-      env:
-        CC_SECRET: ${{ secrets.CC_SECRET }}
-
-    - name: Test Coverage
-      run: yarn test:coverage
-    - name: Coveralls
-      uses: coverallsapp/github-action@master
-      continue-on-error: true
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-
-
   test-coverage:
     runs-on: ubuntu-latest
     steps:
@@ -64,3 +28,28 @@ jobs:
       continue-on-error: true
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
+  test-gas:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-node@v2
+      with:
+        node-version: '16'
+        registry-url: 'https://npm.pkg.github.com'
+        scope: '@sushiswap'
+        cache: 'yarn'
+    - name: Yarn
+      run: yarn --frozen-lockfile
+    - name: Compile
+      run: yarn build
+    - name: Test Gas
+      run: yarn test
+      env:
+        CI: true
+        REPORT_GAS: true
+        ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        COINMARKETCAP_API_KEY: ${{ secrets.COINMARKETCAP_API_KEY }}
+    - name: Codechecks
+      run: npx codechecks
+      env:
+        CC_SECRET: ${{ secrets.CC_SECRET }}
