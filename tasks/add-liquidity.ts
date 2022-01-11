@@ -8,8 +8,8 @@ const { BigNumber } = ethers;
 task("add-liquidity", "Add liquidity")
   .addOptionalParam("tokenA", "Token A", WETH9_ADDRESS[ChainId.KOVAN], types.string)
   .addOptionalParam("tokenB", "Token B", USDC_ADDRESS[ChainId.KOVAN], types.string)
-  .addOptionalParam("pool", "Pool")
-  .addOptionalParam("minLiquidity", "Minimum Liquidity", BigNumber.from(10).pow(1).toString(), types.string)
+  .addOptionalParam("pool", "Pool", "0xb11d9FB782D0185e7D19C8127241398305B110Ed")
+  .addOptionalParam("minLiquidity", "Minimum Liquidity", BigNumber.from(10).pow(0).toString(), types.string)
   .addOptionalParam("recipient", "Recipient", "0xd198B08Fb9bfd659065D3c15FbcE14e44Ab54D42", types.string) // dev default
   .setAction(
     async (
@@ -63,19 +63,22 @@ task("add-liquidity", "Add liquidity")
       await run("whitelist");
 
       if ((await token0.allowance(deployer, bentoBox.address)).lt(liquidityInput[0].amount)) {
+        console.log("Approving token0");
         await run("erc20:approve", {
           token: liquidityInput[0].token,
           spender: bentoBox.address,
         });
+        console.log("Approved token0");
       }
 
       if ((await token1.allowance(deployer, bentoBox.address)).lt(liquidityInput[1].amount)) {
+        console.log("Approving token1");
         await run("erc20:approve", {
           token: liquidityInput[1].token,
           spender: bentoBox.address,
         });
+        console.log("Approved token1");
       }
-      console.log("Approved both tokens");
 
       console.log("Depositing 1st token", [liquidityInput[0].token, dev.address, dev.address, 0, liquidityInput[0].amount]);
       await bentoBox
@@ -103,7 +106,7 @@ task("add-liquidity", "Add liquidity")
 
       console.log("Set master contract approval");
 
-      const data = ethers.utils.defaultAbiCoder.encode(["address"], [recipient]);
+      const data = ethers.utils.defaultAbiCoder.encode(["address"], [dev.address]);
 
       console.log(`Adding minmimum of ${minLiquidity} liquidity to ${pool}`);
 
