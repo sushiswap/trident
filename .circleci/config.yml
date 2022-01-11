@@ -1,42 +1,27 @@
 version: 2.1
 
 jobs:
-  # job-compile:
-  #   working_directory: ~/trident
-  #   docker:
-  #     - image: synthetixio/docker-node:16.13-ubuntu
-  #       auth:
-  #         username: $DOCKERHUB_USERNAME
-  #         password: $DOCKERHUB_TOKEN
-  #   steps:
-  #     - checkout
-  #     - attach_workspace:
-  #         at: .
-  #     - run: npx hardhat compile --optimizer --fail-oversize
   test:
     docker:
       - image: circleci/node:14.15.1-stretch
     parallelism: 1
-    working_directory: ~/trident
     steps:
       - attach_workspace:
           at: .
       - run:
           name: Run tests
           command: |
-            circleci tests glob "test/**/*.ts" | circleci tests split > /tmp/tests-to-run
-            npx hardhat $(cat /tmp/tests-to-run)
-            npx hardhat test xargs
+            circleci tests glob 'test/**/*.test.ts' |
+            circleci tests split |
+            xargs npx hardhat test
       - run:
           name: Save gas report
           command: |
-            mv gas.json ./gas-$CIRCLE_NODE_INDEX.json
-      - persist_to_workspace:
+            mv gas.json ./gas
           root: .
           paths:
             - gas-*.json
   test-gas-report:
-    working_directory: ~/repo
     docker:
       - image: circleci/node:14.15.1-stretch
     steps:
@@ -46,23 +31,10 @@ jobs:
       - run:
           name: Upload gas reports
           command: |
-            npx hardhat test:merge-gas-reports gas-*.json
+            npx hardhat gas-reporter:merge gas-*.json
             npx codechecks codechecks.unit.yml
       - store_artifacts:
           path: gas.json
-    # docker:
-    #   - image: circleci/node:14.15.1-stretch
-    # steps:
-    #   - checkout
-    #   - attach_workspace:
-    #       at: .
-    #   - run:
-    #       name: Upload gas reports
-    #       command: |
-    #         npx hardhat gas-reporter:merge gas-*.json
-    #         npx codechecks codechecks.unit.yml
-    #   - store_artifacts:
-    #       path: gas.json
 
 workflows:
   workflow-all:
