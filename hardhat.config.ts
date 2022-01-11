@@ -58,7 +58,7 @@ const config: HardhatUserConfig = {
     eve: {
       default: 6,
     },
-    swapFeeTo: {
+    feeTo: {
       default: 7,
     },
     barFeeTo: {
