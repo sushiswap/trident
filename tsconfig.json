@@ -15,6 +15,7 @@
   ],
   "files": [
     "./cli.ts",
-    "./hardhat.config.ts", "./types"
+    "./hardhat.config.ts",
+    "./types"
   ]
 }

@@ -33,13 +33,13 @@ jobs:
         scope: '@sushiswap'
 
     - name: Yarn
-      run: yarn
+      run: yarn --frozen-lockfile
 
     - name: Compile
       run: yarn build
 
     - name: Test
-      run: yarn test:coverage
+      run: yarn test:ci
 
     - name: Codechecks
       run: npx codechecks
