@@ -1,4 +1,4 @@
-name: Coveralls
+name: Test
 
 on: 
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Coveralls
+    name: Test
     runs-on: ubuntu-latest
 
     steps:
@@ -40,9 +40,15 @@ jobs:
 
     - name: Test
       run: yarn test:coverage
+
+    - name: Codechecks
+      run: npx codechecks
       env:
+        CI: true
+        REPORT_GAS: true
         ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
-        ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+        COINMARKETCAP_API_KEY: ${{ secrets.COINMARKETCAP_API_KEY }}
+        CC_SECRET: ${{ secrets.CC_SECRET }}
 
     - name: Coveralls
       uses: coverallsapp/github-action@master
