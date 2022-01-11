@@ -35,11 +35,6 @@ jobs:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
           COINMARKETCAP_API_KEY: ${{ secrets.COINMARKETCAP_API_KEY }}
           CC_SECRET: ${{ secrets.CC_SECRET }}
-      - name: Coveralls
-        uses: coverallsapp/github-action@master
-        continue-on-error: true
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
   test-coverage:
     needs: build
     runs-on: ubuntu-latest
