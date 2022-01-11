@@ -13,7 +13,7 @@ import "solidity-coverage";
 import "@tenderly/hardhat-tenderly";
 import "@typechain/hardhat";
 import "hardhat-tracer";
-import "./cli";
+import "./tasks";
 
 import { HardhatUserConfig } from "hardhat/config";
 import { removeConsoleLog } from "hardhat-preprocessor";
