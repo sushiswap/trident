@@ -21,28 +21,20 @@ jobs:
       run: yarn --frozen-lockfile
     - name: Compile
       run: yarn build
-  test-gas:
-    needs: build
-    runs-on: ubuntu-latest
-    steps: 
-      - name: Test Gas
-        run: yarn test
-      - name: Codechecks
-        run: npx codechecks
-        env:
-          CI: true
-          REPORT_GAS: true
-          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
-          COINMARKETCAP_API_KEY: ${{ secrets.COINMARKETCAP_API_KEY }}
-          CC_SECRET: ${{ secrets.CC_SECRET }}
-  test-coverage:
-    needs: build
-    runs-on: ubuntu-latest
-    steps: 
-      - name: Test Coverage
-        run: yarn test:coverage
-      - name: Coveralls
-        uses: coverallsapp/github-action@master
-        continue-on-error: true
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Test Gas
+      run: yarn test
+    - name: Codechecks
+      run: npx codechecks
+      env:
+        CI: true
+        REPORT_GAS: true
+        ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        COINMARKETCAP_API_KEY: ${{ secrets.COINMARKETCAP_API_KEY }}
+        CC_SECRET: ${{ secrets.CC_SECRET }}
+    - name: Test Coverage
+      run: yarn test:coverage
+    - name: Coveralls
+      uses: coverallsapp/github-action@master
+      continue-on-error: true
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
