@@ -1,75 +1,94 @@
 import { BENTOBOX_ADDRESS, ChainId, WETH9_ADDRESS, USDC_ADDRESS } from "@sushiswap/core-sdk";
-import { BigNumber } from "ethers";
+import { ethers } from "ethers";
 import { task, types } from "hardhat/config";
+import { BentoBoxV1, BentoBoxV1__factory, ERC20Mock, TridentRouter } from "../types";
+
+const { BigNumber } = ethers;
 
 task("add-liquidity", "Add liquidity")
   .addOptionalParam("tokenA", "Token A", WETH9_ADDRESS[ChainId.KOVAN], types.string)
   .addOptionalParam("tokenB", "Token B", USDC_ADDRESS[ChainId.KOVAN], types.string)
-  // Probably don't need this, can compute from tokens
-  .addParam("pool", "Pool")
-  .addParam("tokenADesired", "Token A Desired", BigNumber.from(10).pow(18).toString(), types.string)
-  .addParam("tokenBDesired", "Token B Desired", BigNumber.from(10).pow(6).toString(), types.string)
-  // .addParam("tokenAMinimum", "Token A Minimum")
-  // .addParam("tokenBMinimum", "Token B Minimum")
-  // .addParam("to", "To")
-  // .addOptionalParam("deadline", "Deadline", MaxUint256)
-  .setAction(async function ({ tokenA, tokenB, pool }, { ethers, run, getChainId }, runSuper) {
-    const chainId = await getChainId();
-
-    const router = await ethers.getContract("TridentRouter");
-
-    const BentoBox = await ethers.getContractFactory("BentoBoxV1");
-    let bentoBox;
-    try {
-      const _bentoBox = await ethers.getContract("BentoBoxV1");
-      bentoBox = BentoBox.attach(_bentoBox.address);
-    } catch ({}) {
-      bentoBox = BentoBox.attach(BENTOBOX_ADDRESS[chainId]);
-    }
-
-    const dev = await ethers.getNamedSigner("dev");
-
-    let liquidityInput = [
+  .addOptionalParam("pool", "Pool")
+  .addOptionalParam("minLiquidity", "Minimum Liquidity", BigNumber.from(10).pow(1).toString(), types.string)
+  .addOptionalParam("recipient", "Recipient", "0xd198B08Fb9bfd659065D3c15FbcE14e44Ab54D42", types.string) // dev default
+  .setAction(
+    async (
       {
-        token: tokenA,
-        native: false,
-        amount: ethers.BigNumber.from(10).pow(9),
-      },
-      {
-        token: tokenB,
-        native: false,
-        amount: ethers.BigNumber.from(10).pow(6),
-      },
-    ];
+        tokenA,
+        tokenB,
+        pool,
+        minLiquidity,
+        recipient,
+      }: { tokenA: string; tokenB: string; pool?: string; minLiquidity: number; recipient: string },
+      { ethers, run, getChainId, getNamedAccounts },
+      runSuper
+    ) => {
+      const chainId = await getChainId();
 
-    await (await bentoBox.connect(dev).whitelistMasterContract(router.address, true)).wait();
-    console.log("Whitelisted master contract");
+      pool = pool || ((await run("cpp-address")) as string);
 
-    await run("erc20:approve", {
-      token: liquidityInput[0].token,
-      spender: bentoBox.address,
-    });
+      const { deployer } = await getNamedAccounts();
 
-    await run("erc20:approve", {
-      token: liquidityInput[1].token,
-      spender: bentoBox.address,
-    });
+      const router = await ethers.getContract<TridentRouter>("TridentRouter");
 
-    console.log("Approved both tokens");
+      const BentoBox = await ethers.getContractFactory<BentoBoxV1__factory>("BentoBoxV1");
 
-    console.log("Depositing 1st token", [liquidityInput[0].token, dev.address, dev.address, 0, liquidityInput[0].amount]);
-    await (await bentoBox.connect(dev).deposit(liquidityInput[0].token, dev.address, dev.address, 0, liquidityInput[0].amount)).wait();
-    console.log("Depositing 2nd token");
-    await (await bentoBox.connect(dev).deposit(liquidityInput[1].token, dev.address, dev.address, 0, liquidityInput[1].amount)).wait();
+      let bentoBox: BentoBoxV1;
 
-    console.log("Deposited");
+      try {
+        bentoBox = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+      } catch (error) {
+        bentoBox = BentoBox.attach(BENTOBOX_ADDRESS[chainId]);
+      }
 
-    await (await bentoBox.connect(dev).deposit(liquidityInput[0].token, dev.address, dev.address, 0, liquidityInput[0].amount)).wait();
-    await (await bentoBox.connect(dev).deposit(liquidityInput[1].token, dev.address, dev.address, 0, liquidityInput[1].amount)).wait();
+      const dev = await ethers.getNamedSigner("dev");
 
-    console.log("Deposited");
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", tokenA);
 
-    await (
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", tokenB);
+
+      let liquidityInput = [
+        {
+          token: token0.address,
+          native: true,
+          amount: ethers.BigNumber.from(10).pow(3),
+        },
+        {
+          token: token1.address,
+          native: true,
+          amount: ethers.BigNumber.from(10).pow(6),
+        },
+      ];
+
+      await run("whitelist");
+
+      if ((await token0.allowance(deployer, bentoBox.address)).lt(liquidityInput[0].amount)) {
+        await run("erc20:approve", {
+          token: liquidityInput[0].token,
+          spender: bentoBox.address,
+        });
+      }
+
+      if ((await token1.allowance(deployer, bentoBox.address)).lt(liquidityInput[1].amount)) {
+        await run("erc20:approve", {
+          token: liquidityInput[1].token,
+          spender: bentoBox.address,
+        });
+      }
+      console.log("Approved both tokens");
+
+      console.log("Depositing 1st token", [liquidityInput[0].token, dev.address, dev.address, 0, liquidityInput[0].amount]);
+      await bentoBox
+        .connect(dev)
+        .deposit(liquidityInput[0].token, dev.address, dev.address, 0, liquidityInput[0].amount)
+        .then((tx) => tx.wait());
+
+      console.log("Depositing 2nd token");
+      await bentoBox
+        .connect(dev)
+        .deposit(liquidityInput[1].token, dev.address, dev.address, 0, liquidityInput[1].amount)
+        .then((tx) => tx.wait());
+
       await bentoBox
         .connect(dev)
         .setMasterContractApproval(
@@ -80,13 +99,19 @@ task("add-liquidity", "Add liquidity")
           "0x0000000000000000000000000000000000000000000000000000000000000000",
           "0x0000000000000000000000000000000000000000000000000000000000000000"
         )
-    ).wait();
+        .then((tx) => tx.wait());
 
-    console.log("Set master contract approval");
+      console.log("Set master contract approval");
 
-    const data = ethers.utils.defaultAbiCoder.encode(["address"], [dev.address]);
+      const data = ethers.utils.defaultAbiCoder.encode(["address"], [recipient]);
 
-    await (await router.connect(dev).addLiquidity(liquidityInput, pool, 1, data)).wait();
+      console.log(`Adding minmimum of ${minLiquidity} liquidity to ${pool}`);
 
-    console.log("Added liquidity");
-  });
+      await router
+        .connect(dev)
+        .addLiquidity(liquidityInput, pool, minLiquidity, data)
+        .then((tx) => tx.wait());
+
+      console.log("Added liquidity");
+    }
+  );

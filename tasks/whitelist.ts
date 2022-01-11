@@ -1,25 +1,33 @@
 import { BENTOBOX_ADDRESS } from "@sushiswap/core-sdk";
 import { task } from "hardhat/config";
+import { BentoBoxV1, BentoBoxV1__factory, TridentRouter } from "../types";
 
 task("whitelist", "Whitelist Router on BentoBox").setAction(async function (_, { ethers, getChainId }) {
   const dev = await ethers.getNamedSigner("dev");
 
   const chainId = await getChainId();
 
-  const router = await ethers.getContract("TridentRouter");
+  const router = await ethers.getContract<TridentRouter>("TridentRouter");
 
-  const BentoBox = await ethers.getContractFactory("BentoBoxV1");
+  const BentoBox = await ethers.getContractFactory<BentoBoxV1__factory>("BentoBoxV1");
 
-  let bentoBox;
-
+  let bentoBox: BentoBoxV1;
   try {
-    const _bentoBox = await ethers.getContract("BentoBoxV1");
-    bentoBox = BentoBox.attach(_bentoBox.address);
-  } catch ({}) {
+    bentoBox = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+  } catch (error) {
     bentoBox = BentoBox.attach(BENTOBOX_ADDRESS[chainId]);
   }
 
-  await (await bentoBox.connect(dev).whitelistMasterContract(router.address, true)).wait();
+  if (await bentoBox.whitelistedMasterContracts(router.address)) {
+    console.log(`Whitelisted already on BentoBox (BentoBox: ${bentoBox.address})`);
+  }
 
-  console.log(`Router successfully whitelisted on BentoBox (BentoBox: ${bentoBox.address})`);
+  if (!(await bentoBox.whitelistedMasterContracts(router.address))) {
+    console.log(`Whitelisting master contract on BentoBox (BentoBox: ${bentoBox.address})`);
+    await bentoBox
+      .connect(dev)
+      .whitelistMasterContract(router.address, true)
+      .then((tx) => tx.wait());
+    console.log(`Whitelisted master contract on BentoBox (BentoBox: ${bentoBox.address})`);
+  }
 });

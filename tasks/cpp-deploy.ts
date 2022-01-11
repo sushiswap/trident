@@ -36,10 +36,8 @@ task("cpp:deploy", "Constant Product Pool deploy")
 
     const { events } = contractReceipt;
 
-    const poolAddress = events[0].args.pool;
-
     await run("verify:verify", {
-      address: poolAddress,
+      address: events?.[0].args?.pool,
       constructorArguments: [deployData, masterDeployer.address],
     });
   });
