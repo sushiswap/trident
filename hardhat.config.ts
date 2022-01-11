@@ -32,9 +32,10 @@ const config: HardhatUserConfig = {
     coinmarketcap: process.env.COINMARKETCAP_API_KEY,
     currency: "USD",
     enabled: process.env.REPORT_GAS === "true",
-    // outputFile: "gas.json",
+    // outputFile: `gas-${Date.now()}.json`,
     excludeContracts: ["BentoBoxV1", "ERC20Mock", "ERC20", "WETH9"],
-    // onlyCalledMethods: false,
+    // onlyCalledMethods: true,
+    // showTimeSpent: true,
   },
   namedAccounts: {
     deployer: {
@@ -298,6 +299,15 @@ const config: HardhatUserConfig = {
           optimizer: {
             enabled: true,
             runs: 99999,
+          },
+        },
+      },
+      {
+        version: "0.5.17",
+        settings: {
+          optimizer: {
+            enabled: false,
+            runs: 200,
           },
         },
       },
