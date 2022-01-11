@@ -9,13 +9,10 @@
     "noImplicitAny": false
   },
   "include": [
-    "./scripts",
+    "./deploy",
+    "./tasks",
     "./test",
-    "./deploy"
-  ],
-  "files": [
-    "./cli.ts",
+    "./types",
     "./hardhat.config.ts",
-    "./types"
   ]
 }
