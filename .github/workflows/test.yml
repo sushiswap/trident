@@ -8,50 +8,46 @@ on:
 
 jobs:
   build:
-    name: Test
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v2
-    
-    - name: Get yarn cache directory path
-      id: yarn-cache-dir-path
-      run: echo "::set-output name=dir::$(yarn cache dir)"
-
-    - uses: actions/cache@v2
-      id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
-      with:
-        path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-        key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-yarn-
-
     - uses: actions/setup-node@v2
       with:
         node-version: '16'
         registry-url: 'https://npm.pkg.github.com'
         scope: '@sushiswap'
-
+        cache: 'yarn'
     - name: Yarn
       run: yarn --frozen-lockfile
-
     - name: Compile
       run: yarn build
-
-    - name: Test
-      run: yarn test:ci
-
-    - name: Codechecks
-      run: npx codechecks
-      env:
-        CI: true
-        REPORT_GAS: true
-        ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
-        COINMARKETCAP_API_KEY: ${{ secrets.COINMARKETCAP_API_KEY }}
-        CC_SECRET: ${{ secrets.CC_SECRET }}
-
-    - name: Coveralls
-      uses: coverallsapp/github-action@master
-      continue-on-error: true
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+  test-gas:
+    needs: build
+    runs-on: ubuntu-latest
+    steps: 
+      - name: Test Gas
+        run: yarn test
+      - name: Codechecks
+        run: npx codechecks
+        env:
+          CI: true
+          REPORT_GAS: true
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          COINMARKETCAP_API_KEY: ${{ secrets.COINMARKETCAP_API_KEY }}
+          CC_SECRET: ${{ secrets.CC_SECRET }}
+      - name: Coveralls
+        uses: coverallsapp/github-action@master
+        continue-on-error: true
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+  test-coverage:
+    needs: build
+    runs-on: ubuntu-latest
+    steps: 
+      - name: Test Coverage
+        run: yarn test:coverage
+      - name: Coveralls
+        uses: coverallsapp/github-action@master
+        continue-on-error: true
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}

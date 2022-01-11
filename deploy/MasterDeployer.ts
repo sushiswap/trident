@@ -4,7 +4,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 const deployFunction: DeployFunction = async function ({ ethers, deployments, getNamedAccounts, getChainId }: HardhatRuntimeEnvironment) {
-  console.log("Running MasterDeployer deploy script");
+  // console.log("Running MasterDeployer deploy script");
   const { deploy } = deployments;
 
   const barFee = 0;
@@ -33,7 +33,7 @@ const deployFunction: DeployFunction = async function ({ ethers, deployments, ge
     deterministicDeployment: false,
   });
 
-  console.log("MasterDeployer deployed at ", address);
+  // console.log("MasterDeployer deployed at ", address);
 };
 
 export default deployFunction;

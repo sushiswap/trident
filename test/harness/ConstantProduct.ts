@@ -1,11 +1,12 @@
 // @ts-nocheck
 
-import { BigNumber, utils } from "ethers";
-import { ethers, deployments } from "hardhat";
+import { ethers, deployments, ethers } from "hardhat";
 import { expect } from "chai";
 import { encodedSwapData, getBigNumber, randBetween, sqrt, printHumanReadable, ZERO, TWO, MAX_FEE } from "./helpers";
 import { BentoBoxV1, ERC20Mock__factory, IConstantProductPool, MasterDeployer, TridentRouter } from "../../types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+
+const { BigNumber, utils } = ethers;
 
 let accounts: SignerWithAddress[] = [];
 // First token is used as weth
