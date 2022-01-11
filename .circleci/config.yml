@@ -1,5 +1,7 @@
 version: 2.1
 
+on: [push, pull_request]
+
 jobs:
   test:
     docker:

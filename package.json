@@ -74,6 +74,7 @@
     "*.md": "prettier --write"
   },
   "devDependencies": {
+    "@codechecks/client": "^0.1.12",
     "@ethersproject/address": "^5.5.0",
     "@ethersproject/solidity": "^5.5.0",
     "@nomiclabs/hardhat-ethers": "yarn:hardhat-deploy-ethers",
