@@ -1,14 +1,14 @@
 name: Certora
 
 on: 
-  # push:
-  #   branches: [canary]
-  pull_request:
-    branches: [master, canary]
   workflow_dispatch:
 
+concurrency: 
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  verify_trident:
+  verify:
     runs-on: ubuntu-latest
 
     steps:
@@ -60,21 +60,32 @@ jobs:
           chmod +x solc-static-linux
           sudo mv solc-static-linux /usr/local/bin/solc6.12    
           pip3 install certora-cli
-      - name: Prepare
+
+      - name: Apply harnesses
         run: |
           chmod +x spec/scripts/*.sh
           spec/scripts/applyHarnesses.sh
-      - name: Verify Trident Router with Certora
+
+      - name: Sanity Trident with Certora
         run: |
           # spec/scripts/sanityConstantProductPool.sh
           # spec/scripts/sanityHybridPool.sh
           # spec/scripts/sanityMasterDeployer.sh
           # spec/scripts/sanitySymbolicPool.sh
           # spec/scripts/sanityTridentRouter.sh
-          spec/scripts/verifyConstantProductPool.sh
-          spec/scripts/verifyHybridPool.sh
-          spec/scripts/verifyTridentMath.sh
-          spec/scripts/verifyTridentRouter.sh
+
+      - name: Verify Trident Router with Certora
+        run: |
           spec/scripts/verifyTridentRouterSimple.sh
+          spec/scripts/verifyTridentRouter.sh
+      - name: Verify Constant Product Pool with Certora
+        run: |
+          spec/scripts/verifyConstantProductPool.sh
+      - name: Verify Hybrid Pool with Certora
+        run: |
+          spec/scripts/verifyHybridPool.sh
+      - name: Verify Trident Libraries with Certora
+        run: |
+           spec/scripts/verifyTridentMath.sh
         env:
           CERTORAKEY: ${{ secrets.CERTORAKEY }}
