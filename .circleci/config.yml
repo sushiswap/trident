@@ -11,7 +11,9 @@ jobs:
       - run:
           name: Run tests
           command: |
-            npm run test:gas
+            circleci tests glob "test/**/*.test.ts" |
+            circleci tests split |
+            xargs npx hardhat test
       - run:
           name: Save gas report
           command: |
