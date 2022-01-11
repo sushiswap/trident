@@ -33,7 +33,7 @@ const config: HardhatUserConfig = {
     currency: "USD",
     enabled: process.env.REPORT_GAS === "true",
     // outputFile: `gas-${Date.now()}.json`,
-    outputFile: "gasReporterOutput.json",
+    outputFile: "gas.json",
     excludeContracts: ["BentoBoxV1", "ERC20Mock", "ERC20", "WETH9"],
     // onlyCalledMethods: true,
     // showTimeSpent: true,
