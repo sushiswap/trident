@@ -1,11 +1,9 @@
 name: Gas
 
-# Controls when the action will run.
 on: 
   push:
-    branches: [canary, coverage]
+    branches: [canary]
   pull_request:
-    branches: [canary, coverage]
   workflow_dispatch:
   
 jobs:

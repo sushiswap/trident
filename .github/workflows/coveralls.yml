@@ -1,11 +1,10 @@
 name: Coveralls
 
-# Controls when the action will run.
-on: [push, pull_request]
-
-concurrency: 
-  group: ${{ github.ref }}
-  cancel-in-progress: true
+on: 
+  push:
+    branches: [canary]
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -14,6 +13,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    
     - name: Get yarn cache directory path
       id: yarn-cache-dir-path
       run: echo "::set-output name=dir::$(yarn cache dir)"
@@ -28,10 +28,9 @@ jobs:
 
     - uses: actions/setup-node@v2
       with:
-        node-version: '16.x'
+        node-version: '16'
         registry-url: 'https://npm.pkg.github.com'
-        # Defaults to the user or organization that owns the workflow file
-        # scope: '@sushiswap'
+        scope: '@sushiswap'
 
     - name: Yarn
       run: yarn
