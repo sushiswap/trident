@@ -25,7 +25,7 @@
     "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
-    "build": "hardhat compile",
+    "build": "TS_NODE_TRANSPILE_ONLY=1 npx hardhat compile",
     "console": "hardhat console",
     "mainnet:deploy": "hardhat --network mainnet deploy",
     "mainnet:verify": "hardhat --network mainnet etherscan-verify --license GPL-3.0 --force-license",
