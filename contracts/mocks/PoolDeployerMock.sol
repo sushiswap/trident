@@ -6,15 +6,13 @@ import "../interfaces/IPoolFactory.sol";
 import "../abstract/PoolDeployer.sol";
 import "./PoolTemplateMock.sol";
 
-contract PoolFactoryMock is PoolDeployer {
+contract PoolDeployerMock is PoolDeployer {
     constructor(address _masterDeployer) PoolDeployer(_masterDeployer) {}
     function deployPool(bytes memory _deployData) external onlyMaster returns (address pool) {
         (address tokenA, address tokenB) = abi.decode(_deployData, (address, address));
 
-        // @dev correctly sorts tokens to ensure _register in PoolDeployer does not revert
-        if (tokenA > tokenB) {
-            (tokenA, tokenB) = (tokenB, tokenA);
-        }
+        // @dev incorrect because there is no sort tokens, causing PoolDeployer to revert
+        // we want this for testing
 
         // @dev Strips any extra data.
         _deployData = abi.encode(tokenA, tokenB);
@@ -25,7 +23,9 @@ contract PoolFactoryMock is PoolDeployer {
 
         // @dev Salt is not actually needed since `_deployData` is part of creationCode and already contains the salt.
         bytes32 salt = keccak256(_deployData);
+        
         pool = address(new PoolTemplateMock{salt: salt}(_deployData));
+
         _registerPool(pool, tokens, salt);
     }
 }
