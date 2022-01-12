@@ -8,6 +8,10 @@
     "framework"
   ],
   "homepage": "https://github.com/sushiswap/trident",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sushiswap/trident.git"
+  },
   "bugs": {
     "url": "https://github.com/sushiswap/trident/issues",
     "email": "bugs@sushi.com"
@@ -21,9 +25,6 @@
     "exports",
     "types"
   ],
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
-  },
   "scripts": {
     "build": "TS_NODE_TRANSPILE_ONLY=1 hardhat compile",
     "console": "hardhat console",
