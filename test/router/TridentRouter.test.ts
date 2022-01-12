@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { initializedConstantProductPool } from "../fixtures";
 import { customError } from "../utilities";
 
-describe("Constant Product Pool Factory", function () {
+describe("Router", function () {
   before(async function () {
     await deployments.fixture(["TridentRouter"]);
   });
