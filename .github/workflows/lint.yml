@@ -7,13 +7,10 @@ on:
     branches:
       - canary
       - master
-      - coverage
   pull_request:
     branches:
       - canary
       - master
-      - coverage
-
 jobs:
   run-linters:
     name: Run linters
@@ -36,4 +33,4 @@ jobs:
         with:
           prettier: true
           auto_fix: true
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
