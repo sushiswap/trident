@@ -24,7 +24,7 @@ library Ticks {
         ticks[nextTickToCross].secondsGrowthOutside = secondsGrowthGlobal - ticks[nextTickToCross].secondsGrowthOutside;
 
         if (zeroForOne) {
-            // Moving forward through the linked list.
+            // Moving backwards through the linked list.
             // Liquidity cannot overflow due to the MAX_TICK_LIQUIDITY requirement.
             unchecked {
                 if ((nextTickToCross / int24(tickSpacing)) % 2 == 0) {
@@ -37,7 +37,7 @@ library Ticks {
             ticks[nextTickToCross].feeGrowthOutside1 = feeGrowthGlobalA - ticks[nextTickToCross].feeGrowthOutside1;
             nextTickToCross = ticks[nextTickToCross].previousTick;
         } else {
-            // Moving backwards through the linked list.
+            // Moving forwards through the linked list.
             unchecked {
                 if ((nextTickToCross / int24(tickSpacing)) % 2 == 0) {
                     currentLiquidity += ticks[nextTickToCross].liquidity;
