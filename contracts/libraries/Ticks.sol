@@ -127,11 +127,11 @@ library Ticks {
             ticks[oldNextTick].previousTick = upper;
         }
 
-        int24 actualNearestTick = TickMath.getTickAtSqrtRatio(currentPrice);
+        int24 tickAtPrice = TickMath.getTickAtSqrtRatio(currentPrice);
 
-        if (nearestTick < upper && upper <= actualNearestTick) {
+        if (nearestTick < upper && upper <= tickAtPrice) {
             nearestTick = upper;
-        } else if (nearestTick < lower && lower <= actualNearestTick) {
+        } else if (nearestTick < lower && lower <= tickAtPrice) {
             nearestTick = lower;
         }
 
