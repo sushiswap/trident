@@ -108,6 +108,7 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
         ticks[TickMath.MAX_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
         nearestTick = TickMath.MIN_TICK;
         unlocked = 1;
+        lastObservation = uint32(block.timestamp);
     }
 
     /// @dev Called only once from the factory.
