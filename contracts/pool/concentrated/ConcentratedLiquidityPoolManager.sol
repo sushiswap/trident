@@ -255,7 +255,7 @@ contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerSt
         if (token == wETH && address(this).balance > 0) {
             // 'amount' is in BentoBox share units.
             uint256 ethAmount = bento.toAmount(token, amount, true);
-            if (ethAmount >= address(this).balance) {
+            if (address(this).balance >= ethAmount) {
                 bento.deposit{value: ethAmount}(address(0), sender, recipient, 0, amount);
                 return;
             }
