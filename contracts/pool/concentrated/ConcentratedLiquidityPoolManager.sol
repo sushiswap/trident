@@ -146,7 +146,8 @@ contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerSt
             positions[tokenId].feeGrowthInside1 = feeGrowthInside1;
             positions[tokenId].liquidity -= amount;
         } else {
-            (token0Amount, token1Amount, , ) = position.pool.burn(position.lower, position.upper, position.liquidity);
+            amount = position.liquidity;
+            (token0Amount, token1Amount, , ) = position.pool.burn(position.lower, position.upper, amount);
             burn(tokenId);
             delete positions[tokenId];
         }
