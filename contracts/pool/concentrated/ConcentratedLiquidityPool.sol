@@ -108,6 +108,7 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
         ticks[TickMath.MAX_TICK] = Tick(TickMath.MIN_TICK, TickMath.MAX_TICK, uint128(0), 0, 0, 0);
         nearestTick = TickMath.MIN_TICK;
         unlocked = 1;
+        lastObservation = uint32(block.timestamp);
     }
 
     /// @dev Called only once from the factory.
@@ -137,6 +138,8 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
 
         // Ensure no overflow happens when we cast from uint256 to int128.
         if (liquidityMinted > uint128(type(int128).max)) revert Overflow();
+
+        _updateSecondsPerLiquidity(uint256(liquidity));
 
         unchecked {
             (uint256 amount0Fees, uint256 amount1Fees) = _updatePosition(
@@ -212,6 +215,8 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
         uint160 priceUpper = TickMath.getSqrtRatioAtTick(upper);
         uint160 currentPrice = price;
 
+        _updateSecondsPerLiquidity(uint256(liquidity));
+
         unchecked {
             if (priceLower <= currentPrice && currentPrice < priceUpper) liquidity -= amount;
         }
@@ -257,6 +262,16 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
         emit Collect(msg.sender, amount0fees, amount1fees);
     }
 
+    function _updateSecondsPerLiquidity(uint256 currentLiquidity) internal {
+        unchecked {
+            uint256 diff = block.timestamp - uint256(lastObservation);
+            if (diff > 0 && currentLiquidity > 0) {
+                lastObservation = uint32(block.timestamp); // Overfyarnlow in 2106. Don't do staking rewards in the year 2106.
+                secondsGrowthGlobal += uint160((diff << 128) / currentLiquidity);
+            }
+        }
+    }
+
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
     function swap(bytes memory data) public lock returns (uint256 amountOut) {
         (bool zeroForOne, address recipient, bool unwrapBento) = abi.decode(data, (bool, address, bool));
@@ -275,14 +290,7 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
             nextTickToCross: zeroForOne ? nearestTick : ticks[nearestTick].nextTick
         });
 
-        unchecked {
-            uint256 timestamp = block.timestamp;
-            uint256 diff = timestamp - uint256(lastObservation); // Underflow in 2106. Don't do staking rewards in the year 2106.
-            if (diff > 0 && liquidity > 0) {
-                lastObservation = uint32(timestamp);
-                secondsGrowthGlobal += uint160((diff << 128) / liquidity);
-            }
-        }
+        _updateSecondsPerLiquidity(cache.currentLiquidity);
 
         while (cache.input != 0) {
             uint256 nextTickPrice = uint256(TickMath.getSqrtRatioAtTick(cache.nextTickToCross));
