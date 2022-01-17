@@ -279,27 +279,18 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         cachedMsgSender = address(1);
     }
 
-    /// @notice Recover mistakenly sent `bento` tokens.
-    function sweepBentoBoxToken(
+    /// @notice Recover mistakenly sent tokens.
+    function sweep(
         address token,
         uint256 amount,
-        address recipient
-    ) external {
-        bento.transfer(token, address(this), recipient, amount);
-    }
-
-    /// @notice Recover mistakenly sent ERC-20 tokens.
-    function sweepNativeToken(
-        address token,
-        uint256 amount,
-        address recipient
-    ) external {
-        safeTransfer(token, recipient, amount);
-    }
-
-    /// @notice Recover mistakenly sent ETH.
-    function refundETH() external payable {
-        if (address(this).balance != 0) safeTransferETH(msg.sender, address(this).balance);
+        address recipient,
+        bool toBento
+    ) external payable {
+        if (toBento) {
+            bento.transfer(token, address(this), recipient, amount);
+        } else {
+            token == USE_ETHEREUM ? safeTransferETH(msg.sender, address(this).balance) : safeTransfer(token, recipient, amount);
+        }
     }
 
     /// @notice Unwrap this contract's `wETH` into ETH
