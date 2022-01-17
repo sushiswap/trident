@@ -34,12 +34,12 @@ abstract contract TridentERC20 {
         _DOMAIN_SEPARATOR = _calculateDomainSeparator();
     }
 
-    function _calculateDomainSeparator() internal view returns (bytes32 domainSeperator) {
-        domainSeperator = keccak256(
+    function _calculateDomainSeparator() internal view returns (bytes32) {
+        return keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
                 keccak256(bytes(name)),
-                keccak256(bytes("1")),
+                bytes("1"),
                 block.chainid,
                 address(this)
             )
@@ -47,8 +47,8 @@ abstract contract TridentERC20 {
     }
 
     /// @notice EIP-712 typehash for this contract's domain.
-    function DOMAIN_SEPARATOR() public view returns (bytes32 domainSeperator) {
-        domainSeperator = block.chainid == DOMAIN_SEPARATOR_CHAIN_ID ? _DOMAIN_SEPARATOR : _calculateDomainSeparator();
+    function DOMAIN_SEPARATOR() public view returns (bytes32) {
+        return block.chainid == DOMAIN_SEPARATOR_CHAIN_ID ? _DOMAIN_SEPARATOR : _calculateDomainSeparator();
     }
 
     /// @notice Approves `amount` from `msg.sender` to be spent by `spender`.
@@ -67,7 +67,7 @@ abstract contract TridentERC20 {
     /// @return (bool) Returns 'true' if succeeded.
     function transfer(address recipient, uint256 amount) external returns (bool) {
         balanceOf[msg.sender] -= amount;
-        // @dev This is safe from overflow - the sum of all user
+        // This is safe from overflow - the sum of all user
         // balances can't exceed 'type(uint256).max'.
         unchecked {
             balanceOf[recipient] += amount;
@@ -90,7 +90,7 @@ abstract contract TridentERC20 {
             allowance[sender][msg.sender] -= amount;
         }
         balanceOf[sender] -= amount;
-        // @dev This is safe from overflow - the sum of all user
+        // This is safe from overflow - the sum of all user
         // balances can't exceed 'type(uint256).max'.
         unchecked {
             balanceOf[recipient] += amount;
@@ -117,22 +117,25 @@ abstract contract TridentERC20 {
         bytes32 s
     ) external {
         require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
-        bytes32 digest = keccak256(
-            abi.encodePacked(
-                "\x19\x01",
-                DOMAIN_SEPARATOR(),
-                keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, amount, nonces[owner]++, deadline))
-            )
-        );
-        address recoveredAddress = ecrecover(digest, v, r, s);
-        require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_PERMIT_SIGNATURE");
-        allowance[recoveredAddress][spender] = amount;
+        // Nonces cannot realistically overflow on human timescales.
+        unchecked {
+            bytes32 digest = keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    DOMAIN_SEPARATOR(),
+                    keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, amount, nonces[owner]++, deadline))
+                )
+            );
+            address recoveredAddress = ecrecover(digest, v, r, s);
+            require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_PERMIT_SIGNATURE");
+            allowance[recoveredAddress][spender] = amount;
+        }
         emit Approval(owner, spender, amount);
     }
 
     function _mint(address recipient, uint256 amount) internal {
         totalSupply += amount;
-        // @dev This is safe from overflow - the sum of all user
+        // This is safe from overflow - the sum of all user
         // balances can't exceed 'type(uint256).max'.
         unchecked {
             balanceOf[recipient] += amount;
@@ -142,7 +145,7 @@ abstract contract TridentERC20 {
 
     function _burn(address sender, uint256 amount) internal {
         balanceOf[sender] -= amount;
-        // @dev This is safe from underflow - users won't ever
+        // This is safe from underflow - users won't ever
         // have a balance larger than `totalSupply`.
         unchecked {
             totalSupply -= amount;
