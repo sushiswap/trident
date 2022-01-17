@@ -12,7 +12,7 @@ abstract contract TridentBatchable {
     function batch(bytes[] calldata data) external payable returns (bytes[] memory results) {
         results = new bytes[](data.length);
 
-        for (uint256 i = 0; i < data.length; i++) {
+        for (uint256 i = 0; i < data.length; ) {
             (bool success, bytes memory result) = address(this).delegatecall(data[i]);
 
             if (!success) {
@@ -25,6 +25,12 @@ abstract contract TridentBatchable {
             }
 
             results[i] = result;
+
+            // An array can't have a total length
+            // larger than 'type(uint256).max'.
+            unchecked {
+                i++;
+            }
         }
     }
 }
