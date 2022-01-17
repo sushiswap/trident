@@ -294,7 +294,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
     }
 
     /// @notice Unwrap this contract's `wETH` into ETH
-    function unwrapWETH(uint256 amountMinimum, address recipient) external {
+    function unwrapWETH(uint256 amountMinimum, address recipient) external payable {
         uint256 balanceWETH = balanceOfThis(wETH);
         if (balanceWETH < amountMinimum) revert InsufficientWETH();
         if (balanceWETH != 0) {
