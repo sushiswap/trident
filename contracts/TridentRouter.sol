@@ -284,9 +284,9 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         address token,
         uint256 amount,
         address recipient,
-        bool toBento
+        bool onBento
     ) external payable {
-        if (toBento) {
+        if (onBento) {
             bento.transfer(token, address(this), recipient, amount);
         } else {
             token == USE_ETHEREUM ? safeTransferETH(msg.sender, address(this).balance) : safeTransfer(token, recipient, amount);
