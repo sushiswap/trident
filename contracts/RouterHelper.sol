@@ -20,14 +20,14 @@ abstract contract RouterHelper is TridentPermit, TridentBatchable {
     /// @notice Trident AMM master deployer contract.
     IMasterDeployer public immutable masterDeployer;
     /// @notice ERC-20 token for wrapped ETH (v9).
-    IWETH internal immutable wETH;
+    address internal immutable wETH;
     /// @notice The user should use 0x0 if they want to deposit ETH
     address constant USE_ETHEREUM = address(0);
 
     constructor(
         IBentoBoxMinimal _bento,
         IMasterDeployer _masterDeployer,
-        IWETH _wETH
+        address _wETH
     ) {
         bento = _bento;
         masterDeployer = _masterDeployer;
@@ -119,7 +119,7 @@ abstract contract RouterHelper is TridentPermit, TridentBatchable {
     /// @notice Provides `wETH` {withdraw}.
     /// @param amount Token amount to unwrap into ETH.
     function withdrawFromWETH(uint256 amount) internal {
-        wETH.withdraw(amount);
+        IWETH(wETH).withdraw(amount);
     }
 
     /// @notice Provides 'safe' ETH transfer.
