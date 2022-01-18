@@ -3,6 +3,7 @@
 pragma solidity >=0.8.0;
 
 import "./interfaces/IBentoBoxMinimal.sol";
+import "./interfaces/IERC20.sol";
 import "./interfaces/IMasterDeployer.sol";
 import "./interfaces/IWETH.sol";
 import "./TridentBatchable.sol";
