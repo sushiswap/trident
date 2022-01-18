@@ -1,0 +1,36 @@
+name: Lint
+
+on:
+  # Trigger the workflow on push or pull request,
+  # but only for the main branch
+  push:
+    branches:
+      - canary
+      - master
+  pull_request:
+    branches:
+      - canary
+      - master
+jobs:
+  run-linters:
+    name: Run linters
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: 16
+          cache: 'yarn'
+      - name: Yarn
+        run: yarn --frozen-lockfile
+
+      - name: Run linters
+        uses: wearerequired/lint-action@v1
+        with:
+          prettier: true
+          auto_fix: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}

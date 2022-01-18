@@ -2,6 +2,8 @@ const config = require('@sushiswap/prettier-config')
 
 module.exports = {
   ...config.default,
+  singleQuote: false,
+  semi: true,
   overrides: [
     {
       files: '*.sol',
