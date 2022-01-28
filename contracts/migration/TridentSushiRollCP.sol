@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity >= 0.8.0;
+pragma solidity >=0.8.0;
 
 import "../TridentBatchable.sol";
 import "../TridentPermit.sol";
@@ -34,14 +34,18 @@ contract TridentSushiRollCP is TridentBatchable, TridentPermit {
         @param amount Liquidity amount (Lp token balance) to be migrated.
         @param swapFee Swap fee of the Trident CP pool we are migrating into.
         @param twapSupport Whether the Trident CP pool we are migrating into supports twap oracles.
-        @param minReceived Slippage protection for minting liquidity on the Trident CP pool.
+        @param minToken0Received Slippage protection for removing liquidity from a UniV2 style pool.
+        @param minToken1Received Slippage protection for removing liquidity from a UniV2 style pool.
+        @param minLpReceived Slippage protection for minting liquidity on the Trident CP pool.
         @dev If the pool with the current conditions doesn't exist it will be deployed. */
     function migrate(
         IUniswapV2Minimal pair,
         uint256 amount,
         uint256 swapFee,
         bool twapSupport,
-        uint256 minReceived
+        uint256 minToken0Received,
+        uint256 minToken1Received,
+        uint256 minLpReceived
     ) external returns (uint256 liquidity) {
         address token0 = pair.token0();
         address token1 = pair.token1();
@@ -56,11 +60,13 @@ contract TridentSushiRollCP is TridentBatchable, TridentPermit {
         pair.transferFrom(msg.sender, address(pair), amount);
         (uint256 amount0, uint256 amount1) = pair.burn(address(bentoBox));
 
+        if (amount0 < minToken0Received || amount1 < minToken1Received) revert MinimumOutput();
+
         bentoBox.deposit(token0, address(bentoBox), tridentPool, amount0, 0);
         bentoBox.deposit(token1, address(bentoBox), tridentPool, amount1, 0);
 
         liquidity = IPool(tridentPool).mint(abi.encode(msg.sender));
 
-        if (liquidity < minReceived) revert MinimumOutput();
+        if (liquidity < minLpReceived) revert MinimumOutput();
     }
 }
