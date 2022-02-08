@@ -52,6 +52,7 @@
     "arbitrum:deploy": "hardhat --network arbitrum deploy",
     "arbitrum:export": "hardhat --network arbitrum export --export exports/arbitrum.json",
     "test": "hardhat test test/constant-product/ConstantProduct.test.ts test/constant-product/*.test.ts test/deployer/*.test.ts test/library/*.test.ts test/router/*.test.ts",
+    "testOnly": "hardhat test",
     "test:debug": "mocha --inspect-brk",
     "test:trace": "yarn test --logs",
     "test:coverage": "hardhat coverage --testfiles \"{test/constant-product/ConstantProduct.test.ts,test/constant-product/*.test.ts,test/deployer/*.test.ts,test/library/*.test.ts,test/router/*.test.ts}\"",
