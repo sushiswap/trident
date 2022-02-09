@@ -1,6 +1,11 @@
 import { ethers, deployments } from "hardhat";
 import { expect } from "chai";
-import { ConstantProductPoolFactory, MasterDeployer, ConstantProductPool } from "../../types";
+import {
+  ConstantProductPoolFactory,
+  MasterDeployer,
+  ConstantProductPool,
+  ConstantProductPoolFactoryHelper,
+} from "../../types";
 
 describe("Constant Product Pool Factory", function () {
   before(async () => {
@@ -8,7 +13,7 @@ describe("Constant Product Pool Factory", function () {
   });
 
   beforeEach(async () => {
-    await deployments.fixture(["ConstantProductPoolFactory"]);
+    await deployments.fixture(["ConstantProductPoolFactory", "ConstantProductPoolFactoryHelper"]);
   });
 
   describe("#deployPool", function () {
@@ -49,6 +54,10 @@ describe("Constant Product Pool Factory", function () {
         "ConstantProductPoolFactory"
       );
 
+      const constantProductPoolFactoryHelper = await ethers.getContract<ConstantProductPoolFactoryHelper>(
+        "ConstantProductPoolFactoryHelper"
+      );
+
       let deployData = ethers.utils.defaultAbiCoder.encode(
         ["address", "address", "uint256", "bool"],
         [token1, token2, 30, false]
@@ -73,7 +82,10 @@ describe("Constant Product Pool Factory", function () {
       );
       await (await masterDeployer.deployPool(constantProductPoolFactory.address, deployData)).wait();
 
-      const [res, length] = await constantProductPoolFactory.getPoolsForTokens([token1, token2, token3, token4]);
+      const [res, length] = await constantProductPoolFactoryHelper.getPoolsForTokens(
+        constantProductPoolFactory.address,
+        [token1, token2, token3, token4]
+      );
       expect(length).equal(4);
       expect(res.length).equal(4);
     });

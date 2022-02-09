@@ -10,14 +10,6 @@ import "../../abstract/PoolDeployer.sol";
 contract ConstantProductPoolFactory is PoolDeployer {
     constructor(address _masterDeployer) PoolDeployer(_masterDeployer) {}
 
-    struct ConstantProductPoolInfo {
-        uint8 tokenA;
-        uint8 tokenB;
-        uint112 reserve0;
-        uint112 reserve1;
-        uint16 swapFeeAndTwapSupport;
-    }
-
     function deployPool(bytes memory _deployData) external returns (address pool) {
         (address tokenA, address tokenB, uint256 swapFee, bool twapSupport) = abi.decode(_deployData, (address, address, uint256, bool));
 
@@ -36,40 +28,5 @@ contract ConstantProductPoolFactory is PoolDeployer {
         bytes32 salt = keccak256(_deployData);
         pool = address(new ConstantProductPool{salt: salt}(_deployData, masterDeployer));
         _registerPool(pool, tokens, salt);
-    }
-
-    // @dev tokens MUST be sorted i < j => token[i] < token[j]
-    // @dev tokens.length < 256
-    function getPoolsForTokens(address[] calldata tokens)
-        external
-        view
-        returns (ConstantProductPoolInfo[] memory poolInfos, uint256 length)
-    {
-        uint8 tokenNumber = uint8(tokens.length);
-        for (uint8 i = 0; i < tokenNumber; i++) {
-            mapping(address => address[]) storage poolIs = pools[tokens[i]];
-            for (uint8 j = i + 1; j < tokenNumber; j++) {
-                length += poolIs[tokens[j]].length;
-            }
-        }
-        poolInfos = new ConstantProductPoolInfo[](length);
-        uint256 poolNumber = 0;
-        for (uint8 i = 0; i < tokenNumber; i++) {
-            mapping(address => address[]) storage poolIs = pools[tokens[i]];
-            for (uint8 j = i + 1; j < tokenNumber; j++) {
-                address[] storage poolIJs = poolIs[tokens[j]];
-                for (uint256 k = 0; k < poolIJs.length; k++) {
-                    ConstantProductPoolInfo memory poolInfo = poolInfos[poolNumber++];
-                    poolInfo.tokenA = i;
-                    poolInfo.tokenB = j;
-                    ConstantProductPool pool = ConstantProductPool(poolIJs[k]);
-                    (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast) = pool.getReserves();
-                    poolInfo.reserve0 = reserve0;
-                    poolInfo.reserve1 = reserve1;
-                    poolInfo.swapFeeAndTwapSupport = uint16(pool.swapFee());
-                    if (blockTimestampLast != 0) poolInfo.swapFeeAndTwapSupport += 1 << 15;
-                }
-            }
-        }
     }
 }
