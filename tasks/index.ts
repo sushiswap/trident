@@ -6,4 +6,5 @@ import "./cpp-verify";
 import "./erc20-allowance";
 import "./erc20-approve";
 import "./strategy";
-import "./whitelist";
+import "./whitelist-factory";
+import "./whitelist-router";

@@ -2,7 +2,7 @@ import { ChainId, WETH9_ADDRESS, USDC_ADDRESS } from "@sushiswap/core-sdk";
 import { task, types } from "hardhat/config";
 import { ConstantProductPoolFactory, MasterDeployer } from "../types";
 
-task("cpp:deploy", "Constant Product Pool deploy")
+task("cpp-deploy", "Constant Product Pool deploy")
   .addOptionalParam(
     "tokenA",
     "Token A",
@@ -21,15 +21,18 @@ task("cpp:deploy", "Constant Product Pool deploy")
   .setAction(async function ({ tokenA, tokenB, fee, twap, verify }, { ethers, run }) {
     const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
 
-    const constantProductPoolFactory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
+    const constantProductPoolFactory = await ethers.getContract<ConstantProductPoolFactory>(
+      "ConstantProductPoolFactory"
+    );
 
     const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint256", "bool"],
       [...[tokenA, tokenB].sort(), fee, twap]
     );
 
+    console.log("1", [...[tokenA, tokenB].sort(), fee, twap]);
     const contractTransaction = await masterDeployer.deployPool(constantProductPoolFactory.address, deployData);
-
+    console.log("2");
     if (!verify) return;
 
     const contractReceipt = await contractTransaction.wait(5);
