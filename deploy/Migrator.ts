@@ -3,7 +3,13 @@ import { BENTOBOX_ADDRESS, ChainId, WNATIVE } from "@sushiswap/core-sdk";
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-const deployFunction: DeployFunction = async function ({ ethers, deployments, getNamedAccounts, getChainId }: HardhatRuntimeEnvironment) {
+const deployFunction: DeployFunction = async function ({
+  ethers,
+  deployments,
+  getNamedAccounts,
+  getChainId,
+  run,
+}: HardhatRuntimeEnvironment) {
   console.log("Running TridentSushiRollCP deploy script");
   const { deploy } = deployments;
 
@@ -28,11 +34,19 @@ const deployFunction: DeployFunction = async function ({ ethers, deployments, ge
   const constantProductPoolFactoryAddress = (await ethers.getContract("ConstantProductPoolFactory")).address;
   const masterDeployerAddress = (await ethers.getContract("MasterDeployer")).address;
 
-  const { address } = await deploy("TridentSushiRollCP", {
+  const { address, newlyDeployed } = await deploy("TridentSushiRollCP", {
     from: deployer,
     args: [bentoBoxV1Address, constantProductPoolFactoryAddress, masterDeployerAddress],
     deterministicDeployment: false,
+    waitConfirmations: 5,
   });
+
+  if (newlyDeployed) {
+    await run("verify:verify", {
+      address,
+      constructorArguments: [bentoBoxV1Address, constantProductPoolFactoryAddress, masterDeployerAddress],
+    });
+  }
 
   console.log("TridentSushiRollCP deployed at ", address);
 };

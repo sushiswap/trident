@@ -1,7 +1,12 @@
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-const deployFunction: DeployFunction = async function ({ deployments, getNamedAccounts, ethers }: HardhatRuntimeEnvironment) {
+const deployFunction: DeployFunction = async function ({
+  deployments,
+  getNamedAccounts,
+  ethers,
+  run,
+}: HardhatRuntimeEnvironment) {
   // console.log("Running ConstantProductPoolFactory deploy script");
   const { deploy } = deployments;
 
@@ -9,15 +14,23 @@ const deployFunction: DeployFunction = async function ({ deployments, getNamedAc
 
   const masterDeployer = await ethers.getContract("MasterDeployer");
 
-  const { address } = await deploy("ConstantProductPoolFactory", {
+  const { address, newlyDeployed } = await deploy("ConstantProductPoolFactory", {
     from: deployer,
     deterministicDeployment: false,
     args: [masterDeployer.address],
+    waitConfirmations: 5,
   });
 
   if (!(await masterDeployer.whitelistedFactories(address))) {
     // console.log("Add ConstantProductPoolFactory to MasterDeployer whitelist");
     await (await masterDeployer.addToWhitelist(address)).wait();
+  }
+
+  if (newlyDeployed) {
+    await run("verify:verify", {
+      address,
+      constructorArguments: [masterDeployer.address],
+    });
   }
 
   // console.log("ConstantProductPoolFactory deployed at ", address);
