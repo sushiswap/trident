@@ -14,7 +14,6 @@ import "hardhat-spdx-license-identifier";
 import "hardhat-tracer";
 import "hardhat-watcher";
 import "solidity-coverage";
-
 import "./tasks";
 
 import { HardhatUserConfig } from "hardhat/config";
@@ -36,7 +35,16 @@ const config: HardhatUserConfig = {
     enabled: process.env.REPORT_GAS === "true",
     // outputFile: `gas-${Date.now()}.json`,
     // outputFile: "gas.json",
-    excludeContracts: ["examples", "flat", "mocks", "pool/concentrated", "pool/franchised", "pool/hybrid", "pool/index", "TridentERC721"],
+    excludeContracts: [
+      "examples",
+      "flat",
+      "mocks",
+      "pool/concentrated",
+      "pool/franchised",
+      "pool/hybrid",
+      "pool/index",
+      "TridentERC721",
+    ],
     // onlyCalledMethods: true,
     // showTimeSpent: true,
   },
