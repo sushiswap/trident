@@ -157,23 +157,23 @@ contract ConstantProductPool is IPool, TridentERC20 {
         _burn(address(this), liquidity);
 
         // Swap one token for another
-        unchecked {
-            if (tokenOut == token1) {
-                // @dev Swap `token0` for `token1`
-                // - calculate `amountOut` as if the user first withdrew balanced liquidity and then swapped `token0` for `token1`.
-                amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1);
-                _transfer(token1, amount1, recipient, unwrapBento);
-                amountOut = amount1;
-                amount0 = 0;
-            } else {
-                // @dev Swap `token1` for `token0`.
-                require(tokenOut == token0, "INVALID_OUTPUT_TOKEN");
-                amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0);
-                _transfer(token0, amount0, recipient, unwrapBento);
-                amountOut = amount0;
-                amount1 = 0;
-            }
+
+        if (tokenOut == token1) {
+            // @dev Swap `token0` for `token1`
+            // - calculate `amountOut` as if the user first withdrew balanced liquidity and then swapped `token0` for `token1`.
+            amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1);
+            _transfer(token1, amount1, recipient, unwrapBento);
+            amountOut = amount1;
+            amount0 = 0;
+        } else {
+            // @dev Swap `token1` for `token0`.
+            require(tokenOut == token0, "INVALID_OUTPUT_TOKEN");
+            amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0);
+            _transfer(token0, amount0, recipient, unwrapBento);
+            amountOut = amount0;
+            amount1 = 0;
         }
+
 
         (uint256 balance0, uint256 balance1) = _balance();
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
@@ -189,20 +189,20 @@ contract ConstantProductPool is IPool, TridentERC20 {
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 amountIn;
         address tokenOut;
-        unchecked {
-            if (tokenIn == token0) {
-                tokenOut = token1;
-                amountIn = balance0 - _reserve0;
-                amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
-                balance1 -= amountOut;
-            } else {
-                require(tokenIn == token1, "INVALID_INPUT_TOKEN");
-                tokenOut = token0;
-                amountIn = balance1 - reserve1;
-                amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
-                balance0 -= amountOut;
-            }
+
+        if (tokenIn == token0) {
+            tokenOut = token1;
+            amountIn = balance0 - _reserve0;
+            amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
+            balance1 -= amountOut;
+        } else {
+            require(tokenIn == token1, "INVALID_INPUT_TOKEN");
+            tokenOut = token0;
+            amountIn = balance1 - reserve1;
+            amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
+            balance0 -= amountOut;
         }
+
         _transfer(tokenOut, amountOut, recipient, unwrapBento);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
