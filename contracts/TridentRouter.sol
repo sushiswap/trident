@@ -67,30 +67,6 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         if (amountOut < params.amountOutMinimum) revert TooLittleReceived();
     }
 
-    /// @notice Swaps token A to token B by using callbacks.
-    /// @param path Addresses of the pools and data required by the pools for the swaps.
-    /// @param amountOutMinimum Minimum amount of token B after the swap.
-    /// @dev Ensure that the pools are trusted before calling this function. The pools can steal users' tokens.
-    /// This function will unlikely be used in production but it shows how to use callbacks. One use case will be arbitrage.
-    function exactInputLazy(uint256 amountOutMinimum, Path[] calldata path) public payable returns (uint256 amountOut) {
-        // @dev Call every pool in the path.
-        // Pool `N` should transfer its output tokens to pool `N+1` directly.
-        // The last pool should transfer its output tokens to the user.
-        for (uint256 i; i < path.length; i++) {
-            isWhiteListed(path[i].pool);
-            // @dev The cached `msg.sender` is used as the funder when the callback happens.
-            cachedMsgSender = msg.sender;
-            // @dev The cached pool must be the address that calls the callback.
-            cachedPool = path[i].pool;
-            amountOut = IPool(path[i].pool).flashSwap(path[i].data);
-        }
-        // @dev Resets the `cachedPool` to get a refund.
-        // `1` is used as the default value to avoid the storage slot being released.
-        cachedMsgSender = address(1);
-        cachedPool = address(1);
-        if (amountOut < amountOutMinimum) revert TooLittleReceived();
-    }
-
     /// @notice Swaps token A to token B directly. It's the same as `exactInputSingle` except
     /// it takes raw ERC-20 tokens from the users and deposits them into `bento`.
     /// @param params This includes the address of token A, pool, amount of token A to swap,
@@ -182,22 +158,6 @@ contract TridentRouter is ITridentRouter, RouterHelper {
             }
         }
         liquidity = IPool(pool).mint(data);
-        if (liquidity < minLiquidity) revert NotEnoughLiquidityMinted();
-    }
-
-    /// @notice Add liquidity to a pool using callbacks - same as `addLiquidity`, but now with callbacks.
-    /// @dev The input tokens are sent to the pool during the callback.
-    function addLiquidityLazy(
-        address pool,
-        uint256 minLiquidity,
-        bytes calldata data
-    ) public payable returns (uint256 liquidity) {
-        isWhiteListed(pool);
-        cachedMsgSender = msg.sender;
-        cachedPool = pool;
-        liquidity = IPool(pool).mint(data);
-        cachedMsgSender = address(1);
-        cachedPool = address(1);
         if (liquidity < minLiquidity) revert NotEnoughLiquidityMinted();
     }
 
