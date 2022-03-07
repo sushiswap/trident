@@ -1,8 +1,9 @@
-import { deployments, ethers } from "hardhat";
 import { BentoBoxV1, ConstantProductPool__factory, ERC20Mock, MasterDeployer, TridentRouter, WETH9 } from "../../types";
+import { deployments, ethers } from "hardhat";
+
+import { customError } from "../utilities";
 import { expect } from "chai";
 import { initializedConstantProductPool } from "../fixtures";
-import { customError } from "../utilities";
 
 describe("Router", function () {
   before(async function () {
@@ -17,7 +18,9 @@ describe("Router", function () {
     it("Succeeds when msg.sender is WETH", async () => {
       const router = await ethers.getContract<TridentRouter>("TridentRouter");
       const weth9 = await ethers.getContract<WETH9>("WETH9");
+      const deployer = await ethers.getNamedSigner("deployer");
       await expect(weth9.transfer(router.address, 1)).to.not.be.reverted;
+      await expect(router.unwrapWETH(1, deployer.address)).to.not.be.reverted;
     });
     it("Reverts when msg.sender is not WETH", async () => {
       const router = await ethers.getContract<TridentRouter>("TridentRouter");
