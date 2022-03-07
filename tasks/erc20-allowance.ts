@@ -1,5 +1,5 @@
+import type { ERC20Mock } from "../types";
 import { task } from "hardhat/config";
-import { ERC20Mock } from "../types";
 
 task("erc20-allownace", "ERC20 allowance")
   .addParam("token", "Token")

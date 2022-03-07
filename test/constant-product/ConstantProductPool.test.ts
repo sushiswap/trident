@@ -1,11 +1,18 @@
-import { deployments, ethers } from "hardhat";
 import { ConstantProductPool__factory, MasterDeployer } from "../../types";
-import { expect } from "chai";
+import { deployments, ethers } from "hardhat";
 import { initializedConstantProductPool, uninitializedConstantProductPool } from "../fixtures";
+
+import { expect } from "chai";
 
 describe("Constant Product Pool", () => {
   before(async () => {
-    await deployments.fixture(["MasterDeployer"]);
+    console.log("Deploy MasterDeployer fixture");
+    try {
+      await deployments.fixture(["MasterDeployer"]);
+    } catch (error) {
+      console.log("Error:", error);
+    }
+    console.log("Deployed MasterDeployer fixture");
   });
 
   beforeEach(async () => {
@@ -31,7 +38,9 @@ describe("Constant Product Pool", () => {
         ["address", "address", "uint256", "bool"],
         ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000000", 30, false]
       );
-      await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.not.be.revertedWith("ZERO_ADDRESS");
+      await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.not.be.revertedWith(
+        "ZERO_ADDRESS"
+      );
     });
 
     it("reverts if token0 and token1 are identical", async () => {
@@ -41,7 +50,9 @@ describe("Constant Product Pool", () => {
         ["address", "address", "uint256", "bool"],
         ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000001", 30, false]
       );
-      await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.be.revertedWith("IDENTICAL_ADDRESSES");
+      await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.be.revertedWith(
+        "IDENTICAL_ADDRESSES"
+      );
     });
     it("reverts if swap fee more than the max fee", async () => {
       const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
@@ -50,7 +61,9 @@ describe("Constant Product Pool", () => {
         ["address", "address", "uint256", "bool"],
         ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000002", 10001, false]
       );
-      await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.be.revertedWith("INVALID_SWAP_FEE");
+      await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.be.revertedWith(
+        "INVALID_SWAP_FEE"
+      );
     });
   });
 
@@ -157,7 +170,9 @@ describe("Constant Product Pool", () => {
       const pool = await initializedConstantProductPool();
       const reserves = await pool.getReserves();
       expect(
-        await pool.getAmountOut(ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token0(), "1000000000"]))
+        await pool.getAmountOut(
+          ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token0(), "1000000000"])
+        )
       ).to.equal("999999999"); // 999999999
     });
     it("returns 999999999 given input of token1 in 1e18:1e18 pool, with bar fee 0 & swap fee 0", async () => {
@@ -168,7 +183,9 @@ describe("Constant Product Pool", () => {
         reserve1: reserves[1].toString(),
       });
       expect(
-        await pool.getAmountOut(ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token1(), "1000000000"]))
+        await pool.getAmountOut(
+          ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token1(), "1000000000"])
+        )
       ).to.equal("999999999"); // 999999999
     });
     it("reverts if tokenIn is not equal to token0 and token1", async () => {
@@ -180,7 +197,10 @@ describe("Constant Product Pool", () => {
       );
       const constantProductPool = await ConstantProductPool.deploy(deployData, masterDeployer.address);
       await constantProductPool.deployed();
-      const data = ethers.utils.defaultAbiCoder.encode(["address", "uint256"], ["0x0000000000000000000000000000000000000003", 0]);
+      const data = ethers.utils.defaultAbiCoder.encode(
+        ["address", "uint256"],
+        ["0x0000000000000000000000000000000000000003", 0]
+      );
       await expect(constantProductPool.getAmountOut(data)).to.be.revertedWith("INVALID_INPUT_TOKEN");
     });
   });
@@ -189,14 +209,18 @@ describe("Constant Product Pool", () => {
     it("returns 1000000002 given output of token0 in 1e18:1e18 pool, with bar fee 0 & swap fee 0", async () => {
       const pool = await initializedConstantProductPool();
       expect(
-        await pool.getAmountIn(ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token0(), "1000000000"]))
+        await pool.getAmountIn(
+          ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token0(), "1000000000"])
+        )
       ).to.equal("1000000002"); // 1000000002
     });
 
     it("returns 1000000000 given output of token1 in 1e18:1e18 pool, with bar fee 0 & swap fee 0", async () => {
       const pool = await initializedConstantProductPool();
       expect(
-        await pool.getAmountIn(ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token1(), "1000000000"]))
+        await pool.getAmountIn(
+          ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token1(), "1000000000"])
+        )
       ).to.equal("1000000002"); // 1000000002
     });
     it("reverts if tokenOut is not equal to token 1 and token0", async () => {
@@ -208,7 +232,10 @@ describe("Constant Product Pool", () => {
       );
       const constantProductPool = await ConstantProductPool.deploy(deployData, masterDeployer.address);
       await constantProductPool.deployed();
-      const data = ethers.utils.defaultAbiCoder.encode(["address", "uint256"], ["0x0000000000000000000000000000000000000003", 0]);
+      const data = ethers.utils.defaultAbiCoder.encode(
+        ["address", "uint256"],
+        ["0x0000000000000000000000000000000000000003", 0]
+      );
       await expect(constantProductPool.getAmountIn(data)).to.be.revertedWith("INVALID_OUTPUT_TOKEN");
     });
   });

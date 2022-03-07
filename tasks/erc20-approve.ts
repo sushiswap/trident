@@ -1,6 +1,6 @@
-import { task } from "hardhat/config";
+import type { ERC20Mock } from "../types";
 import { constants } from "ethers";
-import { ERC20Mock } from "../types";
+import { task } from "hardhat/config";
 
 const { MaxUint256 } = constants;
 

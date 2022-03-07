@@ -1,7 +1,8 @@
-import { BENTOBOX_ADDRESS, ChainId, WETH9_ADDRESS, USDC_ADDRESS } from "@sushiswap/core-sdk";
-import { ethers } from "ethers";
+import { BENTOBOX_ADDRESS, ChainId, USDC_ADDRESS, WETH9_ADDRESS } from "@sushiswap/core-sdk";
+import type { BentoBoxV1, BentoBoxV1__factory, ERC20Mock, TridentRouter } from "../types";
 import { task, types } from "hardhat/config";
-import { BentoBoxV1, BentoBoxV1__factory, ERC20Mock, TridentRouter } from "../types";
+
+import { ethers } from "ethers";
 
 const { BigNumber } = ethers;
 
@@ -80,7 +81,13 @@ task("add-liquidity", "Add liquidity")
         console.log("Approved token1");
       }
 
-      console.log("Depositing 1st token", [liquidityInput[0].token, dev.address, dev.address, 0, liquidityInput[0].amount]);
+      console.log("Depositing 1st token", [
+        liquidityInput[0].token,
+        dev.address,
+        dev.address,
+        0,
+        liquidityInput[0].amount,
+      ]);
       await bentoBox
         .connect(dev)
         .deposit(liquidityInput[0].token, dev.address, dev.address, 0, liquidityInput[0].amount)

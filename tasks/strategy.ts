@@ -1,6 +1,7 @@
 import { BENTOBOX_ADDRESS, ChainId, WETH9_ADDRESS } from "@sushiswap/core-sdk";
+import type { BentoBoxV1, BentoBoxV1__factory } from "../types";
+
 import { task } from "hardhat/config";
-import { BentoBoxV1, BentoBoxV1__factory } from "../types";
 
 task("add-strategy", "Add strategy to BentoBox")
   .addOptionalParam("bentoBox", "BentoBox address", BENTOBOX_ADDRESS[ChainId.KOVAN])
