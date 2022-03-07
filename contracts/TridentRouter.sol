@@ -247,38 +247,6 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         if (withdrawn < minWithdrawal) revert TooLittleReceived();
     }
 
-    /// @notice Used by the pool 'flashSwap' functionality to take input tokens from the user.
-    function tridentSwapCallback(bytes calldata data) external {
-        if (msg.sender != cachedPool) revert UnauthorizedCallback();
-        TokenInput memory tokenInput = abi.decode(data, (TokenInput));
-        // @dev Transfer the requested tokens to the pool.
-        // TODO: Refactor redudency
-        if (tokenInput.native) {
-            _depositFromUserToBentoBox(tokenInput.token, cachedMsgSender, msg.sender, tokenInput.amount);
-        } else {
-            bento.transfer(tokenInput.token, cachedMsgSender, msg.sender, tokenInput.amount);
-        }
-        // @dev Resets the `msg.sender`'s authorization.
-        cachedMsgSender = address(1);
-    }
-
-    /// @notice Can be used by the pool 'mint' functionality to take tokens from the user.
-    function tridentMintCallback(bytes calldata data) external {
-        if (msg.sender != cachedPool) revert UnauthorizedCallback();
-        TokenInput[] memory tokenInput = abi.decode(data, (TokenInput[]));
-        // @dev Transfer the requested tokens to the pool.
-        for (uint256 i; i < tokenInput.length; i++) {
-            // TODO: Refactor redudency
-            if (tokenInput[i].native) {
-                _depositFromUserToBentoBox(tokenInput[i].token, cachedMsgSender, msg.sender, tokenInput[i].amount);
-            } else {
-                bento.transfer(tokenInput[i].token, cachedMsgSender, msg.sender, tokenInput[i].amount);
-            }
-        }
-        // @dev Resets the `msg.sender`'s authorization.
-        cachedMsgSender = address(1);
-    }
-
     /// @notice Recover mistakenly sent tokens.
     function sweep(
         address token,
