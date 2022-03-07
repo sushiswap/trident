@@ -108,7 +108,76 @@ describe("Router", function () {
   });
 
   describe("#burnLiquidity", function () {
-    //
+    it("Reverts when a token present in minWithdrawals is not withdrawn", async () => {
+      const deployer = await ethers.getNamedSigner("deployer");
+
+      const router = await ethers.getContract<TridentRouter>("TridentRouter");
+
+      const pool = await initializedConstantProductPool();
+
+      const balance = await pool.balanceOf(deployer.address);
+
+      await pool.approve(router.address, balance);
+
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+
+      const weth9 = await ethers.getContract("WETH9");
+
+      const data = ethers.utils.defaultAbiCoder.encode(["address", "bool"], [deployer.address, false]);
+
+      const minWithdrawals = [
+        {
+          token: token0.address,
+          amount: "500000000000000000",
+        },
+        {
+          token: token1.address,
+          amount: "500000000000000000",
+        },
+        {
+          token: weth9.address,
+          amount: "1",
+        },
+      ];
+
+      await expect(router.burnLiquidity(pool.address, balance, data, minWithdrawals)).to.be.revertedWith(
+        "IncorrectTokenWithdrawn"
+      );
+    });
+    it("Reverts when output is less than minimum", async () => {
+      const deployer = await ethers.getNamedSigner("deployer");
+
+      const router = await ethers.getContract<TridentRouter>("TridentRouter");
+
+      const pool = await initializedConstantProductPool();
+
+      const balance = await pool.balanceOf(deployer.address);
+
+      await pool.approve(router.address, balance);
+
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+
+      const data = ethers.utils.defaultAbiCoder.encode(["address", "bool"], [deployer.address, false]);
+
+      const minWithdrawals = [
+        {
+          token: token0.address,
+          amount: "1000000000000000000",
+        },
+        {
+          token: token1.address,
+          amount: "1000000000000000000",
+        },
+      ];
+
+      await expect(router.burnLiquidity(pool.address, balance, data, minWithdrawals)).to.be.revertedWith(
+        "TooLittleReceived"
+      );
+    });
   });
 
   describe("#burnLiquiditySingle", function () {
