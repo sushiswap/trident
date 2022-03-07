@@ -112,15 +112,31 @@ describe("Router", function () {
   });
 
   describe("#burnLiquiditySingle", function () {
-    //
-  });
+    it("Reverts when output is less than minimum", async () => {
+      const deployer = await ethers.getNamedSigner("deployer");
 
-  describe("#tridentSwapCallback", function () {
-    //
-  });
+      const router = await ethers.getContract<TridentRouter>("TridentRouter");
 
-  describe("#tridentMintCallback", function () {
-    //
+      const pool = await initializedConstantProductPool();
+
+      const balance = await pool.balanceOf(deployer.address);
+
+      await pool.approve(router.address, balance);
+
+      console.log("Deployer pool balance", (await pool.balanceOf(deployer.address)).toString());
+
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+
+      const data = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [token0.address, deployer.address, false]
+      );
+
+      // Burn whole balance, expect to get back initial 1000000000000000000 token0, but there wouldn't be enough
+      await expect(router.burnLiquiditySingle(pool.address, balance, data, "1000000000000000000")).to.be.revertedWith(
+        "TooLittleReceived"
+      );
+    });
   });
 
   describe("#sweep", function () {
