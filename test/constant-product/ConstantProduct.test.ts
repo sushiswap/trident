@@ -1,7 +1,7 @@
 // @ts-nocheck
 
-import { initialize, addLiquidity, swap, burnLiquidity } from "../harness/ConstantProduct";
-import { getBigNumber, randBetween, ZERO } from "../harness/helpers";
+import { ZERO, getBigNumber, randBetween } from "../harness/helpers";
+import { addLiquidity, burnLiquidity, initialize, swap } from "../harness/ConstantProduct";
 
 describe("Constant Product Pool Old", function () {
   before(async () => {
@@ -29,6 +29,9 @@ describe("Constant Product Pool Old", function () {
   });
 
   describe("#mint", () => {
+    it("Reverts when not enough liquidity is minted", async () => {
+      await expect(addLiquidity(0, 1, 1)).to.be.revertedWith("NotEnoughLiquidityMinted");
+    });
     it("Balanced liquidity to a balanced pool", async () => {
       const amount = getBigNumber(randBetween(10, 100));
       await addLiquidity(0, amount, amount);
