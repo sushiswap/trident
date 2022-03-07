@@ -1,4 +1,5 @@
 import { BENTOBOX_ADDRESS, WNATIVE_ADDRESS } from "@sushiswap/core-sdk";
+
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
@@ -35,18 +36,20 @@ const deployFunction: DeployFunction = async function ({
 
   const masterDeployer = await ethers.getContract("MasterDeployer");
 
-  const { address } = await deploy("TridentRouter", {
+  const { address, newlyDeployed } = await deploy("TridentRouter", {
     from: deployer,
     args: [bentoBoxV1Address, masterDeployer.address, wethAddress],
     deterministicDeployment: false,
-    waitConfirmations: 5,
+    waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 5 : undefined,
   });
 
-  await run("verify:verify", {
-    address,
-    constructorArguments: [bentoBoxV1Address, masterDeployer.address, wethAddress],
-    contract: "contracts/TridentRouter.sol:TridentRouter",
-  });
+  if (newlyDeployed && process.env.VERIFY_ON_DEPLOY === "true") {
+    await run("verify:verify", {
+      address,
+      constructorArguments: [bentoBoxV1Address, masterDeployer.address, wethAddress],
+      contract: "contracts/TridentRouter.sol:TridentRouter",
+    });
+  }
 
   // console.log("TridentRouter deployed at ", address);
 };

@@ -38,10 +38,10 @@ const deployFunction: DeployFunction = async function ({
     from: deployer,
     args: [bentoBoxV1Address, constantProductPoolFactoryAddress, masterDeployerAddress],
     deterministicDeployment: false,
-    waitConfirmations: 5,
+    waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 5 : undefined,
   });
 
-  if (newlyDeployed) {
+  if (newlyDeployed && process.env.VERIFY_ON_DEPLOY === "true") {
     await run("verify:verify", {
       address,
       constructorArguments: [bentoBoxV1Address, constantProductPoolFactoryAddress, masterDeployerAddress],

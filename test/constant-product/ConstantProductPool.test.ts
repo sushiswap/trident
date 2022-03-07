@@ -1,4 +1,4 @@
-import { ConstantProductPool__factory, MasterDeployer } from "../../types";
+import type { ConstantProductPool__factory, MasterDeployer } from "../../types";
 import { deployments, ethers } from "hardhat";
 import { initializedConstantProductPool, uninitializedConstantProductPool } from "../fixtures";
 
@@ -7,11 +7,7 @@ import { expect } from "chai";
 describe("Constant Product Pool", () => {
   before(async () => {
     console.log("Deploy MasterDeployer fixture");
-    try {
-      await deployments.fixture(["MasterDeployer"]);
-    } catch (error) {
-      console.log("Error:", error);
-    }
+    await deployments.fixture(["MasterDeployer"]);
     console.log("Deployed MasterDeployer fixture");
   });
 

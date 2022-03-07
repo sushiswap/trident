@@ -15,10 +15,10 @@ const deployFunction: DeployFunction = async function ({
   const { address, newlyDeployed } = await deploy("ConstantProductPoolFactoryHelper", {
     from: deployer,
     deterministicDeployment: false,
-    waitConfirmations: 5,
+    waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 5 : undefined,
   });
 
-  if (newlyDeployed) {
+  if (newlyDeployed && process.env.VERIFY_ON_DEPLOY === "true") {
     await run("verify:verify", {
       address,
     });
