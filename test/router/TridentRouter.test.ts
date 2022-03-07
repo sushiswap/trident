@@ -168,11 +168,21 @@ describe("Router", function () {
     it("Reverts if there is not enough balance of WETH on router", async () => {
       const router = await ethers.getContract<TridentRouter>("TridentRouter");
       const deployer = await ethers.getNamedSigner("deployer");
+      await router.unwrapWETH(1, deployer.address);
       await expect(router.unwrapWETH(1, deployer.address)).to.be.revertedWith("InsufficientWETH");
+    });
+    it("Does nothing if balance is zero and amount is zero", async () => {
+      const router = await ethers.getContract<TridentRouter>("TridentRouter");
+      const deployer = await ethers.getNamedSigner("deployer");
+      await router.unwrapWETH(0, deployer.address);
     });
   });
 
   describe("#isWhiteListed", function () {
-    //
+    it("Reverts if the pool is invalid", async () => {
+      // const router = await ethers.getContract<TridentRouter>("TridentRouter");
+      // const deployer = await ethers.getNamedSigner("deployer");
+      // await expect(router.isWhiteListed(1, deployer.address)).to.be.revertedWith("InsufficientWETH");
+    });
   });
 });
