@@ -289,7 +289,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         if (onBento) {
             bento.transfer(token, address(this), recipient, amount);
         } else {
-            token == USE_ETHEREUM ? safeTransferETH(msg.sender, address(this).balance) : safeTransfer(token, recipient, amount);
+            token == USE_ETHEREUM ? safeTransferETH(recipient, address(this).balance) : safeTransfer(token, recipient, amount);
         }
     }
 
@@ -329,7 +329,4 @@ contract TridentRouter is ITridentRouter, RouterHelper {
             whitelistedPools[pool] = true;
         }
     }
-
-    // LIBRARY FUNCTIONS
-    // https://github.com/Uniswap/v2-periphery/blob/master/contracts/UniswapV2Router02.sol#L402
 }
