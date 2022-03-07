@@ -158,7 +158,18 @@ describe("Router", function () {
   });
 
   describe("#unwrapWETH", function () {
-    //
+    it("Succeeds if there is enough balance of WETH on router", async () => {
+      const router = await ethers.getContract<TridentRouter>("TridentRouter");
+      const weth9 = await ethers.getContract<WETH9>("WETH9");
+      const deployer = await ethers.getNamedSigner("deployer");
+      await weth9.transfer(router.address, 1);
+      await expect(router.unwrapWETH(1, deployer.address)).to.not.be.reverted;
+    });
+    it("Reverts if there is not enough balance of WETH on router", async () => {
+      const router = await ethers.getContract<TridentRouter>("TridentRouter");
+      const deployer = await ethers.getNamedSigner("deployer");
+      await expect(router.unwrapWETH(1, deployer.address)).to.be.revertedWith("InsufficientWETH");
+    });
   });
 
   describe("#isWhiteListed", function () {
