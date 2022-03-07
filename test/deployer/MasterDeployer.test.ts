@@ -2,11 +2,11 @@ import { keccak256, pack } from "@ethersproject/solidity";
 
 import { MAX_FEE } from "../utilities";
 import { bytecode as constantProductPoolBytecode } from "../../artifacts/contracts/pool/constant-product/ConstantProductPool.sol/ConstantProductPool.json";
+import { customError } from "../utilities";
 import { defaultAbiCoder } from "@ethersproject/abi";
 import { ethers } from "hardhat";
 import { expect } from "chai";
 import { getCreate2Address } from "@ethersproject/address";
-import { customError } from "../utilities";
 
 describe("MasterDeployer", function () {
   before(async function () {
@@ -25,17 +25,21 @@ describe("MasterDeployer", function () {
   });
 
   it("Reverts on invalid fee", async function () {
-    await expect(this.MasterDeployer.deploy(MAX_FEE + 1, this.feeTo.address, this.bentoBox.address)).to.be.revertedWith("INVALID_BAR_FEE");
-  });
-
-  it("Reverts on fee to zero address", async function () {
-    await expect(this.MasterDeployer.deploy(MAX_FEE, ethers.constants.AddressZero, this.bentoBox.address)).to.be.revertedWith(
-      "ZERO_ADDRESS"
+    await expect(this.MasterDeployer.deploy(MAX_FEE + 1, this.feeTo.address, this.bentoBox.address)).to.be.revertedWith(
+      "INVALID_BAR_FEE"
     );
   });
 
+  it("Reverts on fee to zero address", async function () {
+    await expect(
+      this.MasterDeployer.deploy(MAX_FEE, ethers.constants.AddressZero, this.bentoBox.address)
+    ).to.be.revertedWith("ZERO_ADDRESS");
+  });
+
   it("Reverts on bento zero address", async function () {
-    await expect(this.MasterDeployer.deploy(MAX_FEE, this.feeTo.address, ethers.constants.AddressZero)).to.be.revertedWith("ZERO_ADDRESS");
+    await expect(
+      this.MasterDeployer.deploy(MAX_FEE, this.feeTo.address, ethers.constants.AddressZero)
+    ).to.be.revertedWith("ZERO_ADDRESS");
   });
 
   beforeEach(async function () {
@@ -51,9 +55,9 @@ describe("MasterDeployer", function () {
         [...[this.weth.address, this.sushi.address].sort(), 30, true]
       );
 
-      await expect(this.masterDeployer.deployPool(this.constantProductPoolFactory.address, deployData)).to.be.revertedWith(
-        "FACTORY_NOT_WHITELISTED"
-      );
+      await expect(
+        this.masterDeployer.deployPool(this.constantProductPoolFactory.address, deployData)
+      ).to.be.revertedWith("FACTORY_NOT_WHITELISTED");
     });
 
     it("Adds address to pools array", async function () {
@@ -73,11 +77,13 @@ describe("MasterDeployer", function () {
         [...[this.weth.address, this.sushi.address].sort(), 30, true]
       );
 
-      await expect(this.constantProductPoolFactory.deployPool(deployData)).to.be.revertedWith(customError("UnauthorisedDeployer"));
+      await expect(this.constantProductPoolFactory.deployPool(deployData)).to.be.revertedWith(
+        customError("UnauthorisedDeployer")
+      );
     });
 
     // TODO: Fix this
-    it.skip("Emits event on successful deployment", async function () {
+    it("Emits event on successful deployment", async function () {
       await this.masterDeployer.addToWhitelist(this.constantProductPoolFactory.address);
 
       const deployData = defaultAbiCoder.encode(
@@ -90,7 +96,10 @@ describe("MasterDeployer", function () {
         [
           pack(
             ["bytes", "bytes"],
-            [constantProductPoolBytecode, defaultAbiCoder.encode(["bytes", "address"], [deployData, this.masterDeployer.address])]
+            [
+              constantProductPoolBytecode,
+              defaultAbiCoder.encode(["bytes", "address"], [deployData, this.masterDeployer.address]),
+            ]
           ),
         ]
       );
@@ -103,7 +112,7 @@ describe("MasterDeployer", function () {
 
       await expect(this.masterDeployer.deployPool(this.constantProductPoolFactory.address, deployData))
         .to.emit(this.masterDeployer, "DeployPool")
-        .withArgs(this.constantProductPoolFactory.address, computedConstantProductPoolAddress);
+        .withArgs(this.constantProductPoolFactory.address, computedConstantProductPoolAddress, deployData);
     });
   });
 
