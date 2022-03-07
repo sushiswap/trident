@@ -140,7 +140,7 @@ describe("Router", function () {
       const balance = await carol.getBalance();
       // Gifting 1 unit and sweeping it back
       await router.sweep(ADDRESS_ZERO, 1, carol.address, false, { value: 1 });
-      // Balance should remain the same, since we gifted 1 unit and sweeped it back
+      // Balance should be plus 1, since the deployer gifted 1 unit and carol sweeped it
       expect(await carol.getBalance()).equal(balance.add(1));
     });
     it("Allows sweeps of regular erc20 token", async () => {
