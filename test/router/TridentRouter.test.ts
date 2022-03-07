@@ -1,13 +1,5 @@
 import { ADDRESS_ZERO, customError } from "../utilities";
-import {
-  BentoBoxV1,
-  ConstantProductPool__factory,
-  ERC20Mock,
-  ERC20Mock__factory,
-  MasterDeployer,
-  TridentRouter,
-  WETH9,
-} from "../../types";
+import { BentoBoxV1, ConstantProductPool__factory, ERC20Mock, MasterDeployer, TridentRouter, WETH9 } from "../../types";
 import { deployments, ethers } from "hardhat";
 
 import { expect } from "chai";
@@ -135,13 +127,12 @@ describe("Router", function () {
     it("Allows sweep of bentobox erc20 token", async () => {
       const bentoBox = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
       const router = await ethers.getContract<TridentRouter>("TridentRouter");
-      const ERC20 = await ethers.getContractFactory<ERC20Mock__factory>("ERC20Mock");
-      const erc20Mock = await ERC20.deploy("Mock", "MOCK", 1);
+      const weth9 = await ethers.getContract<WETH9>("WETH9");
       const deployer = await ethers.getNamedSigner("deployer");
-      await erc20Mock.approve(bentoBox.address, 1);
-      await bentoBox.deposit(erc20Mock.address, deployer.address, router.address, 0, 1);
-      await router.sweep(erc20Mock.address, 1, deployer.address, true);
-      expect(await bentoBox.balanceOf(erc20Mock.address, deployer.address)).equal(1);
+      await weth9.approve(bentoBox.address, 1);
+      await bentoBox.deposit(weth9.address, deployer.address, router.address, 0, 1);
+      await router.sweep(weth9.address, 1, deployer.address, true);
+      expect(await bentoBox.balanceOf(weth9.address, deployer.address)).equal(1);
     });
     it("Allows sweep of native eth", async () => {
       const router = await ethers.getContract<TridentRouter>("TridentRouter");
@@ -150,7 +141,7 @@ describe("Router", function () {
       // Gifting 1 unit and sweeping it back
       await router.sweep(ADDRESS_ZERO, 1, carol.address, false, { value: 1 });
       // Balance should remain the same, since we gifted 1 unit and sweeped it back
-      expect(await carol.getBalance()).equal(balance);
+      expect(await carol.getBalance()).equal(balance.add(1));
     });
     it("Allows sweeps of regular erc20 token", async () => {
       const router = await ethers.getContract<TridentRouter>("TridentRouter");
