@@ -1,7 +1,7 @@
+import { ADDRESS_ZERO, customError } from "../utilities";
 import { BentoBoxV1, ConstantProductPool__factory, ERC20Mock, MasterDeployer, TridentRouter, WETH9 } from "../../types";
 import { deployments, ethers } from "hardhat";
 
-import { customError } from "../utilities";
 import { expect } from "chai";
 import { initializedConstantProductPool } from "../fixtures";
 
@@ -123,16 +123,18 @@ describe("Router", function () {
     //
   });
 
-  describe("#sweepBentoBoxToken", function () {
-    //
-  });
-
-  describe("#sweepNativeToken", function () {
-    //
-  });
-
-  describe("#refundETH", function () {
-    //
+  describe("#sweep", function () {
+    it("Allows speed of bentobox erc20 token", async () => {});
+    it("Allows sweep of native eth", async () => {
+      const router = await ethers.getContract<TridentRouter>("TridentRouter");
+      const carol = await ethers.getNamedSigner("carol");
+      const balance = await carol.getBalance();
+      // Gifting 1 unit and sweeping it back
+      await router.sweep(ADDRESS_ZERO, 1, carol.address, false, { value: 1 });
+      // Balance should remain the same, since we gifted 1 unit and sweeped it back
+      expect(await carol.getBalance()).equal(balance);
+    });
+    it("Allows sweeps of regular erc20 token", async () => {});
   });
 
   describe("#unwrapWETH", function () {
