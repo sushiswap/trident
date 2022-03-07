@@ -6,32 +6,27 @@ const deployFunction: DeployFunction = async function ({
   ethers,
   deployments,
   getNamedAccounts,
-  getChainId,
 }: HardhatRuntimeEnvironment) {
-  console.log("Running BentoBox deploy script");
+  console.log("Running WETH9 deploy script");
 
   const { deploy } = deployments;
 
   const { deployer } = await getNamedAccounts();
 
-  const chainId = Number(await getChainId());
-
-  const weth9 = await ethers.getContract<WETH9>("WETH9");
-
-  const { address } = await deploy("BentoBoxV1", {
+  await deploy("WETH9", {
     from: deployer,
-    args: [chainId === 42 ? "0xd0A1E359811322d97991E03f863a0C30C2cF029C" : weth9.address],
     deterministicDeployment: false,
   });
 
-  console.log("BentoBoxV1 deployed at ", address);
+  const weth9 = await ethers.getContract<WETH9>("WETH9");
+  await weth9.deposit({ value: 100 });
+
+  console.log("WETH9 deployed at ", weth9.address);
 };
 
 export default deployFunction;
 
-deployFunction.dependencies = ["WETH9"];
-
-deployFunction.tags = ["BentoBoxV1"];
+deployFunction.tags = ["WETH9"];
 
 deployFunction.skip = ({ getChainId }) =>
   new Promise(async (resolve, reject) => {
