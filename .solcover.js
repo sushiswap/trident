@@ -21,8 +21,8 @@ module.exports = {
     "pool/index",
     "TridentERC721",
     // Covered elsewhere
-    "TridentERC20",
-    "TridentBatchable",
+    "Batchable",
+    "SelfPermit",
     "TridentOwnable",
   ],
   mocha: {
