@@ -1,7 +1,14 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
-import { addLiquidityViaManager, getDx, getDy, getTickAtCurrentPrice, LinkedListHelper, swapViaRouter } from "../harness/Concentrated";
-import { getBigNumber } from "../harness/helpers";
+import {
+  addLiquidityViaManager,
+  getDx,
+  getDy,
+  getTickAtCurrentPrice,
+  LinkedListHelper,
+  swapViaRouter,
+} from "../harness/Concentrated";
+import { getBigNumber } from "../utilities";
 import { Trident } from "../harness/Trident";
 import { createCLRPool } from "./helpers/createCLRPool";
 
@@ -30,7 +37,8 @@ describe("Concentrated Pool Routing", async () => {
       const tickSpacing = (await pool.getImmutables())._tickSpacing;
       const tickAtPrice = await getTickAtCurrentPrice(pool);
       const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-      const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+      const nearestEvenValidTick =
+        (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
       let lower = nearestEvenValidTick - step;
       let upper = nearestEvenValidTick + step + tickSpacing;
@@ -95,7 +103,8 @@ describe("Concentrated Pool Routing", async () => {
       const tickSpacing = (await pool.getImmutables())._tickSpacing;
       const tickAtPrice = await getTickAtCurrentPrice(pool);
       const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-      const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+      const nearestEvenValidTick =
+        (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
       let lower = nearestEvenValidTick - step;
       let upper = nearestEvenValidTick + step + tickSpacing;
@@ -160,7 +169,8 @@ describe("Concentrated Pool Routing", async () => {
       const tickSpacing = (await pool.getImmutables())._tickSpacing;
       const tickAtPrice = await getTickAtCurrentPrice(pool);
       const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-      const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+      const nearestEvenValidTick =
+        (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
       let lower = nearestEvenValidTick - step;
       let upper = nearestEvenValidTick + step + tickSpacing;
@@ -236,7 +246,8 @@ describe("Concentrated Pool Routing", async () => {
       const tickSpacing = (await pool.getImmutables())._tickSpacing;
       const tickAtPrice = await getTickAtCurrentPrice(pool);
       const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-      const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+      const nearestEvenValidTick =
+        (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
       let lower = nearestEvenValidTick - step;
       let upper = nearestEvenValidTick + step + tickSpacing;

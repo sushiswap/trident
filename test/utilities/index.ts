@@ -1,14 +1,21 @@
-import { BigNumber, BigNumberish } from "@ethersproject/bignumber";
+import { BigNumber } from "@ethersproject/bignumber";
+import { ONE } from "@sushiswap/core-sdk";
+import { expect } from "chai";
+import { ethers } from "hardhat";
+import type { ERC20Mock } from "../../types";
 
-export const BASE_TEN = 10;
-export const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000";
+export * from "./address";
+export * from "./error";
+export * from "./expect";
+export * from "./math";
+export * from "./numbers";
+export * from "./permit";
+export * from "./pools";
+export * from "./random";
+export * from "./snapshot";
+export * from "./time";
 
-export const MAX_FEE = 10000;
-
-//Defaults to e18 using amount * 10^18
-export function getBigNumber(amount: BigNumberish, decimals = 18): BigNumber {
-  return BigNumber.from(amount).mul(BigNumber.from(BASE_TEN).pow(decimals));
-}
+// TODO: Refactor
 
 export function getIntegerRandomValue(exp: number, rnd: any): [number, BigNumber] {
   if (exp <= 15) {
@@ -38,9 +45,36 @@ export function areCloseValues(v1: any, v2: any, threshold: any) {
   return Math.abs(v1 / v2 - 1) < threshold;
 }
 
-export * from "./error";
-export * from "./pools";
-export * from "./random";
-export * from "./time";
-export * from "./permit";
-export * from "./snapshot";
+export function expectAlmostEqual(actual, expected, reason = "") {
+  expect(actual).to.be.within(expected.sub(ONE), expected.add(ONE), reason);
+}
+
+export function encodedAddress(account) {
+  return ethers.utils.defaultAbiCoder.encode(["address"], [account.address]);
+}
+
+export function encodedSwapData(tokenIn, to, unwrapBento) {
+  return ethers.utils.defaultAbiCoder.encode(["address", "address", "bool"], [tokenIn, to, unwrapBento]);
+}
+
+export function printHumanReadable(arr) {
+  console.log(
+    arr.map((x) => {
+      let paddedX = x.toString().padStart(19, "0");
+      paddedX = paddedX.substr(0, paddedX.length - 18) + "." + paddedX.substr(paddedX.length - 18) + " ";
+      return paddedX;
+    })
+  );
+}
+
+export function getFactories(contracts: string[]) {
+  return contracts.map((contract) => getFactory(contract));
+}
+
+export function getFactory(contract: string) {
+  return ethers.getContractFactory(contract);
+}
+
+export function sortTokens(tokens: ERC20Mock[]) {
+  return tokens.sort((a, b) => (a.address < b.address ? -1 : 1));
+}

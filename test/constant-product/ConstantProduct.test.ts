@@ -1,17 +1,11 @@
 // @ts-nocheck
 
-import { ZERO, getBigNumber, randBetween } from "../harness/helpers";
+import { ZERO, getBigNumber, randBetween } from "../utilities";
 import { addLiquidity, burnLiquidity, initialize, swap } from "../harness/ConstantProduct";
-
-import { expect } from "chai";
 
 describe("Constant Product Pool Old", function () {
   before(async () => {
     await initialize();
-  });
-
-  beforeEach(async () => {
-    //
   });
 
   describe("#swap", () => {

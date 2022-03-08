@@ -2,7 +2,7 @@
 
 import { ethers, deployments, ethers } from "hardhat";
 import { expect } from "chai";
-import { encodedSwapData, getBigNumber, randBetween, sqrt, printHumanReadable, ZERO, TWO, MAX_FEE } from "./helpers";
+import { encodedSwapData, getBigNumber, randBetween, sqrt, ZERO, TWO, MAX_FEE } from "../utilities";
 import { BentoBoxV1, ERC20Mock__factory, IConstantProductPool, MasterDeployer, TridentRouter } from "../../types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 

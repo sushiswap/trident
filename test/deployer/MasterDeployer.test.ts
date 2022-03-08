@@ -25,9 +25,9 @@ describe("MasterDeployer", function () {
   });
 
   it("Reverts on invalid fee", async function () {
-    await expect(this.MasterDeployer.deploy(MAX_FEE + 1, this.feeTo.address, this.bentoBox.address)).to.be.revertedWith(
-      "INVALID_BAR_FEE"
-    );
+    await expect(
+      this.MasterDeployer.deploy(MAX_FEE.add(1), this.feeTo.address, this.bentoBox.address)
+    ).to.be.revertedWith("INVALID_BAR_FEE");
   });
 
   it("Reverts on fee to zero address", async function () {
@@ -133,7 +133,7 @@ describe("MasterDeployer", function () {
 
   describe("#setFeeTo", async function () {
     it("Reverts on invalid fee", async function () {
-      await expect(this.masterDeployer.setBarFee(MAX_FEE + 1)).to.be.revertedWith("INVALID_BAR_FEE");
+      await expect(this.masterDeployer.setBarFee(MAX_FEE.add(1))).to.be.revertedWith("INVALID_BAR_FEE");
     });
     it("Mutates on valid fee", async function () {
       this.masterDeployer.setBarFee(0);

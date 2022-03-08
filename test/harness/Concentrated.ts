@@ -3,7 +3,7 @@ import { ContractTransaction } from "@ethersproject/contracts";
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { ConcentratedLiquidityPool } from "../../types";
-import { divRoundingUp, expectAlmostEqual, ZERO } from "./helpers";
+import { divRoundingUp, expectAlmostEqual, ZERO } from "../utilities";
 import { Trident } from "./Trident";
 
 export const TWO_POW_96 = BigNumber.from(2).pow(96);
@@ -37,7 +37,10 @@ export async function collectProtocolFee(params: { pool: ConcentratedLiquidityPo
     oldReserve1.sub(oldToken1ProtocolFee).add(BigNumber.from(1)),
     "didn't update the reserve1 correctly"
   );
-  return { token0ProtocolFee: oldToken0ProtocolFee.sub(BigNumber.from(1)), token1ProtocolFee: oldToken1ProtocolFee.sub(BigNumber.from(1)) };
+  return {
+    token0ProtocolFee: oldToken0ProtocolFee.sub(BigNumber.from(1)),
+    token1ProtocolFee: oldToken1ProtocolFee.sub(BigNumber.from(1)),
+  };
 }
 
 export async function collectFees(params: {
@@ -61,8 +64,14 @@ export async function collectFees(params: {
 
   const nwePosition = await Trident.Instance.concentratedPoolManager.positions(tokenId);
   const newUserBalances = await Trident.Instance.getTokenBalance(tokens, recipient, false);
-  expect(nwePosition.feeGrowthInside0.toString()).to.be.eq(range.feeGrowthInside0.toString(), "didn't update fee growth to correct value");
-  expect(nwePosition.feeGrowthInside1.toString()).to.be.eq(range.feeGrowthInside1.toString(), "didn't update fee growth to correct value");
+  expect(nwePosition.feeGrowthInside0.toString()).to.be.eq(
+    range.feeGrowthInside0.toString(),
+    "didn't update fee growth to correct value"
+  );
+  expect(nwePosition.feeGrowthInside1.toString()).to.be.eq(
+    range.feeGrowthInside1.toString(),
+    "didn't update fee growth to correct value"
+  );
   expect(newUserBalances[0].div(100).toString()).to.be.eq(
     oldUserBalances[0].add(token0expected).div(100).toString(),
     "didn't credit token0 fees"
@@ -157,7 +166,9 @@ export async function swapViaRouter(params: {
       totalFees = totalFees.add(feeAmount);
       const protocolFee = divRoundingUp(feeAmount.mul(barFee), BigNumber.from(1e4));
       protocolFeeIncrease = protocolFeeIncrease.add(protocolFee);
-      feeGrowthGlobalIncrease = feeGrowthGlobalIncrease.add(feeAmount.sub(protocolFee).mul(TWO_POW_128).div(currentLiquidity));
+      feeGrowthGlobalIncrease = feeGrowthGlobalIncrease.add(
+        feeAmount.sub(protocolFee).mul(TWO_POW_128).div(currentLiquidity)
+      );
       output = output.add(stepOutput.sub(feeAmount));
     }
 
@@ -223,10 +234,22 @@ export async function swapViaRouter(params: {
     oldPoolBalances[1].add(zeroForOne ? output.mul(-1) : inAmount).toString(),
     "didn't transfer the correct token 1 amount"
   );
-  expect(newReserve0.toString()).to.be.eq(oldReserve0.add(zeroForOne ? inAmount : output.mul(-1)), "Didn't update reserve0 correctly");
-  expect(newReserve1.toString()).to.be.eq(oldReserve1.add(zeroForOne ? output.mul(-1) : inAmount), "Didn't update reserve1 correctly");
-  expect((await pool.liquidity()).toString()).to.be.eq(currentLiquidity.toString(), "didn't set correct liquidity value");
-  expect(await (await pool.getPriceAndNearestTicks())._nearestTick).to.be.eq(nextNearest, "didn't update nearest tick pointer");
+  expect(newReserve0.toString()).to.be.eq(
+    oldReserve0.add(zeroForOne ? inAmount : output.mul(-1)),
+    "Didn't update reserve0 correctly"
+  );
+  expect(newReserve1.toString()).to.be.eq(
+    oldReserve1.add(zeroForOne ? output.mul(-1) : inAmount),
+    "Didn't update reserve1 correctly"
+  );
+  expect((await pool.liquidity()).toString()).to.be.eq(
+    currentLiquidity.toString(),
+    "didn't set correct liquidity value"
+  );
+  expect(await (await pool.getPriceAndNearestTicks())._nearestTick).to.be.eq(
+    nextNearest,
+    "didn't update nearest tick pointer"
+  );
   expect(oldPrice.lt(newPrice) !== zeroForOne, "Price didn't move in the right direction");
   expect(protocolFeesNew.toString()).to.be.eq(
     oldProtocolFees.add(protocolFeeIncrease).toString(),
@@ -249,7 +272,8 @@ export async function removeLiquidityViaManager(params: {
   const { pool, tokenId, liquidityAmount, recipient, unwrapBento } = params;
   const manager = Trident.Instance.concentratedPoolManager;
   const oldOwner = await Trident.Instance.concentratedPoolManager.ownerOf(tokenId);
-  const [oldPoolAddress, oldUserLiquidity, oldLower, oldUpper, oldFeeGrowthInside0, oldFeeGrowthInside1] = await manager.positions(tokenId);
+  const [oldPoolAddress, oldUserLiquidity, oldLower, oldUpper, oldFeeGrowthInside0, oldFeeGrowthInside1] =
+    await manager.positions(tokenId);
   const [oldCurrentPrice, oldPriceLower, oldPriceUpper] = await getPrices(pool, [oldLower, oldUpper]);
   const tokens = await Promise.all([(await pool.getImmutables())._token0, (await pool.getImmutables())._token1]);
   const oldUserBalances = await Trident.Instance.getTokenBalance(tokens, recipient, unwrapBento);
@@ -257,12 +281,17 @@ export async function removeLiquidityViaManager(params: {
   const oldManagerBalances = await Trident.Instance.getTokenBalance(tokens, manager.address, false);
   const oldLiquidity = await pool.liquidity();
   const oldTotalSupply = await manager.totalSupply();
-  const liquidityDecrease = oldPriceLower.lt(oldCurrentPrice) && oldCurrentPrice.lt(oldPriceUpper) ? liquidityAmount : ZERO;
+  const liquidityDecrease =
+    oldPriceLower.lt(oldCurrentPrice) && oldCurrentPrice.lt(oldPriceUpper) ? liquidityAmount : ZERO;
   const { dy, dx } = getAmountForLiquidity(oldPriceLower, oldCurrentPrice, oldPriceUpper, liquidityAmount);
   const [oldLowerPreviousTick, oldLowerNextTick, oldLowerLiquidity] = await pool.ticks(oldLower);
-  const [oldLowerSecondPreviousTick, oldLowerSecondNextTick, oldLowerSecondLiquidity] = await pool.ticks(oldLowerNextTick);
+  const [oldLowerSecondPreviousTick, oldLowerSecondNextTick, oldLowerSecondLiquidity] = await pool.ticks(
+    oldLowerNextTick
+  );
   const [oldUpperPreviousTick, oldUpperNextTick, oldUpperLiquidity] = await pool.ticks(oldUpper);
-  const [oldUpperSecondPreviousTick, oldUpperSecondNextTick, oldUpperSecondLiquidity] = await pool.ticks(oldUpperPreviousTick);
+  const [oldUpperSecondPreviousTick, oldUpperSecondNextTick, oldUpperSecondLiquidity] = await pool.ticks(
+    oldUpperPreviousTick
+  );
   const oldPositionState = await pool.positions(manager.address, oldLower, oldUpper);
   const oldUserNFTBalance = await manager.balanceOf(oldOwner);
 
@@ -273,7 +302,8 @@ export async function removeLiquidityViaManager(params: {
   const fees1 = feeGrowthInside1.sub(position.feeGrowthInside1).mul(position.liquidity).div(TWO_POW_128);
   await manager.burn(tokenId, liquidityAmount, recipient, unwrapBento, 0, 0);
 
-  const [newPoolAddress, newUserLiquidity, newLower, newUpper, newFeeGrowthInside0, newFeeGrowthInside1] = await manager.positions(tokenId);
+  const [newPoolAddress, newUserLiquidity, newLower, newUpper, newFeeGrowthInside0, newFeeGrowthInside1] =
+    await manager.positions(tokenId);
   const [newCurrentPrice, newPriceLower, newPriceUpper] = await getPrices(pool, [newLower, newUpper]);
 
   const newUserBalances = await Trident.Instance.getTokenBalance(tokens, recipient, unwrapBento);
@@ -282,12 +312,19 @@ export async function removeLiquidityViaManager(params: {
   const newLiquidity = await pool.liquidity();
   const newTotalSupply = await manager.totalSupply();
   const [newLowerPreviousTick, newLowerNextTick, newLowerLiquidity] = await pool.ticks(newLower);
-  const [newLowerSecondPreviousTick, newLowerSecondNextTick, newLowerSecondLiquidity] = await pool.ticks(newLowerNextTick);
+  const [newLowerSecondPreviousTick, newLowerSecondNextTick, newLowerSecondLiquidity] = await pool.ticks(
+    newLowerNextTick
+  );
   const [newUpperPreviousTick, newUpperNextTick, newUpperLiquidity] = await pool.ticks(newUpper);
-  const [newUpperSecondPreviousTick, newUpperSecondNextTick, newUpperSecondLiquidity] = await pool.ticks(newUpperPreviousTick);
+  const [newUpperSecondPreviousTick, newUpperSecondNextTick, newUpperSecondLiquidity] = await pool.ticks(
+    newUpperPreviousTick
+  );
   const newPositionState = await pool.positions(manager.address, newLower, newUpper);
   const newUserNFTBalance = await manager.balanceOf(oldOwner);
-  const managerBalanceChange = [newManagerBalances[0].sub(oldManagerBalances[0]), newManagerBalances[1].sub(oldManagerBalances[1])];
+  const managerBalanceChange = [
+    newManagerBalances[0].sub(oldManagerBalances[0]),
+    newManagerBalances[1].sub(oldManagerBalances[1]),
+  ];
 
   if (liquidityAmount.gte(oldUserLiquidity)) {
     expect(newUserNFTBalance).to.be.eq(oldUserNFTBalance.sub(1));
@@ -306,12 +343,21 @@ export async function removeLiquidityViaManager(params: {
     "didn't correctly update position's liquidity"
   );
 
-  expect(newPositionState.feeGrowthInside0Last).to.be.eq(oldPositionState.feeGrowthInside0Last, "didn't reset position's fee0 growth");
-  expect(newPositionState.feeGrowthInside1Last).to.be.eq(oldPositionState.feeGrowthInside1Last, "didn't reset position's fee1 growth");
+  expect(newPositionState.feeGrowthInside0Last).to.be.eq(
+    oldPositionState.feeGrowthInside0Last,
+    "didn't reset position's fee0 growth"
+  );
+  expect(newPositionState.feeGrowthInside1Last).to.be.eq(
+    oldPositionState.feeGrowthInside1Last,
+    "didn't reset position's fee1 growth"
+  );
 
   if (oldLowerLiquidity.gt(liquidityAmount)) {
     // Tick has more liquidity than what's being removed, it shouldn't reset
-    expect(newLowerLiquidity).to.be.eq(oldLowerLiquidity.sub(liquidityAmount), "Didn't decrease lower tick liquidity by the right amount");
+    expect(newLowerLiquidity).to.be.eq(
+      oldLowerLiquidity.sub(liquidityAmount),
+      "Didn't decrease lower tick liquidity by the right amount"
+    );
     expect(newLowerPreviousTick).to.be.eq(oldLowerPreviousTick, "Previous tick mistekenly updated");
     expect(newLowerNextTick).to.be.eq(oldLowerNextTick, "Previous tick mistekenly updated");
     expect(newLowerSecondPreviousTick).to.be.eq(oldLowerSecondPreviousTick, "Previous tick mistekenly updated");
@@ -326,7 +372,10 @@ export async function removeLiquidityViaManager(params: {
 
   if (oldUpperLiquidity.gt(liquidityAmount)) {
     // Tick has more liquidity than what's being removed, it shouldn't reset
-    expect(newUpperLiquidity).to.be.eq(oldUpperLiquidity.sub(liquidityAmount), "Didn't decrease upper tick liquidity by the right amount");
+    expect(newUpperLiquidity).to.be.eq(
+      oldUpperLiquidity.sub(liquidityAmount),
+      "Didn't decrease upper tick liquidity by the right amount"
+    );
     expect(newUpperNextTick).to.be.eq(oldUpperNextTick, "Next tick pointer mistekenly updated");
     expect(newUpperPreviousTick).to.be.eq(oldUpperPreviousTick, "Next tick pointer mistekenly updated");
     expect(newUpperSecondNextTick).to.be.eq(oldUpperSecondNextTick, "Next tick pointer mistekenly updated");
@@ -339,8 +388,16 @@ export async function removeLiquidityViaManager(params: {
     expect(newUpperSecondNextTick).to.be.eq(0, "Next tick pointer not updated");
   }
 
-  expectAlmostEqual(newUserBalances[0], oldUserBalances[0].add(dx).add(fees0), "Didn't receive correct amount of token0");
-  expectAlmostEqual(newUserBalances[1], oldUserBalances[1].add(dy).add(fees1), "Didn't receive correct amount of token1");
+  expectAlmostEqual(
+    newUserBalances[0],
+    oldUserBalances[0].add(dx).add(fees0),
+    "Didn't receive correct amount of token0"
+  );
+  expectAlmostEqual(
+    newUserBalances[1],
+    oldUserBalances[1].add(dy).add(fees1),
+    "Didn't receive correct amount of token1"
+  );
   expectAlmostEqual(
     newPoolBalances[0],
     oldPoolBalances[0].sub(dx.add(fees0).add(managerBalanceChange[0])),
@@ -367,7 +424,19 @@ export async function addLiquidityViaManager(params: {
   recipient: string;
   positionId?: number;
 }): Promise<{ dy: BigNumber; dx: BigNumber; tokenId: BigNumber; liquidity: BigNumber }> {
-  const { pool, amount0Desired, amount1Desired, native, lowerOld, lower, upperOld, upper, positionOwner, recipient, positionId } = params;
+  const {
+    pool,
+    amount0Desired,
+    amount1Desired,
+    native,
+    lowerOld,
+    lower,
+    upperOld,
+    upper,
+    positionOwner,
+    recipient,
+    positionId,
+  } = params;
   const [currentPrice, priceLower, priceUpper] = await getPrices(pool, [lower, upper]);
   const liquidity = getLiquidityForAmount(priceLower, currentPrice, priceUpper, amount1Desired, amount0Desired);
   const tokens = await Promise.all([(await pool.getImmutables())._token0, (await pool.getImmutables())._token1]);
@@ -383,8 +452,14 @@ export async function addLiquidityViaManager(params: {
   const [oldUpperPreviousTick, oldUpperNextTick, oldUpperLiquidity] = await pool.ticks(upper);
   const oldPositionState = await pool.positions(positionOwner, lower, upper);
   const { feeGrowthInside0, feeGrowthInside1 } = await pool.rangeFeeGrowth(lower, upper);
-  const accumulatedFees0 = feeGrowthInside0.sub(oldPositionState.feeGrowthInside0Last).mul(oldPositionState.liquidity).div(TWO_POW_128);
-  const accumulatedFees1 = feeGrowthInside1.sub(oldPositionState.feeGrowthInside1Last).mul(oldPositionState.liquidity).div(TWO_POW_128);
+  const accumulatedFees0 = feeGrowthInside0
+    .sub(oldPositionState.feeGrowthInside0Last)
+    .mul(oldPositionState.liquidity)
+    .div(TWO_POW_128);
+  const accumulatedFees1 = feeGrowthInside1
+    .sub(oldPositionState.feeGrowthInside1Last)
+    .mul(oldPositionState.liquidity)
+    .div(TWO_POW_128);
 
   await Trident.Instance.concentratedPoolManager.mint(
     pool.address,
@@ -412,14 +487,23 @@ export async function addLiquidityViaManager(params: {
   const [newUpperPreviousTick, newUpperNextTick, newUpperLiquidity] = await pool.ticks(upper);
 
   expect(newPrice.toString()).to.be.eq(currentPrice.toString(), "price changed by mistake");
-  expect(newLiquidity.toString()).to.be.eq(oldLiquidity.add(liquidityIncrease).toString(), "Liquidity didn't update correctly");
+  expect(newLiquidity.toString()).to.be.eq(
+    oldLiquidity.add(liquidityIncrease).toString(),
+    "Liquidity didn't update correctly"
+  );
   expect(newLowerOldPreviousTick).to.be.eq(oldLowerOldPreviousTick, "Mistakenly updated previous pointer of lowerOld");
   expect(newPositionState.liquidity.toString()).to.be.eq(
     oldPositionState.liquidity.add(liquidity).toString(),
     "didn't correctly update position's liquidity"
   );
-  expect(newPositionState.feeGrowthInside0Last.toString()).to.be.eq(feeGrowthInside0.toString(), "didn't reset position's fee0 growth");
-  expect(newPositionState.feeGrowthInside1Last.toString()).to.be.eq(feeGrowthInside1.toString(), "didn't reset position's fee1 growth");
+  expect(newPositionState.feeGrowthInside0Last.toString()).to.be.eq(
+    feeGrowthInside0.toString(),
+    "didn't reset position's fee0 growth"
+  );
+  expect(newPositionState.feeGrowthInside1Last.toString()).to.be.eq(
+    feeGrowthInside1.toString(),
+    "didn't reset position's fee1 growth"
+  );
 
   if (oldLowerLiquidity.gt(0)) {
     // existing tick, lowerOld shouldn't get updated
@@ -430,7 +514,10 @@ export async function addLiquidityViaManager(params: {
     expect(newLowerPreviousTick).to.be.eq(oldLowerPreviousTick, "Previous tick mistekenly updated");
   } else {
     // new tick, lowerOld should get updated
-    expect(newLowerLiquidity.toString()).to.be.eq(liquidity.toString(), "Didn't set correct liqiuidity value on new tick");
+    expect(newLowerLiquidity.toString()).to.be.eq(
+      liquidity.toString(),
+      "Didn't set correct liqiuidity value on new tick"
+    );
     expect(newLowerOldNextTick).to.be.eq(lower, "Old not pointing to new");
     expect(newLowerPreviousTick).to.be.eq(lowerOld, "New tick now pointing to old");
   }
@@ -444,12 +531,21 @@ export async function addLiquidityViaManager(params: {
     expect(newUpperNextTick).to.be.eq(oldUpperNextTick, "Next tick pointer mistekenly updated");
   } else {
     // new tick
-    expect(newUpperLiquidity.toString()).to.be.eq(liquidity.toString(), "Didn't set correct liqiuidity value on new tick");
+    expect(newUpperLiquidity.toString()).to.be.eq(
+      liquidity.toString(),
+      "Didn't set correct liqiuidity value on new tick"
+    );
     expect(newUpperOldNextTick).to.be.eq(upper, "Old tick not pointing to the new");
     expect(newUpperPreviousTick).to.be.eq(upperOld, "New Tick not pointing to the old");
   }
-  expect(newUserBalances[0].toString()).to.be.eq(oldUserBalances[0].sub(dx).toString(), "Didn't pay correct amount of token0");
-  expect(newUserBalances[1].toString()).to.be.eq(oldUserBalances[1].sub(dy).toString(), "Didn't pay correct amount of token1");
+  expect(newUserBalances[0].toString()).to.be.eq(
+    oldUserBalances[0].sub(dx).toString(),
+    "Didn't pay correct amount of token0"
+  );
+  expect(newUserBalances[1].toString()).to.be.eq(
+    oldUserBalances[1].sub(dy).toString(),
+    "Didn't pay correct amount of token1"
+  );
   expect(newPoolBalances[0].toString()).to.be.eq(
     oldPoolBalances[0].sub(accumulatedFees0).add(dx).toString(),
     "Didn't receive correct amount of token0"
@@ -464,9 +560,8 @@ export async function addLiquidityViaManager(params: {
     if (positionId == 0) {
       expect(oldTotalSupply.add(1).toString()).to.be.eq(newTotalSupply.toString(), "nft wasn't minted");
     }
-    const [_pool, _liquidity, _lower, _upper, _feeGrowth0, _feeGrowth1] = await Trident.Instance.concentratedPoolManager.positions(
-      nftMinted.minted.sub(1)
-    );
+    const [_pool, _liquidity, _lower, _upper, _feeGrowth0, _feeGrowth1] =
+      await Trident.Instance.concentratedPoolManager.positions(nftMinted.minted.sub(1));
 
     const nftOwner = await Trident.Instance.concentratedPoolManager.ownerOf(nftMinted.minted.sub(1));
 
@@ -494,7 +589,19 @@ export async function _addLiquidityViaManager(params: {
   recipient: string;
   positionId?: number;
 }) {
-  const { pool, amount0Desired, amount1Desired, native, lowerOld, lower, upperOld, upper, positionOwner, recipient, positionId } = params;
+  const {
+    pool,
+    amount0Desired,
+    amount1Desired,
+    native,
+    lowerOld,
+    lower,
+    upperOld,
+    upper,
+    positionOwner,
+    recipient,
+    positionId,
+  } = params;
   await Trident.Instance.concentratedPoolManager.mint(
     pool.address,
     lowerOld,
@@ -521,19 +628,32 @@ export function getTickPrice(tick) {
   return Trident.Instance.tickMath.getSqrtRatioAtTick(tick);
 }
 
-export function getLiquidityForAmount(priceLower: BigNumber, currentPrice: BigNumber, priceUpper: BigNumber, dy: BigNumber, dx: BigNumber) {
+export function getLiquidityForAmount(
+  priceLower: BigNumber,
+  currentPrice: BigNumber,
+  priceUpper: BigNumber,
+  dy: BigNumber,
+  dx: BigNumber
+) {
   if (priceUpper.lte(currentPrice)) {
     return dy.mul("0x1000000000000000000000000").div(priceUpper.sub(priceLower));
   } else if (currentPrice.lte(priceLower)) {
     return dx.mul(priceLower.mul(priceUpper).div("0x1000000000000000000000000")).div(priceUpper.sub(priceLower));
   } else {
-    const liquidity0 = dx.mul(priceUpper.mul(currentPrice).div("0x1000000000000000000000000")).div(priceUpper.sub(currentPrice));
+    const liquidity0 = dx
+      .mul(priceUpper.mul(currentPrice).div("0x1000000000000000000000000"))
+      .div(priceUpper.sub(currentPrice));
     const liquidity1 = dy.mul("0x1000000000000000000000000").div(currentPrice.sub(priceLower));
     return liquidity0.lt(liquidity1) ? liquidity0 : liquidity1;
   }
 }
 
-export function getAmountForLiquidity(priceLower: BigNumber, currentPrice: BigNumber, priceUpper: BigNumber, liquidity: BigNumber) {
+export function getAmountForLiquidity(
+  priceLower: BigNumber,
+  currentPrice: BigNumber,
+  priceUpper: BigNumber,
+  liquidity: BigNumber
+) {
   if (priceUpper.lt(currentPrice)) {
     return {
       dy: getDy(liquidity, priceLower, priceUpper, true),
@@ -552,7 +672,12 @@ export function getAmountForLiquidity(priceLower: BigNumber, currentPrice: BigNu
   }
 }
 
-export function getSwapData(params: { zeroForOne: boolean; inAmount: BigNumber; recipient: string; unwrapBento: boolean }) {
+export function getSwapData(params: {
+  zeroForOne: boolean;
+  inAmount: BigNumber;
+  recipient: string;
+  unwrapBento: boolean;
+}) {
   const { zeroForOne, recipient, unwrapBento } = params;
   return ethers.utils.defaultAbiCoder.encode(["bool", "address", "bool"], [zeroForOne, recipient, unwrapBento]);
 }
@@ -570,11 +695,34 @@ export function getMintData(params: {
   recipient: string;
   positionId: number | undefined;
 }) {
-  const { lowerOld, lower, upperOld, upper, amount0Desired, amount1Desired, native0, native1, positionOwner, recipient, positionId } =
-    params;
+  const {
+    lowerOld,
+    lower,
+    upperOld,
+    upper,
+    amount0Desired,
+    amount1Desired,
+    native0,
+    native1,
+    positionOwner,
+    recipient,
+    positionId,
+  } = params;
   return ethers.utils.defaultAbiCoder.encode(
     ["int24", "int24", "int24", "int24", "uint256", "uint256", "bool", "bool", "address", "address", "uint256"],
-    [lowerOld, lower, upperOld, upper, amount0Desired, amount1Desired, native0, native1, positionOwner, recipient, positionId || 0]
+    [
+      lowerOld,
+      lower,
+      upperOld,
+      upper,
+      amount0Desired,
+      amount1Desired,
+      native0,
+      native1,
+      positionOwner,
+      recipient,
+      positionId || 0,
+    ]
   );
 }
 
@@ -600,7 +748,10 @@ export function getDy(liquidity: BigNumber, priceLower: BigNumber, priceUpper: B
 
 export function getDx(liquidity: BigNumber, priceLower: BigNumber, priceUpper: BigNumber, roundUp: boolean) {
   if (roundUp) {
-    return divRoundingUp(liquidity.mul("0x1000000000000000000000000").mul(priceUpper.sub(priceLower)).div(priceUpper), priceLower);
+    return divRoundingUp(
+      liquidity.mul("0x1000000000000000000000000").mul(priceUpper.sub(priceLower)).div(priceUpper),
+      priceLower
+    );
   } else {
     return liquidity.mul("0x1000000000000000000000000").mul(priceUpper.sub(priceLower)).div(priceUpper).div(priceLower);
   }

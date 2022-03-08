@@ -19,3 +19,7 @@ export function choice(rnd: () => number, object: { [key: string]: number }) {
   }
   throw new Error("Error 70");
 }
+
+export function randBetween(min: number, max: number) {
+  return Math.floor(Math.random() * (max - min)) + min;
+}

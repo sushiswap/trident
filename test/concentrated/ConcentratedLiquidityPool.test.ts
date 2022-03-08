@@ -14,9 +14,8 @@ import {
   swapViaRouter,
   TWO_POW_128,
 } from "../harness/Concentrated";
-import { getBigNumber } from "../harness/helpers";
+import { getBigNumber, customError } from "../utilities";
 import { Trident } from "../harness/Trident";
-import { customError } from "../utilities";
 
 describe("Concentrated Liquidity Product Pool", function () {
   let _snapshotId: string;
@@ -51,7 +50,8 @@ describe("Concentrated Liquidity Product Pool", function () {
         const tickSpacing = (await pool.getImmutables())._tickSpacing;
         const tickAtPrice = await getTickAtCurrentPrice(pool);
         const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+        const nearestEvenValidTick =
+          (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
         // assume increasing tick value by one step brings us to a valid tick
         // satisfy "lower even" & "upper odd" conditions
@@ -108,7 +108,8 @@ describe("Concentrated Liquidity Product Pool", function () {
         const tickSpacing = (await pool.getImmutables())._tickSpacing;
         const tickAtPrice = await getTickAtCurrentPrice(pool);
         const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+        const nearestEvenValidTick =
+          (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
         let lower = nearestEvenValidTick - step;
         let upper = nearestEvenValidTick + step + tickSpacing;
@@ -137,7 +138,8 @@ describe("Concentrated Liquidity Product Pool", function () {
         const tickSpacing = (await pool.getImmutables())._tickSpacing;
         const tickAtPrice = await getTickAtCurrentPrice(pool);
         const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+        const nearestEvenValidTick =
+          (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
         let lower = nearestEvenValidTick - step;
         let upper = nearestEvenValidTick + step + tickSpacing;
@@ -183,7 +185,8 @@ describe("Concentrated Liquidity Product Pool", function () {
         const tickSpacing = (await pool.getImmutables())._tickSpacing;
         const tickAtPrice = await getTickAtCurrentPrice(pool);
         const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+        const nearestEvenValidTick =
+          (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
         let lower = nearestEvenValidTick - step;
         let upper = nearestEvenValidTick + step + tickSpacing;
@@ -234,7 +237,8 @@ describe("Concentrated Liquidity Product Pool", function () {
         const tickSpacing = (await pool.getImmutables())._tickSpacing;
         const tickAtPrice = await getTickAtCurrentPrice(pool);
         const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+        const nearestEvenValidTick =
+          (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
         // assume increasing tick value by one step brings us to a valid tick
         // satisfy "lower even" & "upper odd" conditions
@@ -285,7 +289,8 @@ describe("Concentrated Liquidity Product Pool", function () {
         const tickSpacing = (await pool.getImmutables())._tickSpacing;
         const tickAtPrice = await getTickAtCurrentPrice(pool);
         const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick - tickSpacing;
+        const nearestEvenValidTick =
+          (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick - tickSpacing;
 
         let lower = nearestEvenValidTick - 2 * tickSpacing;
         let upper = nearestEvenValidTick + 3 * tickSpacing;
@@ -371,7 +376,8 @@ describe("Concentrated Liquidity Product Pool", function () {
         const tickSpacing = (await pool.getImmutables())._tickSpacing;
         const tickAtPrice = await getTickAtCurrentPrice(pool);
         const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+        const nearestEvenValidTick =
+          (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
         let lower = nearestEvenValidTick - step;
         let upper = nearestEvenValidTick + step + tickSpacing;
@@ -429,7 +435,8 @@ describe("Concentrated Liquidity Product Pool", function () {
         const tickSpacing = (await pool.getImmutables())._tickSpacing;
         const tickAtPrice = await getTickAtCurrentPrice(pool);
         const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+        const nearestEvenValidTick =
+          (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
         let lower = nearestEvenValidTick - step;
         let upper = nearestEvenValidTick + step + tickSpacing;
@@ -488,7 +495,12 @@ describe("Concentrated Liquidity Product Pool", function () {
           globalFeeGrowth1.toString(),
           "Fee growth 1 wasn't accredited to the positions"
         );
-        const smallerPositionFees1 = await collectFees({ pool, tokenId: tokenIdA, recipient: defaultAddress, unwrapBento: false });
+        const smallerPositionFees1 = await collectFees({
+          pool,
+          tokenId: tokenIdA,
+          recipient: defaultAddress,
+          unwrapBento: false,
+        });
 
         swapTx = await swapViaRouter({
           pool: pool,
@@ -506,12 +518,27 @@ describe("Concentrated Liquidity Product Pool", function () {
           recipient: defaultAddress,
         });
 
-        const smallerPositionFees2 = await collectFees({ pool, tokenId: tokenIdA, recipient: defaultAddress, unwrapBento: false });
+        const smallerPositionFees2 = await collectFees({
+          pool,
+          tokenId: tokenIdA,
+          recipient: defaultAddress,
+          unwrapBento: false,
+        });
 
         const smallerPositionFeesDy = smallerPositionFees2.dy.add(smallerPositionFees1.dy);
         const smallerPositionFeesDx = smallerPositionFees2.dx.add(smallerPositionFees1.dx);
-        const biggerPositionFees = await collectFees({ pool, tokenId: tokenIdB, recipient: defaultAddress, unwrapBento: false });
-        const outsidePositionFees = await collectFees({ pool, tokenId: tokenIdC, recipient: defaultAddress, unwrapBento: false });
+        const biggerPositionFees = await collectFees({
+          pool,
+          tokenId: tokenIdB,
+          recipient: defaultAddress,
+          unwrapBento: false,
+        });
+        const outsidePositionFees = await collectFees({
+          pool,
+          tokenId: tokenIdC,
+          recipient: defaultAddress,
+          unwrapBento: false,
+        });
         const ratioY = smallerPositionFeesDy.mul(1e6).div(biggerPositionFees.dy.div(2));
         const ratioX = smallerPositionFeesDx.mul(1e6).div(biggerPositionFees.dx.div(2));
         // allow for small rounding errors that happen when users claim on different intervals
@@ -528,7 +555,8 @@ describe("Concentrated Liquidity Product Pool", function () {
         const tickSpacing = (await pool.getImmutables())._tickSpacing;
         const tickAtPrice = await getTickAtCurrentPrice(pool);
         const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+        const nearestEvenValidTick =
+          (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
         const lower = nearestEvenValidTick - step;
         const upper = nearestEvenValidTick + step + tickSpacing;
@@ -591,7 +619,14 @@ describe("Concentrated Liquidity Product Pool", function () {
         );
 
         // now trade out of the current range and check if the range still has the correct amount of fees credited
-        const maxDy = await getDy(await pool.liquidity(), (await pool.getPriceAndNearestTicks())._price, upperPrice, false);
+        const maxDy = await getDy(
+          await pool.liquidity(),
+          (
+            await pool.getPriceAndNearestTicks()
+          )._price,
+          upperPrice,
+          false
+        );
 
         swapTx = await swapViaRouter({
           pool: pool,
@@ -636,7 +671,8 @@ describe("Concentrated Liquidity Product Pool", function () {
         const oldBarFeeToBalanceToken0 = await trident.bento.balanceOf(token0, barFeeTo);
         const tickAtPrice = await getTickAtCurrentPrice(pool);
         const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+        const nearestEvenValidTick =
+          (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
         const oldBarFeeToBalanceToken1 = await trident.bento.balanceOf(token1, barFeeTo);
 
         // assume increasing tick value by one step brings us to a valid tick
@@ -702,7 +738,8 @@ describe("Concentrated Liquidity Product Pool", function () {
         const tickSpacing = (await pool.getImmutables())._tickSpacing;
         const tickAtPrice = await getTickAtCurrentPrice(pool);
         const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+        const nearestEvenValidTick =
+          (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
         let lower = nearestEvenValidTick - step;
         let upper = nearestEvenValidTick + step + tickSpacing;
@@ -744,7 +781,8 @@ describe("Concentrated Liquidity Product Pool", function () {
         const tickSpacing = (await pool.getImmutables())._tickSpacing;
         const tickAtPrice = await getTickAtCurrentPrice(pool);
         const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+        const nearestEvenValidTick =
+          (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
         let lowerA = nearestEvenValidTick - 10 * step;
         let upperA = nearestEvenValidTick + 10 * step + tickSpacing;
@@ -836,7 +874,8 @@ describe("Concentrated Liquidity Product Pool", function () {
       const tickSpacing = (await pool.getImmutables())._tickSpacing;
       const tickAtPrice = await getTickAtCurrentPrice(pool);
       const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-      const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+      const nearestEvenValidTick =
+        (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
       const lower = nearestEvenValidTick - step;
       const upper = nearestEvenValidTick + step + tickSpacing;
 
@@ -923,10 +962,9 @@ describe("Concentrated Liquidity Product Pool", function () {
         true,
         "didn't claim a querter of reward duration"
       );
-      expect(rewardsUnclaimed.sub(10).lte(expectedRewardsUnclaimed) && rewardsUnclaimed.add(10).gte(expectedRewardsUnclaimed)).to.be.eq(
-        true,
-        "didn't claim a quarter of rewards"
-      );
+      expect(
+        rewardsUnclaimed.sub(10).lte(expectedRewardsUnclaimed) && rewardsUnclaimed.add(10).gte(expectedRewardsUnclaimed)
+      ).to.be.eq(true, "didn't claim a quarter of rewards");
       let ratio = rewardsA.mul(2).mul(1e6).div(rewardsB);
       expect(ratio.gte(999900) && ratio.lte(1000100)).to.be.eq(true, "Didn't split rewards proportionally");
       const newCurrentPrice = (await pool.getPriceAndNearestTicks())._price;
@@ -959,7 +997,10 @@ describe("Concentrated Liquidity Product Pool", function () {
       expect(ratio.gte(999900) && ratio.lte(1000100)).to.be.eq(true, "Didn't split rewards proportionally");
       incentive = await trident.concentratedPoolStaker.incentives(pool.address, 0);
       const sum = newRewardsA.add(newRewardsB).add(newRewardsC);
-      expect(sum.add(incentive.rewardsUnclaimed)).to.be.eq(incentiveAmount.toString(), "We distributed the wrong amount of tokens");
+      expect(sum.add(incentive.rewardsUnclaimed)).to.be.eq(
+        incentiveAmount.toString(),
+        "We distributed the wrong amount of tokens"
+      );
       expect(incentive.rewardsUnclaimed.lt("99999"), "didn't leave dust in incentive");
     });
   });
@@ -971,7 +1012,8 @@ describe("Concentrated Liquidity Product Pool", function () {
         const tickSpacing = (await pool.getImmutables())._tickSpacing;
         const tickAtPrice = await getTickAtCurrentPrice(pool);
         const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+        const nearestEvenValidTick =
+          (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
         // INVALID_TICK (LOWER)
         let lower = nearestEvenValidTick - step + 1;
@@ -989,7 +1031,8 @@ describe("Concentrated Liquidity Product Pool", function () {
           recipient: trident.accounts[0].address,
         };
 
-        if (tickSpacing != 1) await expect(addLiquidityViaManager(addLiquidityParams)).to.be.revertedWith(customError("InvalidTick"));
+        if (tickSpacing != 1)
+          await expect(addLiquidityViaManager(addLiquidityParams)).to.be.revertedWith(customError("InvalidTick"));
         // LOWER_EVEN
         addLiquidityParams.lower = nearestEvenValidTick - step + tickSpacing;
         addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing;
@@ -1002,7 +1045,8 @@ describe("Concentrated Liquidity Product Pool", function () {
         addLiquidityParams.upper = nearestEvenValidTick + step + tickSpacing + 1;
         addLiquidityParams.lowerOld = helper.insert(addLiquidityParams.lower);
         addLiquidityParams.upperOld = helper.insert(addLiquidityParams.upper);
-        if (tickSpacing != 1) await expect(addLiquidityViaManager(addLiquidityParams)).to.be.revertedWith(customError("InvalidTick"));
+        if (tickSpacing != 1)
+          await expect(addLiquidityViaManager(addLiquidityParams)).to.be.revertedWith(customError("InvalidTick"));
 
         // UPPER_ODD
         addLiquidityParams.lower = nearestEvenValidTick - step;
@@ -1055,7 +1099,8 @@ describe("Concentrated Liquidity Product Pool", function () {
         const tickSpacing = (await pool.getImmutables())._tickSpacing;
         const tickAtPrice = await getTickAtCurrentPrice(pool);
         const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+        const nearestEvenValidTick =
+          (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
         let lower = nearestEvenValidTick - step;
         let upper = nearestEvenValidTick + step + tickSpacing;
@@ -1114,7 +1159,8 @@ describe("Concentrated Liquidity Product Pool", function () {
         const tickSpacing = (await pool.getImmutables())._tickSpacing;
         const tickAtPrice = await getTickAtCurrentPrice(pool);
         const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-        const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+        const nearestEvenValidTick =
+          (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
         let lower = nearestEvenValidTick - step;
         let upper = nearestEvenValidTick + step + tickSpacing;
@@ -1175,7 +1221,8 @@ describe("Concentrated Liquidity Product Pool", function () {
       const tickSpacing = (await pool.getImmutables())._tickSpacing;
       const tickAtPrice = await getTickAtCurrentPrice(pool);
       const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-      const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+      const nearestEvenValidTick =
+        (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
       let lower = nearestEvenValidTick - step;
       let upper = nearestEvenValidTick + step + tickSpacing;
@@ -1200,9 +1247,9 @@ describe("Concentrated Liquidity Product Pool", function () {
 
       const tokens = await pool.getAssets();
 
-      await expect(pool.connect(trident.accounts[4]).burn(lower, upper, BigNumber.from(`2`).pow(128).sub(`1`))).to.be.revertedWith(
-        customError("Overflow")
-      );
+      await expect(
+        pool.connect(trident.accounts[4]).burn(lower, upper, BigNumber.from(`2`).pow(128).sub(`1`))
+      ).to.be.revertedWith(customError("Overflow"));
     });
   });
 });
