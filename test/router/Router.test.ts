@@ -378,12 +378,53 @@ describe("Router", function () {
       );
     });
 
-    it("Reverts when output is less than minimum", async function () {
-      let amountIn = BigNumber.from(10).pow(18);
-      let expectedAmountOut = await pool.getAmountOut(encodedTokenAmount(weth.address, amountIn));
-      let params = {
+    it("Reverts when exactInput output is less than minimum", async function () {
+      const amountIn = BigNumber.from(10).pow(18);
+      const amountOut = await pool.getAmountOut(encodedTokenAmount(weth.address, amountIn));
+      const path = [{ pool: pool.address, data: encodedSwapData(weth.address, alice.address, true) }];
+      const amountOutMinimum = amountOut.add(1);
+      const params = {
+        tokenIn: weth.address,
+        amountIn,
+        amountOutMinimum,
+        path,
+      };
+      await expect(router.exactInput(params)).to.be.revertedWith("TooLittleReceived");
+    });
+
+    it("Reverts when exactInputWithNativeToken output is less than minimum", async function () {
+      const amountIn = BigNumber.from(10).pow(18);
+      const amountOut = await pool.getAmountOut(encodedTokenAmount(weth.address, amountIn));
+      const path = [{ pool: pool.address, data: encodedSwapData(weth.address, alice.address, true) }];
+      const amountOutMinimum = amountOut.add(1);
+      const params = {
+        tokenIn: weth.address,
+        amountIn,
+        amountOutMinimum,
+        path,
+      };
+      await expect(router.exactInputWithNativeToken(params)).to.be.revertedWith("TooLittleReceived");
+    });
+
+    it("Reverts when exactInputSingle output is less than minimum", async function () {
+      const amountIn = BigNumber.from(10).pow(18);
+      const amountOut = await pool.getAmountOut(encodedTokenAmount(weth.address, amountIn));
+      const params = {
         amountIn: amountIn,
-        amountOutMinimum: expectedAmountOut.add(1),
+        amountOutMinimum: amountOut.add(1),
+        pool: pool.address,
+        tokenIn: weth.address,
+        data: encodedSwapData(weth.address, alice.address, true),
+      };
+      await expect(router.exactInputSingle(params)).to.be.revertedWith("TooLittleReceived");
+    });
+
+    it("Reverts when exactInputSingleWithNativeToken output is less than minimum", async function () {
+      const amountIn = BigNumber.from(10).pow(18);
+      const amountOut = await pool.getAmountOut(encodedTokenAmount(weth.address, amountIn));
+      const params = {
+        amountIn: amountIn,
+        amountOutMinimum: amountOut.add(1),
         pool: pool.address,
         tokenIn: weth.address,
         data: encodedSwapData(weth.address, alice.address, true),
