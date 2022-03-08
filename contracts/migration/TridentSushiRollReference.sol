@@ -3,8 +3,6 @@
 pragma solidity >=0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../TridentBatchable.sol";
-import "../TridentPermit.sol";
 
 /// @notice Interface for handling Balancer V1 LP.
 interface IBalancerV1 {

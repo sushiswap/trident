@@ -3,7 +3,7 @@
 pragma solidity >=0.8.0;
 
 /// @notice Generic contract exposing the permit functionality.
-abstract contract TridentPermit {
+abstract contract SelfPermit {
     error PermitFailed();
 
     /// @notice Provides EIP-2612 signed approval for this contract to spend user tokens.

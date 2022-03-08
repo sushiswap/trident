@@ -2,17 +2,17 @@
 
 pragma solidity >=0.8.0;
 
-import "../TridentBatchable.sol";
-import "../TridentPermit.sol";
+import "../interfaces/IUniswapV2Minimal.sol";
 import "../interfaces/IBentoBoxMinimal.sol";
 import "../interfaces/ITridentRouter.sol";
 import "../interfaces/IMasterDeployer.sol";
 import "../interfaces/IPoolFactory.sol";
-import "../interfaces/IUniswapV2Minimal.sol";
 import "../interfaces/IPool.sol";
+import "../abstract/SelfPermit.sol";
+import "../abstract/Batchable.sol";
 
 /// @notice Liquidity migrator from UniV2 style pool to Trident Constant product pool.
-contract TridentSushiRollCP is TridentBatchable, TridentPermit {
+contract TridentSushiRollCP is SelfPermit, Batchable {
     error MinimumOutput();
 
     IBentoBoxMinimal internal immutable bentoBox;

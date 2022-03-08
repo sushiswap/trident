@@ -3,7 +3,7 @@
 pragma solidity >=0.8.0;
 
 /// @notice Generic contract exposing the batch call functionality.
-abstract contract TridentBatchable {
+abstract contract Batchable {
     /// @notice Provides batch function calls for this contract and returns the data from all of them if they all succeed.
     /// Adapted from https://github.com/Uniswap/uniswap-v3-periphery/blob/main/contracts/base/Multicall.sol, License-Identifier: GPL-2.0-or-later.
     /// @dev The `msg.value` should not be trusted for any method callable from this function.

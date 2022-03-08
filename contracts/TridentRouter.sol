@@ -8,19 +8,18 @@ import "./interfaces/IWETH9.sol";
 import "./interfaces/IPool.sol";
 import "./interfaces/ITridentRouter.sol";
 import "./interfaces/IMasterDeployer.sol";
-import "./TridentPermit.sol";
-import "./TridentBatchable.sol";
+import "./abstract/SelfPermit.sol";
+import "./abstract/Batchable.sol";
 
 // Custom Errors
 error TooLittleReceived();
 error NotEnoughLiquidityMinted();
 error IncorrectTokenWithdrawn();
-error UnauthorizedCallback();
 error InsufficientWETH();
 error InvalidPool();
 
 /// @notice Router contract that helps in swapping across Trident pools.
-contract TridentRouter is ITridentRouter, TridentPermit, TridentBatchable {
+contract TridentRouter is ITridentRouter, SelfPermit, Batchable {
     /// @dev Used to ensure that `tridentSwapCallback` is called only by the authorized address.
     /// These are set when someone calls a flash swap and reset afterwards.
     address internal cachedMsgSender;
@@ -32,13 +31,13 @@ contract TridentRouter is ITridentRouter, TridentPermit, TridentBatchable {
     /// @notice BentoBox token vault.
     IBentoBoxMinimal public immutable bento;
     
-    /// @notice Master Deployer
+    /// @notice Master deployer
     IMasterDeployer public immutable masterDeployer;
 
     /// @notice ERC-20 token for wrapped ETH (v9).
     address internal immutable wETH;
     
-    /// @notice The user should use 0x0 if they want to use natic currency e.g. ETH
+    /// @notice The user should use 0x0 if they want to use native currency e.g. ETH
     address constant USE_NATIVE = address(0);
 
     constructor(

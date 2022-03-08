@@ -2,6 +2,8 @@
 
 pragma solidity >=0.8.0;
 
+import "../../abstract/Batchable.sol";
+import "../../abstract/TridentERC721.sol";
 import "../../interfaces/IMasterDeployer.sol";
 import "../../interfaces/IBentoBoxMinimal.sol";
 import "../../interfaces/ITridentRouter.sol";
@@ -11,11 +13,9 @@ import "../../interfaces/IPositionManager.sol";
 import "../../libraries/FullMath.sol";
 import "../../libraries/TickMath.sol";
 import "../../libraries/DyDxMath.sol";
-import "../../TridentBatchable.sol";
-import "../../TridentERC721.sol";
 
 /// @notice Trident Concentrated Liquidity Pool periphery contract that combines non-fungible position management and staking.
-contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerStruct, IPositionManager, TridentERC721, TridentBatchable {
+contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerStruct, IPositionManager, TridentERC721, Batchable {
     event IncreaseLiquidity(address indexed pool, address indexed owner, uint256 indexed positionId, uint128 liquidity);
     event DecreaseLiquidity(address indexed pool, address indexed owner, uint256 indexed positionId, uint128 liquidity);
 

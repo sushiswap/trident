@@ -82,15 +82,15 @@ contract HybridPoolHarness is HybridPool {
     // overrides /////////////////
     // WARNING: Be careful of interlocking "lock" modifier
     // if adding to the overrided code blocks
-    function mint(bytes memory data) public override  nonReentrant returns (uint256 liquidity) {}
+    function mint(bytes memory data) public override nonReentrant returns (uint256 liquidity) {}
 
-    function burn(bytes memory data) public override  nonReentrant returns (IPool.TokenAmount[] memory withdrawnAmounts) {}
+    function burn(bytes memory data) public override nonReentrant returns (IPool.TokenAmount[] memory withdrawnAmounts) {}
 
-    function burnSingle(bytes memory data) public override  nonReentrant returns (uint256 amount) {}
+    function burnSingle(bytes memory data) public override nonReentrant returns (uint256 amount) {}
 
-    function swap(bytes memory data) public override  nonReentrant returns (uint256 amountOut) {}
+    function swap(bytes memory data) public override nonReentrant returns (uint256 amountOut) {}
 
-    function flashSwap(bytes memory data) public override  nonReentrant returns (uint256 amountOut) {}
+    function flashSwap(bytes memory data) public override nonReentrant returns (uint256 amountOut) {}
 
     function getAmountOut(bytes memory data) public view override returns (uint256 finalAmountOut) {}
 
