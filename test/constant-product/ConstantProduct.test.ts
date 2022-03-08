@@ -3,6 +3,8 @@
 import { ZERO, getBigNumber, randBetween } from "../harness/helpers";
 import { addLiquidity, burnLiquidity, initialize, swap } from "../harness/ConstantProduct";
 
+import { expect } from "chai";
+
 describe("Constant Product Pool Old", function () {
   before(async () => {
     await initialize();
