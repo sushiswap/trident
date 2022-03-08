@@ -10,11 +10,12 @@ import "../../interfaces/ITridentCallee.sol";
 import "../../libraries/MathUtils.sol";
 import "../../libraries/RebaseLibrary.sol";
 import "@rari-capital/solmate/src/tokens/ERC20.sol";
+import "@rari-capital/solmate/src/utils/ReentrancyGuard.sol";
 
 /// @notice Trident exchange pool template with hybrid like-kind formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares. However, the stableswap invariant is applied to the underlying amounts.
 ///      The API uses the underlying amounts.
-contract HybridPool is IPool, ERC20 {
+contract HybridPool is IPool, ERC20, ReentrancyGuard {
     using MathUtils for uint256;
     using RebaseLibrary for Rebase;
 
@@ -53,14 +54,6 @@ contract HybridPool is IPool, ERC20 {
 
     bytes32 public constant override poolIdentifier = "Trident:HybridPool";
 
-    uint256 internal unlocked;
-    modifier lock() {
-        require(unlocked == 1, "LOCKED");
-        unlocked = 2;
-        _;
-        unlocked = 1;
-    }
-
     constructor(bytes memory _deployData, address _masterDeployer) ERC20("Sushi LP Token", "SLP", 18) {
         (address _token0, address _token1, uint256 _swapFee, uint256 a) = abi.decode(_deployData, (address, address, uint256, uint256));
 
@@ -81,7 +74,6 @@ contract HybridPool is IPool, ERC20 {
         N_A = 2 * a;
         token0PrecisionMultiplier = uint256(10)**(18 - ERC20(_token0).decimals());
         token1PrecisionMultiplier = uint256(10)**(18 - ERC20(_token1).decimals());
-        unlocked = 1;
     }
 
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.

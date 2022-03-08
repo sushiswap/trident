@@ -8,11 +8,12 @@ import "../../interfaces/IPool.sol";
 import "../../interfaces/ITridentCallee.sol";
 import "../../libraries/TridentMath.sol";
 import "@rari-capital/solmate/src/tokens/ERC20.sol";
+import "@rari-capital/solmate/src/utils/ReentrancyGuard.sol";
 
 /// @notice Trident exchange pool template with constant product formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares.
 ///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
-contract ConstantProductPool is IPool, ERC20 {
+contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Sync(uint256 reserve0, uint256 reserve1);
@@ -42,14 +43,6 @@ contract ConstantProductPool is IPool, ERC20 {
 
     bytes32 public constant override poolIdentifier = "Trident:ConstantProduct";
 
-    uint256 internal unlocked;
-    modifier lock() {
-        require(unlocked == 1, "LOCKED");
-        unlocked = 2;
-        _;
-        unlocked = 1;
-    }
-
     constructor(bytes memory _deployData, address _masterDeployer) ERC20("Sushi LP Token", "SLP", 18) {
         (address _token0, address _token1, uint256 _swapFee, bool _twapSupport) = abi.decode(
             _deployData,
@@ -72,7 +65,6 @@ contract ConstantProductPool is IPool, ERC20 {
         barFeeTo = IMasterDeployer(_masterDeployer).barFeeTo();
         bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
         masterDeployer = IMasterDeployer(_masterDeployer);
-        unlocked = 1;
         if (_twapSupport) blockTimestampLast = uint32(block.timestamp);
     }
 

@@ -7,11 +7,12 @@ import "../../interfaces/IMasterDeployer.sol";
 import "../../interfaces/IPool.sol";
 import "../../interfaces/ITridentCallee.sol";
 import "@rari-capital/solmate/src/tokens/ERC20.sol";
+import "@rari-capital/solmate/src/utils/ReentrancyGuard.sol";
 
 /// @notice Trident exchange pool template with constant mean formula for swapping among an array of ERC-20 tokens.
 /// @dev The reserves are stored as bento shares.
 ///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
-contract IndexPool is IPool, ERC20 {
+contract IndexPool is IPool, ERC20, ReentrancyGuard {
     event Mint(address indexed sender, address tokenIn, uint256 amountIn, address indexed recipient);
     event Burn(address indexed sender, address tokenOut, uint256 amountOut, address indexed recipient);
 
@@ -44,14 +45,6 @@ contract IndexPool is IPool, ERC20 {
 
     bytes32 public constant override poolIdentifier = "Trident:Index";
 
-    uint256 internal unlocked;
-    modifier lock() {
-        require(unlocked == 1, "LOCKED");
-        unlocked = 2;
-        _;
-        unlocked = 1;
-    }
-
     mapping(address => Record) public records;
     struct Record {
         uint120 reserve;
@@ -82,7 +75,6 @@ contract IndexPool is IPool, ERC20 {
         barFeeTo = IMasterDeployer(_masterDeployer).barFeeTo();
         bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
         masterDeployer = IMasterDeployer(_masterDeployer);
-        unlocked = 1;
     }
 
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
