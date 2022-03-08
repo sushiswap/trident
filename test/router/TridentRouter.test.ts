@@ -148,6 +148,55 @@ describe("Router", function () {
         )
       ).to.be.revertedWith("NotEnoughLiquidityMinted");
     });
+
+    it("Reverts when update overflows", async () => {
+      const deployer = await ethers.getNamedSigner("deployer");
+
+      const bentoBox = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+
+      const router = await ethers.getContract<TridentRouter>("TridentRouter");
+
+      await bentoBox.whitelistMasterContract(router.address, true);
+
+      const pool = await initializedConstantProductPool();
+
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+
+      await token0.approve(bentoBox.address, ethers.BigNumber.from(2).pow(112));
+      await token1.approve(bentoBox.address, 1);
+
+      await bentoBox.setMasterContractApproval(
+        deployer.address,
+        router.address,
+        true,
+        "0",
+        "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000000000000000000000000000"
+      );
+
+      const liquidityInput = [
+        {
+          token: token0.address,
+          native: true,
+          amount: ethers.BigNumber.from(2).pow(112),
+        },
+        {
+          token: token1.address,
+          native: true,
+          amount: 1,
+        },
+      ];
+
+      await expect(
+        router.addLiquidity(
+          liquidityInput,
+          pool.address,
+          1000,
+          ethers.utils.defaultAbiCoder.encode(["address"], [deployer.address])
+        )
+      ).to.be.revertedWith("OVERFLOW");
+    });
   });
 
   describe("#burnLiquidity", function () {
@@ -302,6 +351,32 @@ describe("Router", function () {
       const router = await ethers.getContract<TridentRouter>("TridentRouter");
       const deployer = await ethers.getNamedSigner("deployer");
       await router.unwrapWETH(0, deployer.address);
+    });
+  });
+
+  describe("#approveMasterContract", function () {
+    it.skip("Succeed setting master contract approval on bentobox", async () => {
+      const deployer = await ethers.getNamedSigner("deployer");
+
+      const bentoBox = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+
+      const router = await ethers.getContract<TridentRouter>("TridentRouter");
+
+      await bentoBox.whitelistMasterContract(router.address, true);
+
+      // await router.multicall([
+      //   router.interface.encodeFunctionData("approveMasterContract", [
+      //     "0",
+      //     "0x0000000000000000000000000000000000000000000000000000000000000000",
+      //     "0x0000000000000000000000000000000000000000000000000000000000000000",
+      //   ]),
+      // ]);
+
+      await router.approveMasterContract(
+        "0",
+        "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000000000000000000000000000"
+      );
     });
   });
 
