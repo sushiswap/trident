@@ -1,4 +1,4 @@
-import type { ConstantProductPool__factory, MasterDeployer } from "../../types";
+import type { ConstantProductPool__factory, ERC20Mock, MasterDeployer } from "../../types";
 import { deployments, ethers } from "hardhat";
 import { initializedConstantProductPool, uninitializedConstantProductPool } from "../fixtures";
 
@@ -98,6 +98,17 @@ describe("Constant Product Pool", () => {
       const newLocal = "0x0000000000000000000000000000000000000003";
       const mintData = ethers.utils.defaultAbiCoder.encode(["address"], [newLocal]);
       await expect(constantProductPool.mint(mintData)).to.be.revertedWith("INVALID_AMOUNTS");
+    });
+
+    it("reverts if insufficient liquidity minted", async () => {
+      const deployer = await ethers.getNamedSigner("deployer");
+      const pool = await initializedConstantProductPool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+      await token0.transfer(pool.address, 1);
+      await token1.transfer(pool.address, 1);
+      const mintData = ethers.utils.defaultAbiCoder.encode(["address"], [deployer.address]);
+      await expect(pool.mint(mintData)).to.be.revertedWith("INSUFFICIENT_LIQUIDITY_MINTED");
     });
   });
 
