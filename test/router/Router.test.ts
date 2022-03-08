@@ -570,6 +570,62 @@ describe("Router", function () {
       };
       await router.complexPath(complexPathParams);
     });
+
+    it("Reverts when too little received", async function () {
+      // sedona -> weth -> 40% dai
+      //                -> 60% sushi -> dai
+
+      let amountIn = BigNumber.from(10).pow(18);
+      let i = 0;
+      const wethAmountOut = await sedonaWethPool.getAmountOut(encodedTokenAmount(sedona.address, amountIn));
+      const daiWethAmountIn = wethAmountOut.mul(BigNumber.from(40).mul(E6)).div(E8);
+      const sushiWethAmountIn = wethAmountOut.sub(daiWethAmountIn);
+      const sushiAmountOut = await pool.getAmountOut(encodedTokenAmount(weth.address, sushiWethAmountIn));
+      const daiAmountOut = (await daiWethPool.getAmountOut(encodedTokenAmount(weth.address, daiWethAmountIn))).add(
+        await daiSushiPool.getAmountOut(encodedTokenAmount(sushi.address, sushiAmountOut))
+      );
+      let complexPathParams = {
+        initialPath: [
+          {
+            tokenIn: sedona.address,
+            pool: sedonaWethPool.address,
+            native: true,
+            amount: amountIn,
+            data: encodedSwapData(sedona.address, router.address, false), // Receiver for all complex path swaps must be the router
+          },
+        ],
+        percentagePath: [
+          {
+            tokenIn: weth.address,
+            pool: daiWethPool.address,
+            balancePercentage: BigNumber.from(40).mul(E6),
+            data: encodedSwapData(weth.address, router.address, false),
+          },
+          {
+            tokenIn: weth.address,
+            pool: pool.address,
+            // Since 40% of weth has already been spent, we need to spend 100% of the remaining weth here.
+            balancePercentage: BigNumber.from(100).mul(E6),
+            data: encodedSwapData(weth.address, router.address, false),
+          },
+          {
+            tokenIn: sushi.address,
+            pool: daiSushiPool.address,
+            balancePercentage: BigNumber.from(100).mul(E6),
+            data: encodedSwapData(sushi.address, router.address, false),
+          },
+        ],
+        output: [
+          {
+            token: dai.address,
+            to: alice.address,
+            unwrapBento: true,
+            minAmount: daiAmountOut.add(1),
+          },
+        ],
+      };
+      await expect(router.complexPath(complexPathParams)).to.be.revertedWith("TooLittleReceived");
+    });
   });
 });
 
