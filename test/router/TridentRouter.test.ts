@@ -1,5 +1,5 @@
 import { ADDRESS_ZERO, customError } from "../utilities";
-import { BentoBoxV1, ConstantProductPool__factory, ERC20Mock, MasterDeployer, TridentRouter, WETH9 } from "../../types";
+import { BentoBoxV1, ERC20Mock, TridentRouter, WETH9 } from "../../types";
 import { deployments, ethers } from "hardhat";
 import { initializedConstantProductPool, uninitializedConstantProductPool } from "../fixtures";
 
