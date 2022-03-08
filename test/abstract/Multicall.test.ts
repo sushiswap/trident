@@ -56,10 +56,14 @@ describe("Multicall", async () => {
   });
 
   it("gas cost of pay w/o multicall [ @skip-on-coverage ]", async () => {
-    await snapshotGasCost(multicall.pays({ value: 3 }));
+    if (process.env.REPORT_GAS !== "true") {
+      await snapshotGasCost(multicall.pays({ value: 3 }));
+    }
   });
 
   it("gas cost of pay w/ multicall [ @skip-on-coverage ]", async () => {
-    await snapshotGasCost(multicall.multicall([multicall.interface.encodeFunctionData("pays")], { value: 3 }));
+    if (process.env.REPORT_GAS !== "true") {
+      await snapshotGasCost(multicall.multicall([multicall.interface.encodeFunctionData("pays")], { value: 3 }));
+    }
   });
 });
