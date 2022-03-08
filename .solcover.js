@@ -19,10 +19,10 @@ module.exports = {
     "pool/franchised",
     "pool/hybrid",
     "pool/index",
-    "TridentERC721",
+    "abstract/TridentERC721",
     // Covered elsewhere
-    "Batchable",
-    "SelfPermit",
+    "abstract/Batchable",
+    "abstract/SelfPermit",
     "TridentOwnable",
   ],
   mocha: {
