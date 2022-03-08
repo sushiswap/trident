@@ -11,10 +11,10 @@ contract PoolDeployerMock is PoolDeployer {
     function deployPool(bytes memory _deployData) external onlyMaster returns (address pool) {
         (address tokenA, address tokenB) = abi.decode(_deployData, (address, address));
 
-        // @dev incorrect because there is no sort tokens, causing PoolDeployer to revert
-        // we want this for testing
+        /// @dev incorrect because there is no sort tokens, causing PoolDeployer to revert
+        /// we want this for testing
 
-        // @dev Strips any extra data.
+        /// @dev Strips any extra data.
         _deployData = abi.encode(tokenA, tokenB);
 
         address[] memory tokens = new address[](2);
