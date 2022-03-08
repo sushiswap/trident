@@ -9,7 +9,7 @@ import "../interfaces/IBentoBoxMinimal.sol";
 import "../interfaces/ITridentRouter.sol";
 import "../interfaces/IMasterDeployer.sol";
 import "../interfaces/IPoolFactory.sol";
-import "../interfaces/IPool.sol";
+import "../interfaces/IConstantProductPool.sol";
 
 /// @notice Liquidity migrator from UniV2 style pool to Trident Constant product pool.
 contract TridentSushiRollCP is SelfPermit, Multicall {
@@ -47,6 +47,11 @@ contract TridentSushiRollCP is SelfPermit, Multicall {
         uint256 minToken1Received,
         uint256 minLpReceived
     ) external returns (uint256 liquidity) {
+        pair.transferFrom(msg.sender, address(pair), amount);
+        (uint256 amount0, uint256 amount1) = pair.burn(address(bentoBox));
+
+        if (amount0 < minToken0Received || amount1 < minToken1Received) revert MinimumOutput();
+
         address token0 = pair.token0();
         address token1 = pair.token1();
 
@@ -55,18 +60,43 @@ contract TridentSushiRollCP is SelfPermit, Multicall {
 
         if (tridentPool == address(0)) {
             tridentPool = masterDeployer.deployPool(address(poolFactory), poolData);
+            bentoBox.deposit(token0, address(bentoBox), tridentPool, amount0, 0);
+            bentoBox.deposit(token1, address(bentoBox), tridentPool, amount1, 0);
+
+            liquidity = IPool(tridentPool).mint(abi.encode(msg.sender));
+
+            if (liquidity < minLpReceived) revert MinimumOutput();
+        } else {
+            (uint256 reserveA, uint256 reserveB, ) = IConstantProductPool(tridentPool).getNativeReserves();
+            (uint256 amount0Desired, uint256 amount1Desired) = getAmounts(amount0, amount1, reserveA, reserveB);
+            bentoBox.deposit(token0, address(bentoBox), tridentPool, amount0Desired, 0);
+            bentoBox.deposit(token1, address(bentoBox), tridentPool, amount1Desired, 0);
+
+            liquidity = IPool(tridentPool).mint(abi.encode(msg.sender));
+
+            if (liquidity < minLpReceived) revert MinimumOutput();
+
+            if (amount0 > amount0Desired) {
+                IERC20(token0).transfer(msg.sender, amount0 - amount0Desired);
+            }
+            if (amount1 > amount1Desired) {
+                IERC20(token1).transfer(msg.sender, amount1 - amount1Desired);
+            }
         }
+    }
 
-        pair.transferFrom(msg.sender, address(pair), amount);
-        (uint256 amount0, uint256 amount1) = pair.burn(address(bentoBox));
-
-        if (amount0 < minToken0Received || amount1 < minToken1Received) revert MinimumOutput();
-
-        bentoBox.deposit(token0, address(bentoBox), tridentPool, amount0, 0);
-        bentoBox.deposit(token1, address(bentoBox), tridentPool, amount1, 0);
-
-        liquidity = IPool(tridentPool).mint(abi.encode(msg.sender));
-
-        if (liquidity < minLpReceived) revert MinimumOutput();
+    function getAmounts(
+        uint256 _amount0,
+        uint256 _amount1,
+        uint256 reserveA,
+        uint256 reserveB
+    ) internal pure returns (uint256 amount0, uint256 amount1) {
+        uint256 amount1Optimal = (_amount0 * reserveB) / reserveA;
+        if (amount1Optimal <= amount1) {
+            (amount0, amount1) = (_amount0, amount1Optimal);
+        } else {
+            uint256 amount0Optimal = (_amount1 * reserveA) / reserveB;
+            (amount0, amount1) = (amount0Optimal, _amount1);
+        }
     }
 }
