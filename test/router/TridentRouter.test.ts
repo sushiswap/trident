@@ -107,6 +107,8 @@ describe("Router", function () {
 
       const router = await ethers.getContract<TridentRouter>("TridentRouter");
 
+      await bentoBox.whitelistMasterContract(router.address, true);
+
       const pool = await initializedConstantProductPool();
 
       const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
@@ -331,8 +333,8 @@ describe("Router", function () {
       await expect(
         router.addLiquidity(
           liquidityInput,
-          pool.address,
-          1000,
+          "0x0000000000000000000000000000000000000000",
+          1,
           ethers.utils.defaultAbiCoder.encode(["address"], [deployer.address])
         )
       ).to.be.revertedWith("InvalidPool");
