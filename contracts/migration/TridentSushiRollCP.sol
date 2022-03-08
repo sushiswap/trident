@@ -96,6 +96,7 @@ contract TridentSushiRollCP is SelfPermit, Multicall {
             (amount0, amount1) = (_amount0, amount1Optimal);
         } else {
             uint256 amount0Optimal = (_amount1 * reserveA) / reserveB;
+            assert(amount0Optimal <= amount0);
             (amount0, amount1) = (amount0Optimal, _amount1);
         }
     }
