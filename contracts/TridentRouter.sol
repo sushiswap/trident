@@ -3,6 +3,7 @@
 pragma solidity >=0.8.0;
 
 import "./RouterHelper.sol";
+import "./libraries/Transfer.sol";
 import "./interfaces/IPool.sol";
 import "./interfaces/IWETH9.sol";
 import "./interfaces/ITridentRouter.sol";
@@ -174,7 +175,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         IPool.TokenAmount[] memory minWithdrawals
     ) public {
         isWhiteListed(pool);
-        safeTransferFrom(pool, msg.sender, pool, liquidity);
+        Transfer.safeTransferFrom(pool, msg.sender, pool, liquidity);
         IPool.TokenAmount[] memory withdrawnLiquidity = IPool(pool).burn(data);
         for (uint256 i; i < minWithdrawals.length; i++) {
             uint256 j;
@@ -203,7 +204,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
     ) public {
         isWhiteListed(pool);
         // @dev Use 'liquidity = 0' for prefunding.
-        safeTransferFrom(pool, msg.sender, pool, liquidity);
+        Transfer.safeTransferFrom(pool, msg.sender, pool, liquidity);
         uint256 withdrawn = IPool(pool).burnSingle(data);
         if (withdrawn < minWithdrawal) revert TooLittleReceived();
     }
@@ -218,17 +219,17 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         if (onBento) {
             bento.transfer(token, address(this), recipient, amount);
         } else {
-            token == USE_ETHEREUM ? safeTransferETH(recipient, address(this).balance) : safeTransfer(token, recipient, amount);
+            token == USE_NATIVE ? Transfer.safeTransferNative(recipient, address(this).balance) : Transfer.safeTransfer(token, recipient, amount);
         }
     }
 
     /// @notice Unwrap this contract's `wETH` into ETH
     function unwrapWETH(uint256 amountMinimum, address recipient) external payable {
-        uint256 balanceWETH = IWETH9(wETH).balanceOf(address(this));
-        if (balanceWETH < amountMinimum) revert InsufficientWETH();
-        if (balanceWETH != 0) {
-            IWETH9(wETH).withdraw(balanceWETH);
-            safeTransferETH(recipient, balanceWETH);
+        uint256 balance = IWETH9(wETH).balanceOf(address(this));
+        if (balance < amountMinimum) revert InsufficientWETH();
+        if (balance != 0) {
+            IWETH9(wETH).withdraw(balance);
+            Transfer.safeTransferNative(recipient, balance);
         }
     }
 
@@ -239,7 +240,7 @@ contract TridentRouter is ITridentRouter, RouterHelper {
         address recipient,
         uint256 amount
     ) internal {
-        bento.deposit{value: token == USE_ETHEREUM ? amount : 0}(token, msg.sender, recipient, amount, 0);
+        bento.deposit{value: token == USE_NATIVE ? amount : 0}(token, msg.sender, recipient, amount, 0);
     }
 
     function isWhiteListed(address pool) internal {

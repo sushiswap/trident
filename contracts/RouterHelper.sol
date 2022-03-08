@@ -15,9 +15,8 @@ contract RouterHelper is TridentPermit, TridentBatchable {
     IMasterDeployer public immutable masterDeployer;
     /// @notice ERC-20 token for wrapped ETH (v9).
     address internal immutable wETH;
-    /// @notice The user should use 0x0 if they want to deposit ETH
-    address constant USE_ETHEREUM = address(0);
-
+    /// @notice The user should use 0x0 if they want to deposit NATIVE (ETH etc...)
+    address constant USE_NATIVE = address(0);
     constructor(
         IBentoBoxMinimal _bento,
         IMasterDeployer _masterDeployer,
@@ -40,41 +39,5 @@ contract RouterHelper is TridentPermit, TridentBatchable {
         bytes32 s
     ) external payable {
         bento.setMasterContractApproval(msg.sender, address(this), true, v, r, s);
-    }
-
-    /// @notice Provides 'safe' ERC-20 {transfer} for tokens that don't consistently return true/false.
-    /// @param token Address of ERC-20 token.
-    /// @param recipient Account to send tokens to.
-    /// @param amount Token amount to send.
-    function safeTransfer(
-        address token,
-        address recipient,
-        uint256 amount
-    ) internal {
-        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0xa9059cbb, recipient, amount)); // @dev transfer(address,uint256).
-        require(success && (data.length == 0 || abi.decode(data, (bool))), "TRANSFER_FAILED");
-    }
-
-    /// @notice Provides 'safe' ERC-20 {transferFrom} for tokens that don't consistently return true/false.
-    /// @param token Address of ERC-20 token.
-    /// @param sender Account to send tokens from.
-    /// @param recipient Account to send tokens to.
-    /// @param amount Token amount to send.
-    function safeTransferFrom(
-        address token,
-        address sender,
-        address recipient,
-        uint256 amount
-    ) internal {
-        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x23b872dd, sender, recipient, amount)); // @dev transferFrom(address,address,uint256).
-        require(success && (data.length == 0 || abi.decode(data, (bool))), "TRANSFER_FROM_FAILED");
-    }
-
-    /// @notice Provides 'safe' ETH transfer.
-    /// @param recipient Account to send ETH to.
-    /// @param amount ETH amount to send.
-    function safeTransferETH(address recipient, uint256 amount) internal {
-        (bool success, ) = recipient.call{value: amount}("");
-        require(success, "ETH_TRANSFER_FAILED");
     }
 }
