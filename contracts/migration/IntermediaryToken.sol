@@ -2,12 +2,12 @@
 
 pragma solidity >=0.8.0;
 
-import "../TridentERC20.sol";
+import "@rari-capital/solmate/src/tokens/ERC20.sol";
 import "../interfaces/IERC20.sol";
 
 /// @notice Intermediary token users who are staked in MasterChef will receive after migration.
 /// Can be redeemed for the LP token of the new pool.
-contract IntermediaryToken is TridentERC20 {
+contract IntermediaryToken is ERC20 {
     /// @dev Liquidity token of the Trident constant product pool.
     IERC20 public immutable lpToken;
 
@@ -15,7 +15,7 @@ contract IntermediaryToken is TridentERC20 {
         address _lpToken,
         address _recipient,
         uint256 _amount
-    ) {
+    ) ERC20("Sushi LP Token", "SLP", 18) {
         lpToken = IERC20(_lpToken);
         _mint(_recipient, _amount);
     }

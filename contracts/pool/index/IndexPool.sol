@@ -6,12 +6,12 @@ import "../../interfaces/IBentoBoxMinimal.sol";
 import "../../interfaces/IMasterDeployer.sol";
 import "../../interfaces/IPool.sol";
 import "../../interfaces/ITridentCallee.sol";
-import "../../TridentERC20.sol";
+import "@rari-capital/solmate/src/tokens/ERC20.sol";
 
 /// @notice Trident exchange pool template with constant mean formula for swapping among an array of ERC-20 tokens.
 /// @dev The reserves are stored as bento shares.
 ///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
-contract IndexPool is IPool, TridentERC20 {
+contract IndexPool is IPool, ERC20 {
     event Mint(address indexed sender, address tokenIn, uint256 amountIn, address indexed recipient);
     event Burn(address indexed sender, address tokenOut, uint256 amountOut, address indexed recipient);
 
@@ -58,7 +58,7 @@ contract IndexPool is IPool, TridentERC20 {
         uint136 weight;
     }
 
-    constructor(bytes memory _deployData, address _masterDeployer) {
+    constructor(bytes memory _deployData, address _masterDeployer) ERC20("Sushi LP Token", "SLP", 18) {
         (address[] memory _tokens, uint136[] memory _weights, uint256 _swapFee) = abi.decode(_deployData, (address[], uint136[], uint256));
         // @dev Factory ensures that the tokens are sorted.
         require(_tokens.length == _weights.length, "INVALID_ARRAYS");
