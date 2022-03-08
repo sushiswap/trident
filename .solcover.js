@@ -22,7 +22,7 @@ module.exports = {
     "abstract/TridentERC721",
   ],
   mocha: {
-    fgrep: "[skip-on-coverage]",
-    invert: true,
+    grep: "@skip-on-coverage", // Find everything with this tag
+    invert: true, // Run the grep's inverse set.
   },
 };
