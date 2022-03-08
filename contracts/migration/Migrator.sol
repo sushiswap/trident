@@ -2,12 +2,13 @@
 
 pragma solidity >=0.8.0;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import "./IntermediaryToken.sol";
 import "../interfaces/IMasterDeployer.sol";
 import "../interfaces/IBentoBoxMinimal.sol";
 import "../interfaces/IPoolFactory.sol";
 import "../interfaces/IPool.sol";
-import "../interfaces/IERC20.sol";
 import "../interfaces/IConstantProductPool.sol";
 import "../interfaces/IUniswapV2Minimal.sol";
 

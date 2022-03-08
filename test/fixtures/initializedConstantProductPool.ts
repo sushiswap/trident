@@ -23,10 +23,10 @@ export const initializedConstantProductPool = deployments.createFixture(
 
     const ERC20 = await ethers.getContractFactory<ERC20Mock__factory>("ERC20Mock");
 
-    const token0 = await ERC20.deploy("Token 0", "TOKEN0", MaxUint256);
+    const token0 = await ERC20.deploy("Token 0", "TOKEN0", ethers.constants.MaxUint256);
     await token0.deployed();
 
-    const token1 = await ERC20.deploy("Token 1", "TOKEN1", MaxUint256);
+    const token1 = await ERC20.deploy("Token 1", "TOKEN1", ethers.constants.MaxUint256);
     await token1.deployed();
 
     const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");

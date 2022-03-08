@@ -2,14 +2,16 @@
 
 pragma solidity >=0.8.0;
 
-import "./libraries/Transfer.sol";
+import "@rari-capital/solmate/src/utils/SafeTransferLib.sol";
+import "@rari-capital/solmate/src/tokens/ERC20.sol";
+
+import "./abstract/SelfPermit.sol";
+import "./abstract/Multicall.sol";
 import "./interfaces/IBentoBoxMinimal.sol";
 import "./interfaces/IWETH9.sol";
 import "./interfaces/IPool.sol";
 import "./interfaces/ITridentRouter.sol";
 import "./interfaces/IMasterDeployer.sol";
-import "./abstract/SelfPermit.sol";
-import "./abstract/Batchable.sol";
 
 // Custom Errors
 error TooLittleReceived();
@@ -19,7 +21,7 @@ error InsufficientWETH();
 error InvalidPool();
 
 /// @notice Router contract that helps in swapping across Trident pools.
-contract TridentRouter is ITridentRouter, SelfPermit, Batchable {
+contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
     /// @dev Used to ensure that `tridentSwapCallback` is called only by the authorized address.
     /// These are set when someone calls a flash swap and reset afterwards.
     address internal cachedMsgSender;
@@ -195,7 +197,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Batchable {
         IPool.TokenAmount[] memory minWithdrawals
     ) public {
         isWhiteListed(pool);
-        Transfer.safeTransferFrom(pool, msg.sender, pool, liquidity);
+        SafeTransferLib.safeTransferFrom(ERC20(pool), msg.sender, pool, liquidity);
         IPool.TokenAmount[] memory withdrawnLiquidity = IPool(pool).burn(data);
         for (uint256 i; i < minWithdrawals.length; i++) {
             uint256 j;
@@ -224,7 +226,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Batchable {
     ) public {
         isWhiteListed(pool);
         // @dev Use 'liquidity = 0' for prefunding.
-        Transfer.safeTransferFrom(pool, msg.sender, pool, liquidity);
+        SafeTransferLib.safeTransferFrom(ERC20(pool), msg.sender, pool, liquidity);
         uint256 withdrawn = IPool(pool).burnSingle(data);
         if (withdrawn < minWithdrawal) revert TooLittleReceived();
     }
@@ -239,7 +241,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Batchable {
         if (onBento) {
             bento.transfer(token, address(this), recipient, amount);
         } else {
-            token == USE_NATIVE ? Transfer.safeTransferNative(recipient, address(this).balance) : Transfer.safeTransfer(token, recipient, amount);
+            token == USE_NATIVE ? SafeTransferLib.safeTransferETH(recipient, address(this).balance) : SafeTransferLib.safeTransfer(ERC20(token), recipient, amount);
         }
     }
 
@@ -249,7 +251,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Batchable {
         if (balance < amountMinimum) revert InsufficientWETH();
         if (balance != 0) {
             IWETH9(wETH).withdraw(balance);
-            Transfer.safeTransferNative(recipient, balance);
+            SafeTransferLib.safeTransferETH(recipient, balance);
         }
     }
 

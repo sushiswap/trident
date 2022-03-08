@@ -20,10 +20,6 @@ module.exports = {
     "pool/hybrid",
     "pool/index",
     "abstract/TridentERC721",
-    // Covered elsewhere
-    "abstract/Batchable",
-    "abstract/SelfPermit",
-    "TridentOwnable",
   ],
   mocha: {
     fgrep: "[skip-on-coverage]",

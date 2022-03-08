@@ -42,3 +42,5 @@ export * from "./error";
 export * from "./pools";
 export * from "./random";
 export * from "./time";
+export * from "./permit";
+export * from "./snapshot";

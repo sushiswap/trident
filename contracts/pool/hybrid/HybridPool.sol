@@ -2,15 +2,17 @@
 
 pragma solidity >=0.8.0;
 
+import "@rari-capital/solmate/src/tokens/ERC20.sol";
+import "@rari-capital/solmate/src/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import "../../interfaces/IBentoBoxMinimal.sol";
 import "../../interfaces/IMasterDeployer.sol";
-import "../../interfaces/IERC20.sol";
 import "../../interfaces/IPool.sol";
 import "../../interfaces/ITridentCallee.sol";
 import "../../libraries/MathUtils.sol";
 import "../../libraries/RebaseLibrary.sol";
-import "@rari-capital/solmate/src/tokens/ERC20.sol";
-import "@rari-capital/solmate/src/utils/ReentrancyGuard.sol";
+
 
 /// @notice Trident exchange pool template with hybrid like-kind formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares. However, the stableswap invariant is applied to the underlying amounts.

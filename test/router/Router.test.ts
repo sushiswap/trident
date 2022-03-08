@@ -30,6 +30,7 @@ describe("Router", function () {
     [alice] = await ethers.getSigners();
     aliceEncoded = ethers.utils.defaultAbiCoder.encode(["address"], [alice.address]);
 
+    const WETH9 = await ethers.getContractFactory("WETH9");
     const ERC20 = await ethers.getContractFactory("ERC20Mock");
     const Bento = await ethers.getContractFactory("BentoBoxV1");
     const Deployer = await ethers.getContractFactory("MasterDeployer");
@@ -37,7 +38,7 @@ describe("Router", function () {
     const TridentRouter = await ethers.getContractFactory("TridentRouter");
     const Pool = await ethers.getContractFactory("ConstantProductPool");
 
-    weth = await ERC20.deploy("WETH", "ETH", getBigNumber("10000000"));
+    weth = await WETH9.deploy();
     sushi = await ERC20.deploy("SUSHI", "SUSHI", getBigNumber("10000000"));
     dai = await ERC20.deploy("SUSHI", "SUSHI", getBigNumber("10000000"));
     sedona = await ERC20.deploy("SED", "SED", getBigNumber("10000000"));
@@ -210,7 +211,7 @@ describe("Router", function () {
         { token: xsushi.address, native: true, amount: BigNumber.from(10).pow(18) },
       ];
 
-      await router.batch(
+      await router.multicall(
         [
           router.interface.encodeFunctionData("deployPool", [tridentPoolFactory.address, deployDataB]),
           router.interface.encodeFunctionData("addLiquidity", [liquidityInput, somePoolAddy, 1, aliceEncoded]),

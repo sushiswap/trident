@@ -2,12 +2,13 @@
 
 pragma solidity >=0.8.0;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
+
 import "../interfaces/IPoolFactory.sol";
-import "../TridentOwnable.sol";
 
 /// @notice Trident pool deployer contract with template factory whitelist.
 /// @author Mudit Gupta.
-contract MasterDeployer is TridentOwnable {
+contract MasterDeployer is Ownable {
     event DeployPool(address indexed factory, address indexed pool, bytes deployData);
     event AddToWhitelist(address indexed factory);
     event RemoveFromWhitelist(address indexed factory);

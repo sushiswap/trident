@@ -3,7 +3,7 @@
 pragma solidity >=0.8.0;
 
 import "@rari-capital/solmate/src/tokens/ERC20.sol";
-import "../interfaces/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @notice Intermediary token users who are staked in MasterChef will receive after migration.
 /// Can be redeemed for the LP token of the new pool.
