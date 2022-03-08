@@ -1,9 +1,9 @@
 import { ADDRESS_ZERO, customError } from "../utilities";
 import { BentoBoxV1, ConstantProductPool__factory, ERC20Mock, MasterDeployer, TridentRouter, WETH9 } from "../../types";
 import { deployments, ethers } from "hardhat";
+import { initializedConstantProductPool, uninitializedConstantProductPool } from "../fixtures";
 
 import { expect } from "chai";
-import { initializedConstantProductPool } from "../fixtures";
 
 describe("Router", function () {
   before(async function () {
@@ -100,11 +100,52 @@ describe("Router", function () {
   });
 
   describe("#addLiquidity", function () {
-    //
-  });
+    it("Reverts when not enough liquidity is minted", async () => {
+      const deployer = await ethers.getNamedSigner("deployer");
 
-  describe("#addLiquidityLazy", function () {
-    //
+      const bentoBox = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+
+      const router = await ethers.getContract<TridentRouter>("TridentRouter");
+
+      const pool = await initializedConstantProductPool();
+
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+
+      await token0.approve(bentoBox.address, 1);
+      await token1.approve(bentoBox.address, 1);
+
+      await bentoBox.setMasterContractApproval(
+        deployer.address,
+        router.address,
+        true,
+        "0",
+        "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000000000000000000000000000"
+      );
+
+      const liquidityInput = [
+        {
+          token: token0.address,
+          native: true,
+          amount: 1,
+        },
+        {
+          token: token1.address,
+          native: true,
+          amount: 1,
+        },
+      ];
+
+      await expect(
+        router.addLiquidity(
+          liquidityInput,
+          pool.address,
+          1000,
+          ethers.utils.defaultAbiCoder.encode(["address"], [deployer.address])
+        )
+      ).to.be.revertedWith("NotEnoughLiquidityMinted");
+    });
   });
 
   describe("#burnLiquidity", function () {
@@ -264,9 +305,37 @@ describe("Router", function () {
 
   describe("#isWhiteListed", function () {
     it("Reverts if the pool is invalid", async () => {
-      // const router = await ethers.getContract<TridentRouter>("TridentRouter");
-      // const deployer = await ethers.getNamedSigner("deployer");
-      // await expect(router.isWhiteListed(1, deployer.address)).to.be.revertedWith("InsufficientWETH");
+      const deployer = await ethers.getNamedSigner("deployer");
+
+      const router = await ethers.getContract<TridentRouter>("TridentRouter");
+
+      const pool = await uninitializedConstantProductPool();
+
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+
+      let liquidityInput = [
+        {
+          token: token0.address,
+          native: false,
+          amount: 1,
+        },
+        {
+          token: token1.address,
+          native: false,
+          amount: 1,
+        },
+      ];
+
+      await expect(
+        router.addLiquidity(
+          liquidityInput,
+          pool.address,
+          1000,
+          ethers.utils.defaultAbiCoder.encode(["address"], [deployer.address])
+        )
+      ).to.be.revertedWith("InvalidPool");
     });
   });
 });

@@ -31,9 +31,6 @@ describe("Constant Product Pool Old", function () {
   });
 
   describe("#mint", () => {
-    it("Reverts when not enough liquidity is minted", async () => {
-      await expect(addLiquidity(0, 1, 1)).to.be.revertedWith("NotEnoughLiquidityMinted");
-    });
     it("Balanced liquidity to a balanced pool", async () => {
       const amount = getBigNumber(randBetween(10, 100));
       await addLiquidity(0, amount, amount);
