@@ -79,7 +79,7 @@ contract IndexPool is IPool, ERC20, ReentrancyGuard {
 
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
     /// The router must ensure that sufficient LP tokens are minted by using the return value.
-    function mint(bytes calldata data) public override lock returns (uint256 liquidity) {
+    function mint(bytes calldata data) public override  nonReentrant returns (uint256 liquidity) {
         (address recipient, uint256 toMint) = abi.decode(data, (address, uint256));
 
         uint120 ratio = uint120(_div(toMint, totalSupply));
@@ -103,7 +103,7 @@ contract IndexPool is IPool, ERC20, ReentrancyGuard {
     }
 
     /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
-    function burn(bytes calldata data) public override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
+    function burn(bytes calldata data) public override  nonReentrant returns (IPool.TokenAmount[] memory withdrawnAmounts) {
         (address recipient, bool unwrapBento, uint256 toBurn) = abi.decode(data, (address, bool, uint256));
 
         uint256 ratio = _div(toBurn, totalSupply);
@@ -129,7 +129,7 @@ contract IndexPool is IPool, ERC20, ReentrancyGuard {
 
     /// @dev Burns LP tokens sent to this contract and swaps one of the output tokens for another
     /// - i.e., the user gets a single token out by burning LP tokens.
-    function burnSingle(bytes calldata data) public override lock returns (uint256 amountOut) {
+    function burnSingle(bytes calldata data) public override  nonReentrant returns (uint256 amountOut) {
         (address tokenOut, address recipient, bool unwrapBento, uint256 toBurn) = abi.decode(data, (address, address, bool, uint256));
 
         Record storage outRecord = records[tokenOut];
@@ -147,7 +147,7 @@ contract IndexPool is IPool, ERC20, ReentrancyGuard {
     }
 
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
-    function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
+    function swap(bytes calldata data) public override  nonReentrant returns (uint256 amountOut) {
         (address tokenIn, address tokenOut, address recipient, bool unwrapBento, uint256 amountIn) = abi.decode(
             data,
             (address, address, address, bool, uint256)
@@ -171,7 +171,7 @@ contract IndexPool is IPool, ERC20, ReentrancyGuard {
     }
 
     /// @dev Swaps one token for another. The router must support swap callbacks and ensure there isn't too much slippage.
-    function flashSwap(bytes calldata data) public override lock returns (uint256 amountOut) {
+    function flashSwap(bytes calldata data) public override  nonReentrant returns (uint256 amountOut) {
         (address tokenIn, address tokenOut, address recipient, bool unwrapBento, uint256 amountIn, bytes memory context) = abi.decode(
             data,
             (address, address, address, bool, uint256, bytes)

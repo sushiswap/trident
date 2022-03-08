@@ -78,7 +78,7 @@ contract HybridPool is IPool, ERC20, ReentrancyGuard {
 
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
     /// The router must ensure that sufficient LP tokens are minted by using the return value.
-    function mint(bytes calldata data) public override lock returns (uint256 liquidity) {
+    function mint(bytes calldata data) public override  nonReentrant returns (uint256 liquidity) {
         address recipient = abi.decode(data, (address));
         (uint256 _reserve0, uint256 _reserve1) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
@@ -109,7 +109,7 @@ contract HybridPool is IPool, ERC20, ReentrancyGuard {
     }
 
     /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
-    function burn(bytes calldata data) public override lock returns (IPool.TokenAmount[] memory withdrawnAmounts) {
+    function burn(bytes calldata data) public override  nonReentrant returns (IPool.TokenAmount[] memory withdrawnAmounts) {
         (address recipient, bool unwrapBento) = abi.decode(data, (address, bool));
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 liquidity = balanceOf[address(this)];
@@ -136,7 +136,7 @@ contract HybridPool is IPool, ERC20, ReentrancyGuard {
 
     /// @dev Burns LP tokens sent to this contract and swaps one of the output tokens for another
     /// - i.e., the user gets a single token out by burning LP tokens.
-    function burnSingle(bytes calldata data) public override lock returns (uint256 amountOut) {
+    function burnSingle(bytes calldata data) public override  nonReentrant returns (uint256 amountOut) {
         (address tokenOut, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 liquidity = balanceOf[address(this)];
@@ -170,7 +170,7 @@ contract HybridPool is IPool, ERC20, ReentrancyGuard {
     }
 
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
-    function swap(bytes calldata data) public override lock returns (uint256 amountOut) {
+    function swap(bytes calldata data) public override  nonReentrant returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint256 _reserve0, uint256 _reserve1, uint256 balance0, uint256 balance1) = _getReservesAndBalances();
         uint256 amountIn;
@@ -196,7 +196,7 @@ contract HybridPool is IPool, ERC20, ReentrancyGuard {
     }
 
     /// @dev Swaps one token for another with payload. The router must support swap callbacks and ensure there isn't too much slippage.
-    function flashSwap(bytes calldata data) public override lock returns (uint256 amountOut) {
+    function flashSwap(bytes calldata data) public override  nonReentrant returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento, uint256 amountIn, bytes memory context) = abi.decode(
             data,
             (address, address, bool, uint256, bytes)
