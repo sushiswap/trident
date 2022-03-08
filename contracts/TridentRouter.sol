@@ -4,6 +4,7 @@ pragma solidity >=0.8.0;
 
 import "./RouterHelper.sol";
 import "./interfaces/IPool.sol";
+import "./interfaces/IWETH9.sol";
 import "./interfaces/ITridentRouter.sol";
 
 /// @notice Router contract that helps in swapping across Trident pools.
@@ -223,10 +224,10 @@ contract TridentRouter is ITridentRouter, RouterHelper {
 
     /// @notice Unwrap this contract's `wETH` into ETH
     function unwrapWETH(uint256 amountMinimum, address recipient) external payable {
-        uint256 balanceWETH = balanceOfThis(wETH);
+        uint256 balanceWETH = IWETH9(wETH).balanceOf(address(this));
         if (balanceWETH < amountMinimum) revert InsufficientWETH();
         if (balanceWETH != 0) {
-            withdrawFromWETH(balanceWETH);
+            IWETH9(wETH).withdraw(balanceWETH);
             safeTransferETH(recipient, balanceWETH);
         }
     }
