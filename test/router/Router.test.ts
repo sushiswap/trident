@@ -1,6 +1,7 @@
 // @ts-nocheck
 
 import { ADDRESS_ZERO, getBigNumber } from "../utilities";
+
 import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 import { expect } from "chai";
@@ -78,7 +79,11 @@ describe("Router", function () {
       ["address", "address", "uint256", "bool"],
       [addresses[0], addresses[1], 30, false]
     );
-    pool = await Pool.attach((await (await masterDeployer.deployPool(tridentPoolFactory.address, deployData)).wait()).events[0].args[1]);
+    pool = await Pool.attach(
+      (
+        await (await masterDeployer.deployPool(tridentPoolFactory.address, deployData)).wait()
+      ).events[0].args[1]
+    );
     addresses = [dai.address, sushi.address].sort();
     const deployData2 = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint256", "bool"],
@@ -364,11 +369,26 @@ describe("Router", function () {
       let oldPoolSushiBalance = await bento.balanceOf(sushi.address, pool.address);
       await router.exactInput(params);
       expect(await bento.balanceOf(weth.address, alice.address)).eq(oldAliceWethBalance.sub(amountIn));
-      expect(await bento.balanceOf(sushi.address, alice.address)).lt(oldAliceSushiBalance.add(expectedAmountOutSingleHop));
+      expect(await bento.balanceOf(sushi.address, alice.address)).lt(
+        oldAliceSushiBalance.add(expectedAmountOutSingleHop)
+      );
       expect(await bento.balanceOf(weth.address, pool.address)).gt(oldPoolWethBalance.add(amountIn));
       expect(await bento.balanceOf(sushi.address, pool.address)).gt(
         oldPoolSushiBalance.sub(BigNumber.from(2).mul(expectedAmountOutSingleHop))
       );
+    });
+
+    it("Reverts when output is less than minimum", async function () {
+      let amountIn = BigNumber.from(10).pow(18);
+      let expectedAmountOut = await pool.getAmountOut(encodedTokenAmount(weth.address, amountIn));
+      let params = {
+        amountIn: amountIn,
+        amountOutMinimum: expectedAmountOut.add(1),
+        pool: pool.address,
+        tokenIn: weth.address,
+        data: encodedSwapData(weth.address, alice.address, true),
+      };
+      await expect(router.exactInputSingleWithNativeToken(params)).to.be.revertedWith("TooLittleReceived");
     });
 
     it("Should swap some native tokens", async function () {
