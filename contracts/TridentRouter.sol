@@ -2,7 +2,6 @@
 
 pragma solidity >=0.8.0;
 
-import "./RouterHelper.sol";
 import "./libraries/Transfer.sol";
 import "./interfaces/IPool.sol";
 import "./interfaces/IWETH9.sol";
@@ -25,6 +24,7 @@ contract TridentRouter is ITridentRouter, TridentPermit, TridentBatchable {
     address internal cachedMsgSender;
     address internal cachedPool;
 
+    /// @dev  Cached whitelisted pools
     mapping(address => bool) internal whitelistedPools;
 
     /// @notice BentoBox token vault.
@@ -36,8 +36,9 @@ contract TridentRouter is ITridentRouter, TridentPermit, TridentBatchable {
     /// @notice ERC-20 token for wrapped ETH (v9).
     address internal immutable wETH;
     
-    /// @notice The user should use 0x0 if they want to deposit NATIVE (ETH etc...)
+    /// @notice The user should use 0x0 if they want to use natic currency e.g. ETH
     address constant USE_NATIVE = address(0);
+
     constructor(
         IBentoBoxMinimal _bento,
         IMasterDeployer _masterDeployer,
@@ -251,11 +252,12 @@ contract TridentRouter is ITridentRouter, TridentPermit, TridentBatchable {
         }
     }
 
+   /// @notice Wrapper function to allow pool deployment to be batched 
     function deployPool(address factory, bytes calldata deployData) external payable returns (address) {
         return masterDeployer.deployPool(factory, deployData);
     }
 
-    /// @notice Helper function to allow batching of BentoBox master contract approvals so the first trade can happen in one transaction.
+    /// @notice Wrapper function to allow bento set master contract approval to be batched, so the first trade can happen in one transaction.
     function approveMasterContract(
         uint8 v,
         bytes32 r,
