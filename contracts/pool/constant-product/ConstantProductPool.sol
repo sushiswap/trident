@@ -7,12 +7,12 @@ import "../../interfaces/IMasterDeployer.sol";
 import "../../interfaces/IPool.sol";
 import "../../interfaces/ITridentCallee.sol";
 import "../../libraries/TridentMath.sol";
-import "../../TridentERC20.sol";
+import "@rari-capital/solmate/src/tokens/ERC20.sol";
 
 /// @notice Trident exchange pool template with constant product formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares.
 ///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
-contract ConstantProductPool is IPool, TridentERC20 {
+contract ConstantProductPool is IPool, ERC20 {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Sync(uint256 reserve0, uint256 reserve1);
@@ -50,7 +50,7 @@ contract ConstantProductPool is IPool, TridentERC20 {
         unlocked = 1;
     }
 
-    constructor(bytes memory _deployData, address _masterDeployer) {
+    constructor(bytes memory _deployData, address _masterDeployer) ERC20("Sushi LP Token", "SLP", 18) {
         (address _token0, address _token1, uint256 _swapFee, bool _twapSupport) = abi.decode(
             _deployData,
             (address, address, uint256, bool)
