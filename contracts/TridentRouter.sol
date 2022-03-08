@@ -7,9 +7,19 @@ import "./libraries/Transfer.sol";
 import "./interfaces/IPool.sol";
 import "./interfaces/IWETH9.sol";
 import "./interfaces/ITridentRouter.sol";
+import "./TridentPermit.sol";
+import "./TridentBatchable.sol";
+
+// Custom Errors
+error TooLittleReceived();
+error NotEnoughLiquidityMinted();
+error IncorrectTokenWithdrawn();
+error UnauthorizedCallback();
+error InsufficientWETH();
+error InvalidPool();
 
 /// @notice Router contract that helps in swapping across Trident pools.
-contract TridentRouter is ITridentRouter, RouterHelper {
+contract TridentRouter is ITridentRouter, TridentPermit, TridentBatchable {
     /// @dev Used to ensure that `tridentSwapCallback` is called only by the authorized address.
     /// These are set when someone calls a flash swap and reset afterwards.
     address internal cachedMsgSender;
@@ -17,19 +27,27 @@ contract TridentRouter is ITridentRouter, RouterHelper {
 
     mapping(address => bool) internal whitelistedPools;
 
-    // Custom Errors
-    error TooLittleReceived();
-    error NotEnoughLiquidityMinted();
-    error IncorrectTokenWithdrawn();
-    error UnauthorizedCallback();
-    error InsufficientWETH();
-    error InvalidPool();
+    /// @notice BentoBox token vault.
+    IBentoBoxMinimal public immutable bento;
+    
+    /// @notice Trident AMM master deployer contract.
+    IMasterDeployer public immutable masterDeployer;
 
+    /// @notice ERC-20 token for wrapped ETH (v9).
+    address internal immutable wETH;
+    
+    /// @notice The user should use 0x0 if they want to deposit NATIVE (ETH etc...)
+    address constant USE_NATIVE = address(0);
     constructor(
-        IBentoBoxMinimal bento,
-        IMasterDeployer masterDeployer,
-        address wETH
-    ) RouterHelper(bento, masterDeployer, wETH) {}
+        IBentoBoxMinimal _bento,
+        IMasterDeployer _masterDeployer,
+        address _wETH
+    ) {
+        bento = _bento;
+        masterDeployer = _masterDeployer;
+        wETH = _wETH;
+        _bento.registerProtocol();
+    }
 
     receive() external payable {
         require(msg.sender == wETH);
@@ -231,6 +249,19 @@ contract TridentRouter is ITridentRouter, RouterHelper {
             IWETH9(wETH).withdraw(balance);
             Transfer.safeTransferNative(recipient, balance);
         }
+    }
+
+    function deployPool(address factory, bytes calldata deployData) external payable returns (address) {
+        return masterDeployer.deployPool(factory, deployData);
+    }
+
+    /// @notice Helper function to allow batching of BentoBox master contract approvals so the first trade can happen in one transaction.
+    function approveMasterContract(
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external payable {
+        bento.setMasterContractApproval(msg.sender, address(this), true, v, r, s);
     }
 
     /// @notice Deposit from the user's wallet into BentoBox.
