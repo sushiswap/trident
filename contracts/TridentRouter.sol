@@ -3,9 +3,11 @@
 pragma solidity >=0.8.0;
 
 import "./libraries/Transfer.sol";
-import "./interfaces/IPool.sol";
+import "./interfaces/IBentoBoxMinimal.sol";
 import "./interfaces/IWETH9.sol";
+import "./interfaces/IPool.sol";
 import "./interfaces/ITridentRouter.sol";
+import "./interfaces/IMasterDeployer.sol";
 import "./TridentPermit.sol";
 import "./TridentBatchable.sol";
 
@@ -30,7 +32,7 @@ contract TridentRouter is ITridentRouter, TridentPermit, TridentBatchable {
     /// @notice BentoBox token vault.
     IBentoBoxMinimal public immutable bento;
     
-    /// @notice Trident AMM master deployer contract.
+    /// @notice Master Deployer
     IMasterDeployer public immutable masterDeployer;
 
     /// @notice ERC-20 token for wrapped ETH (v9).
