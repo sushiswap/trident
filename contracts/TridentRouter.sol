@@ -26,10 +26,6 @@ error InvalidPool();
 contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
     using SafeTransferLib for address;
     using SafeTransferLib for ERC20;
-    /// @dev Used to ensure that `tridentSwapCallback` is called only by the authorized address.
-    /// These are set when someone calls a flash swap and reset afterwards.
-    address internal cachedMsgSender;
-    address internal cachedPool;
 
     /// @dev Cached whitelisted pools.
     mapping(address => bool) internal whitelistedPools;
