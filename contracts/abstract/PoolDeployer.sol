@@ -27,7 +27,7 @@ abstract contract PoolDeployer {
 
     function _registerPool(
         address pool,
-        address[] calldata tokens,
+        address[] memory tokens,
         bytes32 salt
     ) internal onlyMaster {
         // Store the address of the deployed contract.
