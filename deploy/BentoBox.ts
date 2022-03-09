@@ -8,8 +8,6 @@ const deployFunction: DeployFunction = async function ({
   getNamedAccounts,
   getChainId,
 }: HardhatRuntimeEnvironment) {
-  console.debug("Running BentoBox deploy script");
-
   const { deploy } = deployments;
 
   const { deployer } = await getNamedAccounts();
@@ -18,13 +16,11 @@ const deployFunction: DeployFunction = async function ({
 
   const weth9 = await ethers.getContract<WETH9>("WETH9");
 
-  const { address } = await deploy("BentoBoxV1", {
+  await deploy("BentoBoxV1", {
     from: deployer,
     args: [chainId === 42 ? "0xd0A1E359811322d97991E03f863a0C30C2cF029C" : weth9.address],
     deterministicDeployment: false,
   });
-
-  console.debug("BentoBoxV1 deployed at ", address);
 };
 
 export default deployFunction;

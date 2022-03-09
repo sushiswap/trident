@@ -11,7 +11,6 @@ const deployFunction: DeployFunction = async function ({
   getChainId,
   run,
 }: HardhatRuntimeEnvironment) {
-  console.debug("Running TridentRouter deploy script");
   const { deploy } = deployments;
 
   const { deployer } = await getNamedAccounts();
@@ -34,7 +33,11 @@ const deployFunction: DeployFunction = async function ({
 
   const { address, newlyDeployed } = await deploy("TridentRouter", {
     from: deployer,
-    args: [bentoBox.address, masterDeployer.address, wnative.address],
+    args: [
+      bentoBox ? bentoBox.address : BENTOBOX_ADDRESS[chainId],
+      masterDeployer.address,
+      wnative ? wnative.address : WNATIVE_ADDRESS[chainId],
+    ],
     deterministicDeployment: false,
     waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 5 : undefined,
   });
@@ -51,12 +54,10 @@ const deployFunction: DeployFunction = async function ({
   if (chainId === 31337 && !(await bentoBox.whitelistedMasterContracts(address))) {
     await bentoBox.whitelistMasterContract(address, true);
   }
-
-  console.debug("TridentRouter deployed at ", address);
 };
 
 export default deployFunction;
 
-deployFunction.dependencies = ["MasterDeployer"];
+deployFunction.dependencies = ["ConstantProductPoolFactory"];
 
 deployFunction.tags = ["TridentRouter"];

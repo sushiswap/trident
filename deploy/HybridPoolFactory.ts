@@ -7,7 +7,6 @@ const deployFunction: DeployFunction = async function ({
   ethers,
   run,
 }: HardhatRuntimeEnvironment) {
-  console.debug("Running HybridPoolFactory deploy script");
   const { deploy } = deployments;
   const { deployer } = await getNamedAccounts();
   const masterDeployer = await ethers.getContract("MasterDeployer");
@@ -28,8 +27,6 @@ const deployFunction: DeployFunction = async function ({
       constructorArguments: [masterDeployer.address],
     });
   }
-
-  console.debug("HybridPoolFactory deployed at ", address);
 };
 
 export default deployFunction;

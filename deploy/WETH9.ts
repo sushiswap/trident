@@ -7,8 +7,6 @@ const deployFunction: DeployFunction = async function ({
   deployments,
   getNamedAccounts,
 }: HardhatRuntimeEnvironment) {
-  console.debug("Running WETH9 deploy script");
-
   const { deploy } = deployments;
 
   const { deployer } = await getNamedAccounts();
@@ -20,8 +18,6 @@ const deployFunction: DeployFunction = async function ({
 
   const weth9 = await ethers.getContract<WETH9>("WETH9");
   await weth9.deposit({ value: 100 });
-
-  console.debug("WETH9 deployed at ", weth9.address);
 };
 
 export default deployFunction;

@@ -8,7 +8,6 @@ const deployFunction: DeployFunction = async function ({
   run,
   getChainId,
 }: HardhatRuntimeEnvironment) {
-  console.debug("Running ConstantProductPoolFactory deploy script");
   const { deploy } = deployments;
 
   const { deployer } = await getNamedAccounts();
@@ -33,8 +32,6 @@ const deployFunction: DeployFunction = async function ({
       constructorArguments: [masterDeployer.address],
     });
   }
-
-  console.debug("ConstantProductPoolFactory deployed at ", address);
 };
 
 export default deployFunction;

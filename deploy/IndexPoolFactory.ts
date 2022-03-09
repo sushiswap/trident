@@ -7,7 +7,6 @@ const deployFunction: DeployFunction = async function ({
   ethers,
   run,
 }: HardhatRuntimeEnvironment) {
-  console.debug("Running IndexPoolFactory deploy script");
   const { deploy } = deployments;
 
   const { deployer } = await getNamedAccounts();
@@ -31,8 +30,6 @@ const deployFunction: DeployFunction = async function ({
       constructorArguments: [masterDeployer.address],
     });
   }
-
-  console.debug("IndexPoolFactory deployed at ", address);
 };
 
 export default deployFunction;
