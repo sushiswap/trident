@@ -8,7 +8,7 @@ const deployFunction: DeployFunction = async function ({
   getNamedAccounts,
   getChainId,
 }: HardhatRuntimeEnvironment) {
-  console.log("Running BentoBox deploy script");
+  console.debug("Running BentoBox deploy script");
 
   const { deploy } = deployments;
 
@@ -24,7 +24,7 @@ const deployFunction: DeployFunction = async function ({
     deterministicDeployment: false,
   });
 
-  console.log("BentoBoxV1 deployed at ", address);
+  console.debug("BentoBoxV1 deployed at ", address);
 };
 
 export default deployFunction;

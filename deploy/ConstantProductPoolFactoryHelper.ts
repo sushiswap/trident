@@ -7,7 +7,7 @@ const deployFunction: DeployFunction = async function ({
   ethers,
   run,
 }: HardhatRuntimeEnvironment) {
-  // console.log("Running ConstantProductPoolFactoryHelper deploy script");
+  console.debug("Running ConstantProductPoolFactoryHelper deploy script");
   const { deploy } = deployments;
 
   const { deployer } = await getNamedAccounts();
@@ -23,7 +23,7 @@ const deployFunction: DeployFunction = async function ({
       address,
     });
   }
-  // console.log("ConstantProductPoolFactoryHelper deployed at ", address);
+  console.debug("ConstantProductPoolFactoryHelper deployed at ", address);
 };
 
 export default deployFunction;

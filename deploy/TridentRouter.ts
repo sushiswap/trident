@@ -11,7 +11,7 @@ const deployFunction: DeployFunction = async function ({
   getChainId,
   run,
 }: HardhatRuntimeEnvironment) {
-  // console.log("Running TridentRouter deploy script");
+  console.debug("Running TridentRouter deploy script");
   const { deploy } = deployments;
 
   const { deployer } = await getNamedAccounts();
@@ -52,7 +52,7 @@ const deployFunction: DeployFunction = async function ({
     await bentoBox.whitelistMasterContract(address, true);
   }
 
-  // console.log("TridentRouter deployed at ", address);
+  console.debug("TridentRouter deployed at ", address);
 };
 
 export default deployFunction;

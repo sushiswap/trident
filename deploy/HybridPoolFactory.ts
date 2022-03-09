@@ -7,7 +7,7 @@ const deployFunction: DeployFunction = async function ({
   ethers,
   run,
 }: HardhatRuntimeEnvironment) {
-  // console.log("Running HybridPoolFactory deploy script");
+  console.debug("Running HybridPoolFactory deploy script");
   const { deploy } = deployments;
   const { deployer } = await getNamedAccounts();
   const masterDeployer = await ethers.getContract("MasterDeployer");
@@ -18,7 +18,7 @@ const deployFunction: DeployFunction = async function ({
     waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 5 : undefined,
   });
   if (!(await masterDeployer.whitelistedFactories(address))) {
-    // console.log("Add HybridPoolFactory to MasterDeployer whitelist");
+    console.debug("Add HybridPoolFactory to MasterDeployer whitelist");
     await (await masterDeployer.addToWhitelist(address)).wait();
   }
 
@@ -29,7 +29,7 @@ const deployFunction: DeployFunction = async function ({
     });
   }
 
-  // console.log("HybridPoolFactory deployed at ", address);
+  console.debug("HybridPoolFactory deployed at ", address);
 };
 
 export default deployFunction;

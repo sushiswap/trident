@@ -8,7 +8,7 @@ const deployFunction: DeployFunction = async function ({
   run,
   getChainId,
 }: HardhatRuntimeEnvironment) {
-  // console.log("Running ConstantProductPoolFactory deploy script");
+  console.debug("Running ConstantProductPoolFactory deploy script");
   const { deploy } = deployments;
 
   const { deployer } = await getNamedAccounts();
@@ -23,7 +23,7 @@ const deployFunction: DeployFunction = async function ({
   });
 
   if (!(await masterDeployer.whitelistedFactories(address))) {
-    // console.log("Add ConstantProductPoolFactory to MasterDeployer whitelist");
+    console.debug("Add ConstantProductPoolFactory to MasterDeployer whitelist");
     await (await masterDeployer.addToWhitelist(address)).wait();
   }
 
@@ -34,7 +34,7 @@ const deployFunction: DeployFunction = async function ({
     });
   }
 
-  // console.log("ConstantProductPoolFactory deployed at ", address);
+  console.debug("ConstantProductPoolFactory deployed at ", address);
 };
 
 export default deployFunction;

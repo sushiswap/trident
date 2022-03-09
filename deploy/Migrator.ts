@@ -10,7 +10,7 @@ const deployFunction: DeployFunction = async function ({
   getChainId,
   run,
 }: HardhatRuntimeEnvironment) {
-  console.log("Running TridentSushiRollCP deploy script");
+  console.debug("Running TridentSushiRollCP deploy script");
   const { deploy } = deployments;
 
   const { deployer } = await getNamedAccounts();
@@ -48,7 +48,7 @@ const deployFunction: DeployFunction = async function ({
     });
   }
 
-  console.log("TridentSushiRollCP deployed at ", address);
+  console.debug("TridentSushiRollCP deployed at ", address);
 };
 
 export default deployFunction;
