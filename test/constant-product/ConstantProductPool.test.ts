@@ -252,7 +252,7 @@ describe("Constant Product Pool", () => {
       const [_nativeReserve0, _nativeReserve1, _blockTimestampLast] = await pool.getNativeReserves();
       expect(_nativeReserve0).equal("1000000000000000000");
       expect(_nativeReserve1).equal("1000000000000000000");
-      expect(_blockTimestampLast).equal("0");
+      expect(_blockTimestampLast).equal(0);
     });
   });
 });
