@@ -1,43 +1,63 @@
-// @ts-nocheck
-
-import { ethers, deployments, ethers } from "hardhat";
 import { expect } from "chai";
 import { encodedSwapData, getBigNumber, randBetween, sqrt, ZERO, TWO, MAX_FEE } from "../utilities";
-import { BentoBoxV1, ERC20Mock__factory, IConstantProductPool, MasterDeployer, TridentRouter } from "../../types";
+import {
+  BentoBoxV1,
+  BentoBoxV1__factory,
+  ConstantProductPool,
+  ConstantProductPoolFactory__factory,
+  ConstantProductPool__factory,
+  ERC20Mock,
+  ERC20Mock__factory,
+  MasterDeployer,
+  MasterDeployer__factory,
+  TridentRouter,
+  TridentRouter__factory,
+} from "../../types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-
-const { BigNumber, utils } = ethers;
+import { ethers } from "hardhat";
+import { BigNumber } from "ethers";
 
 let accounts: SignerWithAddress[] = [];
 // First token is used as weth
 let tokens: ERC20Mock[] = [];
-let pools: IConstantProductPool[] = [];
+let pools: ConstantProductPool[] = [];
 let bento: BentoBoxV1;
 let masterDeployer: MasterDeployer;
 let router: TridentRouter;
 let aliceEncoded: string;
 
 export async function initialize() {
+  // TODO: Make use of fixtures...
+  // await deployments.fixture(["TridentRouter"]);
+  // tokens = await initilizeTokens();
+  // bento = await ethers.getContract("BentoBoxV1");
+  // masterDeployer = await ethers.getContract("MasterDeployer");
+  // poolFactory = await ethers.getContract("ConstantProductPoolFactory");
+  // router = await ethers.getContract("TridentRouter");
+
   if (accounts.length > 0) {
     return;
   }
+
   accounts = await ethers.getSigners();
-  aliceEncoded = utils.defaultAbiCoder.encode(["address"], [accounts[0].address]);
+  aliceEncoded = ethers.utils.defaultAbiCoder.encode(["address"], [accounts[0].address]);
 
-  const ERC20Factory = await ethers.getContractFactory<ERC20Mock__factory>("ERC20Mock");
+  const ERC20 = await ethers.getContractFactory<ERC20Mock__factory>("ERC20Mock");
 
-  let promises = [];
+  let promises: Promise<ERC20Mock>[] = [];
 
   for (let i = 0; i < 10; i++) {
-    promises.push(ERC20Factory.deploy("Token" + i, "TOK" + i, getBigNumber(1000000)));
+    promises.push(ERC20.deploy("Token" + i, "TOK" + i, getBigNumber(1000000)));
   }
   tokens = await Promise.all(promises);
 
-  const Bento = await ethers.getContractFactory("BentoBoxV1");
-  const Deployer = await ethers.getContractFactory("MasterDeployer");
-  const PoolFactory = await ethers.getContractFactory("ConstantProductPoolFactory");
-  const TridentRouter = await ethers.getContractFactory("TridentRouter");
-  const Pool = await ethers.getContractFactory("ConstantProductPool");
+  const Bento = await ethers.getContractFactory<BentoBoxV1__factory>("BentoBoxV1");
+  const Deployer = await ethers.getContractFactory<MasterDeployer__factory>("MasterDeployer");
+  const PoolFactory = await ethers.getContractFactory<ConstantProductPoolFactory__factory>(
+    "ConstantProductPoolFactory"
+  );
+  const TridentRouter = await ethers.getContractFactory<TridentRouter__factory>("TridentRouter");
+  const Pool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
 
   bento = await Bento.deploy(tokens[0].address);
   await bento.deployed();
@@ -57,15 +77,13 @@ export async function initialize() {
   await masterDeployer.addToWhitelist(poolFactory.address);
 
   // Approve BentoBox token deposits and deposit tokens in bentobox
-  promises = [];
-  for (let i = 0; i < tokens.length; i++) {
-    promises.push(
-      tokens[i].approve(bento.address, getBigNumber(1000000)).then(() => {
-        bento.deposit(tokens[i].address, accounts[0].address, accounts[0].address, getBigNumber(500000), 0);
+  await Promise.all(
+    tokens.map((token) =>
+      token.approve(bento.address, getBigNumber(1000000)).then(() => {
+        bento.deposit(token.address, accounts[0].address, accounts[0].address, getBigNumber(500000), 0);
       })
-    );
-  }
-  await Promise.all(promises);
+    )
+  );
 
   // Approve Router to spend alice's BentoBox tokens
   await bento.setMasterContractApproval(
@@ -89,16 +107,16 @@ export async function initialize() {
       token0 = tokens[i + 1];
       token1 = tokens[i];
     }
-    const deployData = utils.defaultAbiCoder.encode(
+    const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint256", "bool"],
       [token0.address, token1.address, 30, false]
     );
-    const salt = utils.keccak256(deployData);
-    const constructorParams = utils.defaultAbiCoder
+    const salt = ethers.utils.keccak256(deployData);
+    const constructorParams = ethers.utils.defaultAbiCoder
       .encode(["bytes", "address"], [deployData, masterDeployer.address])
       .substring(2);
-    const initCodeHash = utils.keccak256(Pool.bytecode + constructorParams);
-    const poolAddress = utils.getCreate2Address(poolFactory.address, salt, initCodeHash);
+    const initCodeHash = ethers.utils.keccak256(Pool.bytecode + constructorParams);
+    const poolAddress = ethers.utils.getCreate2Address(poolFactory.address, salt, initCodeHash);
     pools.push(Pool.attach(poolAddress));
     await masterDeployer.deployPool(poolFactory.address, deployData).then((tx) => tx.wait());
     const deployedPoolAddress = (await poolFactory.getPools(token0.address, token1.address, 0, 1))[0];
@@ -197,6 +215,8 @@ export async function addLiquidityInMultipleWays() {
     // 01 -> false, true
     for (let j = 0; j < 4; j++) {
       const binaryJ = j.toString(2).padStart(2, "0");
+      // @ts-ignore
+      // TODO: Why are we ignoring checks?
       await addLiquidity(0, amount0, amount1, binaryJ[0] == 1, binaryJ[1] == 1);
     }
   }
@@ -313,7 +333,7 @@ export async function burnLiquidity(poolIndex, amount, withdrawType, unwrapBento
       getAmountOut(amount1, initialBalances[2].sub(amount1), initialBalances[1].sub(amount0), swapFee)
     );
     amount1 = ZERO;
-    const burnData = utils.defaultAbiCoder.encode(
+    const burnData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "bool"],
       [token0.address, accounts[0].address, unwrapBento]
     );
@@ -324,7 +344,7 @@ export async function burnLiquidity(poolIndex, amount, withdrawType, unwrapBento
       getAmountOut(amount0, initialBalances[1].sub(amount0), initialBalances[2].sub(amount1), swapFee)
     );
     amount0 = ZERO;
-    const burnData = utils.defaultAbiCoder.encode(
+    const burnData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "bool"],
       [token1.address, accounts[0].address, unwrapBento]
     );
@@ -341,7 +361,7 @@ export async function burnLiquidity(poolIndex, amount, withdrawType, unwrapBento
         amount: amount1,
       },
     ];
-    const burnData = utils.defaultAbiCoder.encode(["address", "bool"], [accounts[0].address, unwrapBento]);
+    const burnData = ethers.utils.defaultAbiCoder.encode(["address", "bool"], [accounts[0].address, unwrapBento]);
     burnLiquidityPromise = router.burnLiquidity(pool.address, amount, burnData, minWithdrawals);
   }
 
@@ -388,7 +408,7 @@ async function getBalances(pool, user, token0, token1) {
 }
 
 async function getSwapBalances(hops, user) {
-  let promises = [];
+  const promises: Promise<BigNumber>[] = [];
   for (let i = 0; i < hops; i++) {
     promises.push(bento.balanceOf(tokens[i].address, pools[i].address));
     promises.push(bento.balanceOf(tokens[i + 1].address, pools[i].address));
@@ -404,12 +424,12 @@ async function getSwapBalances(hops, user) {
 }
 
 async function getSwapAmounts(hops, amountIn, poolBalances, reverse = false) {
-  let promises = [];
+  let promises: Promise<BigNumber>[] = [];
   for (let i = 0; i < hops; i++) {
     promises.push(pools[i].swapFee());
   }
   const poolFees = await Promise.all(promises);
-  let amountOuts = [];
+  let amountOuts: BigNumber[] = [];
 
   if (reverse) {
     for (let i = 0; i < hops; i++) {
@@ -436,7 +456,7 @@ function getAmountOut(amountIn, reserveIn, reserveOut, swapFee) {
 }
 
 function getPath(hops, reverse, nativeOut, user) {
-  let path = [];
+  let path: { pool: string; data: string }[] = [];
 
   if (reverse) {
     for (let i = 0; i < hops; i++) {
@@ -490,11 +510,11 @@ function liquidityCalculations(initialBalances, amount0, amount1, kLast, barFee,
   const updatedTotalSupply = initialBalances[0].add(feeMint);
   const computed = sqrt(initialBalances[1].add(amount0).mul(initialBalances[2].add(amount1)));
   const computedLiquidity = preMintComputed.isZero()
-    ? computed.sub(BigNumber.from(1000))
+    ? computed.sub(ethers.BigNumber.from(1000))
     : computed.sub(preMintComputed).mul(updatedTotalSupply).div(preMintComputed);
   const expectedIncreaseInTotalSupply = computedLiquidity
     .add(feeMint)
-    .add(preMintComputed.isZero() ? BigNumber.from(1000) : ZERO);
+    .add(preMintComputed.isZero() ? ethers.BigNumber.from(1000) : ZERO);
   return [computedLiquidity, expectedIncreaseInTotalSupply];
 }
 
