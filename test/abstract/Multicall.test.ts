@@ -26,7 +26,8 @@ describe("Multicall", async () => {
   });
 
   it("revert when result is less than 68", async () => {
-    await expect(multicall.multicall(["functionThatRevertsWithoutError"])).to.be.reverted;
+    await expect(multicall.multicall([multicall.interface.encodeFunctionData("functionThatRevertsWithoutError")])).to.be
+      .reverted;
   });
 
   it("return data is properly encoded", async () => {
