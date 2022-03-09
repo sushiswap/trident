@@ -2,8 +2,9 @@
 
 pragma solidity >=0.8.0;
 
-import {ConstantProductPool} from "./ConstantProductPool.sol";
 import {PoolDeployer} from "../../abstract/PoolDeployer.sol";
+import {IMasterDeployer} from "../../interfaces/IMasterDeployer.sol";
+import {ConstantProductPool} from "./ConstantProductPool.sol";
 
 /// @notice Contract for deploying Trident exchange Constant Product Pool with configurations.
 /// @author Mudit Gupta.
