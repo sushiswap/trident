@@ -25,6 +25,10 @@ describe("Multicall", async () => {
     ).to.be.revertedWith("abcdef");
   });
 
+  it("revert when result is less than 68", async () => {
+    await expect(multicall.multicall(["functionThatRevertsWithoutError"])).to.be.reverted;
+  });
+
   it("return data is properly encoded", async () => {
     const [data] = await multicall.callStatic.multicall([
       multicall.interface.encodeFunctionData("functionThatReturnsTuple", ["1", "2"]),
