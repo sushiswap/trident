@@ -185,6 +185,23 @@ export async function addLiquidity(poolIndex, amount0, amount1, native0 = false,
   expect(finalBalances[7]).eq(initialBalances[7].add(computedLiquidity));
 }
 
+export async function addLiquidityInMultipleWays() {
+  // The first loop selects the liquidity amounts to add - [0, x], [x, 0], [x, x], [x, y]
+  for (let i = 0; i < 4; i++) {
+    const amount0 = i == 0 ? ZERO : getBigNumber(randBetween(10, 100));
+    const amount1 = i == 1 ? ZERO : i == 2 ? amount0 : getBigNumber(randBetween(10, 100));
+
+    // We need to generate all permutations of [bool, bool]. This loop goes from 0 to 3 and then
+    // we use the binary representation of `j` to get the actual values. 0 in binary = false, 1 = true.
+    // 00 -> false, false
+    // 01 -> false, true
+    for (let j = 0; j < 4; j++) {
+      const binaryJ = j.toString(2).padStart(2, "0");
+      await addLiquidity(0, amount0, amount1, binaryJ[0] == 1, binaryJ[1] == 1);
+    }
+  }
+}
+
 export async function swap(hops, amountIn, reverse = false, nativeIn = false, nativeOut = false) {
   if (hops <= 0) return;
 
