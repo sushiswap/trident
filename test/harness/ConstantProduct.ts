@@ -2,22 +2,17 @@ import { expect } from "chai";
 import { encodedSwapData, getBigNumber, randBetween, sqrt, ZERO, TWO, MAX_FEE } from "../utilities";
 import {
   BentoBoxV1,
-  BentoBoxV1__factory,
   ConstantProductPool,
   ConstantProductPoolFactory,
-  ConstantProductPoolFactory__factory,
   ConstantProductPool__factory,
   ERC20Mock,
   ERC20Mock__factory,
   MasterDeployer,
-  MasterDeployer__factory,
   TridentRouter,
-  TridentRouter__factory,
 } from "../../types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { deployments, ethers } from "hardhat";
 import { BigNumber } from "ethers";
-import { bootstrap } from "../fixtures/bootstrap";
 
 // First token is used as weth
 let tokens: ERC20Mock[];
