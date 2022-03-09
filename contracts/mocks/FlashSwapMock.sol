@@ -20,10 +20,16 @@ contract FlashSwapMock {
     }
 
     function tridentSwapCallback(bytes calldata data) external {
-        (bool success, address token) = abi.decode(data, (bool, address));
+        (bool success, address token, bool viaBento) = abi.decode(data, (bool, address, bool));
         if (success) {
-            IERC20(token).transfer(address(bento), IERC20(token).balanceOf(address(this)));
-            bento.deposit(token, address(this), msg.sender, IERC20(token).balanceOf(address(this)), 0);
+            if (viaBento) {
+                uint256 tokenBalanceBento = bento.balanceOf(token, address(this));
+                bento.transfer(token, address(this), msg.sender, tokenBalanceBento);
+            } else {
+                uint256 tokenBalance = IERC20(token).balanceOf(address(this));
+                IERC20(token).transfer(address(bento), tokenBalance);
+                bento.deposit(token, address(bento), msg.sender, tokenBalance, 0);
+            }
         }
     }
 }
