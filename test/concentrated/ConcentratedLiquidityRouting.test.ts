@@ -10,7 +10,7 @@ import {
 } from "../harness/Concentrated";
 import { getBigNumber } from "../utilities";
 import { Trident } from "../harness/Trident";
-import { createCLRPool } from "./helpers/createCLRPool";
+import { createCLRPool } from "../router/helpers/createCLRPool";
 
 let trident: Trident;
 let defaultAddress: string;

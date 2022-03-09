@@ -44,7 +44,12 @@ export class TridentPoolFactory {
   private MIN_POOL_IMBALANCE = 1 / (1 + 1e-3);
   private MAX_POOL_IMBALANCE = 1 + 1e-3;
 
-  constructor(signer: SignerWithAddress, masterDeployer: MasterDeployer, bento: BentoBoxV1, tridentRouter: TridentRouter) {
+  constructor(
+    signer: SignerWithAddress,
+    masterDeployer: MasterDeployer,
+    bento: BentoBoxV1,
+    tridentRouter: TridentRouter
+  ) {
     this.Signer = signer;
     this.MasterDeployer = masterDeployer;
     this.Bento = bento;
@@ -56,7 +61,9 @@ export class TridentPoolFactory {
   }
 
   public async getRandomPool(t0: RToken, t1: RToken, price: number, rnd: () => number, fee: number): Promise<RPool> {
-    return rnd() > 0.5 ? await this.getCLPool(t0, t1, price, rnd, fee, 60, 1e20) : await this.getCPPool(t0, t1, price, rnd, fee);
+    return rnd() > 0.5
+      ? await this.getCLPool(t0, t1, price, rnd, fee, 60, 1e20)
+      : await this.getCPPool(t0, t1, price, rnd, fee);
   }
 
   public async getCPPool(
@@ -86,7 +93,9 @@ export class TridentPoolFactory {
       [t0.address, t1.address, feeContract, true]
     );
 
-    let deployResult = await (await this.MasterDeployer.deployPool(this.ConstantPoolFactory.address, deployData)).wait();
+    let deployResult = await (
+      await this.MasterDeployer.deployPool(this.ConstantPoolFactory.address, deployData)
+    ).wait();
 
     let poolAddress;
 
@@ -101,10 +110,23 @@ export class TridentPoolFactory {
 
     await constantProductPool.mint(ethers.utils.defaultAbiCoder.encode(["address"], [this.Signer.address]));
 
-    return new ConstantProductRPool(constantProductPool.address, t0, t1, fee, getBigNumber(reserve0), getBigNumber(reserve1));
+    return new ConstantProductRPool(
+      constantProductPool.address,
+      t0,
+      t1,
+      fee,
+      getBigNumber(reserve0),
+      getBigNumber(reserve1)
+    );
   }
 
-  public async getHybridPool(t0: RToken, t1: RToken, price: number, rnd: () => number, reserve: number = 0): Promise<HybridRPool> {
+  public async getHybridPool(
+    t0: RToken,
+    t1: RToken,
+    price: number,
+    rnd: () => number,
+    reserve: number = 0
+  ): Promise<HybridRPool> {
     const fee = this.getPoolFee(rnd) * 10_000;
     const A = 7000;
     const imbalance = this.getPoolImbalance(rnd);
@@ -120,7 +142,10 @@ export class TridentPoolFactory {
       reserve1 = Math.round(reserve / price);
     }
 
-    const deployData = ethers.utils.defaultAbiCoder.encode(["address", "address", "uint256", "uint256"], [t0.address, t1.address, fee, A]);
+    const deployData = ethers.utils.defaultAbiCoder.encode(
+      ["address", "address", "uint256", "uint256"],
+      [t0.address, t1.address, fee, A]
+    );
 
     let deployResult = await (await this.MasterDeployer.deployPool(this.HybridPoolFactory.address, deployData)).wait();
 
@@ -168,7 +193,9 @@ export class TridentPoolFactory {
       [t0.address, t1.address, feeContract, getBigNumber(Math.sqrt(price) * 2 ** 96), tickIncrement]
     );
 
-    let deployResult = await (await this.MasterDeployer.deployPool(this.ConcentratedPoolFactory.address, deployData)).wait();
+    let deployResult = await (
+      await this.MasterDeployer.deployPool(this.ConcentratedPoolFactory.address, deployData)
+    ).wait();
 
     let poolAddress;
 
@@ -185,7 +212,8 @@ export class TridentPoolFactory {
     const poolPrice = (await pool.getPriceAndNearestTicks())._price;
     const tickAtPrice = await this.TickMath.getTickAtSqrtRatio(poolPrice);
     const nearestValidTick = tickAtPrice - (tickAtPrice % tickSpacing);
-    const nearestEvenValidTick = (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
+    const nearestEvenValidTick =
+      (nearestValidTick / tickSpacing) % 2 == 0 ? nearestValidTick : nearestValidTick + tickSpacing;
 
     let lower = nearestEvenValidTick - step;
     let upper = nearestEvenValidTick + step + tickSpacing;
@@ -218,7 +246,11 @@ export class TridentPoolFactory {
 
     // await this.TridentRouter.addLiquidityLazy(pool.address, liquidity, mintData);
 
-    addLiquidityParams = helper.setTicks(lower - tickIncrement * step, upper + tickIncrement * step, addLiquidityParams);
+    addLiquidityParams = helper.setTicks(
+      lower - tickIncrement * step,
+      upper + tickIncrement * step,
+      addLiquidityParams
+    );
 
     await this.addLiquidityViaManager(pool, addLiquidityParams);
 
@@ -240,7 +272,18 @@ export class TridentPoolFactory {
       recipient: string;
     }
   ) {
-    const { amount0Desired, amount1Desired, native0, native1, lowerOld, lower, upperOld, upper, positionOwner, recipient } = params;
+    const {
+      amount0Desired,
+      amount1Desired,
+      native0,
+      native1,
+      lowerOld,
+      lower,
+      upperOld,
+      upper,
+      positionOwner,
+      recipient,
+    } = params;
     const [currentPrice, priceLower, priceUpper] = await this.getPrices(pool, [lower, upper]);
     const liquidity = getLiquidityForAmount(priceLower, currentPrice, priceUpper, amount1Desired, amount0Desired);
     await this.ConcentratedPoolManager.mint(
@@ -284,19 +327,25 @@ export class TridentPoolFactory {
 
     const clPoolFactory = await ethers.getContractFactory("ConcentratedLiquidityPoolFactory", { libraries: clpLibs });
 
-    this.ConcentratedLiquidityPool = await ethers.getContractFactory("ConcentratedLiquidityPool", { libraries: clpLibs });
+    this.ConcentratedLiquidityPool = await ethers.getContractFactory("ConcentratedLiquidityPool", {
+      libraries: clpLibs,
+    });
 
     this.ConcentratedPoolManager = (await clPoolManagerFactory.deploy(
       this.MasterDeployer.address,
       this.MasterDeployer.address
     )) as ConcentratedLiquidityPoolManager;
-    this.ConcentratedPoolFactory = (await clPoolFactory.deploy(this.MasterDeployer.address)) as ConcentratedLiquidityPoolFactory;
+    this.ConcentratedPoolFactory = (await clPoolFactory.deploy(
+      this.MasterDeployer.address
+    )) as ConcentratedLiquidityPoolFactory;
     this.TickMath = (await tickMath.deploy()) as TickMathMock;
 
     this.HybridPoolFactory = (await hybridPoolFactory.deploy(this.MasterDeployer.address)) as HybridPoolFactory;
     await this.HybridPoolFactory.deployed();
 
-    this.ConstantPoolFactory = (await constantPoolFactory.deploy(this.MasterDeployer.address)) as ConstantProductPoolFactory;
+    this.ConstantPoolFactory = (await constantPoolFactory.deploy(
+      this.MasterDeployer.address
+    )) as ConstantProductPoolFactory;
     await this.ConstantPoolFactory.deployed();
 
     await this.whitelistFactories();
