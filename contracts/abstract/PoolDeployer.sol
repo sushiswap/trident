@@ -56,10 +56,8 @@ abstract contract PoolDeployer {
         uint256 count
     ) external view returns (address[] memory pairPools) {
         pairPools = new address[](count);
-        unchecked {
-            for (uint256 i; i < count; ++i) {
-                pairPools[i] = pools[token0][token1][startIndex + i];
-            }
+        for (uint256 i = 0; i < count; i++) {
+            pairPools[i] = pools[token0][token1][startIndex + i];
         }
     }
 }
