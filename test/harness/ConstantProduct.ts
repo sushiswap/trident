@@ -4,27 +4,29 @@ import {
   BentoBoxV1,
   BentoBoxV1__factory,
   ConstantProductPool,
+  ConstantProductPoolFactory,
   ConstantProductPoolFactory__factory,
   ConstantProductPool__factory,
   ERC20Mock,
+  ERC20Mock__factory,
   MasterDeployer,
   MasterDeployer__factory,
   TridentRouter,
   TridentRouter__factory,
 } from "../../types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { ethers } from "hardhat";
+import { deployments, ethers } from "hardhat";
 import { BigNumber } from "ethers";
-import { initializeTokens } from "../fixtures/initializeTokens";
+import { bootstrap } from "../fixtures/bootstrap";
 
-let accounts: SignerWithAddress[] = [];
 // First token is used as weth
-let tokens: ERC20Mock[] = [];
+let tokens: ERC20Mock[];
 let pools: ConstantProductPool[] = [];
-let bento: BentoBoxV1;
+let accounts: SignerWithAddress[] = [];
+let bentoBox: BentoBoxV1;
 let masterDeployer: MasterDeployer;
 let router: TridentRouter;
-let aliceEncoded: string;
+let factory: ConstantProductPoolFactory;
 
 export async function initialize() {
   if (accounts.length > 0) {
@@ -32,46 +34,30 @@ export async function initialize() {
   }
 
   accounts = await ethers.getSigners();
-  aliceEncoded = ethers.utils.defaultAbiCoder.encode(["address"], [accounts[0].address]);
 
-  tokens = await initializeTokens();
+  const ERC20 = await ethers.getContractFactory<ERC20Mock__factory>("ERC20Mock");
 
-  const Bento = await ethers.getContractFactory<BentoBoxV1__factory>("BentoBoxV1");
-  const Deployer = await ethers.getContractFactory<MasterDeployer__factory>("MasterDeployer");
-  const PoolFactory = await ethers.getContractFactory<ConstantProductPoolFactory__factory>(
-    "ConstantProductPoolFactory"
+  tokens = await Promise.all(
+    [...Array(10).keys()].map((n) => ERC20.deploy(`Token ${n}`, `TOKEN${n}`, getBigNumber(1000000)))
   );
-  const TridentRouter = await ethers.getContractFactory<TridentRouter__factory>("TridentRouter");
-  const Pool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
 
-  bento = await Bento.deploy(tokens[0].address);
-  await bento.deployed();
-
-  masterDeployer = await Deployer.deploy(randBetween(1, 9999), accounts[1].address, bento.address);
-  await masterDeployer.deployed();
-
-  router = await TridentRouter.deploy(bento.address, masterDeployer.address, tokens[0].address);
-  await router.deployed();
-
-  // Whitelist Router on BentoBox
-  await bento.whitelistMasterContract(router.address, true);
-
-  const poolFactory = await PoolFactory.deploy(masterDeployer.address);
-  await poolFactory.deployed();
-  // Whitelist pool factory in master deployer
-  await masterDeployer.addToWhitelist(poolFactory.address);
+  await deployments.fixture();
+  bentoBox = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+  masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
+  factory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
+  router = await ethers.getContract<TridentRouter>("TridentRouter");
 
   // Approve BentoBox token deposits and deposit tokens in bentobox
   await Promise.all(
     tokens.map((token) =>
-      token.approve(bento.address, getBigNumber(1000000)).then(() => {
-        bento.deposit(token.address, accounts[0].address, accounts[0].address, getBigNumber(500000), 0);
+      token.approve(bentoBox.address, getBigNumber(1000000)).then(() => {
+        bentoBox.deposit(token.address, accounts[0].address, accounts[0].address, getBigNumber(500000), 0);
       })
     )
   );
 
   // Approve Router to spend alice's BentoBox tokens
-  await bento.setMasterContractApproval(
+  await bentoBox.setMasterContractApproval(
     accounts[0].address,
     router.address,
     true,
@@ -79,6 +65,8 @@ export async function initialize() {
     "0x0000000000000000000000000000000000000000000000000000000000000000",
     "0x0000000000000000000000000000000000000000000000000000000000000000"
   );
+
+  const Pool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
 
   // Create pools
   for (let i = 0; i < tokens.length - 1; i++) {
@@ -100,10 +88,10 @@ export async function initialize() {
       .encode(["bytes", "address"], [deployData, masterDeployer.address])
       .substring(2);
     const initCodeHash = ethers.utils.keccak256(Pool.bytecode + constructorParams);
-    const poolAddress = ethers.utils.getCreate2Address(poolFactory.address, salt, initCodeHash);
+    const poolAddress = ethers.utils.getCreate2Address(factory.address, salt, initCodeHash);
     pools.push(Pool.attach(poolAddress));
-    await masterDeployer.deployPool(poolFactory.address, deployData).then((tx) => tx.wait());
-    const deployedPoolAddress = (await poolFactory.getPools(token0.address, token1.address, 0, 1))[0];
+    await masterDeployer.deployPool(factory.address, deployData).then((tx) => tx.wait());
+    const deployedPoolAddress = (await factory.getPools(token0.address, token1.address, 0, 1))[0];
     expect(poolAddress).eq(deployedPoolAddress);
   }
 
@@ -157,7 +145,12 @@ export async function addLiquidity(poolIndex, amount0, amount1, native0 = false,
     swapFee
   );
 
-  var addLiquidityPromise = router.addLiquidity(liquidityInput, pool.address, computedLiquidity, aliceEncoded);
+  var addLiquidityPromise = router.addLiquidity(
+    liquidityInput,
+    pool.address,
+    computedLiquidity,
+    ethers.utils.defaultAbiCoder.encode(["address"], [accounts[0].address])
+  );
   await expect(addLiquidityPromise)
     .to.emit(pool, "Mint")
     .withArgs(router.address, amount0, amount1, accounts[0].address);
@@ -381,10 +374,10 @@ export async function burnLiquidity(poolIndex, amount, withdrawType, unwrapBento
 async function getBalances(pool, user, token0, token1) {
   return Promise.all([
     pool.totalSupply(),
-    bento.balanceOf(token0.address, pool.address),
-    bento.balanceOf(token1.address, pool.address),
-    bento.balanceOf(token0.address, user),
-    bento.balanceOf(token1.address, user),
+    bentoBox.balanceOf(token0.address, pool.address),
+    bentoBox.balanceOf(token1.address, pool.address),
+    bentoBox.balanceOf(token0.address, user),
+    bentoBox.balanceOf(token1.address, user),
     token0.balanceOf(user),
     token1.balanceOf(user),
     pool.balanceOf(user),
@@ -394,15 +387,15 @@ async function getBalances(pool, user, token0, token1) {
 async function getSwapBalances(hops, user) {
   const promises: Promise<BigNumber>[] = [];
   for (let i = 0; i < hops; i++) {
-    promises.push(bento.balanceOf(tokens[i].address, pools[i].address));
-    promises.push(bento.balanceOf(tokens[i + 1].address, pools[i].address));
+    promises.push(bentoBox.balanceOf(tokens[i].address, pools[i].address));
+    promises.push(bentoBox.balanceOf(tokens[i + 1].address, pools[i].address));
   }
   const poolBalances = await Promise.all(promises);
   const userBalances = await Promise.all([
-    bento.balanceOf(tokens[0].address, user),
+    bentoBox.balanceOf(tokens[0].address, user),
     tokens[0].balanceOf(user),
     tokens[hops].balanceOf(user),
-    bento.balanceOf(tokens[hops].address, user),
+    bentoBox.balanceOf(tokens[hops].address, user),
   ]);
   return [poolBalances, userBalances];
 }

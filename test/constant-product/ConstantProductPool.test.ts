@@ -188,10 +188,6 @@ describe("Constant Product Pool", () => {
     it("returns 999999999 given input of token1 in 1e18:1e18 pool, with bar fee 0 & swap fee 0", async () => {
       const pool = await initializedConstantProductPool();
       const reserves = await pool.getReserves();
-      console.log({
-        reserve0: reserves[0].toString(),
-        reserve1: reserves[1].toString(),
-      });
       expect(
         await pool.getAmountOut(
           ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token1(), "1000000000"])
