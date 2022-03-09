@@ -2,14 +2,15 @@
 
 pragma solidity >=0.8.0;
 
-import "@rari-capital/solmate/src/tokens/ERC20.sol";
-import "@rari-capital/solmate/src/utils/ReentrancyGuard.sol";
+import {ERC20} from "@rari-capital/solmate/src/tokens/ERC20.sol";
+import {ReentrancyGuard} from "@rari-capital/solmate/src/utils/ReentrancyGuard.sol";
 
-import "../../interfaces/IBentoBoxMinimal.sol";
-import "../../interfaces/IMasterDeployer.sol";
-import "../../interfaces/IPool.sol";
-import "../../interfaces/ITridentCallee.sol";
-import "../../libraries/TridentMath.sol";
+import {IBentoBoxMinimal} from "../../interfaces/IBentoBoxMinimal.sol";
+import {IMasterDeployer} from "../../interfaces/IMasterDeployer.sol";
+import {IPool} from "../../interfaces/IPool.sol";
+import {ITridentCallee} from "../../interfaces/ITridentCallee.sol";
+
+import {TridentMath} from "../../libraries/TridentMath.sol";
 
 /// @notice Trident exchange pool template with constant product formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares.
@@ -44,13 +45,13 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
 
     bytes32 public constant override poolIdentifier = "Trident:ConstantProduct";
 
-    constructor(bytes memory _deployData, address _masterDeployer) ERC20("Sushi LP Token", "SLP", 18) {
+    constructor(bytes memory _deployData, IMasterDeployer _masterDeployer) ERC20("Sushi LP Token", "SLP", 18) {
         (address _token0, address _token1, uint256 _swapFee, bool _twapSupport) = abi.decode(
             _deployData,
             (address, address, uint256, bool)
         );
 
-        // @dev Factory ensures that the tokens are sorted.
+        // Factory ensures that the tokens are sorted.
         require(_token0 != address(0), "ZERO_ADDRESS");
         require(_token0 != _token1, "IDENTICAL_ADDRESSES");
         require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
@@ -58,14 +59,14 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
         token0 = _token0;
         token1 = _token1;
         swapFee = _swapFee;
-        // @dev This is safe from underflow - `swapFee` cannot exceed `MAX_FEE` per previous check.
+        // This is safe from underflow - `swapFee` cannot exceed `MAX_FEE` per previous check.
         unchecked {
             MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
         }
-        barFee = IMasterDeployer(_masterDeployer).barFee();
-        barFeeTo = IMasterDeployer(_masterDeployer).barFeeTo();
-        bento = IBentoBoxMinimal(IMasterDeployer(_masterDeployer).bento());
-        masterDeployer = IMasterDeployer(_masterDeployer);
+        barFee = _masterDeployer.barFee();
+        barFeeTo = _masterDeployer.barFeeTo();
+        bento = IBentoBoxMinimal(_masterDeployer.bento());
+        masterDeployer = _masterDeployer;
         if (_twapSupport) blockTimestampLast = uint32(block.timestamp);
     }
 
@@ -119,7 +120,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
         _burn(address(this), liquidity);
         _transfer(token0, amount0, recipient, unwrapBento);
         _transfer(token1, amount1, recipient, unwrapBento);
-        // @dev This is safe from underflow - amounts are lesser figures derived from balances.
+        // This is safe from underflow - amounts are lesser figures derived from balances.
         unchecked {
             balance0 -= amount0;
             balance1 -= amount1;
@@ -152,14 +153,14 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
         // Swap one token for another
         unchecked {
             if (tokenOut == token1) {
-                // @dev Swap `token0` for `token1`
+                // Swap `token0` for `token1`
                 // - calculate `amountOut` as if the user first withdrew balanced liquidity and then swapped `token0` for `token1`.
                 amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1);
                 _transfer(token1, amount1, recipient, unwrapBento);
                 amountOut = amount1;
                 amount0 = 0;
             } else {
-                // @dev Swap `token1` for `token0`.
+                // Swap `token1` for `token0`.
                 require(tokenOut == token0, "INVALID_OUTPUT_TOKEN");
                 amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0);
                 _transfer(token0, amount0, recipient, unwrapBento);
@@ -233,7 +234,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
 
     /// @dev Updates `barFee` for Trident protocol.
     function updateBarFee() public {
-        barFee = IMasterDeployer(masterDeployer).barFee();
+        barFee = masterDeployer.barFee();
     }
 
     function _getReserves()
@@ -264,7 +265,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
     ) internal {
         require(balance0 <= type(uint112).max && balance1 <= type(uint112).max, "OVERFLOW");
         if (_blockTimestampLast == 0) {
-            // @dev TWAP support is disabled for gas efficiency.
+            // TWAP support is disabled for gas efficiency.
             reserve0 = uint112(balance0);
             reserve1 = uint112(balance1);
         } else {
@@ -291,7 +292,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
         if (_kLast != 0) {
             computed = TridentMath.sqrt(uint256(_reserve0) * _reserve1);
             if (computed > _kLast) {
-                // @dev `barFee` % of increase in liquidity.
+                // `barFee` % of increase in liquidity.
                 uint256 _barFee = barFee;
                 uint256 numerator = _totalSupply * (computed - _kLast) * _barFee;
                 uint256 denominator = (MAX_FEE - _barFee) * computed + _barFee * _kLast;
@@ -380,7 +381,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
         }
     }
 
-    /// @dev returned values are in terms of BentoBox "shares".
+    /// @dev Returned values are in terms of BentoBox "shares".
     function getReserves()
         public
         view
@@ -393,7 +394,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
         return _getReserves();
     }
 
-    /// @dev returned values are the native ERC20 token amounts.
+    /// @dev Returned values are the native ERC20 token amounts.
     function getNativeReserves()
         public
         view
