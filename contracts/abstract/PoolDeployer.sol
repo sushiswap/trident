@@ -27,7 +27,7 @@ abstract contract PoolDeployer {
 
     function _registerPool(
         address pool,
-        address[] memory tokens,
+        address[] calldata tokens,
         bytes32 salt
     ) internal onlyMaster {
         // Store the address of the deployed contract.
@@ -37,7 +37,7 @@ abstract contract PoolDeployer {
         unchecked {
             for (uint256 i; i < tokens.length - 1; ++i) {
                 if (tokens[i] >= tokens[i + 1]) revert InvalidTokenOrder();
-                for (uint256 j = ++i; j < tokens.length; ++j) {
+                for (uint256 j = i + 1; j < tokens.length; ++j) {
                     pools[tokens[i]][tokens[j]].push(pool);
                     pools[tokens[j]][tokens[i]].push(pool);
                 }
