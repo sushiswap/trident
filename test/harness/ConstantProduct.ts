@@ -27,14 +27,6 @@ let router: TridentRouter;
 let aliceEncoded: string;
 
 export async function initialize() {
-  // TODO: Make use of fixtures...
-  // await deployments.fixture(["TridentRouter"]);
-  // tokens = await initilizeTokens();
-  // bento = await ethers.getContract("BentoBoxV1");
-  // masterDeployer = await ethers.getContract("MasterDeployer");
-  // poolFactory = await ethers.getContract("ConstantProductPoolFactory");
-  // router = await ethers.getContract("TridentRouter");
-
   if (accounts.length > 0) {
     return;
   }

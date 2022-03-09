@@ -63,31 +63,6 @@ describe("Constant Product Pool", () => {
     });
   });
 
-  describe("#swap", function () {
-    it("reverts on uninitialized", async () => {
-      const pool = await uninitializedConstantProductPool();
-      const data = ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "bool"],
-        [await pool.token0(), "0x0000000000000000000000000000000000000000", false]
-      );
-      await expect(pool.swap(data)).to.be.revertedWith("POOL_UNINITIALIZED");
-    });
-  });
-
-  describe("#flashSwap", function () {
-    it("reverts on uninitialized", async () => {
-      const pool = await uninitializedConstantProductPool();
-      const data = ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "bool", "uint256", "bytes"],
-        [await pool.token0(), "0x0000000000000000000000000000000000000000", false, 0, "0x"]
-      );
-      await expect(pool.flashSwap(data)).to.be.revertedWith("POOL_UNINITIALIZED");
-    });
-    it.skip("succeeds in flash swapping", async () => {
-      //
-    });
-  });
-
   describe("#mint", function () {
     it("reverts if total supply is 0 and both token amounts are 0", async () => {
       const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
@@ -121,6 +96,31 @@ describe("Constant Product Pool", () => {
 
   describe("#burnSingle", function () {
     //
+  });
+
+  describe("#swap", function () {
+    it("reverts on uninitialized", async () => {
+      const pool = await uninitializedConstantProductPool();
+      const data = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [await pool.token0(), "0x0000000000000000000000000000000000000000", false]
+      );
+      await expect(pool.swap(data)).to.be.revertedWith("POOL_UNINITIALIZED");
+    });
+  });
+
+  describe("#flashSwap", function () {
+    it("reverts on uninitialized", async () => {
+      const pool = await uninitializedConstantProductPool();
+      const data = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool", "uint256", "bytes"],
+        [await pool.token0(), "0x0000000000000000000000000000000000000000", false, 0, "0x"]
+      );
+      await expect(pool.flashSwap(data)).to.be.revertedWith("POOL_UNINITIALIZED");
+    });
+    it.skip("succeeds in flash swapping", async () => {
+      //
+    });
   });
 
   describe("#poolIdentifier", function () {
