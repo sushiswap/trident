@@ -26,7 +26,8 @@ describe("Multicall", async () => {
   });
 
   it("revert when result is less than 68", async () => {
-    await expect(multicall.multicall(["functionThatRevertsWithoutError"])).to.be.reverted;
+    await expect(multicall.multicall([multicall.interface.encodeFunctionData("functionThatRevertsWithoutError")])).to.be
+      .reverted;
   });
 
   it("return data is properly encoded", async () => {
@@ -57,17 +58,5 @@ describe("Multicall", async () => {
     it("msg.sender", async () => {
       expect(await multicall.returnSender()).to.eq(wallets[0].address);
     });
-  });
-
-  it("gas cost of pay w/o multicall [ @skip-on-coverage ]", async () => {
-    if (process.env.COVERAGE !== "true") {
-      await snapshotGasCost(multicall.pays({ value: 3 }));
-    }
-  });
-
-  it("gas cost of pay w/ multicall [ @skip-on-coverage ]", async () => {
-    if (process.env.COVERAGE !== "true") {
-      await snapshotGasCost(multicall.multicall([multicall.interface.encodeFunctionData("pays")], { value: 3 }));
-    }
   });
 });

@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity >= 0.8.0;
+pragma solidity >=0.8.0;
 
 import "../abstract/Multicall.sol";
 
 contract MulticallMock is Multicall {
     function functionThatRevertsWithError(string memory error) external pure {
         revert(error);
+    }
+
+    function functionThatRevertsWithoutError() external pure {
+        revert();
     }
 
     struct Tuple {
