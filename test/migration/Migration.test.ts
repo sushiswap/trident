@@ -1,9 +1,12 @@
 import { ethers, network } from "hardhat";
 import { expect } from "chai";
 import { customError } from "../utilities";
+import { Migrator__factory, TridentSushiRollCP, TridentSushiRollCP__factory } from "../../types";
 
 describe("Migration", function () {
-  let _owner, owner, chef, migrator, usdcWethLp, usdc, weth, masterDeployer, factory, Pool, snapshotId, ERC20, manualMigrator;
+  let _owner, owner, chef, migrator, usdcWethLp, usdc, weth, masterDeployer, factory, Pool, snapshotId, ERC20;
+
+  let manualMigrator: TridentSushiRollCP;
 
   before(async () => {
     snapshotId = await ethers.provider.send("evm_snapshot", []);
@@ -26,8 +29,8 @@ describe("Migration", function () {
     const BentoBox = await ethers.getContractFactory("BentoBoxV1");
     const MasterDeployer = await ethers.getContractFactory("MasterDeployer");
     const Factory = await ethers.getContractFactory("ConstantProductPoolFactory");
-    const ManualMigrator = await ethers.getContractFactory("TridentSushiRollCP");
-    const Migrator = await ethers.getContractFactory("Migrator");
+    const ManualMigrator = await ethers.getContractFactory<TridentSushiRollCP__factory>("TridentSushiRollCP");
+    const Migrator = await ethers.getContractFactory<Migrator__factory>("Migrator");
     Pool = await ethers.getContractFactory("ConstantProductPool");
     ERC20 = await ethers.getContractFactory("ERC20Mock");
     chef = await ethers.getContractAt(mcABI, "0xc2EdaD668740f1aA35E4D8f227fB8E17dcA888Cd", owner);
@@ -98,16 +101,19 @@ describe("Migration", function () {
     expect(intermediaryTokenBalance.gt(0)).to.be.true;
 
     const newMcBalance = await intermediaryToken.balanceOf(chef.address);
-    expect(newMcBalance.toString()).to.be.eq(newMcBalance.toString(), "MC didn't receive the correct amount of the intermediary token");
+    expect(newMcBalance.toString()).to.be.eq(
+      newMcBalance.toString(),
+      "MC didn't receive the correct amount of the intermediary token"
+    );
   });
 
   it("Should migrate uniswap v2 style Lp positions outside of MasterChef", async () => {
     // _owner has some usdc-weth lp coins we can migrate
     const balance = await usdcWethLp.balanceOf(_owner);
     usdcWethLp.connect(owner).approve(manualMigrator.address, balance);
-    await expect(manualMigrator.connect(owner).migrate(usdcWethLp.address, balance.div(2), 30, false, balance)).to.be.revertedWith(
-      customError("MinimumOutput")
-    );
+    await expect(
+      manualMigrator.connect(owner).migrate(usdcWethLp.address, balance.div(2), 30, false, balance)
+    ).to.be.revertedWith(customError("MinimumOutput"));
     await manualMigrator.connect(owner).migrate(usdcWethLp.address, balance.div(2), 30, false, 1);
     const poolAddy = (await factory.getPools(usdc.address, weth.address, 0, 1))[0];
     const pool = await ERC20.attach(poolAddy);
