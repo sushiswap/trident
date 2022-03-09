@@ -186,7 +186,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
     /// @param minLiquidity Minimum output liquidity - caps slippage.
     /// @param data Data required by the pool to add liquidity.
     function addLiquidity(
-        TokenInput[] memory tokenInput,
+        TokenInput[] calldata tokenInput,
         address pool,
         uint256 minLiquidity,
         bytes calldata data
@@ -216,26 +216,20 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         address pool,
         uint256 liquidity,
         bytes calldata data,
-        IPool.TokenAmount[] memory minWithdrawals
+        IPool.TokenAmount[] calldata minWithdrawals
     ) public {
         isWhiteListed(pool);
-        ERC20(pool).safeTransferFrom(msg.sender, pool, liquidity);
+        SafeTransferLib.safeTransferFrom(ERC20(pool), msg.sender, pool, liquidity);
         IPool.TokenAmount[] memory withdrawnLiquidity = IPool(pool).burn(data);
-        for (uint256 i; i < minWithdrawals.length; ) {
+        for (uint256 i; i < minWithdrawals.length; i++) {
             uint256 j;
-            unchecked {
-                i++;
-            }
-            for (; j < withdrawnLiquidity.length; ) {
+            for (; j < withdrawnLiquidity.length; j++) {
                 if (withdrawnLiquidity[j].token == minWithdrawals[i].token) {
                     if (withdrawnLiquidity[j].amount < minWithdrawals[i].amount) revert TooLittleReceived();
                     break;
                 }
-                unchecked {
-                    j++;
-                }
             }
-            // @dev A token that is present in `minWithdrawals` is missing from `withdrawnLiquidity`.
+            // A token that is present in `minWithdrawals` is missing from `withdrawnLiquidity`.
             if (j >= withdrawnLiquidity.length) revert IncorrectTokenWithdrawn();
         }
     }
