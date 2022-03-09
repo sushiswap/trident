@@ -11,7 +11,7 @@ import {ConstantProductPool} from "./ConstantProductPool.sol";
 contract ConstantProductPoolFactory is PoolDeployer {
     constructor(address _masterDeployer) PoolDeployer(_masterDeployer) {}
 
-    function deployPool(bytes memory _deployData) public returns (address pool) {
+    function deployPool(bytes memory _deployData) external returns (address pool) {
         (address tokenA, address tokenB, uint256 swapFee, bool twapSupport) = abi.decode(_deployData, (address, address, uint256, bool));
 
         if (tokenA > tokenB) {
