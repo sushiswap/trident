@@ -72,7 +72,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
 
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
     /// The router must ensure that sufficient LP tokens are minted by using the return value.
-    function mint(bytes calldata data) public override nonReentrant returns (uint256 liquidity) {
+    function mint(bytes calldata data) external override nonReentrant returns (uint256 liquidity) {
         address recipient = abi.decode(data, (address));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
@@ -106,7 +106,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
     }
 
     /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
-    function burn(bytes calldata data) public override nonReentrant returns (IPool.TokenAmount[] memory withdrawnAmounts) {
+    function burn(bytes calldata data) external override nonReentrant returns (IPool.TokenAmount[] memory withdrawnAmounts) {
         (address recipient, bool unwrapBento) = abi.decode(data, (address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
@@ -136,7 +136,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
 
     /// @dev Burns LP tokens sent to this contract and swaps one of the output tokens for another
     /// - i.e., the user gets a single token out by burning LP tokens.
-    function burnSingle(bytes calldata data) public override nonReentrant returns (uint256 amountOut) {
+    function burnSingle(bytes calldata data) external override nonReentrant returns (uint256 amountOut) {
         (address tokenOut, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         uint256 liquidity = balanceOf[address(this)];
@@ -176,7 +176,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
     }
 
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
-    function swap(bytes calldata data) public override nonReentrant returns (uint256 amountOut) {
+    function swap(bytes calldata data) external override nonReentrant returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         require(_reserve0 > 0, "POOL_UNINITIALIZED");
@@ -203,7 +203,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
     }
 
     /// @dev Swaps one token for another. The router must support swap callbacks and ensure there isn't too much slippage.
-    function flashSwap(bytes calldata data) public override nonReentrant returns (uint256 amountOut) {
+    function flashSwap(bytes calldata data) external override nonReentrant returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento, uint256 amountIn, bytes memory context) = abi.decode(
             data,
             (address, address, bool, uint256, bytes)
@@ -233,7 +233,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
     }
 
     /// @dev Updates `barFee` for Trident protocol.
-    function updateBarFee() public {
+    function updateBarFee() external {
         barFee = masterDeployer.barFee();
     }
 
@@ -353,13 +353,13 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
         }
     }
 
-    function getAssets() public view override returns (address[] memory assets) {
+    function getAssets() external view override returns (address[] memory assets) {
         assets = new address[](2);
         assets[0] = token0;
         assets[1] = token1;
     }
 
-    function getAmountOut(bytes calldata data) public view override returns (uint256 finalAmountOut) {
+    function getAmountOut(bytes calldata data) external view override returns (uint256 finalAmountOut) {
         (address tokenIn, uint256 amountIn) = abi.decode(data, (address, uint256));
         (uint112 _reserve0, uint112 _reserve1, ) = _getReserves();
         if (tokenIn == token0) {
@@ -370,7 +370,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
         }
     }
 
-    function getAmountIn(bytes calldata data) public view override returns (uint256 finalAmountIn) {
+    function getAmountIn(bytes calldata data) external view override returns (uint256 finalAmountIn) {
         (address tokenOut, uint256 amountOut) = abi.decode(data, (address, uint256));
         (uint112 _reserve0, uint112 _reserve1, ) = _getReserves();
         if (tokenOut == token1) {
@@ -383,7 +383,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
 
     /// @dev Returned values are in terms of BentoBox "shares".
     function getReserves()
-        public
+        external
         view
         returns (
             uint112 _reserve0,
@@ -396,7 +396,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
 
     /// @dev Returned values are the native ERC20 token amounts.
     function getNativeReserves()
-        public
+        external
         view
         returns (
             uint256 _nativeReserve0,
