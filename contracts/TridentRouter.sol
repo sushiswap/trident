@@ -4,14 +4,12 @@ pragma solidity >=0.8.0;
 
 import {Multicall} from "./abstract/Multicall.sol";
 import {SelfPermit} from "./abstract/SelfPermit.sol";
-
+import {Transfer} from "./libraries/Transfer.sol";
 import {IBentoBoxMinimal} from "./interfaces/IBentoBoxMinimal.sol";
 import {IMasterDeployer} from "./interfaces/IMasterDeployer.sol";
 import {IPool} from "./interfaces/IPool.sol";
 import {ITridentRouter} from "./interfaces/ITridentRouter.sol";
 import {IWETH9} from "./interfaces/IWETH9.sol";
-
-import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
 
 /// @dev Custom Errors
 error NotWethSender();
@@ -23,7 +21,7 @@ error InvalidPool();
 
 /// @notice Router contract that helps in swapping across Trident pools.
 contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
-    using SafeTransferLib for address;
+    using Transfer for address;
 
     /// @dev Cached whitelisted pools.
     mapping(address => bool) internal whitelistedPools;
@@ -213,7 +211,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         IPool.TokenAmount[] calldata minWithdrawals
     ) public {
         isWhiteListed(pool);
-        SafeTransferLib.safeTransferFrom(pool, msg.sender, pool, liquidity);
+        pool.safeTransferFrom(msg.sender, pool, liquidity);
         IPool.TokenAmount[] memory withdrawnLiquidity = IPool(pool).burn(data);
         for (uint256 i; i < minWithdrawals.length; ++i) {
             uint256 j;
