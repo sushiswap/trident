@@ -2,6 +2,11 @@
 
 pragma solidity >=0.8.0;
 
+/// @dev Custom Errors
+error UnauthorisedDeployer();
+error ZeroAddress();
+error InvalidTokenOrder();
+
 /// @notice Trident pool deployer for whitelisted template factories.
 /// @author Mudit Gupta.
 abstract contract PoolDeployer {
@@ -9,10 +14,6 @@ abstract contract PoolDeployer {
 
     mapping(address => mapping(address => address[])) public pools;
     mapping(bytes32 => address) public configAddress;
-
-    error UnauthorisedDeployer();
-    error ZeroAddress();
-    error InvalidTokenOrder();
 
     modifier onlyMaster() {
         if (msg.sender != masterDeployer) revert UnauthorisedDeployer();
@@ -29,14 +30,14 @@ abstract contract PoolDeployer {
         address[] memory tokens,
         bytes32 salt
     ) internal onlyMaster {
-        // @dev Store the address of the deployed contract.
+        // Store the address of the deployed contract.
         configAddress[salt] = pool;
-        // @dev Attacker used underflow, it was not very effective. poolimon!
+        // Attacker used underflow, it was not very effective. poolimon!
         // null token array would cause deployment to fail via out of bounds memory axis/gas limit.
         unchecked {
-            for (uint256 i; i < tokens.length - 1; i++) {
+            for (uint256 i; i < tokens.length - 1; ++i) {
                 if (tokens[i] >= tokens[i + 1]) revert InvalidTokenOrder();
-                for (uint256 j = i + 1; j < tokens.length; j++) {
+                for (uint256 j = i + 1; j < tokens.length; ++j) {
                     pools[tokens[i]][tokens[j]].push(pool);
                     pools[tokens[j]][tokens[i]].push(pool);
                 }
