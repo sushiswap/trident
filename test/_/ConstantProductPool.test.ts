@@ -1,7 +1,7 @@
 import { getBigNumber, randBetween } from "../utilities";
 import { addLiquidity, addLiquidityInMultipleWays, burnLiquidity, initialize, swap } from "../harness/ConstantProduct";
 
-describe("Constant Product Pool Old", function () {
+describe("Constant Product Pool", function () {
   before(async () => {
     await initialize();
   });
