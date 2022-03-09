@@ -31,7 +31,7 @@ describe("Router", function () {
           to: router.address,
           value: ethers.utils.parseEther("1"),
         })
-      ).to.be.revertedWith("Transaction reverted without a reason string");
+      ).to.be.revertedWith("NotWethSender");
     });
   });
 
