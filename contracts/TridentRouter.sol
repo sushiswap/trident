@@ -91,7 +91,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
             isWhiteListed(params.path[i].pool);
             amountOut = IPool(params.path[i].pool).swap(params.path[i].data);
             unchecked {
-                i++;
+                ++i;
             }
         }
         // Ensure that the slippage wasn't too much. This assumes that the pool is honest.
@@ -127,7 +127,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
             isWhiteListed(params.path[i].pool);
             amountOut = IPool(params.path[i].pool).swap(params.path[i].data);
             unchecked {
-                i++;
+                ++i;
             }
         }
         // Ensure that the slippage wasn't too much. This assumes that the pool is honest.
@@ -151,7 +151,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
             isWhiteListed(params.initialPath[i].pool);
             IPool(params.initialPath[i].pool).swap(params.initialPath[i].data);
             unchecked {
-                i++;
+                ++i;
             }
         }
         // Do all the middle swaps. Input comes from previous pools - output goes to following pools.
@@ -162,7 +162,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
             isWhiteListed(params.percentagePath[i].pool);
             IPool(params.percentagePath[i].pool).swap(params.percentagePath[i].data);
             unchecked {
-                i++;
+                ++i;
             }
         }
         // Do all the final swaps. Input comes from previous pools - output goes to the user.
@@ -175,7 +175,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
                 bento.transfer(params.output[i].token, address(this), params.output[i].to, balanceShares);
             }
             unchecked {
-                i++;
+                ++i;
             }
         }
     }
@@ -200,7 +200,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
                 bento.transfer(tokenInput[i].token, msg.sender, pool, tokenInput[i].amount);
             }
             unchecked {
-                i++;
+                ++i;
             }
         }
         liquidity = IPool(pool).mint(data);
@@ -221,9 +221,9 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         isWhiteListed(pool);
         SafeTransferLib.safeTransferFrom(ERC20(pool), msg.sender, pool, liquidity);
         IPool.TokenAmount[] memory withdrawnLiquidity = IPool(pool).burn(data);
-        for (uint256 i; i < minWithdrawals.length; i++) {
+        for (uint256 i; i < minWithdrawals.length; ++i) {
             uint256 j;
-            for (; j < withdrawnLiquidity.length; j++) {
+            for (; j < withdrawnLiquidity.length; ++j) {
                 if (withdrawnLiquidity[j].token == minWithdrawals[i].token) {
                     if (withdrawnLiquidity[j].amount < minWithdrawals[i].amount) revert TooLittleReceived();
                     break;
