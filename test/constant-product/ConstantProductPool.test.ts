@@ -247,6 +247,12 @@ describe("Constant Product Pool", () => {
   });
 
   describe("#getNativeReserves", function () {
-    //
+    it("returns expected values for initilisedConstantProductPool", async () => {
+      const pool = await initializedConstantProductPool();
+      const [_nativeReserve0, _nativeReserve1, _blockTimestampLast] = await pool.getNativeReserves();
+      expect(_nativeReserve0).equal("1000000000000000000");
+      expect(_nativeReserve1).equal("1000000000000000000");
+      expect(_blockTimestampLast).equal("0");
+    });
   });
 });
