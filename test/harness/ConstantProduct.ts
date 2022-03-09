@@ -7,7 +7,6 @@ import {
   ConstantProductPoolFactory__factory,
   ConstantProductPool__factory,
   ERC20Mock,
-  ERC20Mock__factory,
   MasterDeployer,
   MasterDeployer__factory,
   TridentRouter,
@@ -16,6 +15,7 @@ import {
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { ethers } from "hardhat";
 import { BigNumber } from "ethers";
+import { initializeTokens } from "../fixtures/initializeTokens";
 
 let accounts: SignerWithAddress[] = [];
 // First token is used as weth
@@ -34,14 +34,7 @@ export async function initialize() {
   accounts = await ethers.getSigners();
   aliceEncoded = ethers.utils.defaultAbiCoder.encode(["address"], [accounts[0].address]);
 
-  const ERC20 = await ethers.getContractFactory<ERC20Mock__factory>("ERC20Mock");
-
-  let promises: Promise<ERC20Mock>[] = [];
-
-  for (let i = 0; i < 10; i++) {
-    promises.push(ERC20.deploy("Token" + i, "TOK" + i, getBigNumber(1000000)));
-  }
-  tokens = await Promise.all(promises);
+  tokens = await initializeTokens();
 
   const Bento = await ethers.getContractFactory<BentoBoxV1__factory>("BentoBoxV1");
   const Deployer = await ethers.getContractFactory<MasterDeployer__factory>("MasterDeployer");
@@ -88,7 +81,6 @@ export async function initialize() {
   );
 
   // Create pools
-  promises = [];
   for (let i = 0; i < tokens.length - 1; i++) {
     // Pool deploy data
     let token0, token1;
