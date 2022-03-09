@@ -1,7 +1,15 @@
 import { expect } from "chai";
 import { deployments, ethers } from "hardhat";
 
-import type { ConstantProductPool__factory, ERC20Mock, MasterDeployer } from "../../types";
+import type {
+  BentoBoxV1,
+  ConstantProductPool__factory,
+  ERC20Mock,
+  ERC20Mock__factory,
+  FlashSwapMock,
+  FlashSwapMock__factory,
+  MasterDeployer,
+} from "../../types";
 import { initializedConstantProductPool, uninitializedConstantProductPool } from "../fixtures";
 
 describe("Constant Product Pool", () => {
@@ -118,8 +126,84 @@ describe("Constant Product Pool", () => {
       );
       await expect(pool.flashSwap(data)).to.be.revertedWith("POOL_UNINITIALIZED");
     });
+
+    it("reverts on invalid input token", async () => {
+      const pool = await initializedConstantProductPool();
+      const ERC20 = await ethers.getContractFactory<ERC20Mock__factory>("ERC20Mock");
+      const token2 = await ERC20.deploy("Token 2", "TOKEN2", ethers.constants.MaxUint256);
+      await token2.deployed();
+
+      const data = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool", "uint256", "bytes"],
+        [token2.address, "0x0000000000000000000000000000000000000000", false, 0, "0x"]
+      );
+
+      await expect(pool.flashSwap(data)).to.be.revertedWith("INVALID_INPUT_TOKEN");
+    });
+
+    it("reverts on insuffiecient amount in token 0", async () => {
+      const pool = await initializedConstantProductPool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+
+      const FlashSwapMock = await ethers.getContractFactory<FlashSwapMock__factory>("FlashSwapMock");
+      const flashSwapMock = await FlashSwapMock.deploy(bento.address);
+      await flashSwapMock.deployed();
+      const flashSwapData = ethers.utils.defaultAbiCoder.encode(
+        ["bool", "address"],
+        [false, "0x0000000000000000000000000000000000000000"]
+      );
+      const data = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool", "uint256", "bytes"],
+        [token0.address, flashSwapMock.address, false, 1, flashSwapData]
+      );
+
+      await expect(flashSwapMock.testFlashSwap(pool.address, data)).to.be.revertedWith("INSUFFICIENT_AMOUNT_IN");
+    });
+
+    it("reverts on insuffiecient amount in token 1", async () => {
+      const pool = await initializedConstantProductPool();
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+
+      const FlashSwapMock = await ethers.getContractFactory<FlashSwapMock__factory>("FlashSwapMock");
+      const flashSwapMock = await FlashSwapMock.deploy(bento.address);
+      await flashSwapMock.deployed();
+      const flashSwapData = ethers.utils.defaultAbiCoder.encode(
+        ["bool", "address"],
+        [false, "0x0000000000000000000000000000000000000000"]
+      );
+      const data = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool", "uint256", "bytes"],
+        [token1.address, flashSwapMock.address, false, 1, flashSwapData]
+      );
+
+      await expect(flashSwapMock.testFlashSwap(pool.address, data)).to.be.revertedWith("INSUFFICIENT_AMOUNT_IN");
+    });
+
     it.skip("succeeds in flash swapping", async () => {
-      //
+      const deployer = await ethers.getNamedSigner("deployer");
+
+      const pool = await initializedConstantProductPool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+
+      await token0.transfer(pool.address, 50000000);
+      await token1.transfer(pool.address, 50000000);
+
+      const FlashSwapMock = await ethers.getContractFactory<FlashSwapMock__factory>("FlashSwapMock");
+      const flashSwapMock = await FlashSwapMock.deploy(bento.address);
+      await flashSwapMock.deployed();
+      await token0.transfer(flashSwapMock.address, 5);
+      await token1.transfer(flashSwapMock.address, 5);
+
+      const flashSwapData = ethers.utils.defaultAbiCoder.encode(["bool", "address"], [true, token0.address]);
+      const data = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool", "uint256", "bytes"],
+        [token0.address, flashSwapMock.address, true, 1, flashSwapData]
+      );
+      await flashSwapMock.testFlashSwap(pool.address, data);
     });
   });
 
