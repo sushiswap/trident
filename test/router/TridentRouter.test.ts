@@ -1,9 +1,10 @@
 import { ADDRESS_ZERO, customError } from "../utilities";
 import { BentoBoxV1, ERC20Mock, TridentRouter, WETH9 } from "../../types";
-import { deployments, ethers } from "hardhat";
+import { deployments, ethers, getChainId } from "hardhat";
 import { initializedConstantProductPool, uninitializedConstantProductPool } from "../fixtures";
 
 import { expect } from "chai";
+import { getSignedMasterContractApprovalData } from "../utilities/bentobox";
 
 describe("Router", function () {
   before(async function () {
@@ -355,8 +356,10 @@ describe("Router", function () {
   });
 
   describe("#approveMasterContract", function () {
-    it.skip("Succeed setting master contract approval on bentobox", async () => {
+    it("Succeed setting master contract approval on bentobox", async () => {
       const deployer = await ethers.getNamedSigner("deployer");
+
+      const chainId = Number(await getChainId());
 
       const bentoBox = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
 
@@ -364,19 +367,19 @@ describe("Router", function () {
 
       await bentoBox.whitelistMasterContract(router.address, true);
 
-      // await router.multicall([
-      //   router.interface.encodeFunctionData("approveMasterContract", [
-      //     "0",
-      //     "0x0000000000000000000000000000000000000000000000000000000000000000",
-      //     "0x0000000000000000000000000000000000000000000000000000000000000000",
-      //   ]),
-      // ]);
+      const nonce = await bentoBox.nonces(deployer.address);
 
-      await router.approveMasterContract(
-        "0",
-        "0x0000000000000000000000000000000000000000000000000000000000000000",
-        "0x0000000000000000000000000000000000000000000000000000000000000000"
+      const { v, r, s } = getSignedMasterContractApprovalData(
+        bentoBox,
+        deployer,
+        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+        router.address,
+        true,
+        nonce,
+        chainId
       );
+
+      await router.approveMasterContract(v, r, s);
     });
   });
 
