@@ -1,7 +1,16 @@
 import { expect } from "chai";
+import { BigNumber } from "ethers";
 import { deployments, ethers } from "hardhat";
 
-import type { ConstantProductPool__factory, ERC20Mock, MasterDeployer } from "../../types";
+import type {
+  BentoBoxV1,
+  ConstantProductPool__factory,
+  ERC20Mock,
+  ERC20Mock__factory,
+  FlashSwapMock,
+  FlashSwapMock__factory,
+  MasterDeployer,
+} from "../../types";
 import { initializedConstantProductPool, uninitializedConstantProductPool } from "../fixtures";
 
 describe("Constant Product Pool", () => {
@@ -118,8 +127,154 @@ describe("Constant Product Pool", () => {
       );
       await expect(pool.flashSwap(data)).to.be.revertedWith("POOL_UNINITIALIZED");
     });
-    it.skip("succeeds in flash swapping", async () => {
-      //
+
+    it("reverts on invalid input token", async () => {
+      const pool = await initializedConstantProductPool();
+      const ERC20 = await ethers.getContractFactory<ERC20Mock__factory>("ERC20Mock");
+      const token2 = await ERC20.deploy("Token 2", "TOKEN2", ethers.constants.MaxUint256);
+      await token2.deployed();
+
+      const data = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool", "uint256", "bytes"],
+        [token2.address, "0x0000000000000000000000000000000000000000", false, 0, "0x"]
+      );
+
+      await expect(pool.flashSwap(data)).to.be.revertedWith("INVALID_INPUT_TOKEN");
+    });
+
+    it("reverts on insuffiecient amount in token 0", async () => {
+      const pool = await initializedConstantProductPool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+
+      const FlashSwapMock = await ethers.getContractFactory<FlashSwapMock__factory>("FlashSwapMock");
+      const flashSwapMock = await FlashSwapMock.deploy(bento.address);
+      await flashSwapMock.deployed();
+      const flashSwapData = ethers.utils.defaultAbiCoder.encode(
+        ["bool", "address", "bool"],
+        [false, "0x0000000000000000000000000000000000000000", false]
+      );
+      const data = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool", "uint256", "bytes"],
+        [token0.address, flashSwapMock.address, false, 1, flashSwapData]
+      );
+
+      await expect(flashSwapMock.testFlashSwap(pool.address, data)).to.be.revertedWith("INSUFFICIENT_AMOUNT_IN");
+    });
+
+    it("reverts on insuffiecient amount in token 1", async () => {
+      const pool = await initializedConstantProductPool();
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+
+      const FlashSwapMock = await ethers.getContractFactory<FlashSwapMock__factory>("FlashSwapMock");
+      const flashSwapMock = await FlashSwapMock.deploy(bento.address);
+      await flashSwapMock.deployed();
+      const flashSwapData = ethers.utils.defaultAbiCoder.encode(
+        ["bool", "address", "bool"],
+        [false, "0x0000000000000000000000000000000000000000", false]
+      );
+      const data = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool", "uint256", "bytes"],
+        [token1.address, flashSwapMock.address, false, 1, flashSwapData]
+      );
+
+      await expect(flashSwapMock.testFlashSwap(pool.address, data)).to.be.revertedWith("INSUFFICIENT_AMOUNT_IN");
+    });
+
+    it("succeeds in flash swapping token 0 native", async () => {
+      const pool = await initializedConstantProductPool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+
+      const FlashSwapMock = await ethers.getContractFactory<FlashSwapMock__factory>("FlashSwapMock");
+      const flashSwapMock = await FlashSwapMock.deploy(bento.address);
+      await flashSwapMock.deployed();
+      await token0.transfer(flashSwapMock.address, 100);
+
+      const flashSwapData = ethers.utils.defaultAbiCoder.encode(
+        ["bool", "address", "bool"],
+        [true, token0.address, false]
+      );
+      const data = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool", "uint256", "bytes"],
+        [token0.address, flashSwapMock.address, true, 100, flashSwapData]
+      );
+      await flashSwapMock.testFlashSwap(pool.address, data);
+      expect(await token1.balanceOf(flashSwapMock.address)).to.be.eq(99);
+    });
+
+    it("succeeds in flash swapping token 0 bento", async () => {
+      const pool = await initializedConstantProductPool();
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+
+      const FlashSwapMock = await ethers.getContractFactory<FlashSwapMock__factory>("FlashSwapMock");
+      const flashSwapMock = await FlashSwapMock.deploy(bento.address);
+      await flashSwapMock.deployed();
+      await token0.transfer(bento.address, 100);
+      await bento.deposit(token0.address, bento.address, flashSwapMock.address, 100, 0);
+
+      const flashSwapData = ethers.utils.defaultAbiCoder.encode(
+        ["bool", "address", "bool"],
+        [true, token0.address, true]
+      );
+      const data = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool", "uint256", "bytes"],
+        [token0.address, flashSwapMock.address, false, 100, flashSwapData]
+      );
+      await flashSwapMock.testFlashSwap(pool.address, data);
+      expect(await bento.balanceOf(token1.address, flashSwapMock.address)).to.be.eq(99);
+    });
+
+    it("succeeds in flash swapping token 1 native", async () => {
+      const pool = await initializedConstantProductPool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+
+      const FlashSwapMock = await ethers.getContractFactory<FlashSwapMock__factory>("FlashSwapMock");
+      const flashSwapMock = await FlashSwapMock.deploy(bento.address);
+      await flashSwapMock.deployed();
+      await token1.transfer(flashSwapMock.address, 100);
+
+      const flashSwapData = ethers.utils.defaultAbiCoder.encode(
+        ["bool", "address", "bool"],
+        [true, token1.address, false]
+      );
+      const data = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool", "uint256", "bytes"],
+        [token1.address, flashSwapMock.address, true, 100, flashSwapData]
+      );
+
+      await flashSwapMock.testFlashSwap(pool.address, data);
+      expect(await token0.balanceOf(flashSwapMock.address)).to.be.eq(99);
+    });
+
+    it("succeeds in flash swapping token 1 bento", async () => {
+      const pool = await initializedConstantProductPool();
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+
+      const FlashSwapMock = await ethers.getContractFactory<FlashSwapMock__factory>("FlashSwapMock");
+      const flashSwapMock = await FlashSwapMock.deploy(bento.address);
+      await flashSwapMock.deployed();
+      await token1.transfer(bento.address, 100);
+      await bento.deposit(token1.address, bento.address, flashSwapMock.address, 100, 0);
+
+      const flashSwapData = ethers.utils.defaultAbiCoder.encode(
+        ["bool", "address", "bool"],
+        [true, token1.address, true]
+      );
+      const data = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool", "uint256", "bytes"],
+        [token1.address, flashSwapMock.address, false, 100, flashSwapData]
+      );
+      await flashSwapMock.testFlashSwap(pool.address, data);
+      expect(await bento.balanceOf(token0.address, flashSwapMock.address)).to.be.eq(99);
     });
   });
 
