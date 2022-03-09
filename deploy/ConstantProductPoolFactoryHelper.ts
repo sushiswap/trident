@@ -18,9 +18,13 @@ const deployFunction: DeployFunction = async function ({
   });
 
   if (newlyDeployed && process.env.VERIFY_ON_DEPLOY === "true") {
-    await run("verify:verify", {
-      address,
-    });
+    try {
+      await run("verify:verify", {
+        address,
+      });
+    } catch (error) {
+      console.error(error);
+    }
   }
 };
 

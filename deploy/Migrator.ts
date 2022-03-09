@@ -1,7 +1,8 @@
-import { BENTOBOX_ADDRESS, ChainId, WNATIVE } from "@sushiswap/core-sdk";
+import { BENTOBOX_ADDRESS, ChainId, WNATIVE, WNATIVE_ADDRESS } from "@sushiswap/core-sdk";
 
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
+import { BentoBoxV1, WETH9 } from "../types";
 
 const deployFunction: DeployFunction = async function ({
   ethers,
@@ -17,35 +18,45 @@ const deployFunction: DeployFunction = async function ({
 
   const chainId = Number(await getChainId());
 
-  let bentoBoxV1Address;
+  const bentoBox = await ethers.getContractOrNull<BentoBoxV1>("BentoBoxV1");
 
-  if (chainId === 31337) {
-    // for testing purposes we use a redeployed bentobox address
-    bentoBoxV1Address = (await ethers.getContract("BentoBoxV1")).address;
-  } else {
-    if (!(chainId in WNATIVE)) {
-      throw Error(`No WETH on chain #${chainId}!`);
-    } else if (!(chainId in BENTOBOX_ADDRESS)) {
-      throw Error(`No BENTOBOX on chain #${chainId}!`);
-    }
-    bentoBoxV1Address = BENTOBOX_ADDRESS[chainId as ChainId];
+  const wnative = await ethers.getContractOrNull<WETH9>("WETH9");
+
+  if (!bentoBox && !(chainId in BENTOBOX_ADDRESS)) {
+    throw Error(`No BENTOBOX on chain #${chainId}!`);
   }
 
-  const constantProductPoolFactoryAddress = (await ethers.getContract("ConstantProductPoolFactory")).address;
-  const masterDeployerAddress = (await ethers.getContract("MasterDeployer")).address;
+  if (!wnative && !(chainId in WNATIVE_ADDRESS)) {
+    throw Error(`No WNATIVE on chain #${chainId}!`);
+  }
+
+  const constantProductPoolFactory = await ethers.getContract("ConstantProductPoolFactory");
+  const masterDeployer = await ethers.getContract("MasterDeployer");
 
   const { address, newlyDeployed } = await deploy("TridentSushiRollCP", {
     from: deployer,
-    args: [bentoBoxV1Address, constantProductPoolFactoryAddress, masterDeployerAddress],
+    args: [
+      bentoBox ? bentoBox.address : BENTOBOX_ADDRESS[chainId],
+      constantProductPoolFactory.address,
+      masterDeployer.address,
+    ],
     deterministicDeployment: false,
     waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 5 : undefined,
   });
 
   if (newlyDeployed && process.env.VERIFY_ON_DEPLOY === "true") {
-    await run("verify:verify", {
-      address,
-      constructorArguments: [bentoBoxV1Address, constantProductPoolFactoryAddress, masterDeployerAddress],
-    });
+    try {
+      await run("verify:verify", {
+        address,
+        constructorArguments: [
+          bentoBox ? bentoBox.address : BENTOBOX_ADDRESS[chainId],
+          constantProductPoolFactory.address,
+          masterDeployer.address,
+        ],
+      });
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   console.debug("TridentSushiRollCP deployed at ", address);

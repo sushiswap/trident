@@ -20,9 +20,9 @@ const deployFunction: DeployFunction = async function ({
 
   const chainId = Number(await getChainId());
 
-  const bentoBox = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+  const bentoBox = await ethers.getContractOrNull<BentoBoxV1>("BentoBoxV1");
 
-  const wnative = await ethers.getContract<WETH9>("WETH9");
+  const wnative = await ethers.getContractOrNull<WETH9>("WETH9");
 
   if (!bentoBox && !(chainId in BENTOBOX_ADDRESS)) {
     throw Error(`No BENTOBOX on chain #${chainId}!`);
@@ -36,14 +36,18 @@ const deployFunction: DeployFunction = async function ({
     from: deployer,
     args: [barFee, barFeeTo, bentoBox ? bentoBox.address : BENTOBOX_ADDRESS[chainId]],
     deterministicDeployment: false,
-    waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 5 : undefined,
+    waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 10 : undefined,
   });
 
   if (newlyDeployed && process.env.VERIFY_ON_DEPLOY === "true") {
-    await run("verify:verify", {
-      address,
-      constructorArguments: [barFee, barFeeTo, bentoBox ? bentoBox.address : BENTOBOX_ADDRESS[chainId]],
-    });
+    try {
+      await run("verify:verify", {
+        address,
+        constructorArguments: [barFee, barFeeTo, bentoBox ? bentoBox.address : BENTOBOX_ADDRESS[chainId]],
+      });
+    } catch (error) {
+      console.error(error);
+    }
   }
 };
 

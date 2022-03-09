@@ -17,9 +17,9 @@ const deployFunction: DeployFunction = async function ({
 
   const chainId = Number(await getChainId());
 
-  const bentoBox = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+  const bentoBox = await ethers.getContractOrNull<BentoBoxV1>("BentoBoxV1");
 
-  const wnative = await ethers.getContract<WETH9>("WETH9");
+  const wnative = await ethers.getContractOrNull<WETH9>("WETH9");
 
   if (!bentoBox && !(chainId in BENTOBOX_ADDRESS)) {
     throw Error(`No BENTOBOX on chain #${chainId}!`);
@@ -39,20 +39,28 @@ const deployFunction: DeployFunction = async function ({
       wnative ? wnative.address : WNATIVE_ADDRESS[chainId],
     ],
     deterministicDeployment: false,
-    waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 5 : undefined,
+    waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 10 : undefined,
   });
 
-  if (newlyDeployed && process.env.VERIFY_ON_DEPLOY === "true") {
-    await run("verify:verify", {
-      address,
-      constructorArguments: [bentoBox.address, masterDeployer.address, wnative.address],
-      contract: "contracts/TridentRouter.sol:TridentRouter",
-    });
+  if (process.env.VERIFY_ON_DEPLOY === "true") {
+    try {
+      await run("verify:verify", {
+        address,
+        constructorArguments: [
+          bentoBox ? bentoBox.address : BENTOBOX_ADDRESS[chainId],
+          masterDeployer.address,
+          wnative ? wnative.address : WNATIVE_ADDRESS[chainId],
+        ],
+        contract: "contracts/TridentRouter.sol:TridentRouter",
+      });
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   // Avoid needing to whitelist master contract in fixtures
-  if (chainId === 31337 && !(await bentoBox.whitelistedMasterContracts(address))) {
-    await bentoBox.whitelistMasterContract(address, true);
+  if (chainId === 31337 && !(await bentoBox?.whitelistedMasterContracts(address))) {
+    await bentoBox?.whitelistMasterContract(address, true);
   }
 };
 
