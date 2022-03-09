@@ -14,7 +14,7 @@ import {IPool} from "./interfaces/IPool.sol";
 import {ITridentRouter} from "./interfaces/ITridentRouter.sol";
 import {IWETH9} from "./interfaces/IWETH9.sol";
 
-// Custom Errors
+/// @dev Custom Errors
 error NotWethSender();
 error TooLittleReceived();
 error NotEnoughLiquidityMinted();
@@ -86,10 +86,13 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         // The last pool should transfer its output tokens to the user.
         // If the user wants to unwrap `wETH`, the final destination should be this contract and
         // a batch call should be made to `unwrapWETH`.
-        for (uint256 i; i < params.path.length; i++) {
+        for (uint256 i; i < params.path.length; ) {
             // We don't necessarily need this check but saving users from themselves.
             isWhiteListed(params.path[i].pool);
             amountOut = IPool(params.path[i].pool).swap(params.path[i].data);
+            unchecked {
+                i++;
+            }
         }
         // Ensure that the slippage wasn't too much. This assumes that the pool is honest.
         if (amountOut < params.amountOutMinimum) revert TooLittleReceived();
@@ -120,9 +123,12 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         // Call every pool in the path.
         // Pool `N` should transfer its output tokens to pool `N+1` directly.
         // The last pool should transfer its output tokens to the user.
-        for (uint256 i; i < params.path.length; i++) {
+        for (uint256 i; i < params.path.length; ) {
             isWhiteListed(params.path[i].pool);
             amountOut = IPool(params.path[i].pool).swap(params.path[i].data);
+            unchecked {
+                i++;
+            }
         }
         // Ensure that the slippage wasn't too much. This assumes that the pool is honest.
         if (amountOut < params.amountOutMinimum) revert TooLittleReceived();
@@ -136,7 +142,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
     function complexPath(ComplexPathParams calldata params) public payable {
         // Deposit all initial tokens to respective pools and initiate the swaps.
         // Input tokens come from the user - output goes to following pools.
-        for (uint256 i; i < params.initialPath.length; i++) {
+        for (uint256 i; i < params.initialPath.length; ) {
             if (params.initialPath[i].native) {
                 _depositToBentoBox(params.initialPath[i].tokenIn, params.initialPath[i].pool, params.initialPath[i].amount);
             } else {
@@ -144,23 +150,32 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
             }
             isWhiteListed(params.initialPath[i].pool);
             IPool(params.initialPath[i].pool).swap(params.initialPath[i].data);
+            unchecked {
+                i++;
+            }
         }
         // Do all the middle swaps. Input comes from previous pools - output goes to following pools.
-        for (uint256 i; i < params.percentagePath.length; i++) {
+        for (uint256 i; i < params.percentagePath.length; ) {
             uint256 balanceShares = bento.balanceOf(params.percentagePath[i].tokenIn, address(this));
             uint256 transferShares = (balanceShares * params.percentagePath[i].balancePercentage) / uint256(10)**8;
             bento.transfer(params.percentagePath[i].tokenIn, address(this), params.percentagePath[i].pool, transferShares);
             isWhiteListed(params.percentagePath[i].pool);
             IPool(params.percentagePath[i].pool).swap(params.percentagePath[i].data);
+            unchecked {
+                i++;
+            }
         }
         // Do all the final swaps. Input comes from previous pools - output goes to the user.
-        for (uint256 i; i < params.output.length; i++) {
+        for (uint256 i; i < params.output.length; ) {
             uint256 balanceShares = bento.balanceOf(params.output[i].token, address(this));
             if (balanceShares < params.output[i].minAmount) revert TooLittleReceived();
             if (params.output[i].unwrapBento) {
                 bento.withdraw(params.output[i].token, address(this), params.output[i].to, 0, balanceShares);
             } else {
                 bento.transfer(params.output[i].token, address(this), params.output[i].to, balanceShares);
+            }
+            unchecked {
+                i++;
             }
         }
     }
@@ -178,11 +193,14 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
     ) public payable returns (uint256 liquidity) {
         isWhiteListed(pool);
         // Send all input tokens to the pool.
-        for (uint256 i; i < tokenInput.length; i++) {
+        for (uint256 i; i < tokenInput.length; ) {
             if (tokenInput[i].native) {
                 _depositToBentoBox(tokenInput[i].token, pool, tokenInput[i].amount);
             } else {
                 bento.transfer(tokenInput[i].token, msg.sender, pool, tokenInput[i].amount);
+            }
+            unchecked {
+                i++;
             }
         }
         liquidity = IPool(pool).mint(data);
@@ -203,12 +221,18 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         isWhiteListed(pool);
         ERC20(pool).safeTransferFrom(msg.sender, pool, liquidity);
         IPool.TokenAmount[] memory withdrawnLiquidity = IPool(pool).burn(data);
-        for (uint256 i; i < minWithdrawals.length; i++) {
+        for (uint256 i; i < minWithdrawals.length; ) {
             uint256 j;
-            for (; j < withdrawnLiquidity.length; j++) {
+            unchecked {
+                i++;
+            }
+            for (; j < withdrawnLiquidity.length; ) {
                 if (withdrawnLiquidity[j].token == minWithdrawals[i].token) {
                     if (withdrawnLiquidity[j].amount < minWithdrawals[i].amount) revert TooLittleReceived();
                     break;
+                }
+                unchecked {
+                    j++;
                 }
             }
             // @dev A token that is present in `minWithdrawals` is missing from `withdrawnLiquidity`.
