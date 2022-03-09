@@ -2,10 +2,14 @@
 
 pragma solidity >=0.8.0;
 
+/// @notice Helper utility that enables calling multiple local methods in a single call.
+/// @author Modified from Uniswap (https://github.com/Uniswap/v3-periphery/blob/main/contracts/base/Multicall.sol)
+/// License-Identifier: GPL-2.0-or-later
 abstract contract Multicall {
     function multicall(bytes[] calldata data) public payable returns (bytes[] memory results) {
         results = new bytes[](data.length);
-        for (uint256 i = 0; i < data.length; i++) {
+        
+        for (uint256 i; i < data.length;) {
             (bool success, bytes memory result) = address(this).delegatecall(data[i]);
 
             if (!success) {
@@ -18,6 +22,11 @@ abstract contract Multicall {
             }
 
             results[i] = result;
+
+            // cannot realistically overflow on human timescales
+            unchecked {
+                ++i;
+            }
         }
     }
 }
