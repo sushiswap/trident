@@ -7,20 +7,6 @@
 
 TRIDENT 🔱 is a newly developed AMM and routing system from [SushiSwap](https://sushi.com/) (Sushi). As a system, Trident is not a fork of any existing AMM, though to start, it incorporates popular AMM concepts into a single, upgradeable framework. The Sushi core team began development with [Andre Cronje](https://github.com/andrecronje) as [Deriswap](https://andrecronje.medium.com/deriswap-capital-efficient-swaps-futures-options-and-loans-ea424b24a41c). This development continued on as [Mirin](https://github.com/sushiswap/mirin) developed by [LevX](https://github.com/levx-io). On May 12th, 2021, Sushi began building Trident in earnest on the Mirin/Deriswap foundation.
 
-## Deployment
-
-### Kovan
-
-| Contract                   | Address                                    |
-| -------------------------- | ------------------------------------------ |
-| BentoBox                   | 0xc381a85ed7C7448Da073b7d6C9d4cBf1Cbf576f0 |
-| TridentRouter              | 0x70e9D5279AFbf898FB507C6FfF8Dd92618e892DB |
-| MasterDeployer             | 0xcbD2dB3c724fA4349618fb390f736185Db21a1A1 |
-| ConstantProductPoolFactory | 0xD6A52478FB50f0aaB6E3Bf86f691c0D61DF18f38 |
-| HybridPoolFactory          | 0x4fbeDaEcb25C8094a5bd3b75CD51F02EC956Ad31 |
-| IndexPoolFactory           | 0x3fD4142E61688Db9671D6CcD937543517dAca916 |
-| WETH-DAI Cpp               | 0x1Ef635cE55EaE43D62211779ac133860fcEb9886 |
-
 ## Extensibility
 
 Trident is designed as an extensible AMM framework that allows developers to add new pool types that conform to the [IPool interface](./contracts/interfaces/IPool.sol). Before launch, an [EIP](https://eips.ethereum.org/) will be submitted for the IPool interface design to help standardize pool interfaces across Ethereum. As new AMM pool types are designed or experimented with, they can be added to Trident so long as they conform to the interface. In this way Trident will _at minimum_ be a superset of all popular AMM pool designs as well as a future-proof architecture for Sushi to build on.
