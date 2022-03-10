@@ -103,7 +103,7 @@ describe("Constant Product Pool Factory", function () {
       );
 
       await expect(masterDeployer.deployPool(constantProductPoolFactory.address, deployData)).to.be.revertedWith(
-        "ZERO_ADDRESS"
+        "ZeroAddress()"
       );
     });
 
@@ -120,7 +120,7 @@ describe("Constant Product Pool Factory", function () {
       );
 
       await expect(masterDeployer.deployPool(constantProductPoolFactory.address, deployData)).to.be.revertedWith(
-        "ZERO_ADDRESS"
+        "ZeroAddress()"
       );
     });
 
