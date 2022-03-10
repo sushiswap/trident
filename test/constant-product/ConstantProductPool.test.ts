@@ -32,7 +32,7 @@ describe("Constant Product Pool", () => {
         ["address", "address", "uint256", "bool"],
         ["0x0000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000", 30, false]
       );
-      await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.be.revertedWith("ZERO_ADDRESS");
+      await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.be.revertedWith("ZeroAddress()");
     });
 
     // TODO: fix instantiation allowed if token1 is zero
@@ -44,7 +44,7 @@ describe("Constant Product Pool", () => {
         ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000000", 30, false]
       );
       await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.not.be.revertedWith(
-        "ZERO_ADDRESS"
+        "ZeroAddress()"
       );
     });
 
@@ -56,7 +56,7 @@ describe("Constant Product Pool", () => {
         ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000001", 30, false]
       );
       await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.be.revertedWith(
-        "IDENTICAL_ADDRESSES"
+        "IdenticalAddress()"
       );
     });
     it("reverts if swap fee more than the max fee", async () => {
@@ -67,7 +67,7 @@ describe("Constant Product Pool", () => {
         ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000002", 10001, false]
       );
       await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.be.revertedWith(
-        "INVALID_SWAP_FEE"
+        "InvalidSwapFee()"
       );
     });
   });
@@ -84,7 +84,7 @@ describe("Constant Product Pool", () => {
       await constantProductPool.deployed();
       const newLocal = "0x0000000000000000000000000000000000000003";
       const mintData = ethers.utils.defaultAbiCoder.encode(["address"], [newLocal]);
-      await expect(constantProductPool.mint(mintData)).to.be.revertedWith("INVALID_AMOUNTS");
+      await expect(constantProductPool.mint(mintData)).to.be.revertedWith("InvalidAmounts()");
     });
 
     it("reverts if insufficient liquidity minted", async () => {
@@ -95,7 +95,7 @@ describe("Constant Product Pool", () => {
       await token0.transfer(pool.address, 1);
       await token1.transfer(pool.address, 1);
       const mintData = ethers.utils.defaultAbiCoder.encode(["address"], [deployer.address]);
-      await expect(pool.mint(mintData)).to.be.revertedWith("INSUFFICIENT_LIQUIDITY_MINTED");
+      await expect(pool.mint(mintData)).to.be.revertedWith("InsufficientLiquidityMinted()");
     });
   });
 
@@ -114,7 +114,7 @@ describe("Constant Product Pool", () => {
         ["address", "address", "bool"],
         [await pool.token0(), "0x0000000000000000000000000000000000000000", false]
       );
-      await expect(pool.swap(data)).to.be.revertedWith("POOL_UNINITIALIZED");
+      await expect(pool.swap(data)).to.be.revertedWith("PoolUninitialized()");
     });
   });
 
@@ -125,7 +125,7 @@ describe("Constant Product Pool", () => {
         ["address", "address", "bool", "uint256", "bytes"],
         [await pool.token0(), "0x0000000000000000000000000000000000000000", false, 0, "0x"]
       );
-      await expect(pool.flashSwap(data)).to.be.revertedWith("POOL_UNINITIALIZED");
+      await expect(pool.flashSwap(data)).to.be.revertedWith("PoolUninitialized()");
     });
 
     it("reverts on invalid input token", async () => {
@@ -139,7 +139,7 @@ describe("Constant Product Pool", () => {
         [token2.address, "0x0000000000000000000000000000000000000000", false, 0, "0x"]
       );
 
-      await expect(pool.flashSwap(data)).to.be.revertedWith("INVALID_INPUT_TOKEN");
+      await expect(pool.flashSwap(data)).to.be.revertedWith("InvalidInputToken()");
     });
 
     it("reverts on insuffiecient amount in token 0", async () => {
@@ -159,7 +159,7 @@ describe("Constant Product Pool", () => {
         [token0.address, flashSwapMock.address, false, 1, flashSwapData]
       );
 
-      await expect(flashSwapMock.testFlashSwap(pool.address, data)).to.be.revertedWith("INSUFFICIENT_AMOUNT_IN");
+      await expect(flashSwapMock.testFlashSwap(pool.address, data)).to.be.revertedWith("InsufficientAmountIn()");
     });
 
     it("reverts on insuffiecient amount in token 1", async () => {
@@ -179,7 +179,7 @@ describe("Constant Product Pool", () => {
         [token1.address, flashSwapMock.address, false, 1, flashSwapData]
       );
 
-      await expect(flashSwapMock.testFlashSwap(pool.address, data)).to.be.revertedWith("INSUFFICIENT_AMOUNT_IN");
+      await expect(flashSwapMock.testFlashSwap(pool.address, data)).to.be.revertedWith("InsufficientAmountIn()");
     });
 
     it("succeeds in flash swapping token 0 native", async () => {
@@ -362,7 +362,7 @@ describe("Constant Product Pool", () => {
         ["address", "uint256"],
         ["0x0000000000000000000000000000000000000003", 0]
       );
-      await expect(constantProductPool.getAmountOut(data)).to.be.revertedWith("INVALID_INPUT_TOKEN");
+      await expect(constantProductPool.getAmountOut(data)).to.be.revertedWith("InvalidInputToken()");
     });
   });
 
@@ -397,7 +397,7 @@ describe("Constant Product Pool", () => {
         ["address", "uint256"],
         ["0x0000000000000000000000000000000000000003", 0]
       );
-      await expect(constantProductPool.getAmountIn(data)).to.be.revertedWith("INVALID_OUTPUT_TOKEN");
+      await expect(constantProductPool.getAmountIn(data)).to.be.revertedWith("InvalidOutputToken()");
     });
   });
 

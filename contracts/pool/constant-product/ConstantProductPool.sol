@@ -12,6 +12,18 @@ import {ITridentCallee} from "../../interfaces/ITridentCallee.sol";
 
 import {TridentMath} from "../../libraries/TridentMath.sol";
 
+/// @dev Custom Errors
+error ZeroAddress();
+error IdenticalAddress();
+error InvalidSwapFee();
+error InvalidAmounts();
+error InsufficientLiquidityMinted();
+error InvalidOutputToken();
+error InvalidInputToken();
+error PoolUninitialized();
+error InsufficientAmountIn();
+error Overflow();
+
 /// @notice Trident exchange pool template with constant product formula for swapping between an ERC-20 token pair.
 /// @dev The reserves are stored as bento shares.
 ///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
@@ -52,9 +64,9 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
         );
 
         // Factory ensures that the tokens are sorted.
-        require(_token0 != address(0), "ZERO_ADDRESS");
-        require(_token0 != _token1, "IDENTICAL_ADDRESSES");
-        require(_swapFee <= MAX_FEE, "INVALID_SWAP_FEE");
+        if (_token0 == address(0)) revert ZeroAddress();
+        if (_token0 == _token1) revert IdenticalAddress();
+        if (_swapFee > MAX_FEE) revert InvalidSwapFee();
 
         token0 = _token0;
         token1 = _token1;
@@ -88,7 +100,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
         (uint256 _totalSupply, uint256 k) = _mintFee(_reserve0, _reserve1);
 
         if (_totalSupply == 0) {
-            require(amount0 > 0 && amount1 > 0, "INVALID_AMOUNTS");
+            if (amount0 <= 0 && amount1 <= 0) revert InvalidAmounts();
             liquidity = computed - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
@@ -98,7 +110,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
             }
             liquidity = (kIncrease * _totalSupply) / k;
         }
-        require(liquidity != 0, "INSUFFICIENT_LIQUIDITY_MINTED");
+        if (liquidity == 0) revert InsufficientLiquidityMinted();
         _mint(recipient, liquidity);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         kLast = computed;
@@ -161,7 +173,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
                 amount0 = 0;
             } else {
                 // Swap `token1` for `token0`.
-                require(tokenOut == token0, "INVALID_OUTPUT_TOKEN");
+                if (tokenOut != token0) revert InvalidOutputToken();
                 amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0);
                 _transfer(token0, amount0, recipient, unwrapBento);
                 amountOut = amount0;
@@ -179,7 +191,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
     function swap(bytes calldata data) public override nonReentrant returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
-        require(_reserve0 > 0, "POOL_UNINITIALIZED");
+        if (_reserve0 <= 0) revert PoolUninitialized();
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 amountIn;
         address tokenOut;
@@ -190,7 +202,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
                 amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
                 balance1 -= amountOut;
             } else {
-                require(tokenIn == token1, "INVALID_INPUT_TOKEN");
+                if (tokenIn != token1) revert InvalidInputToken();
                 tokenOut = token0;
                 amountIn = balance1 - reserve1;
                 amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
@@ -209,23 +221,23 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
             (address, address, bool, uint256, bytes)
         );
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
-        require(_reserve0 > 0, "POOL_UNINITIALIZED");
+        if (_reserve0 <= 0) revert PoolUninitialized();
         unchecked {
             if (tokenIn == token0) {
                 amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
                 _transfer(token1, amountOut, recipient, unwrapBento);
                 ITridentCallee(msg.sender).tridentSwapCallback(context);
                 (uint256 balance0, uint256 balance1) = _balance();
-                require(balance0 - _reserve0 >= amountIn, "INSUFFICIENT_AMOUNT_IN");
+                if (balance0 - _reserve0 < amountIn) revert InsufficientAmountIn();
                 _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
                 emit Swap(recipient, tokenIn, token1, amountIn, amountOut);
             } else {
-                require(tokenIn == token1, "INVALID_INPUT_TOKEN");
+                if (tokenIn != token1) revert InvalidInputToken();
                 amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
                 _transfer(token0, amountOut, recipient, unwrapBento);
                 ITridentCallee(msg.sender).tridentSwapCallback(context);
                 (uint256 balance0, uint256 balance1) = _balance();
-                require(balance1 - _reserve1 >= amountIn, "INSUFFICIENT_AMOUNT_IN");
+                if (balance1 - _reserve1 < amountIn) revert InsufficientAmountIn();
                 _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
                 emit Swap(recipient, tokenIn, token0, amountIn, amountOut);
             }
@@ -263,7 +275,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
         uint112 _reserve1,
         uint32 _blockTimestampLast
     ) internal {
-        require(balance0 <= type(uint112).max && balance1 <= type(uint112).max, "OVERFLOW");
+        if (balance0 > type(uint112).max || balance1 > type(uint112).max) revert Overflow();
         if (_blockTimestampLast == 0) {
             // TWAP support is disabled for gas efficiency.
             reserve0 = uint112(balance0);
@@ -365,7 +377,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
         if (tokenIn == token0) {
             finalAmountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
         } else {
-            require(tokenIn == token1, "INVALID_INPUT_TOKEN");
+            if (tokenIn != token1) revert InvalidInputToken();
             finalAmountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
         }
     }
@@ -376,7 +388,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
         if (tokenOut == token1) {
             finalAmountIn = _getAmountIn(amountOut, _reserve0, _reserve1);
         } else {
-            require(tokenOut == token0, "INVALID_OUTPUT_TOKEN");
+            if (tokenOut != token0) revert InvalidOutputToken();
             finalAmountIn = _getAmountIn(amountOut, _reserve1, _reserve0);
         }
     }

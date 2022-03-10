@@ -196,7 +196,7 @@ describe("Router", function () {
           1000,
           ethers.utils.defaultAbiCoder.encode(["address"], [deployer.address])
         )
-      ).to.be.revertedWith("OVERFLOW");
+      ).to.be.revertedWith("Overflow()");
     });
   });
 

@@ -6,6 +6,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "../interfaces/IPoolFactory.sol";
 
+/// @dev Custom Errors
+error InvalidBarFee();
+error ZeroAddress();
+error NotWhitelisted();
+
 /// @notice Trident pool deployer contract with template factory whitelist.
 /// @author Mudit Gupta.
 contract MasterDeployer is Ownable {
@@ -28,9 +33,9 @@ contract MasterDeployer is Ownable {
         address _barFeeTo,
         address _bento
     ) {
-        require(_barFee <= MAX_FEE, "INVALID_BAR_FEE");
-        require(_barFeeTo != address(0), "ZERO_ADDRESS");
-        require(_bento != address(0), "ZERO_ADDRESS");
+        if (_barFee > MAX_FEE) revert InvalidBarFee();
+        if (_barFeeTo == address(0)) revert ZeroAddress();
+        if (_bento == address(0)) revert ZeroAddress();
 
         barFee = _barFee;
         barFeeTo = _barFeeTo;
@@ -38,7 +43,7 @@ contract MasterDeployer is Ownable {
     }
 
     function deployPool(address _factory, bytes calldata _deployData) external returns (address pool) {
-        require(whitelistedFactories[_factory], "FACTORY_NOT_WHITELISTED");
+        if (!whitelistedFactories[_factory]) revert NotWhitelisted();
         pool = IPoolFactory(_factory).deployPool(_deployData);
         pools[pool] = true;
         emit DeployPool(_factory, pool, _deployData);
@@ -55,7 +60,7 @@ contract MasterDeployer is Ownable {
     }
 
     function setBarFee(uint256 _barFee) external onlyOwner {
-        require(_barFee <= MAX_FEE, "INVALID_BAR_FEE");
+        if (_barFee > MAX_FEE) revert InvalidBarFee();
         barFee = _barFee;
         emit BarFeeUpdated(_barFee);
     }
