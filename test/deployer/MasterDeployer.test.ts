@@ -57,7 +57,7 @@ describe("MasterDeployer", function () {
 
       await expect(
         this.masterDeployer.deployPool(this.constantProductPoolFactory.address, deployData)
-      ).to.be.revertedWith("FactoryNotWhitelisted");
+      ).to.be.revertedWith("NotWhitelisted");
     });
 
     it("Adds address to pools array", async function () {
