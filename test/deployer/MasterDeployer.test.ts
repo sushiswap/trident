@@ -27,19 +27,19 @@ describe("MasterDeployer", function () {
   it("Reverts on invalid fee", async function () {
     await expect(
       this.MasterDeployer.deploy(MAX_FEE.add(1), this.feeTo.address, this.bentoBox.address)
-    ).to.be.revertedWith("INVALID_BAR_FEE");
+    ).to.be.revertedWith("InvalidBarFee");
   });
 
   it("Reverts on fee to zero address", async function () {
     await expect(
       this.MasterDeployer.deploy(MAX_FEE, ethers.constants.AddressZero, this.bentoBox.address)
-    ).to.be.revertedWith("ZERO_ADDRESS");
+    ).to.be.revertedWith("ZeroAddress");
   });
 
   it("Reverts on bento zero address", async function () {
     await expect(
       this.MasterDeployer.deploy(MAX_FEE, this.feeTo.address, ethers.constants.AddressZero)
-    ).to.be.revertedWith("ZERO_ADDRESS");
+    ).to.be.revertedWith("ZeroAddress");
   });
 
   beforeEach(async function () {
@@ -57,7 +57,7 @@ describe("MasterDeployer", function () {
 
       await expect(
         this.masterDeployer.deployPool(this.constantProductPoolFactory.address, deployData)
-      ).to.be.revertedWith("FACTORY_NOT_WHITELISTED");
+      ).to.be.revertedWith("FactoryNotWhitelisted");
     });
 
     it("Adds address to pools array", async function () {
@@ -133,7 +133,7 @@ describe("MasterDeployer", function () {
 
   describe("#setFeeTo", async function () {
     it("Reverts on invalid fee", async function () {
-      await expect(this.masterDeployer.setBarFee(MAX_FEE.add(1))).to.be.revertedWith("INVALID_BAR_FEE");
+      await expect(this.masterDeployer.setBarFee(MAX_FEE.add(1))).to.be.revertedWith("InvalidBarFee");
     });
     it("Mutates on valid fee", async function () {
       this.masterDeployer.setBarFee(0);
