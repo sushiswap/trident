@@ -73,18 +73,38 @@ describe("Constant Product Pool", () => {
   });
 
   describe("#mint", function () {
-    it("reverts if total supply is 0 and both token amounts are 0", async () => {
-      const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
-      const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
-      const deployData = ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "uint256", "bool"],
-        ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000002", 30, false]
-      );
-      const constantProductPool = await ConstantProductPool.deploy(deployData, masterDeployer.address);
-      await constantProductPool.deployed();
+    it("reverts if total supply is 0 and one of the token amounts are 0 - token 0", async () => {
+      const pool = await uninitializedConstantProductPool();
+
+      const bentoBox = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+
       const newLocal = "0x0000000000000000000000000000000000000003";
+
+      await token0.transfer(bentoBox.address, 1000);
+
+      await bentoBox.deposit(token0.address, bentoBox.address, pool.address, 1000, 0);
+
       const mintData = ethers.utils.defaultAbiCoder.encode(["address"], [newLocal]);
-      await expect(constantProductPool.mint(mintData)).to.be.revertedWith("InvalidAmounts()");
+      await expect(pool.mint(mintData)).to.be.revertedWith("InvalidAmounts()");
+    });
+
+    it("reverts if total supply is 0 and one of the token amounts are 0 - token 1", async () => {
+      const pool = await uninitializedConstantProductPool();
+
+      const bentoBox = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+
+      const newLocal = "0x0000000000000000000000000000000000000003";
+
+      await token1.transfer(bentoBox.address, 1000);
+
+      await bentoBox.deposit(token1.address, bentoBox.address, pool.address, 1000, 0);
+
+      const mintData = ethers.utils.defaultAbiCoder.encode(["address"], [newLocal]);
+      await expect(pool.mint(mintData)).to.be.revertedWith("InvalidAmounts()");
     });
 
     it("reverts if insufficient liquidity minted", async () => {
