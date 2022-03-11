@@ -191,7 +191,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
     function swap(bytes calldata data) public override nonReentrant returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
-        if (_reserve0 <= 0) revert PoolUninitialized();
+        if (_reserve0 == 0) revert PoolUninitialized();
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 amountIn;
         address tokenOut;
@@ -221,7 +221,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
             (address, address, bool, uint256, bytes)
         );
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
-        if (_reserve0 <= 0) revert PoolUninitialized();
+        if (_reserve0 == 0) revert PoolUninitialized();
         unchecked {
             if (tokenIn == token0) {
                 amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
