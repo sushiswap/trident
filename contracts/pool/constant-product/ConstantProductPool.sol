@@ -100,7 +100,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
         (uint256 _totalSupply, uint256 k) = _mintFee(_reserve0, _reserve1);
 
         if (_totalSupply == 0) {
-            if (amount0 <= 0 && amount1 <= 0) revert InvalidAmounts();
+            if (amount0 == 0 || amount1 == 0) revert InvalidAmounts();
             liquidity = computed - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
