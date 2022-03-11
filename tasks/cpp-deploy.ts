@@ -1,4 +1,4 @@
-import { ChainId, WETH9_ADDRESS, USDC_ADDRESS } from "@sushiswap/core-sdk";
+import { ChainId, WETH9_ADDRESS, USDC_ADDRESS, WNATIVE_ADDRESS } from "@sushiswap/core-sdk";
 import { task, types } from "hardhat/config";
 import { ConstantProductPoolFactory, MasterDeployer } from "../types";
 
@@ -6,13 +6,13 @@ task("cpp-deploy", "Constant Product Pool deploy")
   .addOptionalParam(
     "tokenA",
     "Token A",
-    WETH9_ADDRESS[ChainId.KOVAN], // kovan weth
+    WNATIVE_ADDRESS[ChainId.MATIC], // kovan weth
     types.string
   )
   .addOptionalParam(
     "tokenB",
     "Token B",
-    USDC_ADDRESS[ChainId.KOVAN], // kovan dai
+    USDC_ADDRESS[ChainId.MATIC], // kovan dai
     types.string
   )
   .addOptionalParam("fee", "Fee tier", 30, types.int)
@@ -30,17 +30,22 @@ task("cpp-deploy", "Constant Product Pool deploy")
       [...[tokenA, tokenB].sort(), fee, twap]
     );
 
-    console.log("1", [...[tokenA, tokenB].sort(), fee, twap]);
-    const contractTransaction = await masterDeployer.deployPool(constantProductPoolFactory.address, deployData);
-    console.log("2");
-    if (!verify) return;
-
-    const contractReceipt = await contractTransaction.wait(5);
-
-    const { events } = contractReceipt;
-
-    await run("verify:verify", {
-      address: events?.[0].args?.pool,
-      constructorArguments: [deployData, masterDeployer.address],
+    console.log([...[tokenA, tokenB].sort(), fee, twap], {
+      factory: constantProductPoolFactory.address,
+      deployData,
     });
+
+    // console.log("1", [...[tokenA, tokenB].sort(), fee, twap]);
+    // const contractTransaction = await masterDeployer.deployPool(constantProductPoolFactory.address, deployData);
+    // console.log("2");
+    // if (!verify) return;
+
+    // const contractReceipt = await contractTransaction.wait(5);
+
+    // const { events } = contractReceipt;
+
+    // await run("verify:verify", {
+    //   address: events?.[0].args?.pool,
+    //   constructorArguments: [deployData, masterDeployer.address],
+    // });
   });
