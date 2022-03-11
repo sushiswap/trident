@@ -14,7 +14,7 @@ const deployFunction: DeployFunction = async function ({
   const { address, newlyDeployed } = await deploy("ConstantProductPoolFactoryHelper", {
     from: deployer,
     deterministicDeployment: false,
-    waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 5 : undefined,
+    waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 10 : undefined,
   });
 
   if (newlyDeployed && process.env.VERIFY_ON_DEPLOY === "true") {

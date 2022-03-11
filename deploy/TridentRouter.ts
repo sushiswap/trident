@@ -42,7 +42,7 @@ const deployFunction: DeployFunction = async function ({
     waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 10 : undefined,
   });
 
-  if (process.env.VERIFY_ON_DEPLOY === "true") {
+  if (newlyDeployed && process.env.VERIFY_ON_DEPLOY === "true") {
     try {
       await run("verify:verify", {
         address,
