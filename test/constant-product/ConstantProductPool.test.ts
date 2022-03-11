@@ -326,13 +326,13 @@ describe("Constant Product Pool", () => {
 
       const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
 
-      expect(await pool.barFee()).equal(0);
+      expect(await pool.barFee()).equal(5);
 
       await masterDeployer.setBarFee(10).then((tx) => tx.wait());
 
       expect(await masterDeployer.barFee()).equal(10);
 
-      expect(await pool.barFee()).equal(0);
+      expect(await pool.barFee()).equal(5);
 
       await pool.updateBarFee().then((tx) => tx.wait());
 
@@ -340,13 +340,13 @@ describe("Constant Product Pool", () => {
 
       // reset
 
-      await masterDeployer.setBarFee(0).then((tx) => tx.wait());
+      await masterDeployer.setBarFee(5).then((tx) => tx.wait());
 
-      expect(await masterDeployer.barFee()).equal(0);
+      expect(await masterDeployer.barFee()).equal(5);
 
       await pool.updateBarFee().then((tx) => tx.wait());
 
-      expect(await pool.barFee()).equal(0);
+      expect(await pool.barFee()).equal(5);
     });
   });
 
