@@ -68,20 +68,20 @@ describe("Transfer", () => {
   describe("#safeApprove", () => {
     harness({
       sendTx: (tokenAddress) => transferMock.safeApprove(tokenAddress, constants.AddressZero, constants.MaxUint256),
-      expectedError: "SA",
+      expectedError: "APPROVE_FAILED",
     });
   });
   describe("#safeTransfer", () => {
     harness({
       sendTx: (tokenAddress) => transferMock.safeTransfer(tokenAddress, constants.AddressZero, constants.MaxUint256),
-      expectedError: "ST",
+      expectedError: "TRANSFER_FAILED",
     });
   });
   describe("#safeTransferFrom", () => {
     harness({
       sendTx: (tokenAddress) =>
         transferMock.safeTransferFrom(tokenAddress, constants.AddressZero, constants.AddressZero, constants.MaxUint256),
-      expectedError: "STF",
+      expectedError: "TRANSFER_FROM_FAILED",
     });
   });
 
@@ -92,7 +92,7 @@ describe("Transfer", () => {
     });
     it("fails if call reverts", async () => {
       await erc20Fallback.setup(true);
-      await expect(transferMock.safeTransferETH(erc20Fallback.address, 0)).to.be.revertedWith("STE");
+      await expect(transferMock.safeTransferETH(erc20Fallback.address, 0)).to.be.revertedWith("ETH_TRANSFER_FAILED");
     });
   });
 });
