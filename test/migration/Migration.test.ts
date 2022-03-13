@@ -112,13 +112,13 @@ describe("Migration", function () {
     const balance = await usdcWethLp.balanceOf(_owner);
     usdcWethLp.connect(owner).approve(manualMigrator.address, balance);
     await expect(
-      manualMigrator.connect(owner).migrate(usdcWethLp.address, balance.div(2), 30, false, balance)
+      manualMigrator.connect(owner).migrate(usdcWethLp.address, balance.div(2), 30, false, balance, balance, balance)
     ).to.be.revertedWith(customError("MinimumOutput"));
-    await manualMigrator.connect(owner).migrate(usdcWethLp.address, balance.div(2), 30, false, 1);
+    await manualMigrator.connect(owner).migrate(usdcWethLp.address, balance.div(2), 30, false, 0, 0, 0);
     const poolAddy = (await factory.getPools(usdc.address, weth.address, 0, 1))[0];
     const pool = await ERC20.attach(poolAddy);
     const newBalance = await pool.balanceOf(_owner);
-    await manualMigrator.connect(owner).migrate(usdcWethLp.address, balance.div(2), 30, false, 1);
+    await manualMigrator.connect(owner).migrate(usdcWethLp.address, balance.div(2), 30, false, 0, 0, 0);
     expect(newBalance.gt(0)).to.be.true;
     expect((await pool.balanceOf(_owner)).gt(newBalance)).to.be.true;
   });
