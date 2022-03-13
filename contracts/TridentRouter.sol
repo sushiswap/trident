@@ -2,9 +2,12 @@
 
 pragma solidity >=0.8.0;
 
+import {ERC20} from "@rari-capital/solmate/src/tokens/ERC20.sol";
+import {SafeTransferLib} from "@rari-capital/solmate/src/utils/SafeTransferLib.sol";
+
 import {Multicall} from "./abstract/Multicall.sol";
 import {SelfPermit} from "./abstract/SelfPermit.sol";
-import {Transfer} from "./libraries/Transfer.sol";
+
 import {IBentoBoxMinimal} from "./interfaces/IBentoBoxMinimal.sol";
 import {IMasterDeployer} from "./interfaces/IMasterDeployer.sol";
 import {IPool} from "./interfaces/IPool.sol";
@@ -21,7 +24,8 @@ error InvalidPool();
 
 /// @notice Router contract that helps in swapping across Trident pools.
 contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
-    using Transfer for address;
+    using SafeTransferLib for address;
+    using SafeTransferLib for ERC20;
 
     /// @dev Cached whitelisted pools.
     mapping(address => bool) internal whitelistedPools;
@@ -211,7 +215,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         IPool.TokenAmount[] calldata minWithdrawals
     ) public {
         isWhiteListed(pool);
-        pool.safeTransferFrom(msg.sender, pool, liquidity);
+        ERC20(pool).safeTransferFrom(msg.sender, pool, liquidity);
         IPool.TokenAmount[] memory withdrawnLiquidity = IPool(pool).burn(data);
         for (uint256 i; i < minWithdrawals.length; ++i) {
             uint256 j;
@@ -240,7 +244,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
     ) public {
         isWhiteListed(pool);
         // Use 'liquidity = 0' for prefunding.
-        pool.safeTransferFrom(msg.sender, pool, liquidity);
+        ERC20(pool).safeTransferFrom(msg.sender, pool, liquidity);
         uint256 withdrawn = IPool(pool).burnSingle(data);
         if (withdrawn < minWithdrawal) revert TooLittleReceived();
     }
@@ -255,7 +259,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         if (onBento) {
             bento.transfer(token, address(this), recipient, amount);
         } else {
-            token == USE_NATIVE ? recipient.safeTransferETH(address(this).balance) : token.safeTransfer(recipient, amount);
+            token == USE_NATIVE ? recipient.safeTransferETH(address(this).balance) : ERC20(token).safeTransfer(recipient, amount);
         }
     }
 
@@ -269,7 +273,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         }
     }
 
-   /// @notice Wrapper function to allow pool deployment to be batched. 
+    /// @notice Wrapper function to allow pool deployment to be batched. 
     function deployPool(address factory, bytes calldata deployData) external payable returns (address) {
         return masterDeployer.deployPool(factory, deployData);
     }
