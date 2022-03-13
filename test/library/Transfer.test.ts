@@ -53,7 +53,7 @@ describe("Transfer", () => {
     });
     it("fails with compliant with revert", async () => {
       await erc20Compliant.setup(false, true);
-      await expect(sendTx(erc20Compliant.address)).to.be.revertedWith(expectedError);
+      await expect(sendTx(erc20Compliant.address)).to.be.revertedWith("REVERT");
     });
     it("succeeds with noncompliant (no return) with no revert", async () => {
       await erc20Noncompliant.setup(false);
@@ -61,7 +61,7 @@ describe("Transfer", () => {
     });
     it("fails with noncompliant (no return) with revert", async () => {
       await erc20Noncompliant.setup(true);
-      await expect(sendTx(erc20Noncompliant.address)).to.be.revertedWith(expectedError);
+      await expect(sendTx(erc20Noncompliant.address)).to.be.revertedWith("REVERT");
     });
   }
 
