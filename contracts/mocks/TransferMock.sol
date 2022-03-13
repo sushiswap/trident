@@ -2,15 +2,19 @@
 
 pragma solidity >= 0.8.0;
 
-import "../libraries/Transfer.sol";
+import {ERC20} from "@rari-capital/solmate/src/tokens/ERC20.sol";
+import {SafeTransferLib} from "@rari-capital/solmate/src/utils/SafeTransferLib.sol";
 
 contract TransferMock {
+    using SafeTransferLib for address;
+    using SafeTransferLib for ERC20;
+
     function safeApprove(
         address token,
         address to,
         uint256 value
     ) external {
-        Transfer.safeApprove(token, to, value);
+        ERC20(token).safeApprove(to, value);
     }
 
     function safeTransfer(
@@ -18,7 +22,7 @@ contract TransferMock {
         address to,
         uint256 value
     ) external {
-        Transfer.safeTransfer(token, to, value);
+        ERC20(token).safeTransfer(to, value);
     }
 
     function safeTransferFrom(
@@ -27,10 +31,10 @@ contract TransferMock {
         address to,
         uint256 value
     ) external {
-        Transfer.safeTransferFrom(token, from, to, value);
+        ERC20(token).safeTransferFrom(from, to, value);
     }
 
     function safeTransferETH(address to, uint256 value) external {
-        Transfer.safeTransferETH(to, value);
+        to.safeTransferETH(value);
     }
 }
