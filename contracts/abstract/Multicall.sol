@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity >=0.8.0;
+pragma solidity >=0.8.4;
 
 /// @notice Helper utility that enables calling multiple local methods in a single call.
 /// @author Modified from Uniswap (https://github.com/Uniswap/v3-periphery/blob/main/contracts/base/Multicall.sol)
 /// License-Identifier: GPL-2.0-or-later
 abstract contract Multicall {
     function multicall(bytes[] calldata data) public payable returns (bytes[] memory results) {
-        results = new bytes[](data.length);
+        uint256 length = data.length;
         
-        for (uint256 i; i < data.length;) {
+        results = new bytes[](length);
+        
+        for (uint256 i; i < length;) {
             (bool success, bytes memory result) = address(this).delegatecall(data[i]);
 
             if (!success) {
