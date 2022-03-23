@@ -16,6 +16,7 @@ error NotWethSender();
 error TooLittleReceived();
 error NotEnoughLiquidityMinted();
 error IncorrectTokenWithdrawn();
+error IncorrectSlippageParams();
 error InsufficientWETH();
 error InvalidPool();
 
@@ -75,11 +76,9 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         // The last pool should transfer its output tokens to the user.
         // If the user wants to unwrap `wETH`, the final destination should be this contract and
         // a batch call should be made to `unwrapWETH`.
-        for (uint256 i; i < params.path.length; ) {
+        uint256 n = params.path.length;
+        for (uint256 i = 0; i < n; i = _increment(i)) {
             amountOut = IPool(params.path[i].pool).swap(params.path[i].data);
-            unchecked {
-                ++i;
-            }
         }
         // Ensure that the slippage wasn't too much. This assumes that the pool is honest.
         if (amountOut < params.amountOutMinimum) revert TooLittleReceived();
@@ -110,11 +109,9 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         // Call every pool in the path.
         // Pool `N` should transfer its output tokens to pool `N+1` directly.
         // The last pool should transfer its output tokens to the user.
-        for (uint256 i; i < params.path.length; ) {
+        uint256 n = params.path.length;
+        for (uint256 i = 0; i < n; i = _increment(i)) {
             amountOut = IPool(params.path[i].pool).swap(params.path[i].data);
-            unchecked {
-                ++i;
-            }
         }
         // Ensure that the slippage wasn't too much. This assumes that the pool is honest.
         if (amountOut < params.amountOutMinimum) revert TooLittleReceived();
@@ -128,38 +125,32 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
     function complexPath(ComplexPathParams calldata params) public payable {
         // Deposit all initial tokens to respective pools and initiate the swaps.
         // Input tokens come from the user - output goes to following pools.
-        for (uint256 i; i < params.initialPath.length; ) {
+        uint256 n = params.initialPath.length;
+        for (uint256 i = 0; i < n; i = _increment(i)) {
             if (params.initialPath[i].native) {
                 _depositToBentoBox(params.initialPath[i].tokenIn, params.initialPath[i].pool, params.initialPath[i].amount);
             } else {
                 bento.transfer(params.initialPath[i].tokenIn, msg.sender, params.initialPath[i].pool, params.initialPath[i].amount);
             }
             IPool(params.initialPath[i].pool).swap(params.initialPath[i].data);
-            unchecked {
-                ++i;
-            }
         }
         // Do all the middle swaps. Input comes from previous pools. - output goes to following pools.
-        for (uint256 i; i < params.percentagePath.length; ) {
+        n = params.percentagePath.length;
+        for (uint256 i = 0; i < n; i = _increment(i)) {
             uint256 balanceShares = bento.balanceOf(params.percentagePath[i].tokenIn, address(this));
             uint256 transferShares = (balanceShares * params.percentagePath[i].balancePercentage) / uint256(10)**8;
             bento.transfer(params.percentagePath[i].tokenIn, address(this), params.percentagePath[i].pool, transferShares);
             IPool(params.percentagePath[i].pool).swap(params.percentagePath[i].data);
-            unchecked {
-                ++i;
-            }
         }
         // Ensure enough was received and transfer the ouput to the recipient.
-        for (uint256 i; i < params.output.length; ) {
+        n = params.output.length;
+        for (uint256 i = 0; i < n; i = _increment(i)) {
             uint256 balanceShares = bento.balanceOf(params.output[i].token, address(this));
             if (balanceShares < params.output[i].minAmount) revert TooLittleReceived();
             if (params.output[i].unwrapBento) {
                 bento.withdraw(params.output[i].token, address(this), params.output[i].to, 0, balanceShares);
             } else {
                 bento.transfer(params.output[i].token, address(this), params.output[i].to, balanceShares);
-            }
-            unchecked {
-                ++i;
             }
         }
     }
@@ -176,14 +167,12 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         bytes calldata data
     ) public payable returns (uint256 liquidity) {
         // Send all input tokens to the pool.
-        for (uint256 i; i < tokenInput.length; ) {
+        uint256 n = tokenInput.length;
+        for (uint256 i = 0; i < n; i = _increment(i)) {
             if (tokenInput[i].native) {
                 _depositToBentoBox(tokenInput[i].token, pool, tokenInput[i].amount);
             } else {
                 bento.transfer(tokenInput[i].token, msg.sender, pool, tokenInput[i].amount);
-            }
-            unchecked {
-                ++i;
             }
         }
         liquidity = IPool(pool).mint(data);
@@ -203,16 +192,10 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
     ) public {
         pool.safeTransferFrom(msg.sender, pool, liquidity);
         IPool.TokenAmount[] memory withdrawnLiquidity = IPool(pool).burn(data);
-        for (uint256 i; i < minWithdrawals.length; ++i) {
-            uint256 j;
-            for (; j < withdrawnLiquidity.length; ++j) {
-                if (withdrawnLiquidity[j].token == minWithdrawals[i].token) {
-                    if (withdrawnLiquidity[j].amount < minWithdrawals[i].amount) revert TooLittleReceived();
-                    break;
-                }
-            }
-            // A token that is present in `minWithdrawals` is missing from `withdrawnLiquidity`.
-            if (j >= withdrawnLiquidity.length) revert IncorrectTokenWithdrawn();
+        uint256 n = minWithdrawals.length;
+        for (uint256 i = 0; i < n; i = _increment(i)) {
+            if (minWithdrawals[i].token != withdrawnLiquidity[i].token) revert IncorrectSlippageParams();
+            if (withdrawnLiquidity[i].amount < minWithdrawals[i].amount) revert TooLittleReceived();
         }
     }
 
@@ -286,5 +269,11 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         uint256 amount
     ) internal {
         bento.deposit{value: token == USE_NATIVE ? amount : 0}(token, msg.sender, recipient, amount, 0);
+    }
+
+    function _increment(uint256 i) internal pure returns (uint256) {
+        unchecked {
+            return i + 1;
+        }
     }
 }
