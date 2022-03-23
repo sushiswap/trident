@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { customError } from "../utilities";
 import { Migrator__factory, TridentSushiRollCP, TridentSushiRollCP__factory } from "../../types";
 
-describe("Migration", function () {
+describe.only("Migration", function () {
   let _owner, owner, chef, migrator, usdcWethLp, usdc, weth, masterDeployer, factory, Pool, snapshotId, ERC20;
 
   let manualMigrator: TridentSushiRollCP;
@@ -109,18 +109,42 @@ describe("Migration", function () {
 
   it("Should migrate uniswap v2 style Lp positions outside of MasterChef", async () => {
     // _owner has some usdc-weth lp coins we can migrate
-    const balance = await usdcWethLp.balanceOf(_owner);
+    const balance = (await usdcWethLp.balanceOf(_owner)).div(10);
     usdcWethLp.connect(owner).approve(manualMigrator.address, balance);
     await expect(
-      manualMigrator.connect(owner).migrate(usdcWethLp.address, balance.div(2), 30, false, balance, balance, balance)
+      manualMigrator
+        .connect(owner)
+        .migrateLegacyToCP(usdcWethLp.address, balance.div(2), 30, false, balance, balance, balance)
     ).to.be.revertedWith(customError("MinimumOutput"));
-    await manualMigrator.connect(owner).migrate(usdcWethLp.address, balance.div(2), 30, false, 0, 0, 0);
+    await manualMigrator.connect(owner).migrateLegacyToCP(usdcWethLp.address, balance.div(2), 30, false, 0, 0, 0);
     const poolAddy = (await factory.getPools(usdc.address, weth.address, 0, 1))[0];
     const pool = await ERC20.attach(poolAddy);
     const newBalance = await pool.balanceOf(_owner);
-    await manualMigrator.connect(owner).migrate(usdcWethLp.address, balance.div(2), 30, false, 0, 0, 0);
+    await manualMigrator.connect(owner).migrateLegacyToCP(usdcWethLp.address, balance.div(2), 30, false, 0, 0, 0);
     expect(newBalance.gt(0)).to.be.true;
     expect((await pool.balanceOf(_owner)).gt(newBalance)).to.be.true;
+  });
+
+  it("Should migrate from one trident CP configuration to another", async () => {
+    // _owner has some usdc-weth lp coins we can migrate
+    const balance = (await usdcWethLp.balanceOf(_owner)).div(10);
+    usdcWethLp.connect(owner).approve(manualMigrator.address, balance);
+    await manualMigrator.connect(owner).migrateLegacyToCP(usdcWethLp.address, balance, 30, false, 0, 0, 0);
+
+    const poolAddy = (await factory.getPools(usdc.address, weth.address, 0, 1))[0];
+    const pool = await ERC20.attach(poolAddy);
+    const poolBalance = await pool.balanceOf(_owner);
+    pool.connect(owner).approve(manualMigrator.address, poolBalance);
+
+    await manualMigrator.connect(owner).migrateCP(poolAddy, poolBalance, 30, true, 0, 0, 0);
+
+    const newPoolAddy = (await factory.getPools(usdc.address, weth.address, 1, 1))[0];
+    const newPool = await ERC20.attach(newPoolAddy);
+    const newPoolBalance = await newPool.balanceOf(_owner);
+
+    expect((await pool.balanceOf(_owner)).eq(0)).to.be.true;
+    expect(poolBalance.gt(newPoolBalance)).to.be.true; // balance won't be equal since the pool burns some liquidity
+    expect(poolBalance.lt(newPoolBalance.add(10001))).to.be.true;
   });
 
   after(async () => {
