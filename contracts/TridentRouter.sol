@@ -134,7 +134,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
             }
             IPool(params.initialPath[i].pool).swap(params.initialPath[i].data);
         }
-        // Do all the middle swaps. Input comes from previous pools. - output goes to following pools.
+        // Do all the middle swaps. Input comes from previous pools.
         n = params.percentagePath.length;
         for (uint256 i = 0; i < n; i = _increment(i)) {
             uint256 balanceShares = bento.balanceOf(params.percentagePath[i].tokenIn, address(this));
@@ -231,14 +231,11 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         }
     }
 
-    /// @notice Unwrap this contract's `wETH` into ETH.
-    function unwrapWETH(uint256 amountMinimum, address recipient) external payable {
+    /// @notice Unwrap this contract's wETH into ETH.
+    function unwrapWETH(address recipient) external payable {
         uint256 balance = IWETH9(wETH).balanceOf(address(this));
-        if (balance < amountMinimum) revert InsufficientWETH();
-        if (balance != 0) {
-            IWETH9(wETH).withdraw(balance);
-            recipient.safeTransferETH(balance);
-        }
+        IWETH9(wETH).withdraw(balance);
+        recipient.safeTransferETH(balance);
     }
 
     /// @notice Wrapper function to allow pool deployment to be batched.
