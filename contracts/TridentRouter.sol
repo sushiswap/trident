@@ -272,6 +272,12 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         bento.setMasterContractApproval(msg.sender, address(this), true, v, r, s);
     }
 
+    /// @notice Call BentoBox harvest function to rebalance a BentoBox token strategy and ensure there are enough tokens available to withdraw a swap output.
+    /// @dev Should be batched in before a swap.
+    function harvest(address token, uint256 maxChangeAmount) internal {
+        bento.harvest(token, true, maxChangeAmount);
+    }
+
     /// @notice Deposit from the user's wallet into BentoBox.
     /// @dev Amount is the native token amount. We let BentoBox do the conversion into shares.
     function _depositToBentoBox(
