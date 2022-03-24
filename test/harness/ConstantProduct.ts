@@ -79,10 +79,7 @@ export async function initialize() {
       [token0.address, token1.address, 30, false]
     );
     const salt = ethers.utils.keccak256(deployData);
-    const constructorParams = ethers.utils.defaultAbiCoder
-      .encode(["bytes", "address"], [deployData, masterDeployer.address])
-      .substring(2);
-    const initCodeHash = ethers.utils.keccak256(Pool.bytecode + constructorParams);
+    const initCodeHash = ethers.utils.keccak256(Pool.bytecode);
     const poolAddress = ethers.utils.getCreate2Address(factory.address, salt, initCodeHash);
     pools.push(Pool.attach(poolAddress));
     await masterDeployer.deployPool(factory.address, deployData).then((tx) => tx.wait());
