@@ -254,7 +254,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
 
     /// @notice Call BentoBox harvest function to rebalance a BentoBox token strategy and ensure there are enough tokens available to withdraw a swap output.
     /// @dev Should be batched in before a swap.
-    function harvest(address token, uint256 maxChangeAmount) internal {
+    function harvest(address token, uint256 maxChangeAmount) external {
         bento.harvest(token, true, maxChangeAmount);
     }
 
