@@ -21,7 +21,7 @@ describe("Router", function () {
       const weth9 = await ethers.getContract<WETH9>("WETH9");
       const deployer = await ethers.getNamedSigner("deployer");
       await expect(weth9.transfer(router.address, 1)).to.not.be.reverted;
-      await expect(router.unwrapWETH(1, deployer.address)).to.not.be.reverted;
+      await expect(router.unwrapWETH(deployer.address)).to.not.be.reverted;
     });
     it("Reverts when msg.sender is not WETH", async () => {
       const router = await ethers.getContract<TridentRouter>("TridentRouter");
@@ -201,7 +201,7 @@ describe("Router", function () {
   });
 
   describe("#burnLiquidity", function () {
-    it("Reverts when a token present in minWithdrawals is not withdrawn", async () => {
+    it("Reverts when an incorrect token order for minWithdrawals is sent", async () => {
       const deployer = await ethers.getNamedSigner("deployer");
 
       const router = await ethers.getContract<TridentRouter>("TridentRouter");
@@ -216,27 +216,21 @@ describe("Router", function () {
 
       const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
 
-      const weth9 = await ethers.getContract("WETH9");
-
       const data = ethers.utils.defaultAbiCoder.encode(["address", "bool"], [deployer.address, false]);
 
       const minWithdrawals = [
         {
-          token: token0.address,
-          amount: "500000000000000000",
-        },
-        {
           token: token1.address,
-          amount: "500000000000000000",
+          amount: "0",
         },
         {
-          token: weth9.address,
-          amount: "1",
+          token: token0.address,
+          amount: "0",
         },
       ];
 
       await expect(router.burnLiquidity(pool.address, balance, data, minWithdrawals)).to.be.revertedWith(
-        "IncorrectTokenWithdrawn"
+        "IncorrectSlippageParams"
       );
     });
     it("Reverts when output is less than minimum", async () => {
@@ -336,22 +330,15 @@ describe("Router", function () {
   });
 
   describe("#unwrapWETH", function () {
-    it("Succeeds if there is enough balance of WETH on router", async () => {
+    it("Correctly unwraps weth", async () => {
       const router = await ethers.getContract<TridentRouter>("TridentRouter");
       const weth9 = await ethers.getContract<WETH9>("WETH9");
-      const deployer = await ethers.getNamedSigner("deployer");
       await weth9.transfer(router.address, 1);
-      await expect(router.unwrapWETH(1, deployer.address)).to.not.be.reverted;
-    });
-    it("Reverts if there is not enough balance of WETH on router", async () => {
-      const router = await ethers.getContract<TridentRouter>("TridentRouter");
-      const deployer = await ethers.getNamedSigner("deployer");
-      await expect(router.unwrapWETH(1, deployer.address)).to.be.revertedWith("InsufficientWETH");
-    });
-    it("Does nothing if balance is zero and amount is zero", async () => {
-      const router = await ethers.getContract<TridentRouter>("TridentRouter");
-      const deployer = await ethers.getNamedSigner("deployer");
-      await router.unwrapWETH(0, deployer.address);
+      const difference = await weth9.balanceOf(router.address);
+      const oldBalance = await ethers.provider.getBalance(ethers.constants.AddressZero);
+      await expect(router.unwrapWETH(ethers.constants.AddressZero)).to.not.be.reverted;
+      const newBalance = await ethers.provider.getBalance(ethers.constants.AddressZero);
+      expect(oldBalance.add(difference).eq(newBalance)).to.be.true;
     });
   });
 
@@ -380,42 +367,6 @@ describe("Router", function () {
       );
 
       await router.approveMasterContract(v, r, s);
-    });
-  });
-
-  describe("#isWhiteListed", function () {
-    it("Reverts if the pool is invalid", async () => {
-      const deployer = await ethers.getNamedSigner("deployer");
-
-      const router = await ethers.getContract<TridentRouter>("TridentRouter");
-
-      const pool = await uninitializedConstantProductPool();
-
-      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
-
-      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
-
-      let liquidityInput = [
-        {
-          token: token0.address,
-          native: false,
-          amount: 1,
-        },
-        {
-          token: token1.address,
-          native: false,
-          amount: 1,
-        },
-      ];
-
-      await expect(
-        router.addLiquidity(
-          liquidityInput,
-          "0x0000000000000000000000000000000000000000",
-          1,
-          ethers.utils.defaultAbiCoder.encode(["address"], [deployer.address])
-        )
-      ).to.be.revertedWith("InvalidPool");
     });
   });
 });

@@ -89,4 +89,10 @@ interface IBentoBoxMinimal {
         bytes32 r,
         bytes32 s
     ) external;
+
+    function harvest(
+        address token,
+        bool balance,
+        uint256 maxChangeAmount
+    ) external;
 }
