@@ -17,7 +17,7 @@ import {
 import { getBigNumber, customError } from "../utilities";
 import { Trident } from "../harness/Trident";
 
-describe("Concentrated Liquidity Product Pool", function () {
+describe.skip("Concentrated Liquidity Product Pool", function () {
   let _snapshotId: string;
   let snapshotId: string;
   let trident: Trident;

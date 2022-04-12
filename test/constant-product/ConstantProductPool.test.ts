@@ -122,10 +122,58 @@ describe("Constant Product Pool", () => {
     it("reverts on uninitialized", async () => {
       const pool = await uninitializedConstantProductPool();
       const data = ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "bool"],
-        [await pool.token0(), "0x0000000000000000000000000000000000000000", false]
+        ["bool", "address", "bool"],
+        [true, "0x0000000000000000000000000000000000000000", false]
       );
       await expect(pool.swap(data)).to.be.revertedWith("PoolUninitialized()");
+    });
+    it("successfully preforms a swap", async () => {
+      const pool = await initializedConstantProductPool();
+      const sender = await ethers.provider.getSigner(0).getAddress();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+      const prevBalance = await bento.balanceOf(token1.address, sender);
+      const amount = 100;
+      await token0.transfer(bento.address, amount);
+      await bento.deposit(token0.address, bento.address, pool.address, amount, 0);
+      const data = ethers.utils.defaultAbiCoder.encode(["bool", "address", "bool"], [true, sender, false]);
+      await pool.swap(data);
+      const newBalance = await bento.balanceOf(token1.address, sender);
+      expect(prevBalance.lt(newBalance)).to.be.true;
+    });
+    it("successfully preforms a gas efficient swap", async () => {
+      const pool = await initializedConstantProductPool();
+      const sender = await ethers.provider.getSigner(0).getAddress();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+      const prevBalance = await bento.balanceOf(token0.address, sender);
+      const amount = 100;
+      await token0.transfer(bento.address, 2 * amount);
+      await bento.deposit(token0.address, bento.address, pool.address, amount, 0);
+      await bento.deposit(token0.address, bento.address, sender, amount, 0);
+      const data0 = ethers.utils.defaultAbiCoder.encode(["bool", "address", "bool"], [true, pool.address, false]);
+      await pool.swap(data0);
+      const data1 = ethers.utils.defaultAbiCoder.encode(["bool", "address", "bool"], [false, sender, false]);
+      await pool.swap(data1);
+      const newBalance = await bento.balanceOf(token0.address, sender);
+      expect(prevBalance.lt(newBalance)).to.be.true;
+      expect(newBalance.lt(prevBalance.add(amount * 2))).to.be.true;
+    });
+    it("successfully preforms a swap and unwraps bento", async () => {
+      const pool = await initializedConstantProductPool();
+      const sender = await ethers.provider.getSigner(0).getAddress();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+      const prevBalance = await token1.balanceOf(sender);
+      const amount = 100;
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+      await token0.transfer(bento.address, amount);
+      await bento.deposit(token0.address, bento.address, pool.address, amount, 0);
+      const data = ethers.utils.defaultAbiCoder.encode(["bool", "address", "bool"], [true, sender, true]);
+      await pool.swap(data);
+      const newBalance = await token1.balanceOf(sender);
+      expect(prevBalance.lt(newBalance)).to.be.true;
     });
   });
 
@@ -133,24 +181,10 @@ describe("Constant Product Pool", () => {
     it("reverts on uninitialized", async () => {
       const pool = await uninitializedConstantProductPool();
       const data = ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "bool", "uint256", "bytes"],
-        [await pool.token0(), "0x0000000000000000000000000000000000000000", false, 0, "0x"]
+        ["bool", "address", "bool", "uint256", "bytes"],
+        [true, "0x0000000000000000000000000000000000000000", false, 0, "0x"]
       );
       await expect(pool.flashSwap(data)).to.be.revertedWith("PoolUninitialized()");
-    });
-
-    it("reverts on invalid input token", async () => {
-      const pool = await initializedConstantProductPool();
-      const ERC20 = await ethers.getContractFactory<ERC20Mock__factory>("ERC20Mock");
-      const token2 = await ERC20.deploy("Token 2", "TOKEN2", ethers.constants.MaxUint256);
-      await token2.deployed();
-
-      const data = ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "bool", "uint256", "bytes"],
-        [token2.address, "0x0000000000000000000000000000000000000000", false, 0, "0x"]
-      );
-
-      await expect(pool.flashSwap(data)).to.be.revertedWith("InvalidInputToken()");
     });
 
     it("reverts on insuffiecient amount in token 0", async () => {
@@ -166,8 +200,8 @@ describe("Constant Product Pool", () => {
         [false, "0x0000000000000000000000000000000000000000", false]
       );
       const data = ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "bool", "uint256", "bytes"],
-        [token0.address, flashSwapMock.address, false, 1, flashSwapData]
+        ["bool", "address", "bool", "uint256", "bytes"],
+        [true, flashSwapMock.address, false, 1, flashSwapData]
       );
 
       await expect(flashSwapMock.testFlashSwap(pool.address, data)).to.be.revertedWith("InsufficientAmountIn()");
@@ -186,8 +220,8 @@ describe("Constant Product Pool", () => {
         [false, "0x0000000000000000000000000000000000000000", false]
       );
       const data = ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "bool", "uint256", "bytes"],
-        [token1.address, flashSwapMock.address, false, 1, flashSwapData]
+        ["bool", "address", "bool", "uint256", "bytes"],
+        [false, flashSwapMock.address, false, 1, flashSwapData]
       );
 
       await expect(flashSwapMock.testFlashSwap(pool.address, data)).to.be.revertedWith("InsufficientAmountIn()");
@@ -209,8 +243,8 @@ describe("Constant Product Pool", () => {
         [true, token0.address, false]
       );
       const data = ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "bool", "uint256", "bytes"],
-        [token0.address, flashSwapMock.address, true, 100, flashSwapData]
+        ["bool", "address", "bool", "uint256", "bytes"],
+        [true, flashSwapMock.address, true, 100, flashSwapData]
       );
       await flashSwapMock.testFlashSwap(pool.address, data);
       expect(await token1.balanceOf(flashSwapMock.address)).to.be.eq(99);
@@ -233,8 +267,8 @@ describe("Constant Product Pool", () => {
         [true, token0.address, true]
       );
       const data = ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "bool", "uint256", "bytes"],
-        [token0.address, flashSwapMock.address, false, 100, flashSwapData]
+        ["bool", "address", "bool", "uint256", "bytes"],
+        [true, flashSwapMock.address, false, 100, flashSwapData]
       );
       await flashSwapMock.testFlashSwap(pool.address, data);
       expect(await bento.balanceOf(token1.address, flashSwapMock.address)).to.be.eq(99);
@@ -256,8 +290,8 @@ describe("Constant Product Pool", () => {
         [true, token1.address, false]
       );
       const data = ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "bool", "uint256", "bytes"],
-        [token1.address, flashSwapMock.address, true, 100, flashSwapData]
+        ["bool", "address", "bool", "uint256", "bytes"],
+        [false, flashSwapMock.address, true, 100, flashSwapData]
       );
 
       await flashSwapMock.testFlashSwap(pool.address, data);
@@ -281,8 +315,8 @@ describe("Constant Product Pool", () => {
         [true, token1.address, true]
       );
       const data = ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "bool", "uint256", "bytes"],
-        [token1.address, flashSwapMock.address, false, 100, flashSwapData]
+        ["bool", "address", "bool", "uint256", "bytes"],
+        [false, flashSwapMock.address, false, 100, flashSwapData]
       );
       await flashSwapMock.testFlashSwap(pool.address, data);
       expect(await bento.balanceOf(token0.address, flashSwapMock.address)).to.be.eq(99);
@@ -349,46 +383,19 @@ describe("Constant Product Pool", () => {
   });
 
   describe("#getAmountOut", function () {
-    it("returns 1000000000 given input of token0 in 1e18:1e18 pool, with bar fee 0 & swap fee 0", async () => {
+    it("returns 999999999 given input of token0 in 1e18:1e18 pool, with bar fee 0 & swap fee 0", async () => {
       const pool = await initializedConstantProductPool();
       const reserves = await pool.getReserves();
       expect(
-        await pool.getAmountOut(
-          ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token0(), "1000000000"])
-        )
+        await pool.getAmountOut(ethers.utils.defaultAbiCoder.encode(["bool", "uint256"], [true, "1000000000"]))
       ).to.equal("999999999"); // 999999999
     });
     it("returns 999999999 given input of token1 in 1e18:1e18 pool, with bar fee 0 & swap fee 0", async () => {
       const pool = await initializedConstantProductPool();
       const reserves = await pool.getReserves();
       expect(
-        await pool.getAmountOut(
-          ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token1(), "1000000000"])
-        )
+        await pool.getAmountOut(ethers.utils.defaultAbiCoder.encode(["bool", "uint256"], [false, "1000000000"]))
       ).to.equal("999999999"); // 999999999
-    });
-    it("reverts if tokenIn is not equal to token0 and token1", async () => {
-      const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
-      const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
-      const deployData = ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "uint256", "bool"],
-        ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000002", 30, false]
-      );
-      const cppFactory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
-      await masterDeployer.deployPool(cppFactory.address, deployData);
-      const addy = await cppFactory.calculatePoolAddress(
-        "0x0000000000000000000000000000000000000001",
-        "0x0000000000000000000000000000000000000002",
-        30,
-        false
-      );
-      const constantProductPool = ConstantProductPool.attach(addy);
-
-      const data = ethers.utils.defaultAbiCoder.encode(
-        ["address", "uint256"],
-        ["0x0000000000000000000000000000000000000003", 0]
-      );
-      await expect(constantProductPool.getAmountOut(data)).to.be.revertedWith("InvalidInputToken()");
     });
   });
 
@@ -396,41 +403,15 @@ describe("Constant Product Pool", () => {
     it("returns 1000000002 given output of token0 in 1e18:1e18 pool, with bar fee 0 & swap fee 0", async () => {
       const pool = await initializedConstantProductPool();
       expect(
-        await pool.getAmountIn(
-          ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token0(), "1000000000"])
-        )
+        await pool.getAmountIn(ethers.utils.defaultAbiCoder.encode(["bool", "uint256"], [true, "1000000000"]))
       ).to.equal("1000000002"); // 1000000002
     });
 
     it("returns 1000000000 given output of token1 in 1e18:1e18 pool, with bar fee 0 & swap fee 0", async () => {
       const pool = await initializedConstantProductPool();
       expect(
-        await pool.getAmountIn(
-          ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token1(), "1000000000"])
-        )
+        await pool.getAmountIn(ethers.utils.defaultAbiCoder.encode(["bool", "uint256"], [false, "1000000000"]))
       ).to.equal("1000000002"); // 1000000002
-    });
-    it("reverts if tokenOut is not equal to token 1 and token0", async () => {
-      const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
-      const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
-      const deployData = ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "uint256", "bool"],
-        ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000002", 30, false]
-      );
-      const cppFactory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
-      await masterDeployer.deployPool(cppFactory.address, deployData);
-      const addy = await cppFactory.calculatePoolAddress(
-        "0x0000000000000000000000000000000000000001",
-        "0x0000000000000000000000000000000000000002",
-        30,
-        false
-      );
-      const constantProductPool = ConstantProductPool.attach(addy);
-      const data = ethers.utils.defaultAbiCoder.encode(
-        ["address", "uint256"],
-        ["0x0000000000000000000000000000000000000003", 0]
-      );
-      await expect(constantProductPool.getAmountIn(data)).to.be.revertedWith("InvalidOutputToken()");
     });
   });
 

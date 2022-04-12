@@ -48,7 +48,7 @@ function areCloseValues(v1, v2, threshould) {
   return Math.abs(v1 / v2 - 1) < threshould;
 }
 
-describe("HybridPool Typescript == Solidity check", function () {
+describe.skip("HybridPool Typescript == Solidity check", function () {
   let alice, feeTo, usdt, usdc, weth, bento, masterDeployer, tridentPoolFactory, router, Pool;
 
   async function createHybridPool(A, fee, res0exp, res1exp) {

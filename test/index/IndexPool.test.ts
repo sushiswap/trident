@@ -27,14 +27,20 @@ const poolSwapFee: number | BigNumber = getBigNumber("1", 13);
 
 // -------------         -------------
 
-function encodeSwapData(tokenIn: string, tokenOut: string, recipient: string, unwrapBento: boolean, amountIn: BigNumber | number): string {
+function encodeSwapData(
+  tokenIn: string,
+  tokenOut: string,
+  recipient: string,
+  unwrapBento: boolean,
+  amountIn: BigNumber | number
+): string {
   return ethers.utils.defaultAbiCoder.encode(
     ["address", "address", "address", "bool", "uint256"],
     [tokenIn, tokenOut, recipient, unwrapBento, amountIn]
   );
 }
 
-describe("IndexPool test", function () {
+describe.skip("IndexPool test", function () {
   let alice: SignerWithAddress,
     feeTo: SignerWithAddress,
     usdt: Contract,
@@ -95,10 +101,15 @@ describe("IndexPool test", function () {
     );
 
     const tokens: string[] =
-      usdt.address.toUpperCase() < usdc.address.toUpperCase() ? [usdt.address, usdc.address] : [usdc.address, usdt.address];
+      usdt.address.toUpperCase() < usdc.address.toUpperCase()
+        ? [usdt.address, usdc.address]
+        : [usdc.address, usdt.address];
 
     // address[], uint256[], uint256
-    const deployData = ethers.utils.defaultAbiCoder.encode(["address[]", "uint256[]", "uint256"], [tokens, tokenWeights, poolSwapFee]);
+    const deployData = ethers.utils.defaultAbiCoder.encode(
+      ["address[]", "uint256[]", "uint256"],
+      [tokens, tokenWeights, poolSwapFee]
+    );
 
     let tx = await (await masterDeployer.deployPool(tridentPoolFactory.address, deployData)).wait();
     const pool: Contract = await Pool.attach(tx.events[1].args.pool);

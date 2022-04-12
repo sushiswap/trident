@@ -68,10 +68,7 @@ describe("Router", function () {
         amountOutMinimum: "1000000000000000000",
         pool: pool.address,
         tokenIn: token0.address,
-        data: ethers.utils.defaultAbiCoder.encode(
-          ["address", "address", "bool"],
-          [token0.address, deployer.address, false]
-        ), // (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
+        data: ethers.utils.defaultAbiCoder.encode(["bool", "address", "bool"], [true, deployer.address, false]), // (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
       };
 
       await expect(router.exactInputSingle(exactInputSingleParams)).to.be.revertedWith(
@@ -289,10 +286,7 @@ describe("Router", function () {
 
       const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
 
-      const data = ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "bool"],
-        [token0.address, deployer.address, false]
-      );
+      const data = ethers.utils.defaultAbiCoder.encode(["bool", "address", "bool"], [true, deployer.address, false]);
 
       // Burn whole balance, expect to get back initial 1000000000000000000 token0, but there wouldn't be enough
       await expect(router.burnLiquiditySingle(pool.address, balance, data, "1000000000000000000")).to.be.revertedWith(
