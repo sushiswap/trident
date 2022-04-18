@@ -40,13 +40,13 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
     uint256 public immutable swapFee;
     uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
 
-    address public immutable barFeeTo;
     IBentoBoxMinimal public immutable bento;
     IMasterDeployer public immutable masterDeployer;
     address public immutable token0;
     address public immutable token1;
 
     uint256 public barFee;
+    address public barFeeTo;
     uint256 public price0CumulativeLast;
     uint256 public price1CumulativeLast;
     uint256 public kLast;
@@ -244,9 +244,10 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
         }
     }
 
-    /// @dev Updates `barFee` for Trident protocol.
-    function updateBarFee() public {
+    /// @dev Updates `barFee` and `barFeeTo` for Trident protocol.
+    function updateBarParameters() public {
         barFee = masterDeployer.barFee();
+        barFeeTo = masterDeployer.barFeeTo();
     }
 
     function _getReserves()

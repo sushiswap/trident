@@ -18,9 +18,10 @@ contract MasterDeployer is Ownable {
     event AddToWhitelist(address indexed factory);
     event RemoveFromWhitelist(address indexed factory);
     event BarFeeUpdated(uint256 indexed barFee);
+    event BarFeeToUpdated(address indexed barFee);
 
     uint256 public barFee;
-    address public immutable barFeeTo;
+    address public barFeeTo;
     address public immutable bento;
 
     uint256 internal constant MAX_FEE = 10000; // @dev 100%.
@@ -63,5 +64,10 @@ contract MasterDeployer is Ownable {
         if (_barFee > MAX_FEE) revert InvalidBarFee();
         barFee = _barFee;
         emit BarFeeUpdated(_barFee);
+    }
+
+    function setBarFeeTo(address _barFeeTo) external onlyOwner {
+        barFeeTo = _barFeeTo;
+        emit BarFeeToUpdated(_barFeeTo);
     }
 }
