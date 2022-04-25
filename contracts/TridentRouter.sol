@@ -186,7 +186,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         bytes calldata data,
         IPool.TokenAmount[] calldata minWithdrawals
     ) external {
-        pool.safeTransferFrom(msg.sender, pool, liquidity);
+        ERC20(pool).safeTransferFrom(msg.sender, pool, liquidity);
         IPool.TokenAmount[] memory withdrawnLiquidity = IPool(pool).burn(data);
         for (uint256 i; i < minWithdrawals.length; i = _increment(i)) {
             if (minWithdrawals[i].token != withdrawnLiquidity[i].token) revert IncorrectSlippageParams();
@@ -207,7 +207,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         uint256 minWithdrawal
     ) external {
         // Use 'liquidity = 0' for prefunding.
-        pool.safeTransferFrom(msg.sender, pool, liquidity);
+        ERC20(pool).safeTransferFrom(msg.sender, pool, liquidity);
         if (IPool(pool).burnSingle(data) < minWithdrawal) revert TooLittleReceived();
     }
 
@@ -221,7 +221,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         if (fromBento) {
             bento.transfer(token, address(this), recipient, amount);
         } else {
-            token == USE_NATIVE ? recipient.safeTransferETH(address(this).balance) : token.safeTransfer(recipient, amount);
+            token == USE_NATIVE ? recipient.safeTransferETH(address(this).balance) : ERC20(token).safeTransfer(recipient, amount);
         }
     }
 
