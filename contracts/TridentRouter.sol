@@ -266,7 +266,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
     function _increment(uint256 i) internal pure returns (uint256) {
         // Cannot realistically overflow on human timescales.
         unchecked {
-            return i++;
+            return i + 1;
         }
     }
 }
