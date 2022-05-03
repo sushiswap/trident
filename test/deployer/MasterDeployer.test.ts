@@ -131,7 +131,7 @@ describe("MasterDeployer", function () {
     });
   });
 
-  describe("#setFeeTo", async function () {
+  describe("#setBarFee", async function () {
     it("Reverts on invalid fee", async function () {
       await expect(this.masterDeployer.setBarFee(MAX_FEE.add(1))).to.be.revertedWith("InvalidBarFee");
     });

@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { BigNumber } from "ethers";
-import { deployments, ethers } from "hardhat";
+import { deployments, ethers, getNamedAccounts } from "hardhat";
 
 import type {
   BentoBoxV1,
@@ -320,33 +320,44 @@ describe("Constant Product Pool", () => {
     });
   });
 
-  describe("#updateBarFee", () => {
+  describe("#updateBarParameters", () => {
     it("mutates bar fee if changed on master deployer", async () => {
       const pool = await initializedConstantProductPool();
 
       const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
 
+      const { barFeeTo, bob } = await getNamedAccounts();
+
       expect(await pool.barFee()).equal(5);
+
+      expect(await pool.barFeeTo()).equal(barFeeTo);
 
       await masterDeployer.setBarFee(10).then((tx) => tx.wait());
+      await masterDeployer.setBarFeeTo(bob).then((tx) => tx.wait());
 
       expect(await masterDeployer.barFee()).equal(10);
+      expect(await masterDeployer.barFeeTo()).equal(bob);
 
       expect(await pool.barFee()).equal(5);
+      expect(await pool.barFeeTo()).equal(barFeeTo);
 
-      await pool.updateBarFee().then((tx) => tx.wait());
+      await pool.updateBarParameters().then((tx) => tx.wait());
 
       expect(await pool.barFee()).equal(10);
+      expect(await pool.barFeeTo()).equal(bob);
 
       // reset
 
       await masterDeployer.setBarFee(5).then((tx) => tx.wait());
+      await masterDeployer.setBarFeeTo(barFeeTo).then((tx) => tx.wait());
 
       expect(await masterDeployer.barFee()).equal(5);
+      expect(await masterDeployer.barFeeTo()).equal(barFeeTo);
 
-      await pool.updateBarFee().then((tx) => tx.wait());
+      await pool.updateBarParameters().then((tx) => tx.wait());
 
       expect(await pool.barFee()).equal(5);
+      expect(await pool.barFeeTo()).equal(barFeeTo);
     });
   });
 
