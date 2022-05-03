@@ -91,18 +91,7 @@ describe("MasterDeployer", function () {
         [...[this.weth.address, this.sushi.address].sort(), 30, true]
       );
 
-      const INIT_CODE_HASH = keccak256(
-        ["bytes"],
-        [
-          pack(
-            ["bytes", "bytes"],
-            [
-              constantProductPoolBytecode,
-              defaultAbiCoder.encode(["bytes", "address"], [deployData, this.masterDeployer.address]),
-            ]
-          ),
-        ]
-      );
+      const INIT_CODE_HASH = keccak256(["bytes"], [constantProductPoolBytecode]);
 
       const computedConstantProductPoolAddress = getCreate2Address(
         this.constantProductPoolFactory.address,

@@ -6,9 +6,10 @@ import {ERC20} from "@rari-capital/solmate/src/tokens/ERC20.sol";
 import {ReentrancyGuard} from "@rari-capital/solmate/src/utils/ReentrancyGuard.sol";
 
 import {IBentoBoxMinimal} from "../../interfaces/IBentoBoxMinimal.sol";
-import {IMasterDeployer} from "../../interfaces/IMasterDeployer.sol";
 import {IPool} from "../../interfaces/IPool.sol";
 import {ITridentCallee} from "../../interfaces/ITridentCallee.sol";
+import {IConstantProductPoolFactory} from "../../interfaces/IConstantProductPoolFactory.sol";
+import {IMasterDeployer} from "../../interfaces/IMasterDeployer.sol";
 
 import {TridentMath} from "../../libraries/TridentMath.sol";
 
@@ -56,7 +57,9 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
 
     bytes32 public constant override poolIdentifier = "Trident:ConstantProduct";
 
-    constructor(bytes memory _deployData, IMasterDeployer _masterDeployer) ERC20("Sushi LP Token", "SLP", 18) {
+    constructor() ERC20("Sushi LP Token", "SLP", 18) {
+        (bytes memory _deployData, IMasterDeployer _masterDeployer) = IConstantProductPoolFactory(msg.sender).getDeployData();
+
         (address _token0, address _token1, uint256 _swapFee, bool _twapSupport) = abi.decode(
             _deployData,
             (address, address, uint256, bool)

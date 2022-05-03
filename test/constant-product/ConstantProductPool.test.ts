@@ -2,9 +2,11 @@ import { expect } from "chai";
 import { BigNumber } from "ethers";
 import { deployments, ethers, getNamedAccounts } from "hardhat";
 
-import type {
+import {
   BentoBoxV1,
+  ConstantProductPoolFactory,
   ConstantProductPool__factory,
+  ConstantProductPoolFactory__factory,
   ERC20Mock,
   ERC20Mock__factory,
   FlashSwapMock,
@@ -15,9 +17,9 @@ import { initializedConstantProductPool, uninitializedConstantProductPool } from
 
 describe("Constant Product Pool", () => {
   before(async () => {
-    console.log("Deploy MasterDeployer fixture");
-    await deployments.fixture(["MasterDeployer"]);
-    console.log("Deployed MasterDeployer fixture");
+    console.log("Deploying ConstantProductPoolFactory fixture");
+    await deployments.fixture(["ConstantProductPoolFactory"]);
+    console.log("Deployed ConstantProductPoolFactory fixture");
   });
 
   beforeEach(async () => {
@@ -26,49 +28,38 @@ describe("Constant Product Pool", () => {
 
   describe("#instantiation", () => {
     it("reverts if token0 is zero", async () => {
-      const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
-      const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
+      const cppFactory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
       const deployData = ethers.utils.defaultAbiCoder.encode(
         ["address", "address", "uint256", "bool"],
         ["0x0000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000", 30, false]
       );
-      await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.be.revertedWith("ZeroAddress()");
+      await expect(cppFactory.deployPool(deployData)).to.be.revertedWith("ZeroAddress()");
     });
 
-    // TODO: fix instantiation allowed if token1 is zero
     it("deploys if token1 is zero", async () => {
-      const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
-      const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
+      const cppFactory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
       const deployData = ethers.utils.defaultAbiCoder.encode(
         ["address", "address", "uint256", "bool"],
         ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000000", 30, false]
       );
-      await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.not.be.revertedWith(
-        "ZeroAddress()"
-      );
+      await expect(cppFactory.deployPool(deployData)).to.be.revertedWith("ZeroAddress()");
     });
 
     it("reverts if token0 and token1 are identical", async () => {
-      const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
-      const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
+      const cppFactory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
       const deployData = ethers.utils.defaultAbiCoder.encode(
         ["address", "address", "uint256", "bool"],
         ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000001", 30, false]
       );
-      await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.be.revertedWith(
-        "IdenticalAddress()"
-      );
+      await expect(cppFactory.deployPool(deployData)).to.be.revertedWith("IdenticalAddress()");
     });
     it("reverts if swap fee more than the max fee", async () => {
-      const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
-      const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
+      const cppFactory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
       const deployData = ethers.utils.defaultAbiCoder.encode(
         ["address", "address", "uint256", "bool"],
         ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000002", 10001, false]
       );
-      await expect(ConstantProductPool.deploy(deployData, masterDeployer.address)).to.be.revertedWith(
-        "InvalidSwapFee()"
-      );
+      await expect(cppFactory.deployPool(deployData)).to.be.revertedWith("InvalidSwapFee()");
     });
   });
 
@@ -305,13 +296,20 @@ describe("Constant Product Pool", () => {
   describe("#getAssets", function () {
     it("returns the assets the pool was deployed with, and in the correct order", async () => {
       const ConstantProductPool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
+      const cppFactory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
       const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
       const deployData = ethers.utils.defaultAbiCoder.encode(
         ["address", "address", "uint256", "bool"],
         ["0x0000000000000000000000000000000000000002", "0x0000000000000000000000000000000000000001", 30, false]
       );
-      const constantProductPool = await ConstantProductPool.deploy(deployData, masterDeployer.address);
-      await constantProductPool.deployed();
+      await masterDeployer.deployPool(cppFactory.address, deployData);
+      const addy = await cppFactory.calculatePoolAddress(
+        "0x0000000000000000000000000000000000000001",
+        "0x0000000000000000000000000000000000000002",
+        30,
+        false
+      );
+      const constantProductPool = ConstantProductPool.attach(addy);
 
       const assets = await constantProductPool.getAssets();
 
@@ -387,8 +385,16 @@ describe("Constant Product Pool", () => {
         ["address", "address", "uint256", "bool"],
         ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000002", 30, false]
       );
-      const constantProductPool = await ConstantProductPool.deploy(deployData, masterDeployer.address);
-      await constantProductPool.deployed();
+      const cppFactory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
+      await masterDeployer.deployPool(cppFactory.address, deployData);
+      const addy = await cppFactory.calculatePoolAddress(
+        "0x0000000000000000000000000000000000000001",
+        "0x0000000000000000000000000000000000000002",
+        30,
+        false
+      );
+      const constantProductPool = ConstantProductPool.attach(addy);
+
       const data = ethers.utils.defaultAbiCoder.encode(
         ["address", "uint256"],
         ["0x0000000000000000000000000000000000000003", 0]
@@ -422,8 +428,15 @@ describe("Constant Product Pool", () => {
         ["address", "address", "uint256", "bool"],
         ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000002", 30, false]
       );
-      const constantProductPool = await ConstantProductPool.deploy(deployData, masterDeployer.address);
-      await constantProductPool.deployed();
+      const cppFactory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
+      await masterDeployer.deployPool(cppFactory.address, deployData);
+      const addy = await cppFactory.calculatePoolAddress(
+        "0x0000000000000000000000000000000000000001",
+        "0x0000000000000000000000000000000000000002",
+        30,
+        false
+      );
+      const constantProductPool = ConstantProductPool.attach(addy);
       const data = ethers.utils.defaultAbiCoder.encode(
         ["address", "uint256"],
         ["0x0000000000000000000000000000000000000003", 0]
