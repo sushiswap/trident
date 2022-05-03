@@ -14,7 +14,7 @@ const deployFunction: DeployFunction = async function ({
   console.debug("Running MasterDeployer deploy script");
   const { deploy } = deployments;
 
-  const barFee = 5;
+  const barFee = 1667; // 1667/10000 ≈ 1/6
 
   const { deployer, barFeeTo } = await getNamedAccounts();
 
