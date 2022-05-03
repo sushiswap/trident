@@ -4,14 +4,15 @@ pragma solidity >=0.8.0;
 
 import {Multicall} from "./abstract/Multicall.sol";
 import {SelfPermit} from "./abstract/SelfPermit.sol";
-import {Transfer} from "./libraries/Transfer.sol";
 import {IBentoBoxMinimal} from "./interfaces/IBentoBoxMinimal.sol";
 import {IMasterDeployer} from "./interfaces/IMasterDeployer.sol";
 import {IPool} from "./interfaces/IPool.sol";
 import {ITridentRouter} from "./interfaces/ITridentRouter.sol";
 import {IWETH9} from "./interfaces/IWETH9.sol";
+import {ERC20} from "@rari-capital/solmate/src/tokens/ERC20.sol";
+import {SafeTransferLib} from "@rari-capital/solmate/src/utils/SafeTransferLib.sol";
 
-/// @dev Custom Errors
+/// @dev Custom Errors.
 error NotWethSender();
 error TooLittleReceived();
 error NotEnoughLiquidityMinted();
@@ -22,7 +23,8 @@ error InvalidPool();
 
 /// @notice Router contract that helps in swapping across Trident pools.
 contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
-    using Transfer for address;
+    using SafeTransferLib for address;
+    using SafeTransferLib for ERC20;
 
     /// @notice BentoBox token vault.
     IBentoBoxMinimal public immutable bento;
@@ -55,7 +57,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
     /// @param params This includes the address of token A, pool, amount of token A to swap,
     /// minimum amount of token B after the swap and data required by the pool for the swap.
     /// @dev Ensure that the pool is trusted before calling this function. The pool can steal users' tokens.
-    function exactInputSingle(ExactInputSingleParams calldata params) public payable returns (uint256 amountOut) {
+    function exactInputSingle(ExactInputSingleParams calldata params) external payable returns (uint256 amountOut) {
         // Prefund the pool with token A.
         bento.transfer(params.tokenIn, msg.sender, params.pool, params.amountIn);
         // Trigger the swap in the pool.
@@ -68,7 +70,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
     /// @param params This includes the addresses of the tokens, pools, amount of token A to swap,
     /// minimum amount of token B after the swap and data required by the pools for the swaps.
     /// @dev Ensure that the pools are trusted before calling this function. The pools can steal users' tokens.
-    function exactInput(ExactInputParams calldata params) public payable returns (uint256 amountOut) {
+    function exactInput(ExactInputParams calldata params) external payable returns (uint256 amountOut) {
         // Pay the first pool directly.
         bento.transfer(params.tokenIn, msg.sender, params.path[0].pool, params.amountIn);
         // Call every pool in the path.
@@ -76,8 +78,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         // The last pool should transfer its output tokens to the user.
         // If the user wants to unwrap `wETH`, the final destination should be this contract and
         // a batch call should be made to `unwrapWETH`.
-        uint256 n = params.path.length;
-        for (uint256 i = 0; i < n; i = _increment(i)) {
+        for (uint256 i; i < params.path.length; i = _increment(i)) {
             amountOut = IPool(params.path[i].pool).swap(params.path[i].data);
         }
         // Ensure that the slippage wasn't too much. This assumes that the pool is honest.
@@ -89,7 +90,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
     /// @param params This includes the address of token A, pool, amount of token A to swap,
     /// minimum amount of token B after the swap and data required by the pool for the swap.
     /// @dev Ensure that the pool is trusted before calling this function. The pool can steal users' tokens.
-    function exactInputSingleWithNativeToken(ExactInputSingleParams calldata params) public payable returns (uint256 amountOut) {
+    function exactInputSingleWithNativeToken(ExactInputSingleParams calldata params) external payable returns (uint256 amountOut) {
         // Deposits the native ERC-20 token from the user into the pool's `bento`.
         _depositToBentoBox(params.tokenIn, params.pool, params.amountIn);
         // Trigger the swap in the pool.
@@ -103,14 +104,13 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
     /// @param params This includes the addresses of the tokens, pools, amount of token A to swap,
     /// minimum amount of token B after the swap and data required by the pools for the swaps.
     /// @dev Ensure that the pools are trusted before calling this function. The pools can steal users' tokens.
-    function exactInputWithNativeToken(ExactInputParams calldata params) public payable returns (uint256 amountOut) {
+    function exactInputWithNativeToken(ExactInputParams calldata params) external payable returns (uint256 amountOut) {
         // Deposits the native ERC-20 token from the user into the pool's `bento`.
         _depositToBentoBox(params.tokenIn, params.path[0].pool, params.amountIn);
         // Call every pool in the path.
         // Pool `N` should transfer its output tokens to pool `N+1` directly.
         // The last pool should transfer its output tokens to the user.
-        uint256 n = params.path.length;
-        for (uint256 i = 0; i < n; i = _increment(i)) {
+        for (uint256 i; i < params.path.length; i = _increment(i)) {
             amountOut = IPool(params.path[i].pool).swap(params.path[i].data);
         }
         // Ensure that the slippage wasn't too much. This assumes that the pool is honest.
@@ -122,11 +122,10 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
     /// @param params This includes everything needed for the swap. Look at the `ComplexPathParams` struct for more details.
     /// @dev This function is not optimized for single swaps and should only be used in complex cases where
     /// the amounts are large enough that minimizing slippage by using multiple paths is worth the extra gas.
-    function complexPath(ComplexPathParams calldata params) public payable {
+    function complexPath(ComplexPathParams calldata params) external payable {
         // Deposit all initial tokens to respective pools and initiate the swaps.
         // Input tokens come from the user - output goes to following pools.
-        uint256 n = params.initialPath.length;
-        for (uint256 i = 0; i < n; i = _increment(i)) {
+        for (uint256 i; i < params.initialPath.length; i = _increment(i)) {
             if (params.initialPath[i].native) {
                 _depositToBentoBox(params.initialPath[i].tokenIn, params.initialPath[i].pool, params.initialPath[i].amount);
             } else {
@@ -135,16 +134,14 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
             IPool(params.initialPath[i].pool).swap(params.initialPath[i].data);
         }
         // Do all the middle swaps. Input comes from previous pools.
-        n = params.percentagePath.length;
-        for (uint256 i = 0; i < n; i = _increment(i)) {
+        for (uint256 i; i < params.percentagePath.length; i = _increment(i)) {
             uint256 balanceShares = bento.balanceOf(params.percentagePath[i].tokenIn, address(this));
             uint256 transferShares = (balanceShares * params.percentagePath[i].balancePercentage) / uint256(10)**8;
             bento.transfer(params.percentagePath[i].tokenIn, address(this), params.percentagePath[i].pool, transferShares);
             IPool(params.percentagePath[i].pool).swap(params.percentagePath[i].data);
         }
         // Ensure enough was received and transfer the ouput to the recipient.
-        n = params.output.length;
-        for (uint256 i = 0; i < n; i = _increment(i)) {
+        for (uint256 i; i < params.output.length; i = _increment(i)) {
             uint256 balanceShares = bento.balanceOf(params.output[i].token, address(this));
             if (balanceShares < params.output[i].minAmount) revert TooLittleReceived();
             if (params.output[i].unwrapBento) {
@@ -165,10 +162,9 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         address pool,
         uint256 minLiquidity,
         bytes calldata data
-    ) public payable returns (uint256 liquidity) {
+    ) external payable returns (uint256 liquidity) {
         // Send all input tokens to the pool.
-        uint256 n = tokenInput.length;
-        for (uint256 i = 0; i < n; i = _increment(i)) {
+        for (uint256 i; i < tokenInput.length; i = _increment(i)) {
             if (tokenInput[i].native) {
                 _depositToBentoBox(tokenInput[i].token, pool, tokenInput[i].amount);
             } else {
@@ -189,11 +185,10 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         uint256 liquidity,
         bytes calldata data,
         IPool.TokenAmount[] calldata minWithdrawals
-    ) public {
-        pool.safeTransferFrom(msg.sender, pool, liquidity);
+    ) external {
+        ERC20(pool).safeTransferFrom(msg.sender, pool, liquidity);
         IPool.TokenAmount[] memory withdrawnLiquidity = IPool(pool).burn(data);
-        uint256 n = minWithdrawals.length;
-        for (uint256 i = 0; i < n; i = _increment(i)) {
+        for (uint256 i; i < minWithdrawals.length; i = _increment(i)) {
             if (minWithdrawals[i].token != withdrawnLiquidity[i].token) revert IncorrectSlippageParams();
             if (withdrawnLiquidity[i].amount < minWithdrawals[i].amount) revert TooLittleReceived();
         }
@@ -210,11 +205,10 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         uint256 liquidity,
         bytes calldata data,
         uint256 minWithdrawal
-    ) public {
+    ) external {
         // Use 'liquidity = 0' for prefunding.
-        pool.safeTransferFrom(msg.sender, pool, liquidity);
-        uint256 withdrawn = IPool(pool).burnSingle(data);
-        if (withdrawn < minWithdrawal) revert TooLittleReceived();
+        ERC20(pool).safeTransferFrom(msg.sender, pool, liquidity);
+        if (IPool(pool).burnSingle(data) < minWithdrawal) revert TooLittleReceived();
     }
 
     /// @notice Recover mistakenly sent tokens.
@@ -227,7 +221,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         if (fromBento) {
             bento.transfer(token, address(this), recipient, amount);
         } else {
-            token == USE_NATIVE ? recipient.safeTransferETH(address(this).balance) : token.safeTransfer(recipient, amount);
+            token == USE_NATIVE ? recipient.safeTransferETH(address(this).balance) : ERC20(token).safeTransfer(recipient, amount);
         }
     }
 
@@ -267,7 +261,8 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
     ) internal {
         bento.deposit{value: token == USE_NATIVE ? amount : 0}(token, msg.sender, recipient, amount, 0);
     }
-
+    
+    /// @notice Increment helper.
     function _increment(uint256 i) internal pure returns (uint256) {
         unchecked {
             return i + 1;
