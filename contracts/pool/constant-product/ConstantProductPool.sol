@@ -6,9 +6,10 @@ import {ERC20} from "@rari-capital/solmate/src/tokens/ERC20.sol";
 import {ReentrancyGuard} from "@rari-capital/solmate/src/utils/ReentrancyGuard.sol";
 
 import {IBentoBoxMinimal} from "../../interfaces/IBentoBoxMinimal.sol";
-import {IMasterDeployer} from "../../interfaces/IMasterDeployer.sol";
 import {IPool} from "../../interfaces/IPool.sol";
 import {ITridentCallee} from "../../interfaces/ITridentCallee.sol";
+import {IConstantProductPoolFactory} from "../../interfaces/IConstantProductPoolFactory.sol";
+import {IMasterDeployer} from "../../interfaces/IMasterDeployer.sol";
 
 import {TridentMath} from "../../libraries/TridentMath.sol";
 
@@ -39,13 +40,13 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
     uint256 public immutable swapFee;
     uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
 
-    address public immutable barFeeTo;
     IBentoBoxMinimal public immutable bento;
     IMasterDeployer public immutable masterDeployer;
     address public immutable token0;
     address public immutable token1;
 
     uint256 public barFee;
+    address public barFeeTo;
     uint256 public price0CumulativeLast;
     uint256 public price1CumulativeLast;
     uint256 public kLast;
@@ -56,7 +57,9 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
 
     bytes32 public constant override poolIdentifier = "Trident:ConstantProduct";
 
-    constructor(bytes memory _deployData, IMasterDeployer _masterDeployer) ERC20("Sushi LP Token", "SLP", 18) {
+    constructor() ERC20("Sushi LP Token", "SLP", 18) {
+        (bytes memory _deployData, IMasterDeployer _masterDeployer) = IConstantProductPoolFactory(msg.sender).getDeployData();
+
         (address _token0, address _token1, uint256 _swapFee, bool _twapSupport) = abi.decode(
             _deployData,
             (address, address, uint256, bool)
@@ -129,8 +132,8 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
         uint256 amount1 = (liquidity * balance1) / _totalSupply;
 
         _burn(address(this), liquidity);
-        _transfer(token0, amount0, recipient, unwrapBento);
-        _transfer(token1, amount1, recipient, unwrapBento);
+        _transfer0(amount0, recipient, unwrapBento);
+        _transfer1(amount1, recipient, unwrapBento);
         // This is safe from underflow - amounts are lesser figures derived from balances.
         unchecked {
             balance0 -= amount0;
@@ -148,7 +151,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
     /// @dev Burns LP tokens sent to this contract and swaps one of the output tokens for another
     /// - i.e., the user gets a single token out by burning LP tokens.
     function burnSingle(bytes calldata data) public override nonReentrant returns (uint256 amountOut) {
-        (address tokenOut, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
+        (bool zeroForOne, address recipient, bool unwrapBento) = abi.decode(data, (bool, address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         uint256 liquidity = balanceOf[address(this)];
 
@@ -163,18 +166,17 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
 
         // Swap one token for another
         unchecked {
-            if (tokenOut == token1) {
+            if (zeroForOne) {
                 // Swap `token0` for `token1`
                 // - calculate `amountOut` as if the user first withdrew balanced liquidity and then swapped `token0` for `token1`.
                 amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1);
-                _transfer(token1, amount1, recipient, unwrapBento);
+                _transfer1(amount1, recipient, unwrapBento);
                 amountOut = amount1;
                 amount0 = 0;
             } else {
                 // Swap `token1` for `token0`.
-                if (tokenOut != token0) revert InvalidOutputToken();
                 amount0 += _getAmountOut(amount1, _reserve1 - amount1, _reserve0 - amount0);
-                _transfer(token0, amount0, recipient, unwrapBento);
+                _transfer0(amount0, recipient, unwrapBento);
                 amountOut = amount0;
                 amount1 = 0;
             }
@@ -188,64 +190,63 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
 
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
     function swap(bytes calldata data) public override nonReentrant returns (uint256 amountOut) {
-        (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
+        (bool zeroForOne, address recipient, bool unwrapBento) = abi.decode(data, (bool, address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         if (_reserve0 == 0) revert PoolUninitialized();
         (uint256 balance0, uint256 balance1) = _balance();
         uint256 amountIn;
-        address tokenOut;
         unchecked {
-            if (tokenIn == token0) {
-                tokenOut = token1;
+            if (zeroForOne) {
                 amountIn = balance0 - _reserve0;
                 amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
                 balance1 -= amountOut;
+                _transfer1(amountOut, recipient, unwrapBento);
+                _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
+                emit Swap(recipient, token0, token1, amountIn, amountOut);
             } else {
-                if (tokenIn != token1) revert InvalidInputToken();
-                tokenOut = token0;
                 amountIn = balance1 - reserve1;
                 amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
                 balance0 -= amountOut;
+                _transfer0(amountOut, recipient, unwrapBento);
+                _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
+                emit Swap(recipient, token1, token0, amountIn, amountOut);
             }
         }
-        _transfer(tokenOut, amountOut, recipient, unwrapBento);
-        _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
 
     /// @dev Swaps one token for another. The router must support swap callbacks and ensure there isn't too much slippage.
     function flashSwap(bytes calldata data) public override nonReentrant returns (uint256 amountOut) {
-        (address tokenIn, address recipient, bool unwrapBento, uint256 amountIn, bytes memory context) = abi.decode(
+        (bool zeroForOne, address recipient, bool unwrapBento, uint256 amountIn, bytes memory context) = abi.decode(
             data,
-            (address, address, bool, uint256, bytes)
+            (bool, address, bool, uint256, bytes)
         );
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         if (_reserve0 == 0) revert PoolUninitialized();
         unchecked {
-            if (tokenIn == token0) {
+            if (zeroForOne) {
                 amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
-                _transfer(token1, amountOut, recipient, unwrapBento);
+                _transfer1(amountOut, recipient, unwrapBento);
                 ITridentCallee(msg.sender).tridentSwapCallback(context);
                 (uint256 balance0, uint256 balance1) = _balance();
                 if (balance0 - _reserve0 < amountIn) revert InsufficientAmountIn();
                 _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-                emit Swap(recipient, tokenIn, token1, amountIn, amountOut);
+                emit Swap(recipient, token0, token1, amountIn, amountOut);
             } else {
-                if (tokenIn != token1) revert InvalidInputToken();
                 amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
-                _transfer(token0, amountOut, recipient, unwrapBento);
+                _transfer0(amountOut, recipient, unwrapBento);
                 ITridentCallee(msg.sender).tridentSwapCallback(context);
                 (uint256 balance0, uint256 balance1) = _balance();
                 if (balance1 - _reserve1 < amountIn) revert InsufficientAmountIn();
                 _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-                emit Swap(recipient, tokenIn, token0, amountIn, amountOut);
+                emit Swap(recipient, token1, token0, amountIn, amountOut);
             }
         }
     }
 
-    /// @dev Updates `barFee` for Trident protocol.
-    function updateBarFee() public {
+    /// @dev Updates `barFee` and `barFeeTo` for Trident protocol.
+    function updateBarParameters() public {
         barFee = masterDeployer.barFee();
+        barFeeTo = masterDeployer.barFeeTo();
     }
 
     function _getReserves()
@@ -334,16 +335,27 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
         amountIn = (reserveAmountIn * amountOut * MAX_FEE) / ((reserveAmountOut - amountOut) * MAX_FEE_MINUS_SWAP_FEE) + 1;
     }
 
-    function _transfer(
-        address token,
+    function _transfer0(
         uint256 shares,
         address to,
         bool unwrapBento
     ) internal {
         if (unwrapBento) {
-            bento.withdraw(token, address(this), to, 0, shares);
+            bento.withdraw(token0, address(this), to, 0, shares);
         } else {
-            bento.transfer(token, address(this), to, shares);
+            bento.transfer(token0, address(this), to, shares);
+        }
+    }
+
+    function _transfer1(
+        uint256 shares,
+        address to,
+        bool unwrapBento
+    ) internal {
+        if (unwrapBento) {
+            bento.withdraw(token1, address(this), to, 0, shares);
+        } else {
+            bento.transfer(token1, address(this), to, shares);
         }
     }
 
@@ -371,23 +383,21 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
     }
 
     function getAmountOut(bytes calldata data) public view override returns (uint256 finalAmountOut) {
-        (address tokenIn, uint256 amountIn) = abi.decode(data, (address, uint256));
+        (bool zeroForOne, uint256 amountIn) = abi.decode(data, (bool, uint256));
         (uint112 _reserve0, uint112 _reserve1, ) = _getReserves();
-        if (tokenIn == token0) {
+        if (zeroForOne) {
             finalAmountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
         } else {
-            if (tokenIn != token1) revert InvalidInputToken();
             finalAmountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
         }
     }
 
     function getAmountIn(bytes calldata data) public view override returns (uint256 finalAmountIn) {
-        (address tokenOut, uint256 amountOut) = abi.decode(data, (address, uint256));
+        (bool zeroForOne, uint256 amountOut) = abi.decode(data, (bool, uint256));
         (uint112 _reserve0, uint112 _reserve1, ) = _getReserves();
-        if (tokenOut == token1) {
+        if (zeroForOne) {
             finalAmountIn = _getAmountIn(amountOut, _reserve0, _reserve1);
         } else {
-            if (tokenOut != token0) revert InvalidOutputToken();
             finalAmountIn = _getAmountIn(amountOut, _reserve1, _reserve0);
         }
     }

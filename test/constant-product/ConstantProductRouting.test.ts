@@ -57,8 +57,8 @@ function areCloseValues(v1, v2, threshold) {
   return Math.abs(v1 / v2 - 1) < threshold;
 }
 
-function encodedSwapData(tokenIn: string, to: string, unwrapBento: boolean) {
-  return ethers.utils.defaultAbiCoder.encode(["address", "address", "bool"], [tokenIn, to, unwrapBento]);
+function encodedSwapData(zeroForOne: bool, to: string, unwrapBento: boolean) {
+  return ethers.utils.defaultAbiCoder.encode(["bool", "address", "bool"], [zeroForOne, to, unwrapBento]);
 }
 
 describe("ConstantProductPool Typescript == Solidity check", function () {
@@ -94,6 +94,8 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
     usdc = await ERC20.deploy("USDC", "USDC", getBigNumber("1000000000000000000"));
     await usdc.deployed();
 
+    [usdt, usdc] = usdt.address.toUpperCase() < usdc.address.toUpperCase() ? [usdt, usdc] : [usdc, usdt];
+
     bento = await Bento.deploy(weth.address);
     await bento.deployed();
 
@@ -126,13 +128,9 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
       "0x0000000000000000000000000000000000000000000000000000000000000000"
     );
 
-    const [address0, address1]: string[] =
-      usdt.address.toUpperCase() < usdc.address.toUpperCase()
-        ? [usdt.address, usdc.address]
-        : [usdc.address, usdt.address];
     const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint256", "bool"],
-      [address0, address1, Math.round(fee * 10_000), true]
+      [usdt.address, usdc.address, Math.round(fee * 10_000), true]
     );
     const pool: ConstantProductPool = await Pool.attach(
       (
@@ -149,8 +147,8 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
 
     const poolInfo = new ConstantProductRPool(
       pool.address,
-      { name: "USDC", address: usdt.address },
       { name: "USDT", address: usdt.address },
+      { name: "USDC", address: usdc.address },
       fee,
       bnVal0,
       bnVal1
@@ -169,7 +167,7 @@ describe("ConstantProductPool Typescript == Solidity check", function () {
       amountOutMinimum: 0,
       pool: pool.address,
       tokenIn: t0.address,
-      data: encodedSwapData(t0.address, alice.address, false),
+      data: encodedSwapData(swapDirection, alice.address, false),
     };
 
     poolRouterInfo.updateReserves(

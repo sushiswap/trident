@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { encodedSwapData, getBigNumber, randBetween, sqrt, ZERO, TWO, MAX_FEE } from "../utilities";
+import { encodedSwapData, getBigNumber, randBetween, sqrt, ZERO, TWO, MAX_FEE, getZeroForOne } from "../utilities";
 import {
   BentoBoxV1,
   ConstantProductPool,
@@ -79,10 +79,7 @@ export async function initialize() {
       [token0.address, token1.address, 30, false]
     );
     const salt = ethers.utils.keccak256(deployData);
-    const constructorParams = ethers.utils.defaultAbiCoder
-      .encode(["bytes", "address"], [deployData, masterDeployer.address])
-      .substring(2);
-    const initCodeHash = ethers.utils.keccak256(Pool.bytecode + constructorParams);
+    const initCodeHash = ethers.utils.keccak256(Pool.bytecode);
     const poolAddress = ethers.utils.getCreate2Address(factory.address, salt, initCodeHash);
     pools.push(Pool.attach(poolAddress));
     await masterDeployer.deployPool(factory.address, deployData).then((tx) => tx.wait());
@@ -210,8 +207,8 @@ export async function swap(hops, amountIn, reverse = false, nativeIn = false, na
       pool: pools[0].address,
       tokenIn: tokenIn,
       data: ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "bool"],
-        [tokenIn, accounts[0].address, nativeOut]
+        ["bool", "address", "bool"],
+        [(await pools[0].token0()) == tokenIn, accounts[0].address, nativeOut]
       ),
     };
     if (nativeIn) {
@@ -306,8 +303,8 @@ export async function burnLiquidity(poolIndex, amount, withdrawType, unwrapBento
     );
     amount1 = ZERO;
     const burnData = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "bool"],
-      [token0.address, accounts[0].address, unwrapBento]
+      ["bool", "address", "bool"],
+      [false, accounts[0].address, unwrapBento]
     );
     burnLiquidityPromise = router.burnLiquiditySingle(pool.address, amount, burnData, amount0);
   } else if (withdrawType == 1) {
@@ -317,8 +314,8 @@ export async function burnLiquidity(poolIndex, amount, withdrawType, unwrapBento
     );
     amount0 = ZERO;
     const burnData = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "bool"],
-      [token1.address, accounts[0].address, unwrapBento]
+      ["bool", "address", "bool"],
+      [true, accounts[0].address, unwrapBento]
     );
     burnLiquidityPromise = router.burnLiquiditySingle(pool.address, amount, burnData, amount1);
   } else {
@@ -436,7 +433,7 @@ function getPath(hops, reverse, nativeOut, user) {
       path.push({
         pool: pools[poolIndex].address,
         data: encodedSwapData(
-          tokens[poolIndex + 1].address,
+          getZeroForOne(tokens[poolIndex + 1].address, tokens[poolIndex].address),
           i == hops - 1 ? user : pools[poolIndex - 1].address,
           i == hops - 1 ? nativeOut : false
         ),
@@ -449,7 +446,7 @@ function getPath(hops, reverse, nativeOut, user) {
     path.push({
       pool: pools[i].address,
       data: encodedSwapData(
-        tokens[i].address,
+        getZeroForOne(tokens[i].address, tokens[i + 1].address),
         i == hops - 1 ? user : pools[i + 1].address,
         i == hops - 1 ? nativeOut : false
       ),

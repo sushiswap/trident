@@ -53,8 +53,12 @@ export function encodedAddress(account) {
   return ethers.utils.defaultAbiCoder.encode(["address"], [account.address]);
 }
 
-export function encodedSwapData(tokenIn, to, unwrapBento) {
-  return ethers.utils.defaultAbiCoder.encode(["address", "address", "bool"], [tokenIn, to, unwrapBento]);
+export function getZeroForOne(input: string, output: string): boolean {
+  return input.toLocaleLowerCase() < output.toLocaleLowerCase();
+}
+
+export function encodedSwapData(zeroForOne: boolean, to: string, unwrapBento: boolean) {
+  return ethers.utils.defaultAbiCoder.encode(["bool", "address", "bool"], [zeroForOne, to, unwrapBento]);
 }
 
 export function printHumanReadable(arr) {
