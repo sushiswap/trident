@@ -326,7 +326,7 @@ describe("Constant Product Pool", () => {
 
       const { barFeeTo, bob } = await getNamedAccounts();
 
-      expect(await pool.barFee()).equal(5);
+      expect(await pool.barFee()).equal(1667);
 
       expect(await pool.barFeeTo()).equal(barFeeTo);
 
@@ -336,7 +336,7 @@ describe("Constant Product Pool", () => {
       expect(await masterDeployer.barFee()).equal(10);
       expect(await masterDeployer.barFeeTo()).equal(bob);
 
-      expect(await pool.barFee()).equal(5);
+      expect(await pool.barFee()).equal(1667);
       expect(await pool.barFeeTo()).equal(barFeeTo);
 
       await pool.updateBarParameters().then((tx) => tx.wait());
@@ -346,15 +346,15 @@ describe("Constant Product Pool", () => {
 
       // reset
 
-      await masterDeployer.setBarFee(5).then((tx) => tx.wait());
+      await masterDeployer.setBarFee(1667).then((tx) => tx.wait());
       await masterDeployer.setBarFeeTo(barFeeTo).then((tx) => tx.wait());
 
-      expect(await masterDeployer.barFee()).equal(5);
+      expect(await masterDeployer.barFee()).equal(1667);
       expect(await masterDeployer.barFeeTo()).equal(barFeeTo);
 
       await pool.updateBarParameters().then((tx) => tx.wait());
 
-      expect(await pool.barFee()).equal(5);
+      expect(await pool.barFee()).equal(1667);
       expect(await pool.barFeeTo()).equal(barFeeTo);
     });
   });
