@@ -280,6 +280,13 @@ const config: HardhatUserConfig = {
       live: true,
       saveDeployments: true,
     },
+    optimism: {
+      url: "https://mainnet.optimism.io",
+      accounts,
+      chainId: 10,
+      live: true,
+      saveDeployments: true,
+    },
   },
   paths: {
     artifacts: "artifacts",
