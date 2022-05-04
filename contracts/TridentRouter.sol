@@ -189,7 +189,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         uint256 liquidity,
         bytes calldata data,
         IPool.TokenAmount[] calldata minWithdrawals
-    ) public {
+    ) public payable {
         pool.safeTransferFrom(msg.sender, pool, liquidity);
         IPool.TokenAmount[] memory withdrawnLiquidity = IPool(pool).burn(data);
         uint256 n = minWithdrawals.length;
@@ -210,7 +210,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         uint256 liquidity,
         bytes calldata data,
         uint256 minWithdrawal
-    ) public {
+    ) public payable {
         // Use 'liquidity = 0' for prefunding.
         pool.safeTransferFrom(msg.sender, pool, liquidity);
         uint256 withdrawn = IPool(pool).burnSingle(data);
@@ -254,7 +254,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
 
     /// @notice Call BentoBox harvest function to rebalance a BentoBox token strategy and ensure there are enough tokens available to withdraw a swap output.
     /// @dev Should be batched in before a swap.
-    function harvest(address token, uint256 maxChangeAmount) external {
+    function harvest(address token, uint256 maxChangeAmount) external payable {
         bento.harvest(token, true, maxChangeAmount);
     }
 
