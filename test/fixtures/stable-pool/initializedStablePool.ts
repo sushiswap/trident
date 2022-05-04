@@ -12,7 +12,7 @@ export const initializedStablePool = deployments.createFixture(
     },
     options
   ) => {
-    await deployments.fixture(["StablePoolFactory"], { keepExistingDeployments: true }); // ensure you start from a fresh deployments
+    await deployments.fixture(["StablePoolFactory"]); // ensure you start from a fresh deployments
     const { deployer } = await getNamedSigners();
 
     const ERC20 = await ethers.getContractFactory<ERC20Mock__factory>("ERC20Mock");
