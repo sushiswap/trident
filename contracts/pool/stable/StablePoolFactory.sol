@@ -8,7 +8,7 @@ import {StablePool} from "./StablePool.sol";
 
 /// @notice Contract for deploying Trident exchange Constant Product Pool with configurations.
 /// @author Mudit Gupta.
-contract ConstantProductPoolFactory is PoolDeployer {
+contract StablePoolFactory is PoolDeployer {
     constructor(address _masterDeployer) PoolDeployer(_masterDeployer) {}
 
     function deployPool(bytes memory _deployData) external returns (address pool) {
