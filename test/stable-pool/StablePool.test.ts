@@ -32,8 +32,7 @@ describe("Stable Pool", () => {
         ["address", "address", "uint256", "bool"],
         ["0x0000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000", 30, false]
       );
-      await StablePool.deploy(deployData, masterDeployer.address);
-      // await expect(StablePool.deploy(deployData, masterDeployer.address)).to.be.revertedWith("ZeroAddress()");
+      await expect(StablePool.deploy(deployData, masterDeployer.address)).to.be.revertedWith("ZeroAddress()");
     });
 
     // TODO: fix instantiation allowed if token1 is zero
