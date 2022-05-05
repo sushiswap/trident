@@ -18,7 +18,7 @@ contract MasterDeployer is Ownable {
     event AddToWhitelist(address indexed factory);
     event RemoveFromWhitelist(address indexed factory);
     event BarFeeUpdated(uint256 indexed barFee);
-    event BarFeeToUpdated(address indexed barFee);
+    event BarFeeToUpdated(address indexed barFeeTo);
 
     uint256 public barFee;
     address public barFeeTo;
