@@ -144,6 +144,33 @@ contract StablePool is ERC20, ReentrancyGuard {
         emit Burn(msg.sender, amount0, amount1, recipient);
     }
 
+    /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
+    function swap(bytes calldata data) public nonReentrant returns (uint256 amountOut) {
+        (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
+        (uint256 _reserve0, uint256 _reserve1, uint32 _blockTimestampLast) = _getReserves();
+        if (_reserve0 == 0) revert PoolUninitialized();
+        (uint256 balance0, uint256 balance1) = _balance();
+        uint256 amountIn;
+        address tokenOut;
+        unchecked {
+            if (tokenIn == token0) {
+                tokenOut = token1;
+                amountIn = balance0 - _reserve0;
+                amountOut = _getAmountOut(amountIn, token0, _reserve0, _reserve1);
+                balance1 -= amountOut;
+            } else {
+                if (tokenIn != token1) revert InvalidInputToken();
+                tokenOut = token0;
+                amountIn = balance1 - reserve1;
+                amountOut = _getAmountOut(amountIn, token1, _reserve1, _reserve0);
+                balance0 -= amountOut;
+            }
+        }
+        _transfer(tokenOut, amountOut, recipient, unwrapBento);
+        _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
+        // emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut); add event later
+    }
+
     /// @dev Updates `barFee` for Trident protocol.
     function updateBarFee() public {
         barFee = masterDeployer.barFee();
@@ -315,6 +342,7 @@ contract StablePool is ERC20, ReentrancyGuard {
         uint256 _reserve0,
         uint256 _reserve1
     ) internal view returns (uint256) {
+        amountIn = (amountIn * MAX_FEE_MINUS_SWAP_FEE) / MAX_FEE;
         uint256 xy = _k(_reserve0, _reserve1);
         _reserve0 = (_reserve0 * 1e18) / decimal0;
         _reserve1 = (_reserve1 * 1e18) / decimal1;
@@ -327,7 +355,6 @@ contract StablePool is ERC20, ReentrancyGuard {
     function getAmountOut(bytes calldata data) public view returns (uint256 finalAmountOut) {
         (address tokenIn, uint256 amountIn) = abi.decode(data, (address, uint256));
         (uint256 _reserve0, uint256 _reserve1, ) = _getReserves();
-        // amountIn -= amountIn / 10000;
         finalAmountOut = _getAmountOut(amountIn, tokenIn, _reserve0, _reserve1);
     }
 }
