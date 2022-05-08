@@ -9,46 +9,42 @@ import {IBentoBoxMinimal} from "../../interfaces/IBentoBoxMinimal.sol";
 import {IMasterDeployer} from "../../interfaces/IMasterDeployer.sol";
 import {IPool} from "../../interfaces/IPool.sol";
 import {ITridentCallee} from "../../interfaces/ITridentCallee.sol";
+import {IStablePoolFactory} from "../../interfaces/IStablePoolFactory.sol";
 
 import {TridentMath} from "../../libraries/TridentMath.sol";
-
-import "hardhat/console.sol";
 
 /// @dev Custom Errors
 error ZeroAddress();
 error IdenticalAddress();
 error InvalidSwapFee();
-error InvalidAmounts();
 error InsufficientLiquidityMinted();
-error InvalidOutputToken();
+error InvalidAmounts();
 error InvalidInputToken();
 error PoolUninitialized();
-error InsufficientAmountIn();
 error Overflow();
 
-/// @notice Trident exchange pool template with constant product formula for swapping between an ERC-20 token pair.
+/// @notice Trident exchange pool template with stable swap (solidly exchange) for swapping between tightly correlated assets
 /// @dev The reserves are stored as bento shares.
 ///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
-contract StablePool is ERC20, ReentrancyGuard {
+
+contract StablePool is IPool, ERC20, ReentrancyGuard {
     event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Sync(uint256 reserve0, uint256 reserve1);
 
     uint256 internal constant MINIMUM_LIQUIDITY = 1000;
 
-    uint8 internal constant PRECISION = 112;
     uint256 internal constant MAX_FEE = 10000; // @dev 100%.
-    uint256 internal constant MAX_FEE_SQUARE = 100000000;
     uint256 public immutable swapFee;
     uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
 
-    address public immutable barFeeTo;
     IBentoBoxMinimal public immutable bento;
     IMasterDeployer public immutable masterDeployer;
     address public immutable token0;
     address public immutable token1;
 
     uint256 public barFee;
+    address public barFeeTo;
     uint256 public price0CumulativeLast;
     uint256 public price1CumulativeLast;
     uint256 public kLast;
@@ -61,7 +57,9 @@ contract StablePool is ERC20, ReentrancyGuard {
 
     bytes32 public constant poolIdentifier = "Trident:StablePool";
 
-    constructor(bytes memory _deployData, IMasterDeployer _masterDeployer) ERC20("Sushi LP Token", "SLP", 18) {
+    constructor() ERC20("Sushi Stable LP Token", "SSLP", 18) {
+        (bytes memory _deployData, IMasterDeployer _masterDeployer) = IStablePoolFactory(msg.sender).getDeployData();
+
         (address _token0, address _token1, uint256 _swapFee, bool _twapSupport) = abi.decode(
             _deployData,
             (address, address, uint256, bool)
@@ -76,13 +74,14 @@ contract StablePool is ERC20, ReentrancyGuard {
         token1 = _token1;
         swapFee = _swapFee;
 
-        decimal0 = 10**ERC20(_token0).decimals();
-        decimal1 = 10**ERC20(_token0).decimals();
-
         // This is safe from underflow - `swapFee` cannot exceed `MAX_FEE` per previous check.
         unchecked {
             MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
         }
+
+        decimal0 = 10**ERC20(_token0).decimals();
+        decimal1 = 10**ERC20(_token0).decimals();
+
         barFee = _masterDeployer.barFee();
         barFeeTo = _masterDeployer.barFeeTo();
         bento = IBentoBoxMinimal(_masterDeployer.bento());
@@ -92,7 +91,7 @@ contract StablePool is ERC20, ReentrancyGuard {
 
     /// @dev Mints LP tokens - should be called via the router after transferring `bento` tokens.
     /// The router must ensure that sufficient LP tokens are minted by using the return value.
-    function mint(bytes calldata data) public nonReentrant returns (uint256 liquidity) {
+    function mint(bytes calldata data) public override nonReentrant returns (uint256 liquidity) {
         address recipient = abi.decode(data, (address));
         (uint256 _reserve0, uint256 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
@@ -103,6 +102,7 @@ contract StablePool is ERC20, ReentrancyGuard {
         uint256 _totalSupply = _mintFee(_reserve0, _reserve1);
 
         if (_totalSupply == 0) {
+            if (amount0 == 0 || amount1 == 0) revert InvalidAmounts();
             liquidity = TridentMath.sqrt(amount0 * amount1) - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
@@ -116,7 +116,7 @@ contract StablePool is ERC20, ReentrancyGuard {
     }
 
     /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
-    function burn(bytes calldata data) public nonReentrant returns (IPool.TokenAmount[] memory withdrawnAmounts) {
+    function burn(bytes calldata data) public override nonReentrant returns (TokenAmount[] memory withdrawnAmounts) {
         (address recipient, bool unwrapBento) = abi.decode(data, (address, bool));
         (uint256 _reserve0, uint256 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
@@ -138,14 +138,14 @@ contract StablePool is ERC20, ReentrancyGuard {
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
         kLast = _k(balance0, balance1);
 
-        withdrawnAmounts = new IPool.TokenAmount[](2);
-        withdrawnAmounts[0] = IPool.TokenAmount({token: address(token0), amount: amount0});
-        withdrawnAmounts[1] = IPool.TokenAmount({token: address(token1), amount: amount1});
+        withdrawnAmounts = new TokenAmount[](2);
+        withdrawnAmounts[0] = TokenAmount({token: address(token0), amount: amount0});
+        withdrawnAmounts[1] = TokenAmount({token: address(token1), amount: amount1});
         emit Burn(msg.sender, amount0, amount1, recipient);
     }
 
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
-    function swap(bytes calldata data) public nonReentrant returns (uint256 amountOut) {
+    function swap(bytes calldata data) public override nonReentrant returns (uint256 amountOut) {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint256 _reserve0, uint256 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         if (_reserve0 == 0) revert PoolUninitialized();
@@ -168,12 +168,13 @@ contract StablePool is ERC20, ReentrancyGuard {
         }
         _transfer(tokenOut, amountOut, recipient, unwrapBento);
         _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        // emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut); add event later
+        emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
 
-    /// @dev Updates `barFee` for Trident protocol.
-    function updateBarFee() public {
+    /// @dev Updates `barFee` and `barFeeTo` for Trident protocol.
+    function updateBarParameters() public {
         barFee = masterDeployer.barFee();
+        barFeeTo = masterDeployer.barFeeTo();
     }
 
     function _getReserves()
@@ -212,8 +213,8 @@ contract StablePool is ERC20, ReentrancyGuard {
             if (blockTimestamp != _blockTimestampLast && _reserve0 != 0 && _reserve1 != 0) {
                 unchecked {
                     uint32 timeElapsed = blockTimestamp - _blockTimestampLast;
-                    price0CumulativeLast += reserve0 * timeElapsed;
-                    price1CumulativeLast += reserve1 * timeElapsed;
+                    price0CumulativeLast += (reserve1 / reserve0) * timeElapsed;
+                    price1CumulativeLast += (reserve0 / reserve1) * timeElapsed;
                 }
             }
 
@@ -242,54 +243,6 @@ contract StablePool is ERC20, ReentrancyGuard {
                 }
             }
         }
-    }
-
-    function _transfer(
-        address token,
-        uint256 shares,
-        address to,
-        bool unwrapBento
-    ) internal {
-        if (unwrapBento) {
-            bento.withdraw(token, address(this), to, 0, shares);
-        } else {
-            bento.transfer(token, address(this), to, shares);
-        }
-    }
-
-    function getAssets() public view returns (address[] memory assets) {
-        assets = new address[](2);
-        assets[0] = token0;
-        assets[1] = token1;
-    }
-
-    /// @dev Returned values are in terms of BentoBox "shares".
-    function getReserves()
-        public
-        view
-        returns (
-            uint256 _reserve0,
-            uint256 _reserve1,
-            uint32 _blockTimestampLast
-        )
-    {
-        return _getReserves();
-    }
-
-    /// @dev Returned values are the native ERC20 token amounts.
-    function getNativeReserves()
-        public
-        view
-        returns (
-            uint256 _nativeReserve0,
-            uint256 _nativeReserve1,
-            uint32 _blockTimestampLast
-        )
-    {
-        (uint256 _reserve0, uint256 _reserve1, uint32 __blockTimestampLast) = _getReserves();
-        _nativeReserve0 = bento.toAmount(token0, _reserve0, false);
-        _nativeReserve1 = bento.toAmount(token1, _reserve1, false);
-        _blockTimestampLast = __blockTimestampLast;
     }
 
     function _k(uint256 x, uint256 y) internal view returns (uint256) {
@@ -352,9 +305,63 @@ contract StablePool is ERC20, ReentrancyGuard {
         return (y * (tokenIn == token0 ? decimal1 : decimal0)) / 1e18;
     }
 
-    function getAmountOut(bytes calldata data) public view returns (uint256 finalAmountOut) {
+    function getAmountOut(bytes calldata data) public view override returns (uint256 finalAmountOut) {
         (address tokenIn, uint256 amountIn) = abi.decode(data, (address, uint256));
         (uint256 _reserve0, uint256 _reserve1, ) = _getReserves();
         finalAmountOut = _getAmountOut(amountIn, tokenIn, _reserve0, _reserve1);
     }
+
+    function _transfer(
+        address token,
+        uint256 shares,
+        address to,
+        bool unwrapBento
+    ) internal {
+        if (unwrapBento) {
+            bento.withdraw(token, address(this), to, 0, shares);
+        } else {
+            bento.transfer(token, address(this), to, shares);
+        }
+    }
+
+    function getAssets() public view returns (address[] memory assets) {
+        assets = new address[](2);
+        assets[0] = token0;
+        assets[1] = token1;
+    }
+
+    /// @dev Returned values are in terms of BentoBox "shares".
+    function getReserves()
+        public
+        view
+        returns (
+            uint256 _reserve0,
+            uint256 _reserve1,
+            uint32 _blockTimestampLast
+        )
+    {
+        return _getReserves();
+    }
+
+    /// @dev Returned values are the native ERC20 token amounts.
+    function getNativeReserves()
+        public
+        view
+        returns (
+            uint256 _nativeReserve0,
+            uint256 _nativeReserve1,
+            uint32 _blockTimestampLast
+        )
+    {
+        (uint256 _reserve0, uint256 _reserve1, uint32 __blockTimestampLast) = _getReserves();
+        _nativeReserve0 = bento.toAmount(token0, _reserve0, false);
+        _nativeReserve1 = bento.toAmount(token1, _reserve1, false);
+        _blockTimestampLast = __blockTimestampLast;
+    }
+
+    function burnSingle(bytes calldata data) external override returns (uint256 amountOut) {}
+
+    function flashSwap(bytes calldata data) external override returns (uint256 finalAmountOut) {}
+
+    function getAmountIn(bytes calldata data) external view override returns (uint256 finalAmountIn) {}
 }
