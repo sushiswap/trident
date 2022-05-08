@@ -67,40 +67,6 @@ describe("Stable Pool", () => {
   });
 
   describe("#mint", function () {
-    it("reverts if total supply is 0 and one of the token amounts are 0 - token 0", async () => {
-      const pool = await uninitializedStablePool();
-
-      const bentoBox = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
-
-      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
-
-      const newLocal = "0x0000000000000000000000000000000000000003";
-
-      await token0.transfer(bentoBox.address, 1000);
-
-      await bentoBox.deposit(token0.address, bentoBox.address, pool.address, 1000, 0);
-
-      const mintData = ethers.utils.defaultAbiCoder.encode(["address"], [newLocal]);
-      await expect(pool.mint(mintData)).to.be.revertedWith("InvalidAmounts()");
-    });
-
-    it("reverts if total supply is 0 and one of the token amounts are 0 - token 1", async () => {
-      const pool = await uninitializedStablePool();
-
-      const bentoBox = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
-
-      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
-
-      const newLocal = "0x0000000000000000000000000000000000000003";
-
-      await token1.transfer(bentoBox.address, 1000);
-
-      await bentoBox.deposit(token1.address, bentoBox.address, pool.address, 1000, 0);
-
-      const mintData = ethers.utils.defaultAbiCoder.encode(["address"], [newLocal]);
-      await expect(pool.mint(mintData)).to.be.revertedWith("InvalidAmounts()");
-    });
-
     it("reverts if insufficient liquidity minted", async () => {
       const deployer = await ethers.getNamedSigner("deployer");
       const pool = await initializedStablePool();
@@ -110,6 +76,39 @@ describe("Stable Pool", () => {
       await token1.transfer(pool.address, 1);
       const mintData = ethers.utils.defaultAbiCoder.encode(["address"], [deployer.address]);
       await expect(pool.mint(mintData)).to.be.revertedWith("InsufficientLiquidityMinted()");
+    });
+
+    it("adds more liqudity", async () => {
+      const deployer = await ethers.getNamedSigner("deployer");
+      const pool = await initializedStablePool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+      await token0.transfer(bento.address, ethers.utils.parseEther("10000000000"));
+      await token1.transfer(bento.address, ethers.utils.parseEther("10000000000"));
+      await bento.deposit(token0.address, bento.address, pool.address, ethers.utils.parseEther("10000000000"), 0);
+      await bento.deposit(token1.address, bento.address, pool.address, ethers.utils.parseEther("10000000000"), 0);
+      const mintData = ethers.utils.defaultAbiCoder.encode(["address"], [deployer.address]);
+      await pool.mint(mintData);
+    });
+
+    it("removes liquidity", async () => {
+      const deployer = await ethers.getNamedSigner("deployer");
+      const pool = await initializedStablePool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+      await token0.transfer(bento.address, ethers.utils.parseEther("100"));
+      await token1.transfer(bento.address, ethers.utils.parseEther("100"));
+      await bento.deposit(token0.address, bento.address, pool.address, ethers.utils.parseEther("100"), 0);
+      await bento.deposit(token1.address, bento.address, pool.address, ethers.utils.parseEther("100"), 0);
+      const mintData = ethers.utils.defaultAbiCoder.encode(["address"], [deployer.address]);
+      await pool.mint(mintData);
+
+      await pool.transfer(pool.address, (await pool.balanceOf(deployer.address)).div(2));
+
+      const burnData = ethers.utils.defaultAbiCoder.encode(["address", "bool"], [deployer.address, true]);
+      await pool.burn(burnData);
     });
   });
 });
