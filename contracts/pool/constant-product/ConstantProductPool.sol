@@ -57,7 +57,7 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
 
     bytes32 public constant override poolIdentifier = "Trident:ConstantProduct";
 
-    constructor() ERC20("Sushi LP Token", "SLP", 18) {
+    constructor() ERC20("Sushi Constant Product LP Token", "SCPLP", 18) {
         (bytes memory _deployData, IMasterDeployer _masterDeployer) = IConstantProductPoolFactory(msg.sender).getDeployData();
 
         (address _token0, address _token1, uint256 _swapFee, bool _twapSupport) = abi.decode(
