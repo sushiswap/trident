@@ -14,11 +14,11 @@ task("cpp-address", "Constant Product Pool deploy")
       [...[tokenA, tokenB].sort(), fee, twap]
     );
     const salt = ethers.utils.keccak256(deployData);
-    const constructorParams = ethers.utils.defaultAbiCoder
-      .encode(["bytes", "address"], [deployData, master])
-      .substring(2);
+    // const constructorParams = ethers.utils.defaultAbiCoder
+    //   .encode(["bytes", "address"], [deployData, master])
+    //   .substring(2);
     const Pool = await ethers.getContractFactory("ConstantProductPool");
-    const initCodeHash = ethers.utils.keccak256(Pool.bytecode + constructorParams);
+    const initCodeHash = ethers.utils.keccak256(Pool.bytecode);
     const address = ethers.utils.getCreate2Address(factory, salt, initCodeHash);
     console.log(address, [...[tokenA, tokenB].sort(), fee, twap]);
     return address;
