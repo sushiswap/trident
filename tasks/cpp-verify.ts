@@ -1,4 +1,4 @@
-import { ChainId, USDC_ADDRESS, WETH9_ADDRESS } from "@sushiswap/core-sdk";
+import { ChainId, DAI_ADDRESS, USDC_ADDRESS, WETH9_ADDRESS } from "@sushiswap/core-sdk";
 import { task, types } from "hardhat/config";
 
 import type { MasterDeployer } from "../types";
@@ -7,17 +7,17 @@ task("cpp-verify", "Constant Product Pool verify")
   .addOptionalParam(
     "tokenA",
     "Token A",
-    WETH9_ADDRESS[ChainId.KOVAN], // kovan weth
+    WETH9_ADDRESS[ChainId.OPTIMISM], // kovan weth
     types.string
   )
   .addOptionalParam(
     "tokenB",
     "Token B",
-    USDC_ADDRESS[ChainId.KOVAN], // kovan dai
+    DAI_ADDRESS[ChainId.OPTIMISM], // kovan dai
     types.string
   )
   .addOptionalParam("fee", "Fee tier", 30, types.int)
-  .addOptionalParam("twap", "Twap enabled", true, types.boolean)
+  .addOptionalParam("twap", "Twap enabled", false, types.boolean)
   .setAction(async function ({ tokenA, tokenB, fee, twap }, { ethers, run }) {
     console.log(`Verify cpp tokenA: ${tokenA} tokenB: ${tokenB} fee: ${fee} twap: ${twap}`);
 
@@ -34,6 +34,6 @@ task("cpp-verify", "Constant Product Pool verify")
 
     await run("verify:verify", {
       address,
-      constructorArguments: [deployData, masterDeployer.address],
+      constructorArguments: [],
     });
   });
