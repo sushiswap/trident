@@ -19,12 +19,8 @@ contract ConcentratedLiquidityPoolFactory is PoolDeployer {
             (address, address, uint24, uint160, uint24)
         );
 
-        // // Revert instead of switching tokens and inverting price.
-        // if (tokenA > tokenB) revert WrongTokenOrder();
-
-        if (tokenA > tokenB) {
-            (tokenA, tokenB) = (tokenB, tokenA);
-        }
+        // Revert instead of switching tokens and inverting price.
+        if (tokenA > tokenB) revert WrongTokenOrder();
 
         // Strips any extra data.
         // Don't include price in _deployData to enable predictable address calculation.
