@@ -178,8 +178,6 @@ export class TridentPoolFactory {
     tickIncrement = 60,
     reserve: number = 1e25
   ) {
-    console.log(t0.address);
-    console.log(t1.address);
     const flipped = t0.address.toLowerCase() > t1.address.toLowerCase();
     if (flipped) {
       const t = t0;
