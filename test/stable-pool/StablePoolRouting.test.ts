@@ -41,11 +41,11 @@ async function createEnvironment() {
 
 async function createConstantProductPool(
   env: Environment,
-  //fee: Number,
+  fee: number, // basepoins
   res0: BigNumber,
   res1: BigNumber
 ): Promise<[StableSwapRPool, StablePool]> {
-  const pool = await initializedStablePool();
+  const pool = await initializedStablePool({ fee });
   await env.token0.transfer(env.bento.address, res0);
   await env.token1.transfer(env.bento.address, res1);
   await env.bento.deposit(env.token0.address, env.bento.address, pool.address, res0, 0);
@@ -60,7 +60,7 @@ async function createConstantProductPool(
     pool.address,
     { name: name0, address: env.token0.address },
     { name: name1, address: env.token1.address },
-    0.0001, //fee,
+    fee / 10_000,
     res0,
     res1
   );
@@ -99,7 +99,7 @@ describe("Stable Pool <-> Tines consistency", () => {
   });
 
   it("simple 3 swap test", async () => {
-    const [info, pool] = await createConstantProductPool(env, BigNumber.from(1e6), BigNumber.from(1e6 + 1e3));
+    const [info, pool] = await createConstantProductPool(env, 30, BigNumber.from(1e6), BigNumber.from(1e6 + 1e3));
     await checkSwap(env, pool, info, BigNumber.from(1e4));
     await checkSwap(env, pool, info, BigNumber.from(1e5));
     await checkSwap(env, pool, info, BigNumber.from(2e5));

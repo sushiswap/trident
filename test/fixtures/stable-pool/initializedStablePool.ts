@@ -10,8 +10,9 @@ export const initializedStablePool = deployments.createFixture(
         constants: { MaxUint256 },
       },
     },
-    options
+    options?: { fee?: number }
   ) => {
+    options = { fee: 1, ...options };
     await deployments.fixture(["StablePoolFactory"]); // ensure you start from a fresh deployments
     const { deployer } = await getNamedSigners();
 
@@ -29,7 +30,7 @@ export const initializedStablePool = deployments.createFixture(
 
     const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint256", "bool"],
-      [token0.address, token1.address, 1, false]
+      [token0.address, token1.address, options.fee, false]
     );
 
     const contractReceipt = await masterDeployer

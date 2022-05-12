@@ -22,7 +22,7 @@ const deployFunction: DeployFunction = async function ({
   });
 
   if (!(await masterDeployer.whitelistedFactories(address))) {
-    console.debug("Add StablePoolFactory to MasterDeployer whitelist");
+    //console.debug("Add StablePoolFactory to MasterDeployer whitelist");
     await (await masterDeployer.addToWhitelist(address)).wait();
   }
 
