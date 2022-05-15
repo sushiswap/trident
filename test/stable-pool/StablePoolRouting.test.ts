@@ -5,6 +5,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { StableSwapRPool } from "@sushiswap/tines";
 import { initializedStablePool } from "../fixtures";
 import { BentoBoxV1, ERC20Mock, StablePool } from "../../types";
+import { closeValues } from "@sushiswap/sdk";
 
 interface Environment {
   deployer: SignerWithAddress;
@@ -68,28 +69,37 @@ async function createConstantProductPool(
   return [poolInfo, pool];
 }
 
-async function swapStablePool(env: Environment, pool: StablePool, swapAmount: BigNumber) {
-  await env.token0.transfer(env.bento.address, swapAmount);
-  await env.bento.deposit(env.token0.address, env.bento.address, pool.address, swapAmount, 0);
+async function swapStablePool(env: Environment, pool: StablePool, swapAmount: BigNumber, direction: boolean) {
+  const tokenIn = direction ? env.token0 : env.token1;
+  const tokenOut = direction ? env.token1 : env.token0;
+
+  await tokenIn.transfer(env.bento.address, swapAmount);
+  await env.bento.deposit(tokenIn.address, env.bento.address, pool.address, swapAmount, 0);
   const swapData = ethers.utils.defaultAbiCoder.encode(
     ["address", "address", "bool"],
-    [env.token0.address, env.alice.address, true]
+    [tokenIn.address, env.alice.address, true]
   );
-  let balOutBefore: BigNumber = await env.token1.balanceOf(env.alice.address);
+  let balOutBefore: BigNumber = await tokenOut.balanceOf(env.alice.address);
   await pool.swap(swapData);
-  let balOutAfter: BigNumber = await env.token1.balanceOf(env.alice.address);
+  let balOutAfter: BigNumber = await tokenOut.balanceOf(env.alice.address);
   return balOutAfter.sub(balOutBefore);
 }
 
-async function checkSwap(env: Environment, pool: StablePool, poolRouterInfo: StableSwapRPool, swapAmount: BigNumber) {
+async function checkSwap(
+  env: Environment,
+  pool: StablePool,
+  poolRouterInfo: StableSwapRPool,
+  swapAmount: BigNumber,
+  direction: boolean
+) {
   poolRouterInfo.updateReserves(
     await env.bento.balanceOf(env.token0.address, pool.address),
     await env.bento.balanceOf(env.token1.address, pool.address)
   );
-  const { out: expectedAmountOut } = poolRouterInfo.calcOutByIn(parseInt(swapAmount.toString()), true);
-  const poolAmountOut = await swapStablePool(env, pool, swapAmount);
+  const { out: expectedAmountOut } = poolRouterInfo.calcOutByIn(parseInt(swapAmount.toString()), direction);
+  const poolAmountOut = await swapStablePool(env, pool, swapAmount, direction);
   //console.log(poolAmountOut.toString(), expectedAmountOut);
-  expect(parseInt(poolAmountOut.toString())).equal(expectedAmountOut);
+  expect(closeValues(parseFloat(poolAmountOut.toString()), expectedAmountOut, 1e-12)).true;
 }
 
 describe("Stable Pool <-> Tines consistency", () => {
@@ -98,10 +108,13 @@ describe("Stable Pool <-> Tines consistency", () => {
     env = await createEnvironment();
   });
 
-  it("simple 3 swap test", async () => {
+  it("simple 6 swap test", async () => {
     const [info, pool] = await createConstantProductPool(env, 30, BigNumber.from(1e6), BigNumber.from(1e6 + 1e3));
-    await checkSwap(env, pool, info, BigNumber.from(1e4));
-    await checkSwap(env, pool, info, BigNumber.from(1e5));
-    await checkSwap(env, pool, info, BigNumber.from(2e5));
+    await checkSwap(env, pool, info, BigNumber.from(1e4), true);
+    await checkSwap(env, pool, info, BigNumber.from(1e5), true);
+    await checkSwap(env, pool, info, BigNumber.from(2e5), true);
+    await checkSwap(env, pool, info, BigNumber.from(1e4), false);
+    await checkSwap(env, pool, info, BigNumber.from(1e5), false);
+    await checkSwap(env, pool, info, BigNumber.from(2e5), false);
   });
 });
