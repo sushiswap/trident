@@ -1,5 +1,12 @@
 import { ethers, deployments } from "hardhat";
-import { BentoBoxV1, StablePoolFactory, StablePool__factory, ERC20Mock__factory, MasterDeployer } from "../../../types";
+import {
+  BentoBoxV1,
+  StablePoolFactory,
+  StablePool__factory,
+  ERC20Mock__factory,
+  MasterDeployer,
+  ERC20Mock,
+} from "../../../types";
 
 export const initializedStablePool = deployments.createFixture(
   async (
@@ -18,11 +25,8 @@ export const initializedStablePool = deployments.createFixture(
 
     const ERC20 = await ethers.getContractFactory<ERC20Mock__factory>("ERC20Mock");
 
-    const token0 = await ERC20.deploy("Token 0", "TOKEN0", ethers.constants.MaxUint256);
-    await token0.deployed();
-
-    const token1 = await ERC20.deploy("Token 1", "TOKEN1", ethers.constants.MaxUint256);
-    await token1.deployed();
+    const token0 = await ethers.getContract<ERC20Mock>("Token0-18");
+    const token1 = await ethers.getContract<ERC20Mock>("Token1-18");
 
     const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
 
