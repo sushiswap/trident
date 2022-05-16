@@ -3,36 +3,70 @@ import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 import seedrandom from "seedrandom";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { StableSwapRPool } from "@sushiswap/tines";
+import { getBigNumber, StableSwapRPool } from "@sushiswap/tines";
 import { initializedStablePool } from "../fixtures";
 import { BentoBoxV1, ERC20Mock, StablePool } from "../../types";
 import { closeValues } from "@sushiswap/sdk";
 
+type RndGen = () => number;
 const testSeed = "0"; // Change it to change random generator values
-const rnd = seedrandom(testSeed); // random [0, 1)
+const rnd: RndGen = seedrandom(testSeed); // random [0, 1)
 
 const MINIMUM_LIQUIDITY = 1000;
+const MAXIMUM_LIQUIDITY = 1e28; // Limit of contract implementation. TODO: is it enough ????
+const MINIMUM_INITIAL_LIQUIDITY = MINIMUM_LIQUIDITY * 10;
+const MAXIMUM_INITIAL_LIQUIDITY = MAXIMUM_LIQUIDITY / 10;
+const MINIMUM_SWAP_VALUE = MINIMUM_LIQUIDITY;
+const MAXIMUM_SWAP_VALUE = MAXIMUM_LIQUIDITY;
+const poolState = {
+  "1% imbalance": 100,
+  "10% imbalance": 50,
+  "up to 100x imbalance": 5,
+  "up to 1e6 imbalance": 1,
+  "one token min value": 1,
+};
+const feeValues = {
+  // basepoints
+  30: 10,
+  5: 10,
+  1: 1,
+  2: 1,
+  50: 1,
+};
+const decimals = {
+  18: 1,
+};
+const swapSize = {
+  minimum: 1,
+  "up to 0.001 pool liquidity": 10,
+  "0.001-1 pool liquidity": 10,
+  "> pool liquidity": 1,
+};
 
-function getIntegerRandomValue(exp): [number, BigNumber] {
-  if (exp <= 15) {
-    const value = Math.floor(rnd() * Math.pow(10, exp));
-    return [value, BigNumber.from(value)];
-  } else {
-    const random = Math.floor(rnd() * 1e15);
-    const value = random * Math.pow(10, exp - 15);
-    const bnValue = BigNumber.from(10)
-      .pow(exp - 15)
-      .mul(random);
-    return [value, bnValue];
-  }
+function getRandExp(rnd: RndGen, min: number, max: number) {
+  const minL = Math.log(min);
+  const maxL = Math.log(max);
+  const v = rnd() * (maxL - minL) + minL;
+  const res = Math.exp(v);
+  console.assert(res <= max && res >= min, "Random value is out of the range");
+  return res;
 }
 
-function getIntegerRandomValueWithMin(exp, min = 0): [number, BigNumber] {
-  let res;
-  do {
-    res = getIntegerRandomValue(exp);
-  } while (res[0] < min);
-  return res;
+interface Variants {
+  [key: string | number]: number;
+}
+
+function choice(rnd: () => number, obj: Variants) {
+  let total = 0;
+  Object.entries(obj).forEach(([_, p]) => (total += p));
+  if (total <= 0) throw new Error("Error 62");
+  const val = rnd() * total;
+  let past = 0;
+  for (let k in obj) {
+    past += obj[k];
+    if (past >= val) return k;
+  }
+  throw new Error("Error 70");
 }
 
 interface Environment {
@@ -85,9 +119,40 @@ async function createPool(
   };
 }
 
-async function createRandomPool(fee: number, res0exp: number, res1exp?: number): Promise<Environment> {
-  const res0 = getIntegerRandomValueWithMin(res0exp, MINIMUM_LIQUIDITY)[1];
-  return await createPool(fee, res0, res0, 18, 18);
+function getSecondReserve(rnd: RndGen, res0: number): number {
+  let res1;
+  switch (choice(rnd, poolState)) {
+    case "1% imbalance":
+      res1 = res0 * getRandExp(rnd, 0.99, 1.01);
+      break;
+    case "10% imbalance":
+      res1 = res0 * getRandExp(rnd, 0.9, 1.1);
+      break;
+    case "up to 100x imbalance":
+      res1 = res0 * getRandExp(rnd, 0.01, 100);
+      break;
+    case "up to 1e6 imbalance":
+      res1 = res0 * getRandExp(rnd, 1e-6, 1e6);
+      break;
+    case "one token min value":
+      res1 = MINIMUM_INITIAL_LIQUIDITY;
+      break;
+    default:
+      throw new Error("Error 139");
+  }
+  if (res1 < MINIMUM_INITIAL_LIQUIDITY) res1 = MINIMUM_INITIAL_LIQUIDITY;
+  if (res1 > MAXIMUM_INITIAL_LIQUIDITY) res1 = MAXIMUM_INITIAL_LIQUIDITY;
+  return res1;
+}
+
+async function createRandomPool(rnd: RndGen): Promise<Environment> {
+  const res0 = getRandExp(rnd, MINIMUM_INITIAL_LIQUIDITY, MAXIMUM_INITIAL_LIQUIDITY);
+  const res1 = getSecondReserve(rnd, res0);
+  const fee = parseInt(choice(rnd, feeValues));
+  const decimals0 = parseInt(choice(rnd, decimals));
+  const decimals1 = parseInt(choice(rnd, decimals));
+  //console.log(`Pool: fee=${fee}, res0=${res0}, res1=${res1}, decimals=(${decimals0}, ${decimals1})`);
+  return await createPool(fee, getBigNumber(res0), getBigNumber(res1), decimals0, decimals1);
 }
 
 async function swapStablePool(env: Environment, swapAmount: BigNumber, direction: boolean) {
@@ -119,6 +184,47 @@ async function checkSwap(env: Environment, swapAmount: BigNumber, direction: boo
   expect(closeValues(parseFloat(poolAmountOut.toString()), expectedAmountOut, 1e-12)).true;
 }
 
+function getAmountIn(rnd: RndGen, res0: number): number {
+  let amount;
+  switch (choice(rnd, swapSize)) {
+    case "minimum":
+      amount = MINIMUM_SWAP_VALUE;
+      break;
+    case "up to 0.001 pool liquidity":
+      amount = getRandExp(rnd, MINIMUM_SWAP_VALUE, res0 / 1000);
+      break;
+    case "0.001-1 pool liquidity":
+      amount = getRandExp(rnd, res0 / 1000, res0);
+      break;
+    case "> pool liquidity":
+      amount = getRandExp(rnd, res0, MAXIMUM_SWAP_VALUE);
+      break;
+    default:
+      throw new Error("Error 199");
+  }
+  if (amount < MINIMUM_SWAP_VALUE) amount = MINIMUM_SWAP_VALUE;
+  if (amount > MAXIMUM_SWAP_VALUE) amount = MAXIMUM_SWAP_VALUE;
+  return amount;
+}
+async function checkRandomSwap(rnd: RndGen, env: Environment, iteration: number) {
+  env.poolTines.updateReserves(
+    await env.bento.balanceOf(env.token0.address, env.pool.address),
+    await env.bento.balanceOf(env.token1.address, env.pool.address)
+  );
+  const swapAmount = getAmountIn(rnd, parseInt(env.poolTines.reserve0.toString()));
+  const direction = true; // rnd() < 0.5 TODO - bug in contract for back direction swaps
+  // if (iteration < 4)  {
+  //   console.log(`Skip swap ${iteration} amount=${swapAmount}, dir=${direction}`)
+  //   return
+  // }
+  const { out: expectedAmountOut } = env.poolTines.calcOutByIn(swapAmount, direction);
+  const poolAmountOut = await swapStablePool(env, getBigNumber(swapAmount), direction);
+  const realOut = parseFloat(poolAmountOut.toString());
+  // console.log(`Swap ${iteration} amount=${swapAmount}, dir=${direction}`)
+  // console.log('Diff:', realOut, Math.abs(realOut - expectedAmountOut), Math.abs(realOut/expectedAmountOut-1));
+  expect(closeValues(realOut, expectedAmountOut, 1e-12)).true;
+}
+
 describe("Stable Pool <-> Tines consistency", () => {
   it("simple 6 swap test", async () => {
     const env = await createPool(30, BigNumber.from(1e6), BigNumber.from(1e6 + 1e3), 18, 18);
@@ -128,5 +234,14 @@ describe("Stable Pool <-> Tines consistency", () => {
     await checkSwap(env, BigNumber.from(1e4), false);
     await checkSwap(env, BigNumber.from(1e5), false);
     await checkSwap(env, BigNumber.from(2e5), false);
+  });
+
+  it("Random swap test", async () => {
+    for (let i = 0; i < 1; ++i) {
+      const env = await createRandomPool(rnd);
+      for (let j = 0; j < 10; ++j) {
+        await checkRandomSwap(rnd, env, j);
+      }
+    }
   });
 });
