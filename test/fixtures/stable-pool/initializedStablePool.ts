@@ -17,16 +17,26 @@ export const initializedStablePool = deployments.createFixture(
         constants: { MaxUint256 },
       },
     },
-    options?: { fee?: number }
+    options?: {
+      fee?: number;
+      token0?: string;
+      token1?: string;
+    }
   ) => {
-    options = { fee: 1, ...options };
+    options = {
+      fee: 1,
+      token0: "Token0-18",
+      token1: "Token1-18",
+      ...options,
+    };
+
     await deployments.fixture(["StablePoolFactory"]); // ensure you start from a fresh deployments
     const { deployer } = await getNamedSigners();
 
     const ERC20 = await ethers.getContractFactory<ERC20Mock__factory>("ERC20Mock");
 
-    const token0 = await ethers.getContract<ERC20Mock>("Token0-18");
-    const token1 = await ethers.getContract<ERC20Mock>("Token1-18");
+    const token0 = await ethers.getContract<ERC20Mock>(options.token0 as string);
+    const token1 = await ethers.getContract<ERC20Mock>(options.token1 as string);
 
     const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
 
