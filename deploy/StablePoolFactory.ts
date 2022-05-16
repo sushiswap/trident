@@ -26,6 +26,14 @@ const deployFunction: DeployFunction = async function ({
     await (await masterDeployer.addToWhitelist(address)).wait();
   }
 
+  const { address: addrToken0 } = await deploy("Token0", {
+    contract: "ERC20",
+    //from: deployer,
+    //deterministicDeployment: false,
+    args: ["Token 0", "TOKEN0", ethers.constants.MaxUint256],
+    //waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 10 : undefined,
+  });
+
   if (newlyDeployed && process.env.VERIFY_ON_DEPLOY === "true") {
     try {
       await run("verify:verify", {

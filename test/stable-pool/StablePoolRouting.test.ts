@@ -1,11 +1,39 @@
 import { expect } from "chai";
 import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
+import seedrandom from "seedrandom";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { StableSwapRPool } from "@sushiswap/tines";
 import { initializedStablePool } from "../fixtures";
 import { BentoBoxV1, ERC20Mock, StablePool } from "../../types";
 import { closeValues } from "@sushiswap/sdk";
+
+const testSeed = "0"; // Change it to change random generator values
+const rnd = seedrandom(testSeed); // random [0, 1)
+
+const MINIMUM_LIQUIDITY = 1000;
+
+function getIntegerRandomValue(exp): [number, BigNumber] {
+  if (exp <= 15) {
+    const value = Math.floor(rnd() * Math.pow(10, exp));
+    return [value, BigNumber.from(value)];
+  } else {
+    const random = Math.floor(rnd() * 1e15);
+    const value = random * Math.pow(10, exp - 15);
+    const bnValue = BigNumber.from(10)
+      .pow(exp - 15)
+      .mul(random);
+    return [value, bnValue];
+  }
+}
+
+function getIntegerRandomValueWithMin(exp, min = 0): [number, BigNumber] {
+  let res;
+  do {
+    res = getIntegerRandomValue(exp);
+  } while (res[0] < min);
+  return res;
+}
 
 interface Environment {
   deployer: SignerWithAddress;
@@ -40,7 +68,7 @@ async function createEnvironment() {
   };
 }
 
-async function createConstantProductPool(
+async function createPool(
   env: Environment,
   fee: number, // basepoins
   res0: BigNumber,
@@ -67,6 +95,17 @@ async function createConstantProductPool(
   );
 
   return [poolInfo, pool];
+}
+
+async function createRandomPool(
+  env: Environment,
+  fee: number,
+  res0exp: number,
+  res1exp?: number
+): Promise<[StableSwapRPool, StablePool]> {
+  const res0 = getIntegerRandomValueWithMin(res0exp, MINIMUM_LIQUIDITY)[1];
+  const res1 = res1exp == undefined ? res0 : getIntegerRandomValueWithMin(res1exp, MINIMUM_LIQUIDITY)[1];
+  return createPool(env, fee, res0, res1);
 }
 
 async function swapStablePool(env: Environment, pool: StablePool, swapAmount: BigNumber, direction: boolean) {
@@ -109,7 +148,7 @@ describe("Stable Pool <-> Tines consistency", () => {
   });
 
   it("simple 6 swap test", async () => {
-    const [info, pool] = await createConstantProductPool(env, 30, BigNumber.from(1e6), BigNumber.from(1e6 + 1e3));
+    const [info, pool] = await createPool(env, 30, BigNumber.from(1e6), BigNumber.from(1e6 + 1e3));
     await checkSwap(env, pool, info, BigNumber.from(1e4), true);
     await checkSwap(env, pool, info, BigNumber.from(1e5), true);
     await checkSwap(env, pool, info, BigNumber.from(2e5), true);
@@ -118,3 +157,29 @@ describe("Stable Pool <-> Tines consistency", () => {
     await checkSwap(env, pool, info, BigNumber.from(2e5), false);
   });
 });
+
+/*describe("Check regular liquidity values", function () {
+  let env;
+  before(async () => {
+    env = await createEnvironment();
+  });
+  
+  for (let mintNum = 0; mintNum < 3; ++mintNum) {
+    it(`Test ${mintNum + 1}`, async function () {
+      const [poolRouterInfo, pool] = await createRandomPool(env, 0.003, 19, 19);
+
+      // test regular values
+      for (let swapNum = 0; swapNum < 3; ++swapNum) {
+        await checkSwap(pool, poolRouterInfo, 17);
+      }
+      // test small values
+      for (let swapNum = 0; swapNum < 3; ++swapNum) {
+        await checkSwap(pool, poolRouterInfo, 2);
+      }
+      //test extremely big values 2^112 = 10^33.7153
+      for (let swapNum = 0; swapNum < 3; ++swapNum) {
+        await checkSwap(pool, poolRouterInfo, 32);
+      }
+    });
+  }
+});*/
