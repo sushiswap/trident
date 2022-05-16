@@ -145,13 +145,13 @@ function getSecondReserve(rnd: RndGen, res0: number): number {
   return res1;
 }
 
-async function createRandomPool(rnd: RndGen): Promise<Environment> {
+async function createRandomPool(rnd: RndGen, iteration: number): Promise<Environment> {
   const res0 = getRandExp(rnd, MINIMUM_INITIAL_LIQUIDITY, MAXIMUM_INITIAL_LIQUIDITY);
   const res1 = getSecondReserve(rnd, res0);
   const fee = parseInt(choice(rnd, feeValues));
   const decimals0 = parseInt(choice(rnd, decimals));
   const decimals1 = parseInt(choice(rnd, decimals));
-  //console.log(`Pool: fee=${fee}, res0=${res0}, res1=${res1}, decimals=(${decimals0}, ${decimals1})`);
+  //console.log(`Pool ${iteration}: fee=${fee}, res0=${res0}, res1=${res1}, decimals=(${decimals0}, ${decimals1})`);
   return await createPool(fee, getBigNumber(res0), getBigNumber(res1), decimals0, decimals1);
 }
 
@@ -217,12 +217,17 @@ async function checkRandomSwap(rnd: RndGen, env: Environment, iteration: number)
   //   console.log(`Skip swap ${iteration} amount=${swapAmount}, dir=${direction}`)
   //   return
   // }
-  const { out: expectedAmountOut } = env.poolTines.calcOutByIn(swapAmount, direction);
-  const poolAmountOut = await swapStablePool(env, getBigNumber(swapAmount), direction);
-  const realOut = parseFloat(poolAmountOut.toString());
+  // console.log(`Pool ${parseInt(env.poolTines.reserve0.toString())} -> ${parseInt(env.poolTines.reserve1.toString())}`)
   // console.log(`Swap ${iteration} amount=${swapAmount}, dir=${direction}`)
-  // console.log('Diff:', realOut, Math.abs(realOut - expectedAmountOut), Math.abs(realOut/expectedAmountOut-1));
-  expect(closeValues(realOut, expectedAmountOut, 1e-12)).true;
+  const { out: expectedAmountOut } = env.poolTines.calcOutByIn(swapAmount, direction);
+  if (parseInt(env.poolTines.reserve1.toString()) - expectedAmountOut > MINIMUM_LIQUIDITY) {
+    const poolAmountOut = await swapStablePool(env, getBigNumber(swapAmount), direction);
+    const realOut = parseFloat(poolAmountOut.toString());
+    //console.log('Diff:', realOut, Math.abs(realOut - expectedAmountOut), Math.abs(realOut/expectedAmountOut-1));
+    expect(closeValues(realOut, expectedAmountOut, 1e-12)).true;
+  } else {
+    console.log("Swap check was skipped");
+  }
 }
 
 describe("Stable Pool <-> Tines consistency", () => {
@@ -237,8 +242,8 @@ describe("Stable Pool <-> Tines consistency", () => {
   });
 
   it("Random swap test", async () => {
-    for (let i = 0; i < 1; ++i) {
-      const env = await createRandomPool(rnd);
+    for (let i = 0; i < 5; ++i) {
+      const env = await createRandomPool(rnd, i);
       for (let j = 0; j < 10; ++j) {
         await checkRandomSwap(rnd, env, j);
       }
