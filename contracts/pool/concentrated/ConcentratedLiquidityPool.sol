@@ -419,7 +419,7 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
     function getAmountIn(bytes calldata data) public view returns (uint256 finalAmountIn) {
         // TODO: make override
         (address tokenOut, uint256 amountOut) = abi.decode(data, (address, uint256));
-        uint256 amountOutWithoutFee = (amountOut * 1e6) / (MAX_FEE - swapFee) + 1;
+        uint256 amountOutWithoutFee = (amountOut * 1e6) / (1e6 - swapFee) + 1;
         uint256 currentPrice = uint256(price);
         uint256 currentLiquidity = uint256(liquidity);
         int24 nextTickToCross = tokenOut == token1 ? nearestTick : ticks[nearestTick].nextTick;
@@ -432,7 +432,7 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
                 uint256 maxDy = DyDxMath.getDy(currentLiquidity, nextTickPrice, currentPrice, false);
                 if (amountOutWithoutFee <= maxDy) {
                     unchecked {
-                        amountOut = (amountOut * 1e6) / (MAX_FEE - swapFee) + 1;
+                        amountOut = (amountOut * 1e6) / (1e6 - swapFee) + 1;
                     }
                     uint256 newPrice = currentPrice - FullMath.mulDiv(amountOut, 0x1000000000000000000000000, currentLiquidity);
                     finalAmountIn += (DyDxMath.getDx(currentLiquidity, newPrice, currentPrice, false) + 1);
@@ -459,13 +459,13 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
 
                 if (amountOutWithoutFee <= maxDx) {
                     unchecked {
-                        amountOut = (amountOut * 1e6) / (MAX_FEE - swapFee) + 1;
+                        amountOut = (amountOut * 1e6) / (1e6 - swapFee) + 1;
                     }
                     uint256 liquidityPadded = currentLiquidity << 96;
                     uint256 newPrice = uint256(
                         FullMath.mulDivRoundingUp(liquidityPadded, currentPrice, liquidityPadded - currentPrice * amountOut)
                     );
-                    if (!(nextTickPrice <= newPrice && newPrice < currentPrice)) {
+                    if (!(currentPrice < newPrice && newPrice <= nextTickPrice)) {
                         // Overflow. We use a modified version of the formula.
                         newPrice = uint160(UnsafeMath.divRoundingUp(liquidityPadded, liquidityPadded / currentPrice - amountOut));
                     }
