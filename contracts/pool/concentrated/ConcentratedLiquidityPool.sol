@@ -416,6 +416,85 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
         }
     }
 
+    function getAmountIn(bytes calldata data) public view returns (uint256 finalAmountIn) {
+        // TODO: make override
+        (address tokenOut, uint256 amountOut) = abi.decode(data, (address, uint256));
+        uint256 amountOutWithoutFee = (amountOut * 1e6) / (MAX_FEE - swapFee) + 1;
+        uint256 currentPrice = uint256(price);
+        uint256 currentLiquidity = uint256(liquidity);
+        int24 nextTickToCross = tokenOut == token1 ? nearestTick : ticks[nearestTick].nextTick;
+        int24 nextTick;
+
+        finalAmountIn = 0;
+        while (amountOutWithoutFee != 0) {
+            uint256 nextTickPrice = uint256(TickMath.getSqrtRatioAtTick(nextTickToCross));
+            if (tokenOut == token1) {
+                uint256 maxDy = DyDxMath.getDy(currentLiquidity, nextTickPrice, currentPrice, false);
+                if (amountOutWithoutFee <= maxDy) {
+                    unchecked {
+                        amountOut = (amountOut * 1e6) / (MAX_FEE - swapFee) + 1;
+                    }
+                    uint256 newPrice = currentPrice - FullMath.mulDiv(amountOut, 0x1000000000000000000000000, currentLiquidity);
+                    finalAmountIn += (DyDxMath.getDx(currentLiquidity, newPrice, currentPrice, false) + 1);
+                    // finalAmountIn += amountOut/currentPrice/newPrice  TODO: equal?
+                    break;
+                } else {
+                    finalAmountIn += DyDxMath.getDx(currentLiquidity, nextTickPrice, currentPrice, false);
+                    unchecked {
+                        if ((nextTickToCross / int24(tickSpacing)) % 2 == 0) {
+                            currentLiquidity -= ticks[nextTickToCross].liquidity;
+                        } else {
+                            currentLiquidity += ticks[nextTickToCross].liquidity;
+                        }
+                        amountOutWithoutFee -= maxDy;
+                        amountOutWithoutFee += 1; // to compensate rounding issues
+                        uint256 feeAmount = FullMath.mulDivRoundingUp(maxDy, swapFee, 1e6);
+                        if (amountOut <= (maxDy - feeAmount)) break;
+                        amountOut -= (maxDy - feeAmount);
+                    }
+                    nextTick = ticks[nextTickToCross].previousTick;
+                }
+            } else {
+                uint256 maxDx = DyDxMath.getDx(currentLiquidity, currentPrice, nextTickPrice, false);
+
+                if (amountOutWithoutFee <= maxDx) {
+                    unchecked {
+                        amountOut = (amountOut * 1e6) / (MAX_FEE - swapFee) + 1;
+                    }
+                    uint256 liquidityPadded = currentLiquidity << 96;
+                    uint256 newPrice = uint256(
+                        FullMath.mulDivRoundingUp(liquidityPadded, currentPrice, liquidityPadded - currentPrice * amountOut)
+                    );
+                    if (!(nextTickPrice <= newPrice && newPrice < currentPrice)) {
+                        // Overflow. We use a modified version of the formula.
+                        newPrice = uint160(UnsafeMath.divRoundingUp(liquidityPadded, liquidityPadded / currentPrice - amountOut));
+                    }
+                    finalAmountIn += (DyDxMath.getDy(currentLiquidity, currentPrice, newPrice, false) + 1);
+                    break;
+                } else {
+                    // Swap & cross the tick.
+                    finalAmountIn += DyDxMath.getDy(currentLiquidity, currentPrice, nextTickPrice, false);
+                    unchecked {
+                        if ((nextTickToCross / int24(tickSpacing)) % 2 == 0) {
+                            currentLiquidity += ticks[nextTickToCross].liquidity;
+                        } else {
+                            currentLiquidity -= ticks[nextTickToCross].liquidity;
+                        }
+                        amountOutWithoutFee -= maxDx;
+                        amountOutWithoutFee += 1; // to compensate rounding issues
+                        uint256 feeAmount = FullMath.mulDivRoundingUp(maxDx, swapFee, 1e6);
+                        if (amountOut <= (maxDx - feeAmount)) break;
+                        amountOut -= (maxDx - feeAmount);
+                    }
+                    nextTick = ticks[nextTickToCross].nextTick;
+                }
+            }
+            currentPrice = nextTickPrice;
+            require(nextTickToCross != nextTick, "CL:Insufficient output liquidity");
+            nextTickToCross = nextTick;
+        }
+    }
+
     /// @dev Updates `barFee` for Trident protocol.
     function updateBarFee() public {
         barFee = IMasterDeployer(masterDeployer).barFee();
