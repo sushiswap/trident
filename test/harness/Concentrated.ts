@@ -206,11 +206,14 @@ export async function swapViaRouter(params: {
     inAmount
   );
 
-  /*console.log('in:', inAmount.toString(), '->', output.toString())
-  const getInData = ethers.utils.defaultAbiCoder.encode(["address", "uint256"], 
-    [zeroForOne ? tokens[1] : tokens[0], output]);
-  const getAmountIn = await pool.getAmountIn(getInData)
-  console.log('out:', output.toString(), '<-', getAmountIn.toString(), getAmountIn.sub(inAmount).toString());*/
+  // Checking getAmountIn
+  const getInData = ethers.utils.defaultAbiCoder.encode(
+    ["address", "uint256"],
+    [zeroForOne ? tokens[1] : tokens[0], output]
+  );
+  const getAmountIn = await pool.getAmountIn(getInData);
+  const { output: outputAlt } = await calcOutput(pool, zeroForOne, getAmountIn);
+  expect(output).equals(outputAlt); // Rather strong check. Can be changed to outputAlt >= output in the future
 
   const swapData = getSwapData({ zeroForOne, inAmount, recipient, unwrapBento });
   const routerData = {
