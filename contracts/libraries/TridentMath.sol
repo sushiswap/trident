@@ -58,15 +58,12 @@ library TridentMath {
             z := shr(1, add(z, div(x, z)))
             z := shr(1, add(z, div(x, z)))
 
-            // See https://en.wikipedia.org/wiki/Integer_square_root#Using_only_integer_division.
             // If x+1 is a perfect square, the Babylonian method cycles between
-            // floor(sqrt(x)) and ceil(sqrt(x)). This check ensures we return floor.
-            // Since this case is rare, we choose to save gas on the assignment and
-            // repeat division in the rare case.
-            // If you don't care whether floor or ceil is returned, you can skip this.
-            if lt(div(x, z), z) {
-                z := div(x, z)
-            }
+            // floor(sqrt(x)) and ceil(sqrt(x)). This statement ensures we return floor.
+            // See: https://en.wikipedia.org/wiki/Integer_square_root#Using_only_integer_division
+            // Since the ceil is rare, we save gas on the assignment and repeat division in the rare case.
+            // If you don't care whether the floor or ceil square root is returned, you can remove this statement.
+            z := sub(z, lt(div(x, z), z))
         }
     }
 }
