@@ -66,10 +66,7 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
     constructor() ERC20("Sushi Stable LP Token", "SSLP", 18) {
         (bytes memory _deployData, IMasterDeployer _masterDeployer) = IStablePoolFactory(msg.sender).getDeployData();
 
-        (address _token0, address _token1, uint256 _swapFee, bool _twapSupport) = abi.decode(
-            _deployData,
-            (address, address, uint256, bool)
-        );
+        (address _token0, address _token1, uint256 _swapFee) = abi.decode(_deployData, (address, address, uint256));
 
         // Factory ensures that the tokens are sorted.
         if (_token0 == address(0)) revert ZeroAddress();
