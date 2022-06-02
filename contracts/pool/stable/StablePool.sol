@@ -227,7 +227,7 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         }
     }
 
-    function _computeLiquidityFromAdjustedBalances(uint256 x, uint256 y) internal view returns (uint256 computed) {
+    function _computeLiquidityFromAdjustedBalances(uint256 x, uint256 y) internal pure returns (uint256 computed) {
         return TridentMath.sqrt(TridentMath.sqrt(_k(x, y)));
     }
 
@@ -269,7 +269,7 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         }
     }
 
-    function _k(uint256 x, uint256 y) internal view returns (uint256) {
+    function _k(uint256 x, uint256 y) internal pure returns (uint256) {
         uint256 _a = (x * y) / 1e18;
         uint256 _b = ((x * x) / 1e18 + (y * y) / 1e18);
         return ((_a * _b) / 1e18); // x3y+y3x >= k
