@@ -55,11 +55,8 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
     uint256 internal reserve0;
     uint256 internal reserve1;
 
-    /// @dev Multipliers for each pooled token's precision to get to POOL_PRECISION_DECIMALS.
-    /// For example, TBTC has 18 decimals, so the multiplier should be 1. WBTC
-    /// has 8, so the multiplier should be 10 ** 18 / 10 ** 8 => 10 ** 10.
-    uint256 public immutable token0PrecisionMultiplier;
-    uint256 public immutable token1PrecisionMultiplier;
+    uint256 public immutable decimals0;
+    uint256 public immutable decimals1;
 
     bytes32 public constant poolIdentifier = "Trident:StablePool";
 
@@ -82,8 +79,8 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
             MAX_FEE_MINUS_SWAP_FEE = MAX_FEE - _swapFee;
         }
 
-        token0PrecisionMultiplier = uint256(10)**(18 - ERC20(_token0).decimals());
-        token1PrecisionMultiplier = uint256(10)**(18 - ERC20(_token1).decimals());
+        decimals0 = uint256(10)**(ERC20(_token0).decimals());
+        decimals1 = uint256(10)**(ERC20(_token1).decimals());
 
         barFee = _masterDeployer.barFee();
         barFeeTo = _masterDeployer.barFeeTo();
@@ -99,9 +96,12 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         (uint256 balance0, uint256 balance1) = _balance();
 
         uint256 newLiq = _computeLiquidity(balance0, balance1);
+
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
+
         (uint256 fee0, uint256 fee1) = _nonOptimalMintFee(amount0, amount1, _reserve0, _reserve1);
+
         _reserve0 += uint112(fee0);
         _reserve1 += uint112(fee1);
 
@@ -114,8 +114,11 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         } else {
             liquidity = ((newLiq - oldLiq) * _totalSupply) / oldLiq;
         }
+
         require(liquidity != 0, "INSUFFICIENT_LIQUIDITY_MINTED");
+
         _mint(recipient, liquidity);
+
         _updateReserves();
 
         kLast = newLiq;
@@ -218,8 +221,8 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
 
     function _computeLiquidity(uint256 _reserve0, uint256 _reserve1) internal view returns (uint256 liquidity) {
         unchecked {
-            uint256 adjustedReserve0 = _reserve0 * token0PrecisionMultiplier;
-            uint256 adjustedReserve1 = _reserve1 * token1PrecisionMultiplier;
+            uint256 adjustedReserve0 = (_reserve0 * 1e18) / decimals0;
+            uint256 adjustedReserve1 = (_reserve1 * 1e18) / decimals1;
             liquidity = _computeLiquidityFromAdjustedBalances(adjustedReserve0, adjustedReserve1);
         }
     }
@@ -267,9 +270,9 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
     }
 
     function _k(uint256 x, uint256 y) internal view returns (uint256) {
-        uint256 _a = (x * y);
-        uint256 _b = ((x * x) + (y * y));
-        return (_a * _b); // x3y+y3x >= k
+        uint256 _a = (x * y) / 1e18;
+        uint256 _b = ((x * x) / 1e18 + (y * y) / 1e18);
+        return ((_a * _b) / 1e18); // x3y+y3x >= k
     }
 
     function _f(uint256 x0, uint256 y) internal pure returns (uint256) {
@@ -315,21 +318,20 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         bool token0In
     ) internal view returns (uint256 dy) {
         unchecked {
-            uint256 adjustedReserve0 = _reserve0 * token0PrecisionMultiplier;
-            uint256 adjustedReserve1 = _reserve1 * token1PrecisionMultiplier;
+            uint256 adjustedReserve0 = (_reserve0 * 1e18) / decimals0;
+            uint256 adjustedReserve1 = (_reserve1 * 1e18) / decimals1;
             uint256 feeDeductedAmountIn = amountIn - (amountIn * swapFee) / MAX_FEE;
             uint256 xy = _k(adjustedReserve0, adjustedReserve1);
-
             if (token0In) {
-                uint256 x0 = adjustedReserve0 + (feeDeductedAmountIn * token0PrecisionMultiplier);
+                uint256 x0 = adjustedReserve0 + ((feeDeductedAmountIn * 1e18) / decimals0);
                 uint256 y = _get_y(x0, xy, adjustedReserve1);
                 dy = adjustedReserve1 - y;
-                dy /= token1PrecisionMultiplier;
+                dy = (dy * decimals1) / 1e18;
             } else {
-                uint256 x0 = adjustedReserve1 + (feeDeductedAmountIn * token1PrecisionMultiplier);
+                uint256 x0 = adjustedReserve1 + ((feeDeductedAmountIn * 1e18) / decimals1);
                 uint256 y = _get_y(x0, xy, adjustedReserve0);
                 dy = adjustedReserve0 - y;
-                dy /= token0PrecisionMultiplier;
+                dy = (dy * decimals0) / 1e18;
             }
         }
     }

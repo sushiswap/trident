@@ -1,4 +1,4 @@
-import { expect } from "chai";
+import { expect, util } from "chai";
 import { BigNumber } from "ethers";
 import { deployments, ethers } from "hardhat";
 
@@ -37,6 +37,8 @@ describe("Stable Pool", () => {
       await bento.deposit(token1.address, bento.address, pool.address, ethers.utils.parseEther("10000000000"), 0);
       const mintData = ethers.utils.defaultAbiCoder.encode(["address"], [deployer.address]);
       await pool.mint(mintData);
+      // const getAmountOutData = ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [token0.address, ethers.utils.parseEther("100000")]);
+      // console.log(ethers.utils.formatEther(await pool.getAmountOut(getAmountOutData)));
     });
 
     it("removes liquidity", async () => {
