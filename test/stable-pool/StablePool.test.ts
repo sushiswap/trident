@@ -31,14 +31,26 @@ describe("Stable Pool", () => {
       const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
       const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
       const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
-      await token0.transfer(bento.address, ethers.utils.parseEther("10000000000"));
-      await token1.transfer(bento.address, ethers.utils.parseEther("10000000000"));
-      await bento.deposit(token0.address, bento.address, pool.address, ethers.utils.parseEther("10000000000"), 0);
-      await bento.deposit(token1.address, bento.address, pool.address, ethers.utils.parseEther("10000000000"), 0);
+      await token0.transfer(bento.address, ethers.utils.parseUnits("100000000000", "18"));
+      await token1.transfer(bento.address, ethers.utils.parseUnits("100000000000", "18"));
+      await bento.deposit(
+        token0.address,
+        bento.address,
+        pool.address,
+        ethers.utils.parseUnits("100000000000", "18"),
+        0
+      );
+      await bento.deposit(
+        token1.address,
+        bento.address,
+        pool.address,
+        ethers.utils.parseUnits("100000000000", "18"),
+        0
+      );
       const mintData = ethers.utils.defaultAbiCoder.encode(["address"], [deployer.address]);
       await pool.mint(mintData);
-      // const getAmountOutData = ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [token0.address, ethers.utils.parseEther("100000")]);
-      // console.log(ethers.utils.formatEther(await pool.getAmountOut(getAmountOutData)));
+      // const getAmountOutData = ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [token0.address, ethers.utils.parseUnits("100", '18')]);
+      // console.log(ethers.utils.formatUnits(await pool.getAmountOut(getAmountOutData), '18'));
     });
 
     it("removes liquidity", async () => {
