@@ -1131,10 +1131,10 @@
   dependencies:
     antlr4ts "^0.5.0-alpha.4"
 
-"@sushiswap/core-sdk@1.0.0-canary.100":
-  version "1.0.0-canary.100"
-  resolved "https://registry.yarnpkg.com/@sushiswap/core-sdk/-/core-sdk-1.0.0-canary.100.tgz#d804dd1b322db95cfd97a4a22120bd1be5adfd57"
-  integrity sha512-9Cr4SpQGqHeateRk9se6CagX89tBc2gmpU2xubCDHAtFd48sjnmDY5cyJaW+A6Tu/Up5xYIEGY9ohpwKUo/J8g==
+"@sushiswap/core-sdk@1.0.0-canary.112":
+  version "1.0.0-canary.112"
+  resolved "https://registry.yarnpkg.com/@sushiswap/core-sdk/-/core-sdk-1.0.0-canary.112.tgz#f11bc45a59ddff76a0e801906c5d763efb1dab2a"
+  integrity sha512-l0aPNGdj0fSeLLJrDKnFncBkgX+zx08Ab6V2s0aPEx2i+A4cxU9Z6dXi6t/PEHyYofLejbzaBzz2GQbTqEh3xA==
   dependencies:
     "@ethersproject/address" "^5.4.0"
     "@ethersproject/bignumber" "^5.4.0"

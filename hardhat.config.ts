@@ -287,6 +287,13 @@ const config: HardhatUserConfig = {
       live: true,
       saveDeployments: true,
     },
+    kava: {
+      url: "https://evm.kava.io",
+      accounts,
+      chainId: 2222,
+      live: true,
+      saveDeployments: true,
+    },
   },
   paths: {
     artifacts: "artifacts",
