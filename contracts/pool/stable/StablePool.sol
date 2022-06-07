@@ -12,6 +12,7 @@ import {ITridentCallee} from "../../interfaces/ITridentCallee.sol";
 import {IStablePoolFactory} from "../../interfaces/IStablePoolFactory.sol";
 
 import {TridentMath} from "../../libraries/TridentMath.sol";
+import "../../libraries/stable_pool/StablePoolMath.sol";
 import "../../libraries/RebaseLibrary.sol";
 
 /// @dev Custom Errors
@@ -94,8 +95,6 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         (uint256 _reserve0, uint256 _reserve1) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
 
-        uint256 newLiq = _computeLiquidity(balance0, balance1);
-
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
 
@@ -104,14 +103,14 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         _reserve0 += uint112(fee0);
         _reserve1 += uint112(fee1);
 
-        (uint256 _totalSupply, uint256 oldLiq) = _mintFee(_reserve0, _reserve1);
+        (uint256 _totalSupply, ) = _mintFee(_reserve0, _reserve1);
 
         if (_totalSupply == 0) {
             require(amount0 > 0 && amount1 > 0, "INVALID_AMOUNTS");
-            liquidity = newLiq - MINIMUM_LIQUIDITY;
+            liquidity = TridentMath.sqrt(amount0 * amount1) - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
-            liquidity = ((newLiq - oldLiq) * _totalSupply) / oldLiq;
+            liquidity = StablePoolMath.min((amount0 * _totalSupply) / _reserve0, (amount1 * _totalSupply) / _reserve1);
         }
 
         require(liquidity != 0, "INSUFFICIENT_LIQUIDITY_MINTED");
@@ -120,7 +119,7 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
 
         _updateReserves();
 
-        kLast = newLiq;
+        kLast = _computeLiquidity(_reserve0, _reserve1);
         uint256 liquidityForEvent = liquidity;
         emit Mint(msg.sender, amount0, amount1, recipient, liquidityForEvent);
     }
@@ -219,21 +218,23 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
 
     function _computeLiquidity(uint256 _reserve0, uint256 _reserve1) internal view returns (uint256 liquidity) {
         unchecked {
-            uint256 adjustedReserve0 = (_reserve0 * 1e12) / decimals0;
-            uint256 adjustedReserve1 = (_reserve1 * 1e12) / decimals1;
+            uint256 adjustedReserve0 = (_reserve0 * 1e16) / decimals0;
+            uint256 adjustedReserve1 = (_reserve1 * 1e16) / decimals1;
             liquidity = _computeLiquidityFromAdjustedBalances(adjustedReserve0, adjustedReserve1);
         }
     }
 
     function _computeLiquidityFromAdjustedBalances(uint256 x, uint256 y) internal pure returns (uint256 computed) {
-        return TridentMath.sqrt(TridentMath.sqrt(_k(x, y)));
+        return _k(x, y);
     }
 
     function _mintFee(uint256 _reserve0, uint256 _reserve1) internal returns (uint256 _totalSupply, uint256 computed) {
         _totalSupply = totalSupply;
         uint256 _kLast = kLast;
         if (_kLast != 0) {
-            computed = _computeLiquidity(_reserve0, _reserve1);
+            uint256 adjustedReserve0 = (_reserve0 * 1e16) / decimals0;
+            uint256 adjustedReserve1 = (_reserve1 * 1e16) / decimals1;
+            computed = _computeLiquidity(adjustedReserve0, adjustedReserve1);
             if (computed > _kLast) {
                 // `barFee` % of increase in liquidity.
                 uint256 _barFee = barFee;
@@ -268,17 +269,17 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
     }
 
     function _k(uint256 x, uint256 y) internal pure returns (uint256) {
-        uint256 _a = (x * y) / 1e12;
-        uint256 _b = ((x * x) / 1e12 + (y * y) / 1e12);
-        return ((_a * _b) / 1e12); // x3y+y3x >= k
+        uint256 _a = (x * y) / 1e16;
+        uint256 _b = ((x * x) / 1e16 + (y * y) / 1e16);
+        return ((_a * _b) / 1e16); // x3y+y3x >= k
     }
 
     function _f(uint256 x0, uint256 y) internal pure returns (uint256) {
-        return (x0 * ((((y * y) / 1e12) * y) / 1e12)) / 1e12 + (((((x0 * x0) / 1e12) * x0) / 1e12) * y) / 1e12;
+        return (x0 * ((((y * y) / 1e16) * y) / 1e16)) / 1e16 + (((((x0 * x0) / 1e16) * x0) / 1e16) * y) / 1e16;
     }
 
     function _d(uint256 x0, uint256 y) internal pure returns (uint256) {
-        return (3 * x0 * ((y * y) / 1e12)) / 1e12 + ((((x0 * x0) / 1e12) * x0) / 1e12);
+        return (3 * x0 * ((y * y) / 1e16)) / 1e16 + ((((x0 * x0) / 1e16) * x0) / 1e16);
     }
 
     function _get_y(
@@ -290,10 +291,10 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
             uint256 y_prev = y;
             uint256 k = _f(x0, y);
             if (k < xy) {
-                uint256 dy = ((xy - k) * 1e12) / _d(x0, y);
+                uint256 dy = ((xy - k) * 1e16) / _d(x0, y);
                 y = y + dy;
             } else {
-                uint256 dy = ((k - xy) * 1e12) / _d(x0, y);
+                uint256 dy = ((k - xy) * 1e16) / _d(x0, y);
                 y = y - dy;
             }
             if (y > y_prev) {
@@ -316,20 +317,20 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         bool token0In
     ) internal view returns (uint256 dy) {
         unchecked {
-            uint256 adjustedReserve0 = (_reserve0 * 1e12) / decimals0;
-            uint256 adjustedReserve1 = (_reserve1 * 1e12) / decimals1;
+            uint256 adjustedReserve0 = (_reserve0 * 1e16) / decimals0;
+            uint256 adjustedReserve1 = (_reserve1 * 1e16) / decimals1;
             uint256 feeDeductedAmountIn = amountIn - (amountIn * swapFee) / MAX_FEE;
             uint256 xy = _k(adjustedReserve0, adjustedReserve1);
             if (token0In) {
-                uint256 x0 = adjustedReserve0 + ((feeDeductedAmountIn * 1e12) / decimals0);
+                uint256 x0 = adjustedReserve0 + ((feeDeductedAmountIn * 1e16) / decimals0);
                 uint256 y = _get_y(x0, xy, adjustedReserve1);
                 dy = adjustedReserve1 - y;
-                dy = (dy * decimals1) / 1e12;
+                dy = (dy * decimals1) / 1e16;
             } else {
-                uint256 x0 = adjustedReserve1 + ((feeDeductedAmountIn * 1e12) / decimals1);
+                uint256 x0 = adjustedReserve1 + ((feeDeductedAmountIn * 1e16) / decimals1);
                 uint256 y = _get_y(x0, xy, adjustedReserve0);
                 dy = adjustedReserve0 - y;
-                dy = (dy * decimals0) / 1e12;
+                dy = (dy * decimals0) / 1e16;
             }
         }
     }
