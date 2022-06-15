@@ -54,7 +54,7 @@ export const initializedStablePool = deployments.createFixture(
 
     const deployData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint256"],
-      [token0.address, token1.address, 1]
+      [token0.address, token1.address, options.fee]
     );
 
     const contractReceipt = await masterDeployer

@@ -84,12 +84,18 @@ async function createPool(
   token0Decimals: number,
   token1Decimals: number
 ): Promise<Environment> {
-  const pool = await initializedStablePool({ fee });
+  const token0ContractName = `Token0-${token0Decimals}`;
+  const token1ContractName = `Token1-${token1Decimals}`;
+  const pool = await initializedStablePool({
+    fee,
+    token0: token0ContractName,
+    token1: token1ContractName,
+  });
   const { deployer } = await ethers.getNamedSigners();
 
   const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
-  const token0 = await ethers.getContract<ERC20Mock>(`Token0-${token0Decimals}`);
-  const token1 = await ethers.getContract<ERC20Mock>(`Token1-${token1Decimals}`);
+  const token0 = await ethers.getContract<ERC20Mock>(token0ContractName);
+  const token1 = await ethers.getContract<ERC20Mock>(token1ContractName);
   await token0.transfer(bento.address, res0);
   await token1.transfer(bento.address, res1);
 
