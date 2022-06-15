@@ -53,6 +53,22 @@ describe("Stable Pool", () => {
       // console.log(ethers.utils.formatUnits(await pool.getAmountOut(getAmountOutData), '18'));
     });
 
+    it("adds small quantity of liqudity", async () => {
+      const deployer = await ethers.getNamedSigner("deployer");
+      const pool = await initializedStablePool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+      await token0.transfer(bento.address, ethers.utils.parseUnits("100000000000", "18"));
+      await token1.transfer(bento.address, ethers.utils.parseUnits("100000000000", "18"));
+      await bento.deposit(token0.address, bento.address, pool.address, BigNumber.from(1e14), 0);
+      await bento.deposit(token1.address, bento.address, pool.address, BigNumber.from(1e14), 0);
+      const mintData = ethers.utils.defaultAbiCoder.encode(["address"], [deployer.address]);
+      await pool.mint(mintData);
+      // const getAmountOutData = ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [token0.address, ethers.utils.parseUnits("100", '18')]);
+      // console.log(ethers.utils.formatUnits(await pool.getAmountOut(getAmountOutData), '18'));
+    });
+
     it("removes liquidity", async () => {
       const deployer = await ethers.getNamedSigner("deployer");
       const bob = await ethers.getNamedSigner("bob");
