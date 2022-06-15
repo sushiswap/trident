@@ -237,7 +237,7 @@ async function checkRandomSwap(rnd: RndGen, env: Environment, iteration: number)
 }
 
 describe("Stable Pool <-> Tines consistency", () => {
-  it("simple 6 swap test", async () => {
+  it.skip("simple 6 swap test small values", async () => {
     const env = await createPool(30, BigNumber.from(1e6), BigNumber.from(1e6 + 1e3), 18, 18);
     await checkSwap(env, BigNumber.from(1e4), true);
     await checkSwap(env, BigNumber.from(1e5), true);
@@ -245,6 +245,16 @@ describe("Stable Pool <-> Tines consistency", () => {
     await checkSwap(env, BigNumber.from(1e4), false);
     await checkSwap(env, BigNumber.from(1e5), false);
     await checkSwap(env, BigNumber.from(2e5), false);
+  });
+
+  it("simple 6 swap test big values", async () => {
+    const env = await createPool(30, BigNumber.from(1e20), BigNumber.from(1e20 + 1e17), 18, 18);
+    await checkSwap(env, BigNumber.from(1e18), true);
+    // await checkSwap(env, BigNumber.from(1e5), true);
+    // await checkSwap(env, BigNumber.from(2e5), true);
+    // await checkSwap(env, BigNumber.from(1e4), false);
+    // await checkSwap(env, BigNumber.from(1e5), false);
+    // await checkSwap(env, BigNumber.from(2e5), false);
   });
 
   it("Random swap test", async () => {
