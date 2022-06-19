@@ -1,3 +1,4 @@
+import { BigNumber } from "ethers";
 import { ethers, deployments } from "hardhat";
 import {
   BentoBoxV1,
@@ -66,8 +67,12 @@ export const initializedStablePool = deployments.createFixture(
     await bento.whitelistMasterContract("0x0000000000000000000000000000000000000001", true);
 
     await token0.approve(bento.address, MaxUint256).then((tx) => tx.wait());
-
     await token1.approve(bento.address, MaxUint256).then((tx) => tx.wait());
+
+    // To emulate base !== elastic
+    const elastic = BigNumber.from(10).pow(18);
+    await token0.transfer(bento.address, elastic);
+    await bento.setTokenTotal(token0.address, elastic, elastic.mul(110).div(100));
 
     await bento
       .setMasterContractApproval(

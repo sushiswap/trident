@@ -1131,10 +1131,10 @@
   dependencies:
     antlr4ts "^0.5.0-alpha.4"
 
-"@sushiswap/core-sdk@1.0.0-canary.107":
-  version "1.0.0-canary.107"
-  resolved "https://registry.yarnpkg.com/@sushiswap/core-sdk/-/core-sdk-1.0.0-canary.107.tgz#b60e938ab6f86006fa0cc27ef1f3b754b0e2f5cb"
-  integrity sha512-rUqNmYJNhEz1kE/4E06zmfA+ai6J3TsEKvhfePqyG0kf2fjQslRk4a2bzRV2TxvFeETp3f0Sp9hJPTrS3+hAKA==
+"@sushiswap/core-sdk@1.0.0-canary.116":
+  version "1.0.0-canary.116"
+  resolved "https://registry.yarnpkg.com/@sushiswap/core-sdk/-/core-sdk-1.0.0-canary.116.tgz#f00db64d603b3b8b8b0c68fb43ea8dd85ce308d0"
+  integrity sha512-e4S44ocDi9iwjdu0SHcxKrsZ3wDfntISg6/mThyT+WBin0HOXOOscFepsS7lP1m1IaAjuBwVjtXAvP4WPwLD1A==
   dependencies:
     "@ethersproject/address" "^5.4.0"
     "@ethersproject/bignumber" "^5.4.0"
@@ -1200,13 +1200,13 @@
     tiny-warning "^1.0.3"
     toformat "^2.0.0"
 
-"@sushiswap/tines@1.0.0-canary.87":
-  version "1.0.0-canary.87"
-  resolved "https://registry.yarnpkg.com/@sushiswap/tines/-/tines-1.0.0-canary.87.tgz#22651dc90ed89937df1f0389154df151df5a84de"
-  integrity sha512-4SpllZAeajhYNPVbqdfaCU2Be4enn0u11NsxCia2yUVkTheTGJQklvHmUzHgByN19eGBH6KYSVoueKm4sc4kIA==
+"@sushiswap/tines@1.0.0-canary.98":
+  version "1.0.0-canary.98"
+  resolved "https://registry.yarnpkg.com/@sushiswap/tines/-/tines-1.0.0-canary.98.tgz#6034dccd8765f9fde34b27e5484d4864cf456017"
+  integrity sha512-DmPbrC8rrku8asdQ68DzOwYeIxOxihfi+YRvgOpNEllI1vtKn5TZFbgvUtOhcj32bBtBYvF6eOAaOF32NGOGzw==
   dependencies:
     "@ethersproject/bignumber" "^5.4.0"
-    "@sushiswap/core-sdk" "1.0.0-canary.107"
+    "@sushiswap/core-sdk" "1.0.0-canary.116"
 
 "@szmarczak/http-timer@^1.1.2":
   version "1.1.2"
