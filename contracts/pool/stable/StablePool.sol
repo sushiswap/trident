@@ -164,6 +164,7 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
                 amountIn = balance0 - _reserve0;
             }
             amountOut = _getAmountOut(amountIn, _reserve0, _reserve1, true);
+            console.log(_reserve0, _reserve1, amountIn, amountOut);
         } else {
             require(tokenIn == token1, "INVALID_INPUT_TOKEN");
             tokenOut = token0;
@@ -171,6 +172,7 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
                 amountIn = balance1 - _reserve1;
             }
             amountOut = _getAmountOut(amountIn, _reserve0, _reserve1, false);
+            console.log(_reserve0, _reserve1, amountIn, amountOut);
         }
         _transfer(tokenOut, amountOut, recipient, unwrapBento);
         _updateReserves();
@@ -204,8 +206,8 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         Rebase memory total0 = bento.totals(token0);
         Rebase memory total1 = bento.totals(token1);
 
-        _reserve0 = total0.toElastic(_reserve0);
-        _reserve1 = total1.toElastic(_reserve1);
+        // _reserve0 = total0.toElastic(_reserve0);
+        // _reserve1 = total1.toElastic(_reserve1);
         balance0 = total0.toElastic(balance0);
         balance1 = total1.toElastic(balance1);
     }
@@ -349,13 +351,14 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
 
     function _transfer(
         address token,
-        uint256 shares,
+        uint256 amount,
         address to,
         bool unwrapBento
     ) internal {
         if (unwrapBento) {
-            bento.withdraw(token, address(this), to, 0, shares);
+            bento.withdraw(token, address(this), to, amount, 0);
         } else {
+            uint256 shares = bento.toShare(token, amount, false);
             bento.transfer(token, address(this), to, shares);
         }
     }
@@ -368,8 +371,8 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
 
     function _getReserves() internal view returns (uint256 _reserve0, uint256 _reserve1) {
         (_reserve0, _reserve1) = (reserve0, reserve1);
-        _reserve0 = bento.toAmount(token0, _reserve0, false);
-        _reserve1 = bento.toAmount(token1, _reserve1, false);
+        // _reserve0 = bento.toAmount(token0, _reserve0, false);
+        // _reserve1 = bento.toAmount(token1, _reserve1, false);
     }
 
     function burnSingle(bytes calldata data) external override returns (uint256 amountOut) {}
