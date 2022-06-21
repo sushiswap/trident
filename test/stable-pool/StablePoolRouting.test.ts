@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { BigNumber } from "ethers";
+import { BigNumber, BigNumberish } from "ethers";
 import { ethers } from "hardhat";
 import seedrandom from "seedrandom";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
@@ -48,8 +48,20 @@ function getRandExp(rnd: RndGen, min: number, max: number) {
   const maxL = Math.log(max);
   const v = rnd() * (maxL - minL) + minL;
   const res = Math.exp(v);
-  console.assert(res <= max && res >= min, "Random value is out of the range");
   return res;
+}
+
+function expectCloseValues(v1: BigNumberish, v2: BigNumberish, precision: number, description = "") {
+  const a = typeof v1 == "number" ? v1 : parseFloat(v1.toString());
+  const b = typeof v2 == "number" ? v2 : parseFloat(v2.toString());
+  const res = closeValues(a, b, precision);
+  if (!res) {
+    console.log("Close values expectation failed:", description);
+    console.log("v1 =", a);
+    console.log("v2 =", b);
+    console.log("precision =", Math.abs(a / b - 1), ", expected <", precision);
+  }
+  expect(res).true;
 }
 
 interface Variants {
@@ -199,8 +211,7 @@ async function checkSwap(env: Environment, swapShare: BigNumber, direction: bool
   //   env.poolTines.reserve1.toString(), swapAmount.toString(), expectedAmountOut);
 
   const poolAmountOut = await swapStablePool(env, swapShare, direction);
-  //console.log(poolAmountOut.toString(), expectedAmountOut);
-  expect(closeValues(parseFloat(poolAmountOut.toString()), expectedAmountOut, 1e-11)).true;
+  expectCloseValues(poolAmountOut, expectedAmountOut, 1e-11, "Swap output compare");
 }
 
 function getAmountIn(rnd: RndGen, res0: number): number {
@@ -231,19 +242,11 @@ async function checkRandomSwap(rnd: RndGen, env: Environment, iteration: number)
     await env.bento.balanceOf(env.token1.address, env.pool.address)
   );
   const swapAmount = getAmountIn(rnd, parseInt(env.poolTines.reserve0.toString()));
-  const direction = true; // rnd() < 0.5 TODO - bug in contract for back direction swaps
-  // if (iteration < 4)  {
-  //   console.log(`Skip swap ${iteration} amount=${swapAmount}, dir=${direction}`)
-  //   return
-  // }
-  // console.log(`Pool ${parseInt(env.poolTines.reserve0.toString())} -> ${parseInt(env.poolTines.reserve1.toString())}`)
-  // console.log(`Swap ${iteration} amount=${swapAmount}, dir=${direction}`)
+  const direction = rnd() < 0.5;
   const { out: expectedAmountOut } = env.poolTines.calcOutByIn(swapAmount, direction);
   if (parseInt(env.poolTines.reserve1.toString()) - expectedAmountOut > MINIMUM_LIQUIDITY) {
     const poolAmountOut = await swapStablePool(env, getBigNumber(swapAmount), direction);
-    const realOut = parseFloat(poolAmountOut.toString());
-    //console.log('Diff:', realOut, Math.abs(realOut - expectedAmountOut), Math.abs(realOut/expectedAmountOut-1));
-    expect(closeValues(realOut, expectedAmountOut, 1e-12)).true;
+    expectCloseValues(poolAmountOut, expectedAmountOut, 1e-12, "Random swap output compare");
   } else {
     console.log("Swap check was skipped");
   }
