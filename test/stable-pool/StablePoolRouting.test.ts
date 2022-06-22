@@ -9,11 +9,11 @@ import { BentoBoxV1, ERC20Mock, StablePool } from "../../types";
 import { closeValues } from "@sushiswap/sdk";
 
 type RndGen = () => number;
-const testSeed = "0"; // Change it to change random generator values
+const testSeed = "3"; // Change it to change random generator values
 const rnd: RndGen = seedrandom(testSeed); // random [0, 1)
 
 const MINIMUM_LIQUIDITY = 1e20; //1000; TODO: return back after pool fix
-const MAXIMUM_LIQUIDITY = 1e28; // Limit of contract implementation. TODO: is it enough ????
+const MAXIMUM_LIQUIDITY = 1e31; // Limit of contract implementation. TODO: is it enough ????
 const MINIMUM_INITIAL_LIQUIDITY = MINIMUM_LIQUIDITY * 10;
 const MAXIMUM_INITIAL_LIQUIDITY = MAXIMUM_LIQUIDITY / 10;
 const MINIMUM_SWAP_VALUE = MINIMUM_LIQUIDITY;
@@ -34,6 +34,7 @@ const feeValues = {
   50: 1,
 };
 const decimals = {
+  // TODO: to check other values also
   18: 1,
 };
 const swapSize = {
@@ -51,7 +52,13 @@ function getRandExp(rnd: RndGen, min: number, max: number) {
   return res;
 }
 
-function expectCloseValues(v1: BigNumberish, v2: BigNumberish, precision: number, description = "") {
+function expectCloseValues(
+  v1: BigNumberish,
+  v2: BigNumberish,
+  precision: number,
+  description = "",
+  additionalInfo = ""
+) {
   const a = typeof v1 == "number" ? v1 : parseFloat(v1.toString());
   const b = typeof v2 == "number" ? v2 : parseFloat(v2.toString());
   const res = closeValues(a, b, precision);
@@ -60,8 +67,12 @@ function expectCloseValues(v1: BigNumberish, v2: BigNumberish, precision: number
     console.log("v1 =", a);
     console.log("v2 =", b);
     console.log("precision =", Math.abs(a / b - 1), ", expected <", precision);
+    if (additionalInfo != "") {
+      console.log(additionalInfo);
+    }
   }
   expect(res).true;
+  return res;
 }
 
 interface Variants {
@@ -236,19 +247,36 @@ function getAmountIn(rnd: RndGen, res0: number): number {
   if (amount > MAXIMUM_SWAP_VALUE) amount = MAXIMUM_SWAP_VALUE;
   return amount;
 }
+
+let skippedTestCounter = 0;
+let totalTestCounter = 0;
 async function checkRandomSwap(rnd: RndGen, env: Environment, iteration: number) {
+  ++totalTestCounter;
   env.poolTines.updateReserves(
     await env.bento.balanceOf(env.token0.address, env.pool.address),
     await env.bento.balanceOf(env.token1.address, env.pool.address)
   );
   const swapAmount = getAmountIn(rnd, parseInt(env.poolTines.reserve0.toString()));
   const direction = rnd() < 0.5;
+  //console.log(env.poolTines.reserve0.toString(), env.poolTines.reserve1.toString(), swapAmount, direction);
+  console.log(
+    Math.floor(Math.log10(parseFloat(env.poolTines.reserve0.toString()))),
+    Math.floor(Math.log10(parseFloat(env.poolTines.reserve1.toString())))
+  );
+
   const { out: expectedAmountOut } = env.poolTines.calcOutByIn(swapAmount, direction);
   if (parseInt(env.poolTines.reserve1.toString()) - expectedAmountOut > MINIMUM_LIQUIDITY) {
+    // TODO: reduce to 1000
     const poolAmountOut = await swapStablePool(env, getBigNumber(swapAmount), direction);
-    expectCloseValues(poolAmountOut, expectedAmountOut, 1e-12, "Random swap output compare");
+    expectCloseValues(
+      poolAmountOut,
+      expectedAmountOut,
+      1e-11,
+      "Random swap output compare",
+      `${env.poolTines.reserve0.toString()}:${env.poolTines.reserve1.toString()} ${swapAmount} ${direction}`
+    );
   } else {
-    console.log("Swap check was skipped");
+    console.log(`Swap check was skipped (too low rested liquidity) ${++skippedTestCounter}/${totalTestCounter}`);
   }
 }
 
@@ -276,7 +304,7 @@ describe("Stable Pool <-> Tines consistency", () => {
   it("Random swap test", async () => {
     for (let i = 0; i < 5; ++i) {
       const env = await createRandomPool(rnd, i);
-      for (let j = 0; j < 10; ++j) {
+      for (let j = 0; j < 100; ++j) {
         await checkRandomSwap(rnd, env, j);
       }
     }
