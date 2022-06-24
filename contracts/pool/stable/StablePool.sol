@@ -24,8 +24,6 @@ error InvalidInputToken();
 error PoolUninitialized();
 
 /// @notice Trident exchange pool template with stable swap (solidly exchange) for swapping between tightly correlated assets
-/// @dev The reserves are stored as bento shares.
-///      The curve is applied to shares as well. This pool does not care about the underlying amounts.
 
 contract StablePool is IPool, ERC20, ReentrancyGuard {
     using RebaseLibrary for Rebase;
