@@ -45,8 +45,6 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
 
     uint256 public barFee;
     address public barFeeTo;
-    uint256 public price0CumulativeLast;
-    uint256 public price1CumulativeLast;
     uint256 public kLast;
 
     uint256 internal reserve0;
