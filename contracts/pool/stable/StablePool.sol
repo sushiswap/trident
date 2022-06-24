@@ -107,14 +107,14 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         (uint256 _totalSupply, uint256 oldLiq) = _mintFee(_reserve0, _reserve1);
 
         if (_totalSupply == 0) {
-            require(amount0 > 0 && amount1 > 0, "INVALID_AMOUNTS");
+            if (amount0 == 0 || amount1 == 0) revert InvalidAmounts();
             liquidity = newLiq - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
             liquidity = ((newLiq - oldLiq) * _totalSupply) / oldLiq;
         }
 
-        require(liquidity != 0, "INSUFFICIENT_LIQUIDITY_MINTED");
+        if (liquidity == 0) revert InsufficientLiquidityMinted();
 
         _mint(recipient, liquidity);
 
@@ -165,7 +165,7 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
             }
             amountOut = _getAmountOut(amountIn, _reserve0, _reserve1, true);
         } else {
-            require(tokenIn == token1, "INVALID_INPUT_TOKEN");
+            if (tokenIn != token1) revert InvalidInputToken();
             tokenOut = token0;
             unchecked {
                 amountIn = balance1 - _reserve1;
@@ -342,7 +342,7 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         if (tokenIn == token0) {
             finalAmountOut = bento.toShare(token1, _getAmountOut(amountIn, _reserve0, _reserve1, true), false);
         } else {
-            require(tokenIn == token1, "INVALID_INPUT_TOKEN");
+            if (tokenIn != token1) revert InvalidInputToken();
             finalAmountOut = bento.toShare(token0, _getAmountOut(amountIn, _reserve0, _reserve1, false), false);
         }
     }
