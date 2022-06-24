@@ -12,8 +12,8 @@ type RndGen = () => number;
 const testSeed = "3"; // Change it to change random generator values
 const rnd: RndGen = seedrandom(testSeed); // random [0, 1)
 
-const MINIMUM_LIQUIDITY = 1e20; //1000; TODO: return back after pool fix
-const MAXIMUM_LIQUIDITY = 1e31; // Limit of contract implementation. TODO: is it enough ????
+const MINIMUM_LIQUIDITY = 1e8; //1000; TODO: return back after pool fix
+const MAXIMUM_LIQUIDITY = 1e19; // Limit of contract implementation. TODO: is it enough ????
 const MINIMUM_INITIAL_LIQUIDITY = MINIMUM_LIQUIDITY * 10;
 const MAXIMUM_INITIAL_LIQUIDITY = MAXIMUM_LIQUIDITY / 10;
 const MINIMUM_SWAP_VALUE = MINIMUM_LIQUIDITY;
@@ -35,7 +35,8 @@ const feeValues = {
 };
 const decimals = {
   // TODO: to check other values also
-  18: 1,
+  //18: 1,
+  6: 1,
 };
 const swapSize = {
   minimum: 1,
@@ -56,12 +57,13 @@ function expectCloseValues(
   v1: BigNumberish,
   v2: BigNumberish,
   precision: number,
+  maxDiff = 0,
   description = "",
   additionalInfo = ""
 ) {
   const a = typeof v1 == "number" ? v1 : parseFloat(v1.toString());
   const b = typeof v2 == "number" ? v2 : parseFloat(v2.toString());
-  const res = closeValues(a, b, precision);
+  const res = (maxDiff > 0 && Math.abs(a - b) <= maxDiff) || closeValues(a, b, precision);
   if (!res) {
     console.log("Close values expectation failed:", description);
     console.log("v1 =", a);
@@ -224,7 +226,7 @@ async function checkSwap(env: Environment, swapShare: BigNumber, direction: bool
   //   env.poolTines.reserve1.toString(), swapAmount.toString(), expectedAmountOut);
 
   const poolAmountOut = await swapStablePool(env, swapShare, direction);
-  expectCloseValues(poolAmountOut, expectedAmountOut, 1e-11, "Swap output compare");
+  expectCloseValues(poolAmountOut, expectedAmountOut, 1e-11, 10, "Swap output compare");
 }
 
 function getAmountIn(rnd: RndGen, res0: number): number {
@@ -269,7 +271,8 @@ async function checkRandomSwap(rnd: RndGen, env: Environment, iteration: number)
     expectCloseValues(
       poolAmountOut,
       expectedAmountOut,
-      1e-11,
+      1 / Math.min(1e-11, swapAmount),
+      10,
       "Random swap output compare",
       `${env.poolTines.reserve0.toString()}:${env.poolTines.reserve1.toString()} ${swapAmount} ${direction}`
     );
