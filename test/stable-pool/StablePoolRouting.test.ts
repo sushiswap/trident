@@ -140,6 +140,8 @@ async function createPool(
     fee / 10_000,
     res0,
     res1,
+    token0Decimals,
+    token1Decimals,
     await bento.totals(token0.address),
     await bento.totals(token1.address)
   );
@@ -259,14 +261,10 @@ async function checkRandomSwap(rnd: RndGen, env: Environment, iteration: number)
   const swapAmount = getAmountIn(rnd, parseInt(env.poolTines.reserve0.toString()));
   const direction = rnd() < 0.5;
   //console.log(env.poolTines.reserve0.toString(), env.poolTines.reserve1.toString(), swapAmount, direction);
-  console.log(
-    Math.floor(Math.log10(parseFloat(env.poolTines.reserve0.toString()))),
-    Math.floor(Math.log10(parseFloat(env.poolTines.reserve1.toString())))
-  );
 
   const { out: expectedAmountOut } = env.poolTines.calcOutByIn(swapAmount, direction);
-  if (parseInt(env.poolTines.reserve1.toString()) - expectedAmountOut > MINIMUM_LIQUIDITY) {
-    // TODO: reduce to 1000
+  const reserve = direction ? env.poolTines.getRealReserve0() : env.poolTines.getRealReserve1();
+  if (reserve.sub(getBigNumber(expectedAmountOut)).gt(1000)) {
     const poolAmountOut = await swapStablePool(env, getBigNumber(swapAmount), direction);
     expectCloseValues(
       poolAmountOut,
