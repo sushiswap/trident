@@ -11,7 +11,7 @@ import { closeValues } from "@sushiswap/sdk";
 const DEBUG_MODE = true;
 
 type RndGen = () => number;
-const testSeed = "3"; // Change it to change random generator values
+const testSeed = "4"; // Change it to change random generator values
 const rnd: RndGen = seedrandom(testSeed); // random [0, 1)
 
 const MINIMUM_LIQUIDITY = 1e20; //1000; TODO: return back after pool fix
@@ -37,8 +37,9 @@ const feeValues = {
 };
 const decimals = {
   // TODO: to check other values also
-  18: 1,
-  6: 1,
+  18: 10,
+  6: 10,
+  13: 1,
 };
 const swapSize = {
   minimum: 1,
@@ -324,7 +325,7 @@ describe("Stable Pool <-> Tines consistency", () => {
   it("Random swap test", async () => {
     for (let i = 0; i < 5; ++i) {
       const env = await createRandomPool(rnd, i);
-      for (let j = 0; j < 100; ++j) {
+      for (let j = 0; j < 10; ++j) {
         await checkRandomSwap(rnd, env, j);
       }
     }
