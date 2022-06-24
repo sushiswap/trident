@@ -8,12 +8,14 @@ import { initializedStablePool } from "../fixtures";
 import { BentoBoxV1, ERC20Mock, StablePool } from "../../types";
 import { closeValues } from "@sushiswap/sdk";
 
+const DEBUG_MODE = true;
+
 type RndGen = () => number;
 const testSeed = "3"; // Change it to change random generator values
 const rnd: RndGen = seedrandom(testSeed); // random [0, 1)
 
-const MINIMUM_LIQUIDITY = 1e8; //1000; TODO: return back after pool fix
-const MAXIMUM_LIQUIDITY = 1e19; // Limit of contract implementation. TODO: is it enough ????
+const MINIMUM_LIQUIDITY = 1e20; //1000; TODO: return back after pool fix
+const MAXIMUM_LIQUIDITY = 1e31; // Limit of contract implementation. TODO: is it enough ????
 const MINIMUM_INITIAL_LIQUIDITY = MINIMUM_LIQUIDITY * 10;
 const MAXIMUM_INITIAL_LIQUIDITY = MAXIMUM_LIQUIDITY / 10;
 const MINIMUM_SWAP_VALUE = MINIMUM_LIQUIDITY;
@@ -35,8 +37,8 @@ const feeValues = {
 };
 const decimals = {
   // TODO: to check other values also
-  //18: 1,
-  6: 1,
+  18: 1,
+  //6: 1,
 };
 const swapSize = {
   minimum: 1,
@@ -184,13 +186,21 @@ function getSecondReserve(rnd: RndGen, res0: number): number {
 }
 
 async function createRandomPool(rnd: RndGen, iteration: number): Promise<Environment> {
+  const decimals0 = parseInt(choice(rnd, decimals));
+  const decimals1 = parseInt(choice(rnd, decimals));
+  const liquidityCoeff0 = Math.pow(10, decimals0 - 18);
+  const liquidityCoeff1 = Math.pow(10, decimals1 - 18);
   const res0 = getRandExp(rnd, MINIMUM_INITIAL_LIQUIDITY, MAXIMUM_INITIAL_LIQUIDITY);
   const res1 = getSecondReserve(rnd, res0);
   const fee = parseInt(choice(rnd, feeValues));
-  const decimals0 = parseInt(choice(rnd, decimals));
-  const decimals1 = parseInt(choice(rnd, decimals));
   //console.log(`Pool ${iteration}: fee=${fee}, res0=${res0}, res1=${res1}, decimals=(${decimals0}, ${decimals1})`);
-  return await createPool(fee, getBigNumber(res0), getBigNumber(res1), decimals0, decimals1);
+  return await createPool(
+    fee,
+    getBigNumber(res0 * liquidityCoeff0),
+    getBigNumber(res1 * liquidityCoeff1),
+    decimals0,
+    decimals1
+  );
 }
 
 async function swapStablePool(env: Environment, swapShares: BigNumber, direction: boolean) {
@@ -229,26 +239,26 @@ async function checkSwap(env: Environment, swapShare: BigNumber, direction: bool
   expectCloseValues(poolAmountOut, expectedAmountOut, 1e-11, 10, "Swap output compare");
 }
 
-function getAmountIn(rnd: RndGen, res0: number): number {
+function getAmountIn(rnd: RndGen, res0: number, min: number, max: number): number {
   let amount;
   switch (choice(rnd, swapSize)) {
     case "minimum":
-      amount = MINIMUM_SWAP_VALUE;
+      amount = min;
       break;
     case "up to 0.001 pool liquidity":
-      amount = getRandExp(rnd, MINIMUM_SWAP_VALUE, res0 / 1000);
+      amount = getRandExp(rnd, min, res0 / 1000);
       break;
     case "0.001-1 pool liquidity":
       amount = getRandExp(rnd, res0 / 1000, res0);
       break;
     case "> pool liquidity":
-      amount = getRandExp(rnd, res0, MAXIMUM_SWAP_VALUE);
+      amount = getRandExp(rnd, res0, max);
       break;
     default:
       throw new Error("Error 199");
   }
-  if (amount < MINIMUM_SWAP_VALUE) amount = MINIMUM_SWAP_VALUE;
-  if (amount > MAXIMUM_SWAP_VALUE) amount = MAXIMUM_SWAP_VALUE;
+  if (amount < min) amount = min;
+  if (amount > max) amount = max;
   return amount;
 }
 
@@ -260,12 +270,19 @@ async function checkRandomSwap(rnd: RndGen, env: Environment, iteration: number)
     await env.bento.balanceOf(env.token0.address, env.pool.address),
     await env.bento.balanceOf(env.token1.address, env.pool.address)
   );
-  const swapAmount = getAmountIn(rnd, parseInt(env.poolTines.reserve0.toString()));
   const direction = rnd() < 0.5;
+  const reserve = direction ? env.poolTines.getRealReserve0() : env.poolTines.getRealReserve1();
+  const decimals = direction ? env.poolTines.decimals0 : env.poolTines.decimals1;
+  const liquidityCoeff = Math.pow(10, decimals - 18);
+  const swapAmount = getAmountIn(
+    rnd,
+    parseInt(reserve.toString()),
+    MINIMUM_SWAP_VALUE * liquidityCoeff,
+    MAXIMUM_SWAP_VALUE * liquidityCoeff
+  );
   //console.log(env.poolTines.reserve0.toString(), env.poolTines.reserve1.toString(), swapAmount, direction);
 
   const { out: expectedAmountOut } = env.poolTines.calcOutByIn(swapAmount, direction);
-  const reserve = direction ? env.poolTines.getRealReserve0() : env.poolTines.getRealReserve1();
   if (reserve.sub(getBigNumber(expectedAmountOut)).gt(1000)) {
     const poolAmountOut = await swapStablePool(env, getBigNumber(swapAmount), direction);
     expectCloseValues(
@@ -277,7 +294,8 @@ async function checkRandomSwap(rnd: RndGen, env: Environment, iteration: number)
       `${env.poolTines.reserve0.toString()}:${env.poolTines.reserve1.toString()} ${swapAmount} ${direction}`
     );
   } else {
-    console.log(`Swap check was skipped (too low rested liquidity) ${++skippedTestCounter}/${totalTestCounter}`);
+    if (DEBUG_MODE)
+      console.log(`Swap check was skipped (too low rested liquidity) ${++skippedTestCounter}/${totalTestCounter}`);
   }
 }
 
