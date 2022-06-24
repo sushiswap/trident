@@ -11,7 +11,7 @@ const deployFunction: DeployFunction = async function ({
   getChainId,
   run,
 }: HardhatRuntimeEnvironment) {
-  console.debug("Running MasterDeployer deploy script");
+  //console.debug("Running MasterDeployer deploy script");
   const { deploy } = deployments;
 
   const barFee = 5;

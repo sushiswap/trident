@@ -734,6 +734,18 @@ contract BentoBoxV1 is MasterContractManager, BoringBatchable {
         wethToken = wethToken_;
     }
 
+    // Just for testing purposes!!! Don't deploy this contract on production!!
+    function setTokenTotal(
+        IERC20 token,
+        uint128 elastic,
+        uint128 base
+    ) public {
+        Rebase memory total;
+        total.elastic = elastic;
+        total.base = base;
+        totals[token] = total;
+    }
+
     // ***************** //
     // *** MODIFIERS *** //
     // ***************** //
