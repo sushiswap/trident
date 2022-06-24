@@ -3,8 +3,7 @@ import { task, types } from "hardhat/config";
 
 task("cpp-stable-pools", "Generate stable pool addresses")
   .addOptionalParam("fee", "Fee tier", 30, types.int)
-  .addOptionalParam("twap", "Twap enabled", true, types.boolean)
-  .setAction(async function ({ fee, twap }, { ethers, run, getChainId }) {
+  .setAction(async function ({ fee }, { ethers, run, getChainId }) {
     const chainId = await getChainId();
 
     const wnative = WNATIVE_ADDRESS[chainId];
@@ -18,7 +17,7 @@ task("cpp-stable-pools", "Generate stable pool addresses")
       [wnative, dai],
     ]) {
       console.log(`Genrating pool for tokenA: ${tokenA} and ${tokenB}`);
-      const address = await run("cpp-address", { tokenA, tokenB, fee, twap });
+      const address = await run("cpp-address", { tokenA, tokenB, fee });
       console.log(`Genrated address ${address} pool with tokenA: ${tokenA} and ${tokenB}`);
     }
   });
