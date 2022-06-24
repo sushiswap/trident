@@ -8,7 +8,6 @@ import {ReentrancyGuard} from "@rari-capital/solmate/src/utils/ReentrancyGuard.s
 import {IBentoBoxMinimal} from "../../interfaces/IBentoBoxMinimal.sol";
 import {IMasterDeployer} from "../../interfaces/IMasterDeployer.sol";
 import {IPool} from "../../interfaces/IPool.sol";
-import {ITridentCallee} from "../../interfaces/ITridentCallee.sol";
 import {IStablePoolFactory} from "../../interfaces/IStablePoolFactory.sol";
 
 import {TridentMath} from "../../libraries/TridentMath.sol";
@@ -200,8 +199,6 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         Rebase memory total0 = bento.totals(token0);
         Rebase memory total1 = bento.totals(token1);
 
-        // _reserve0 = total0.toElastic(_reserve0);
-        // _reserve1 = total1.toElastic(_reserve1);
         balance0 = total0.toElastic(balance0);
         balance1 = total1.toElastic(balance1);
     }
@@ -365,15 +362,17 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
 
     function _getReserves() internal view returns (uint256 _reserve0, uint256 _reserve1) {
         (_reserve0, _reserve1) = (reserve0, reserve1);
-        // _reserve0 = bento.toAmount(token0, _reserve0, false);
-        // _reserve1 = bento.toAmount(token1, _reserve1, false);
     }
 
-    function burnSingle(bytes calldata data) external override returns (uint256 amountOut) {}
+    function burnSingle(bytes calldata) external pure override returns (uint256) {
+        revert();
+    }
 
-    function flashSwap(bytes calldata data) external override returns (uint256 finalAmountOut) {}
+    function flashSwap(bytes calldata) external pure override returns (uint256) {
+        revert();
+    }
 
-    function getAmountIn(bytes calldata) public pure override returns (uint256) {
+    function getAmountIn(bytes calldata) external pure override returns (uint256) {
         revert();
     }
 }
