@@ -8,7 +8,6 @@ import {ReentrancyGuard} from "@rari-capital/solmate/src/utils/ReentrancyGuard.s
 import {IBentoBoxMinimal} from "../../interfaces/IBentoBoxMinimal.sol";
 import {IMasterDeployer} from "../../interfaces/IMasterDeployer.sol";
 import {IPool} from "../../interfaces/IPool.sol";
-import {ITridentCallee} from "../../interfaces/ITridentCallee.sol";
 import {IStablePoolFactory} from "../../interfaces/IStablePoolFactory.sol";
 
 import {TridentMath} from "../../libraries/TridentMath.sol";
@@ -24,8 +23,6 @@ error InvalidInputToken();
 error PoolUninitialized();
 
 /// @notice Trident exchange pool template with stable swap (solidly exchange) for swapping between tightly correlated assets
-/// @dev The reserves are stored as bento shares.
-///      The curve is applied to shares as well.
 
 contract StablePool is IPool, ERC20, ReentrancyGuard {
     using RebaseLibrary for Rebase;
@@ -47,8 +44,6 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
 
     uint256 public barFee;
     address public barFeeTo;
-    uint256 public price0CumulativeLast;
-    uint256 public price1CumulativeLast;
     uint256 public kLast;
 
     uint256 internal reserve0;
@@ -107,14 +102,14 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         (uint256 _totalSupply, uint256 oldLiq) = _mintFee(_reserve0, _reserve1);
 
         if (_totalSupply == 0) {
-            require(amount0 > 0 && amount1 > 0, "INVALID_AMOUNTS");
+            if (amount0 == 0 || amount1 == 0) revert InvalidAmounts();
             liquidity = newLiq - MINIMUM_LIQUIDITY;
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
             liquidity = ((newLiq - oldLiq) * _totalSupply) / oldLiq;
         }
 
-        require(liquidity != 0, "INSUFFICIENT_LIQUIDITY_MINTED");
+        if (liquidity == 0) revert InsufficientLiquidityMinted();
 
         _mint(recipient, liquidity);
 
@@ -165,7 +160,7 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
             }
             amountOut = _getAmountOut(amountIn, _reserve0, _reserve1, true);
         } else {
-            require(tokenIn == token1, "INVALID_INPUT_TOKEN");
+            if (tokenIn != token1) revert InvalidInputToken();
             tokenOut = token0;
             unchecked {
                 amountIn = balance1 - _reserve1;
@@ -340,7 +335,7 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         if (tokenIn == token0) {
             finalAmountOut = bento.toShare(token1, _getAmountOut(amountIn, _reserve0, _reserve1, true), false);
         } else {
-            require(tokenIn == token1, "INVALID_INPUT_TOKEN");
+            if (tokenIn != token1) revert InvalidInputToken();
             finalAmountOut = bento.toShare(token0, _getAmountOut(amountIn, _reserve0, _reserve1, false), false);
         }
     }
@@ -369,11 +364,15 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         (_reserve0, _reserve1) = (reserve0, reserve1);
     }
 
-    function burnSingle(bytes calldata data) external override returns (uint256 amountOut) {}
+    function burnSingle(bytes calldata) external pure override returns (uint256) {
+        revert();
+    }
 
-    function flashSwap(bytes calldata data) external override returns (uint256 finalAmountOut) {}
+    function flashSwap(bytes calldata) external pure override returns (uint256) {
+        revert();
+    }
 
-    function getAmountIn(bytes calldata) public pure override returns (uint256) {
+    function getAmountIn(bytes calldata) external pure override returns (uint256) {
         revert();
     }
 }
