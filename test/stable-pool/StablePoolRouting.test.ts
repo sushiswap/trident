@@ -36,7 +36,6 @@ const feeValues = {
   50: 1,
 };
 const decimals = {
-  // TODO: to check other values also
   18: 10,
   6: 10,
   13: 1,
