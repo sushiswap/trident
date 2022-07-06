@@ -1,6 +1,6 @@
 import { ContractFactory } from "@ethersproject/contracts";
 import { BigNumber, Contract } from "ethers";
-import { BentoBoxV1 } from "../../../types";
+import { BentoBoxV1, ERC20 } from "../../../types";
 import { Topology } from "./interfaces";
 import { getRandom } from "../../utilities/random";
 import { TridentPoolFactory } from "./TridentPoolFactory";
@@ -64,10 +64,6 @@ export class TopologyFactory {
 
   public async getTwoParallelPools(rnd: () => number): Promise<Topology> {
     return await this.getTopoplogy(2, 2, rnd);
-  }
-
-  public async getThreeParallelPools(rnd: () => number): Promise<Topology> {
-    return await this.getTopologyParallel(rnd);
   }
 
   public async getFivePoolBridge(rnd: () => number): Promise<Topology> {
@@ -329,7 +325,7 @@ export class TopologyFactory {
     return topology;
   }
 
-  private async getTopologyParallel(rnd: () => number): Promise<Topology> {
+  async getTopologyParallel(rnd: () => number): Promise<Topology> {
     const topology: Topology = {
       tokens: [
         { name: "Token0", address: "0" },
@@ -339,16 +335,19 @@ export class TopologyFactory {
       pools: [],
     };
 
+    const tokenDecimals: number[] = [];
     const tokenContracts: Contract[] = [];
     for (let i = 0; i < topology.tokens.length; i++) {
-      const tokenContract = await this.Erc20Factory.deploy(
+      const tokenContract = (await this.Erc20Factory.deploy(
         topology.tokens[i].name,
         topology.tokens[i].name,
         this.tokenSupply
-      );
+      )) as ERC20;
       await tokenContract.deployed();
       tokenContracts.push(tokenContract);
       topology.tokens[i].address = tokenContract.address;
+      const decimals = await tokenContract.decimals();
+      tokenDecimals.push(decimals);
     }
 
     await this.approveAndFund(tokenContracts);
@@ -360,6 +359,18 @@ export class TopologyFactory {
     topology.pools.push(await this.PoolFactory.getCLPool(token0, token1, poolPrice, rnd));
     topology.pools.push(await this.PoolFactory.getHybridPool(token0, token1, poolPrice, rnd));
     topology.pools.push(await this.PoolFactory.getCPPool(token0, token1, poolPrice, rnd, 0.003, 1e22));
+    topology.pools.push(
+      await this.PoolFactory.getStablePool(
+        token0,
+        tokenDecimals[0],
+        token1,
+        tokenDecimals[1],
+        poolPrice,
+        rnd,
+        0.003,
+        1e22
+      )
+    );
 
     return topology;
   }

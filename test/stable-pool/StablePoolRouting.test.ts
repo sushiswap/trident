@@ -271,8 +271,8 @@ async function checkRandomSwap(rnd: RndGen, env: Environment, iteration: number)
     await env.bento.balanceOf(env.token1.address, env.pool.address)
   );
   const direction = rnd() < 0.5;
-  const reserveIn = direction ? env.poolTines.getRealReserve0() : env.poolTines.getRealReserve1();
-  const reserveOut = direction ? env.poolTines.getRealReserve1() : env.poolTines.getRealReserve0();
+  const reserveIn = direction ? env.poolTines.getReserve0() : env.poolTines.getReserve1();
+  const reserveOut = direction ? env.poolTines.getReserve1() : env.poolTines.getReserve0();
   const decimals = direction ? env.poolTines.decimals0 : env.poolTines.decimals1;
   const liquidityCoeff = Math.pow(10, decimals - 18);
   const swapAmount = getAmountIn(

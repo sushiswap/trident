@@ -21,8 +21,8 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
     }
   }
 
-  it("Should Test Normal Values with 3 Parallel Pools", async function () {
-    const topology: Topology = await this.topologyFactory.getThreeParallelPools(this.rnd);
+  it("Should Test Normal Values with 4 Parallel Pools", async function () {
+    const topology: Topology = await this.topologyFactory.getTopologyParallel(this.rnd);
 
     const fromToken = topology.tokens[0];
     const toToken = topology.tokens[1];
@@ -36,7 +36,7 @@ describe("MultiPool Routing Tests - Fixed Topology", function () {
       throw new Error("Tines failed to get route");
     }
 
-    expect(route.legs.length).equal(3);
+    expect(route.legs.length).equal(4);
 
     const routerParams = this.swapParams.getTridentRouterParams(
       route,
