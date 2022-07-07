@@ -58,14 +58,6 @@ export class TopologyFactory {
     return await this.getTopoplogy(3, 1, rnd);
   }
 
-  public async getThreeSerialPools(rnd: () => number): Promise<Topology> {
-    return await this.getTopoplogyWithClPools(4, 1, rnd);
-  }
-
-  public async getTwoParallelPools(rnd: () => number): Promise<Topology> {
-    return await this.getTopoplogy(2, 2, rnd);
-  }
-
   public async getFivePoolBridge(rnd: () => number): Promise<Topology> {
     let topology: Topology = {
       tokens: [],
@@ -264,74 +256,13 @@ export class TopologyFactory {
     return topology;
   }
 
-  private async getTopoplogyWithClPools(
-    tokenCount: number,
-    poolVariants: number,
-    rnd: () => number
-  ): Promise<Topology> {
-    const tokenContracts: Contract[] = [];
-
-    let topology: Topology = {
-      tokens: [],
-      prices: [],
-      pools: [],
-    };
-
-    const poolCount = tokenCount - 1;
-
-    for (var i = 0; i < tokenCount; ++i) {
-      topology.tokens.push({ name: `Token${i}`, address: "" + i });
-      topology.prices.push(this.getTokenPrice(rnd));
-    }
-
-    for (let i = 0; i < topology.tokens.length; i++) {
-      const tokenContract = await this.Erc20Factory.deploy(
-        topology.tokens[i].name,
-        topology.tokens[i].name,
-        this.tokenSupply
-      );
-      await tokenContract.deployed();
-      tokenContracts.push(tokenContract);
-      topology.tokens[i].address = tokenContract.address;
-    }
-
-    await this.approveAndFund(tokenContracts);
-
-    let poolType = 0;
-    for (i = 0; i < poolCount; i++) {
-      for (let index = 0; index < poolVariants; index++) {
-        const j = i + 1;
-
-        const token0 = topology.tokens[i];
-        const token1 = topology.tokens[j];
-
-        const price0 = topology.prices[i];
-        const price1 = topology.prices[j];
-
-        let poolPrice = price0 / price1;
-
-        if (poolType % 3 == 0) {
-          topology.pools.push(await this.PoolFactory.getCLPool(token0, token1, poolPrice, rnd));
-        } else if (poolType % 3 == 1) {
-          topology.pools.push(await this.PoolFactory.getHybridPool(token0, token1, poolPrice, rnd));
-        } else {
-          topology.pools.push(await this.PoolFactory.getCPPool(token0, token1, poolPrice, rnd, 0.003, 1e22));
-        }
-
-        poolType++;
-      }
-    }
-
-    return topology;
-  }
-
   async getTopologyParallel(rnd: () => number): Promise<Topology> {
     const topology: Topology = {
       tokens: [
         { name: "Token0", address: "0" },
         { name: "Token1", address: "1" },
       ],
-      prices: [this.getTokenPrice(rnd), this.getTokenPrice(rnd)],
+      prices: [3, 3.5],
       pools: [],
     };
 
@@ -356,8 +287,8 @@ export class TopologyFactory {
     const token1 = topology.tokens[1];
     const poolPrice = topology.prices[0] / topology.prices[1];
 
-    topology.pools.push(await this.PoolFactory.getCLPool(token0, token1, poolPrice, rnd));
-    topology.pools.push(await this.PoolFactory.getHybridPool(token0, token1, poolPrice, rnd));
+    topology.pools.push(await this.PoolFactory.getCLPool(token0, token1, poolPrice, rnd, 0.003, 60, 1e22));
+    topology.pools.push(await this.PoolFactory.getHybridPool(token0, token1, poolPrice, rnd, 1e22));
     topology.pools.push(await this.PoolFactory.getCPPool(token0, token1, poolPrice, rnd, 0.003, 1e22));
     topology.pools.push(
       await this.PoolFactory.getStablePool(
@@ -370,6 +301,55 @@ export class TopologyFactory {
         0.003,
         1e22
       )
+    );
+
+    return topology;
+  }
+
+  async getTopologySerial(rnd: () => number): Promise<Topology> {
+    const topology: Topology = {
+      tokens: [
+        { name: "Token0", address: "0" },
+        { name: "Token1", address: "1" },
+        { name: "Token2", address: "2" },
+        { name: "Token3", address: "3" },
+        { name: "Token4", address: "4" },
+      ],
+      prices: [
+        this.getTokenPrice(rnd),
+        this.getTokenPrice(rnd),
+        this.getTokenPrice(rnd),
+        this.getTokenPrice(rnd),
+        this.getTokenPrice(rnd),
+      ],
+      pools: [],
+    };
+
+    const tokenDecimals: number[] = [];
+    const tokenContracts: Contract[] = [];
+    for (let i = 0; i < topology.tokens.length; i++) {
+      const tokenContract = (await this.Erc20Factory.deploy(
+        topology.tokens[i].name,
+        topology.tokens[i].name,
+        this.tokenSupply
+      )) as ERC20;
+      await tokenContract.deployed();
+      tokenContracts.push(tokenContract);
+      topology.tokens[i].address = tokenContract.address;
+      const decimals = await tokenContract.decimals();
+      tokenDecimals.push(decimals);
+    }
+
+    await this.approveAndFund(tokenContracts);
+
+    const tok = topology.tokens;
+    const prc = topology.prices;
+
+    topology.pools.push(await this.PoolFactory.getCLPool(tok[0], tok[1], prc[0] / prc[1], rnd));
+    topology.pools.push(await this.PoolFactory.getHybridPool(tok[1], tok[2], prc[1] / prc[2], rnd));
+    topology.pools.push(await this.PoolFactory.getCPPool(tok[2], tok[3], prc[2] / prc[3], rnd));
+    topology.pools.push(
+      await this.PoolFactory.getStablePool(tok[3], tokenDecimals[3], tok[4], tokenDecimals[4], prc[3] / prc[4], rnd)
     );
 
     return topology;
