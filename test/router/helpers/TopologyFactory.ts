@@ -5,7 +5,9 @@ import { Topology } from "./interfaces";
 import { getRandom } from "../../utilities/random";
 import { TridentPoolFactory } from "./TridentPoolFactory";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { ConstantProductRPool, getBigNumber, HybridRPool, RPool, RToken } from "@sushiswap/tines";
+import { ConstantProductRPool, getBigNumber, HybridRPool, RPool, RToken, StableSwapRPool } from "@sushiswap/tines";
+
+export const STABLE_TOKEN_PRICE = 1;
 
 export class TopologyFactory {
   private Erc20Factory!: ContractFactory;
@@ -46,6 +48,10 @@ export class TopologyFactory {
         const poolContract = new Contract(pool.address, hybridPoolAbi, this.Signer);
         const [reserve0, reserve1] = await poolContract.getReserves();
         (pool as HybridRPool).updateReserves(reserve0, reserve1);
+      } else if (pool instanceof StableSwapRPool) {
+        const reserve0 = await this.Bento.balanceOf(pool.token0.address, pool.address);
+        const reserve1 = await this.Bento.balanceOf(pool.token1.address, pool.address);
+        (pool as StableSwapRPool).updateReserves(reserve0, reserve1);
       }
     }
   }
@@ -364,7 +370,7 @@ export class TopologyFactory {
   }
 
   private getTokenPrice(rnd: () => number) {
-    const price = getRandom(rnd, this.MIN_TOKEN_PRICE, this.MAX_TOKEN_PRICE);
-    return price;
+    if (rnd() < 0.7) return STABLE_TOKEN_PRICE;
+    return getRandom(rnd, this.MIN_TOKEN_PRICE, this.MAX_TOKEN_PRICE);
   }
 }

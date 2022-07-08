@@ -20,6 +20,8 @@ async function checkTokenBalancesAreZero(tokens: RToken[], bentoContract: Contra
   }
 }
 
+//const rnd = seedrandom("0");
+
 describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function () {
   before(async function () {
     [this.signer, tridentRouterAddress, bentoContract, topologyFactory, swapParamsFactory] = await testHelper.init();
@@ -38,14 +40,14 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
   }
 
   // Temp skip till the issue with amountIn won't be fixed in CLPool
-  it.skip("Random topology output prediction precision is ok", async function () {
-    for (let index = 0; index < 10; index++) {
-      // console.log(`Topology #${index}`);
+  it("Random topology output prediction precision is ok", async function () {
+    for (let index = 0; index < 3; index++) {
       const topology = await topologyFactory.getRandomTopology(5, 0.3, this.rnd);
 
-      for (let i = 0; i < 1; i++) {
+      for (let i = 0; i < 10; i++) {
         const [fromToken, toToken, baseToken] = getRandomTokens(this.rnd, topology);
         const [amountIn, amountInBn] = getIntegerRandomValue(21, this.rnd);
+
         const route = testHelper.createRoute(fromToken, toToken, baseToken, topology, amountIn, this.gasPrice);
 
         if (route == undefined) {
@@ -80,10 +82,9 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
           // console.log(`Actual amount out: ${actualAmountOutBN.toString()}`);
           // console.log(`Precision: ${Math.abs(route.amountOut/parseInt(actualAmountOutBN.toString()) - 1)}`);
 
-          expect(closeValues(route.amountOut, parseInt(actualAmountOutBN.toString()), route.legs.length * 1e-9)).to.equal(
-            true,
-            "predicted amount did not equal actual swapped amount"
-          );
+          expect(
+            closeValues(route.amountOut, parseInt(actualAmountOutBN.toString()), route.legs.length * 1e-9)
+          ).to.equal(true, "predicted amount did not equal actual swapped amount");
 
           await topologyFactory.refreshPools(topology);
         }

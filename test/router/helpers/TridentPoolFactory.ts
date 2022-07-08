@@ -24,6 +24,7 @@ import { RToken } from "@sushiswap/sdk";
 import { BigNumber } from "ethers";
 import { createCLRPool } from "./createCLRPool";
 import { getLiquidityForAmount, getMintData, LinkedListHelper } from "../../harness/Concentrated";
+import { STABLE_TOKEN_PRICE, TopologyFactory } from "./TopologyFactory";
 
 export class TridentPoolFactory {
   private ConcentratedLiquidityPool!: ContractFactory;
@@ -68,9 +69,12 @@ export class TridentPoolFactory {
   }
 
   public async getRandomPool(t0: RToken, t1: RToken, price: number, rnd: () => number, fee: number): Promise<RPool> {
-    return rnd() > 0.5
-      ? await this.getCLPool(t0, t1, price, rnd, fee, 60, 1e20)
-      : await this.getCPPool(t0, t1, price, rnd, fee);
+    if (price == STABLE_TOKEN_PRICE) {
+      return rnd() > 0.3
+        ? await this.getStablePool(t0, 18, t1, 18, price, rnd, fee)
+        : await this.getCPPool(t0, t1, price, rnd, fee);
+    }
+    return await this.getCPPool(t0, t1, price, rnd, fee);
   }
 
   public async getCPPool(
@@ -111,6 +115,14 @@ export class TridentPoolFactory {
     }
 
     const constantProductPool = this.ConstantProductPool.attach(poolAddress) as ConstantProductPool;
+
+    const token0Address = await constantProductPool.token0();
+    if (token0Address !== t0.address) {
+      // tokens could be swapped in the factory
+      const t = t0;
+      t0 = t1;
+      t1 = t;
+    }
 
     await this.Bento.transfer(t0.address, this.Signer.address, constantProductPool.address, getBigNumber(reserve0));
     await this.Bento.transfer(t1.address, this.Signer.address, constantProductPool.address, getBigNumber(reserve1));
@@ -165,6 +177,14 @@ export class TridentPoolFactory {
     }
 
     const stablePool = this.StablePool.attach(poolAddress) as StablePool;
+
+    const token0Address = await stablePool.token0();
+    if (token0Address !== t0.address) {
+      // tokens could be swapped in the factory
+      const t = t0;
+      t0 = t1;
+      t1 = t;
+    }
 
     await this.Bento.transfer(t0.address, this.Signer.address, stablePool.address, getBigNumber(reserve0));
     await this.Bento.transfer(t1.address, this.Signer.address, stablePool.address, getBigNumber(reserve1));
