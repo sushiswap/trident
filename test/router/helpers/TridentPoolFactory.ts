@@ -48,7 +48,7 @@ export class TridentPoolFactory {
   private MIN_POOL_RESERVE = 1e12;
   private MAX_POOL_RESERVE = 1e23;
   private STABLE_MIN_POOL_RESERVE = 1e20;
-  private STABLE_MAX_POOL_RESERVE = 1e31;
+  private STABLE_MAX_POOL_RESERVE = 1e30;
   private MIN_POOL_IMBALANCE = 1 / (1 + 1e-3);
   private MAX_POOL_IMBALANCE = 1 + 1e-3;
 
