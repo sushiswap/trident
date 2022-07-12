@@ -89,13 +89,11 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         (uint256 _reserve0, uint256 _reserve1) = _getReserves();
         (uint256 balance0, uint256 balance1) = _balance();
 
-        uint256 newLiq = _computeLiquidity(balance0, balance1);
-
+        uint256 newLiq = TridentMath.sqrt(balance0 * balance1);
         uint256 amount0 = balance0 - _reserve0;
         uint256 amount1 = balance1 - _reserve1;
 
         (uint256 fee0, uint256 fee1) = _nonOptimalMintFee(amount0, amount1, _reserve0, _reserve1);
-
         _reserve0 += uint112(fee0);
         _reserve1 += uint112(fee1);
 
@@ -219,7 +217,7 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
     }
 
     function _computeLiquidityFromAdjustedBalances(uint256 x, uint256 y) internal pure returns (uint256 computed) {
-        return TridentMath.sqrt(TridentMath.sqrt(_k(x, y)));
+        return TridentMath.sqrt(x * y);
     }
 
     function _mintFee(uint256 _reserve0, uint256 _reserve1) internal returns (uint256 _totalSupply, uint256 computed) {
