@@ -24,6 +24,21 @@ interface ITridentRouter {
         Path[] path;
     }
 
+    struct ExactOutputSingleParams {
+        uint256 amountOut;
+        uint256 amountInMaximum;
+        address pool;
+        address tokenOut;
+        bytes data;
+    }
+
+    struct ExactOutputParams {
+        address tokenOut;
+        uint256 amountOut;
+        uint256 amountInMaximum;
+        Path[] path;
+    }
+
     struct TokenInput {
         address token;
         bool native;

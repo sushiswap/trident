@@ -10,6 +10,7 @@ import {IMasterDeployer} from "./interfaces/IMasterDeployer.sol";
 import {IPool} from "./interfaces/IPool.sol";
 import {ITridentRouter} from "./interfaces/ITridentRouter.sol";
 import {IWETH9} from "./interfaces/IWETH9.sol";
+import {TridentRouterLibrary} from "./libraries/TridentRouterLibrary.sol";
 
 /// @dev Custom Errors
 error NotWethSender();
@@ -64,6 +65,18 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         if (amountOut < params.amountOutMinimum) revert TooLittleReceived();
     }
 
+    function exactOutputSingle(ExactOutputSingleParams calldata params) public payable returns (uint256 amountIn) {
+        amountIn = TridentRouterLibrary.getAmountIn(params.pool, params.amountOut, params.tokenOut);
+
+        if (amountIn > params.amountInMaximum) revert TooLittleReceived();
+
+        address tokenIn = abi.decode(params.data, (address));
+
+        bento.transfer(tokenIn, msg.sender, params.pool, amountIn);
+
+        IPool(params.pool).swap(params.data);
+    }
+
     /// @notice Swaps token A to token B indirectly by using multiple hops.
     /// @param params This includes the addresses of the tokens, pools, amount of token A to swap,
     /// minimum amount of token B after the swap and data required by the pools for the swaps.
@@ -82,6 +95,22 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         }
         // Ensure that the slippage wasn't too much. This assumes that the pool is honest.
         if (amountOut < params.amountOutMinimum) revert TooLittleReceived();
+    }
+
+    function exactOutput(ExactOutputParams calldata params) public payable returns (uint256 amountIn) {
+        amountIn = TridentRouterLibrary.getAmountsIn(params.path, params.tokenOut, params.amountOut)[0];
+
+        if (amountIn > params.amountInMaximum) revert TooLittleReceived();
+
+        address tokenIn = abi.decode(params.path[0].data, (address));
+
+        bento.transfer(tokenIn, msg.sender, params.path[0].pool, amountIn);
+
+        uint256 n = params.path.length;
+
+        for (uint256 i = 0; i < n; i = _increment(i)) {
+            IPool(params.path[i].pool).swap(params.path[i].data);
+        }
     }
 
     /// @notice Swaps token A to token B directly. It's the same as `exactInputSingle` except
