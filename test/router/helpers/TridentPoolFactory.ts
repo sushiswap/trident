@@ -85,6 +85,14 @@ export class TridentPoolFactory {
     fee: number = 0.003,
     reserve: number = 0
   ): Promise<ConstantProductRPool> {
+    if (t0.address > t1.address) {
+      // tokens could be swapped in the factory
+      const t = t0;
+      t0 = t1;
+      t1 = t;
+      price = 1 / price;
+    }
+
     const feeContract = Math.round(fee * 10_000);
     const imbalance = this.getPoolImbalance(rnd);
 
@@ -116,14 +124,6 @@ export class TridentPoolFactory {
 
     const constantProductPool = this.ConstantProductPool.attach(poolAddress) as ConstantProductPool;
 
-    const token0Address = await constantProductPool.token0();
-    if (token0Address !== t0.address) {
-      // tokens could be swapped in the factory
-      const t = t0;
-      t0 = t1;
-      t1 = t;
-    }
-
     await this.Bento.transfer(t0.address, this.Signer.address, constantProductPool.address, getBigNumber(reserve0));
     await this.Bento.transfer(t1.address, this.Signer.address, constantProductPool.address, getBigNumber(reserve1));
 
@@ -149,6 +149,14 @@ export class TridentPoolFactory {
     fee: number = 0.003,
     reserve: number = 0
   ): Promise<StableSwapRPool> {
+    if (t0.address > t1.address) {
+      // tokens could be swapped in the factory
+      const t = t0;
+      t0 = t1;
+      t1 = t;
+      price = 1 / price;
+    }
+
     const feeContract = Math.round(fee * 10_000);
     const imbalance = this.getPoolImbalance(rnd);
 
@@ -177,14 +185,6 @@ export class TridentPoolFactory {
     }
 
     const stablePool = this.StablePool.attach(poolAddress) as StablePool;
-
-    const token0Address = await stablePool.token0();
-    if (token0Address !== t0.address) {
-      // tokens could be swapped in the factory
-      const t = t0;
-      t0 = t1;
-      t1 = t;
-    }
 
     await this.Bento.transfer(t0.address, this.Signer.address, stablePool.address, getBigNumber(reserve0));
     await this.Bento.transfer(t1.address, this.Signer.address, stablePool.address, getBigNumber(reserve1));
