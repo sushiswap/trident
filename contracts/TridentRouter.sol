@@ -127,6 +127,18 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         if (amountOut < params.amountOutMinimum) revert TooLittleReceived();
     }
 
+    function exactOutputSingleWithNativeTokens(ExactOutputSingleParams calldata params) public payable returns (uint256 amountIn) {
+        amountIn = TridentRouterLibrary.getAmountIn(params.pool, params.amountOut, params.tokenOut);
+
+        if (amountIn > params.amountInMaximum) revert TooLittleReceived();
+
+        address tokenIn = abi.decode(params.data, (address));
+
+        _depositToBentoBox(tokenIn, params.pool, amountIn);
+
+        IPool(params.pool).swap(params.data);
+    }
+
     /// @notice Swaps token A to token B indirectly by using multiple hops. It's the same as `exactInput` except
     /// it takes raw ERC-20 tokens from the users and deposits them into `bento`.
     /// @param params This includes the addresses of the tokens, pools, amount of token A to swap,
@@ -144,6 +156,22 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         }
         // Ensure that the slippage wasn't too much. This assumes that the pool is honest.
         if (amountOut < params.amountOutMinimum) revert TooLittleReceived();
+    }
+
+    function exactOutputWithNativeToken(ExactOutputParams calldata params) public payable returns (uint256 amountIn) {
+        amountIn = TridentRouterLibrary.getAmountsIn(params.path, params.tokenOut, params.amountOut)[0];
+
+        if (amountIn > params.amountInMaximum) revert TooLittleReceived();
+
+        address tokenIn = abi.decode(params.path[0].data, (address));
+
+        _depositToBentoBox(tokenIn, params.path[0].pool, amountIn);
+
+        uint256 n = params.path.length;
+
+        for (uint256 i = 0; i < n; i = _increment(i)) {
+            IPool(params.path[i].pool).swap(params.path[i].data);
+        }
     }
 
     /// @notice Swaps multiple input tokens to multiple output tokens using multiple paths, in different percentages.
