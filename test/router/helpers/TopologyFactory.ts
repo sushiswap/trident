@@ -184,7 +184,7 @@ export class TopologyFactory {
           }
           if (r < density * density * density) {
             // third pool
-            pools.push(await this.PoolFactory.getRandomPool(token0, token1, poolPrice, rnd, 0.00002));
+            pools.push(await this.PoolFactory.getRandomPool(token0, token1, poolPrice, rnd, 0.0002));
           }
           if (r < Math.pow(density, 4)) {
             // forth pool
