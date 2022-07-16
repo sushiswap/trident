@@ -65,6 +65,10 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         if (amountOut < params.amountOutMinimum) revert TooLittleReceived();
     }
 
+    /// @notice Swaps token B to token A directly. Swaps are done on `bento` tokens.
+    /// @param params This includes the address of token B, pool, amount of token B to swap,
+    /// maximum amount of token A for the swap and data required by the pool for the swap.
+    /// @dev Ensure that the pool is trusted before calling this function. The pool can steal users' tokens.
     function exactOutputSingle(ExactOutputSingleParams calldata params) public payable returns (uint256 amountIn) {
         amountIn = TridentRouterLibrary.getAmountIn(params.pool, params.amountOut, params.tokenOut);
 
@@ -97,6 +101,10 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         if (amountOut < params.amountOutMinimum) revert TooLittleReceived();
     }
 
+    /// @notice Swaps token B to token A indirectly by using multiple hops.
+    /// @param params This includes the addresses of the tokens, pools, amount of token B to swap,
+    /// maximum amount of token A for the swap and data required by the pools for the swaps.
+    /// @dev Ensure that the pools are trusted before calling this function. The pools can steal users' tokens.
     function exactOutput(ExactOutputParams calldata params) public payable returns (uint256 amountIn) {
         amountIn = TridentRouterLibrary.getAmountsIn(params.path, params.tokenOut, params.amountOut)[0];
 
@@ -127,6 +135,11 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         if (amountOut < params.amountOutMinimum) revert TooLittleReceived();
     }
 
+    /// @notice Swaps token B to token A directly. It's the same as `exactOutputSingle` except
+    /// it takes raw ERC-20 tokens from the users and deposits them into `bento`.
+    /// @param params This includes the address of token B, pool, amount of token B to swap,
+    /// minimum amount of token A for the swap and data required by the pool for the swap.
+    /// @dev Ensure that the pool is trusted before calling this function. The pool can steal users' tokens.
     function exactOutputSingleWithNativeTokens(ExactOutputSingleParams calldata params) public payable returns (uint256 amountIn) {
         amountIn = TridentRouterLibrary.getAmountIn(params.pool, params.amountOut, params.tokenOut);
 
@@ -158,6 +171,11 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         if (amountOut < params.amountOutMinimum) revert TooLittleReceived();
     }
 
+    /// @notice Swaps token B to token A indirectly by using multiple hops. It's the same as `exactOutput` except
+    /// it takes raw ERC-20 tokens from the users and deposits them into `bento`.
+    /// @param params This includes the addresses of the tokens, pools, amount of token B to swap,
+    /// maximum amount of token A for the swap and data required by the pools for the swaps.
+    /// @dev Ensure that the pools are trusted before calling this function. The pools can steal users' tokens.
     function exactOutputWithNativeToken(ExactOutputParams calldata params) public payable returns (uint256 amountIn) {
         amountIn = TridentRouterLibrary.getAmountsIn(params.path, params.tokenOut, params.amountOut)[0];
 

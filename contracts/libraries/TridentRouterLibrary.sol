@@ -6,6 +6,10 @@ import "../interfaces/ITridentRouter.sol";
 import "../interfaces/IPool.sol";
 
 library TridentRouterLibrary {
+    /// @notice Get Amount In from the pool
+    /// @param pool Pool address
+    /// @param amountOut Amount out required
+    /// @param tokenOut Token out required
     function getAmountIn(
         address pool,
         uint256 amountOut,
@@ -15,6 +19,10 @@ library TridentRouterLibrary {
         amountIn = IPool(pool).getAmountIn(data);
     }
 
+    /// @notice Get Amount In multihop
+    /// @param path Path for the hops (pool addresses)
+    /// @param tokenOut Token out required
+    /// @param amountOut Amount out required
     function getAmountsIn(
         ITridentRouter.Path[] memory path,
         address tokenOut,
