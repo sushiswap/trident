@@ -147,7 +147,7 @@ describe("Constant Product Pool", () => {
     });
     it("succeeds in swapping tokens back and forth", async () => {
       // swap gas costs:  min  |  max  |  avg
-      //                 56183 · 74098 · 60699
+      //                 54967 · 72882 · 59455
       const me = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
       const pool = await initializedConstantProductPool();
       const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
