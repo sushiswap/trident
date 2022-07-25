@@ -28,6 +28,16 @@ const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY,
+    customChains: [
+      {
+        network: "kava",
+        chainId: 2222,
+        urls: {
+          apiURL: "https://explorer.kava.io/api",
+          browserURL: "https://explorer.kava.io",
+        },
+      },
+    ],
   },
   gasReporter: {
     coinmarketcap: process.env.COINMARKETCAP_API_KEY,
