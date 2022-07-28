@@ -127,6 +127,56 @@ describe("Constant Product Pool", () => {
       );
       await expect(pool.swap(data)).to.be.revertedWith("PoolUninitialized()");
     });
+    it("succeeds in swapping token 0", async () => {
+      const pool = await initializedConstantProductPool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+      const [r0, r1] = await pool.getNativeReserves();
+      const swapData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [token0.address, (await ethers.getSigners())[0].address, true]
+      );
+      const amountIn = 1000000;
+      await token0.transfer(bento.address, amountIn);
+      await bento.deposit(token0.address, bento.address, pool.address, amountIn, 0);
+      await pool.swap(swapData);
+
+      const [r0_, r1_] = await pool.getNativeReserves();
+      expect(r0.add(amountIn).toString()).to.be.eq(r0_.toString());
+      expect(r1_.lt(r1)).to.be.true;
+    });
+    it("succeeds in swapping tokens back and forth", async () => {
+      // swap gas costs:  min  |  max  |  avg
+      //                 54967 · 72882 · 59455
+      const me = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+      const pool = await initializedConstantProductPool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+      const [r0, r1] = await pool.getReserves();
+      const amount = BigNumber.from((1e18).toString());
+      await token0.transfer(bento.address, amount.mul(2));
+      await token1.transfer(bento.address, amount);
+      await bento.deposit(token0.address, bento.address, pool.address, amount, 0);
+      await bento.deposit(token0.address, bento.address, me, amount, 0);
+      await bento.deposit(token1.address, bento.address, me, amount, 0);
+      const swapData0in = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [token0.address, me, false]
+      );
+      const swapData1in = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [token1.address, me, false]
+      );
+      await pool.swap(swapData0in);
+      await bento.transfer(token1.address, me, pool.address, amount.div(2));
+      await pool.swap(swapData1in);
+      await bento.transfer(token0.address, me, pool.address, amount.div(2));
+      await pool.swap(swapData0in);
+      const [r0_, r1_] = await pool.getReserves();
+      expect(r0_.gt(r0)).to.be.true;
+      expect(r1_.lt(r1)).to.be.true;
+    });
   });
 
   describe("#flashSwap", function () {
