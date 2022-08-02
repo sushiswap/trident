@@ -3,29 +3,54 @@
 pragma solidity >=0.8.0;
 
 /// @notice Helper utility that enables calling multiple local methods in a single call.
-/// @author Modified from Uniswap (https://github.com/Uniswap/v3-periphery/blob/main/contracts/base/Multicall.sol)
-/// License-Identifier: GPL-2.0-or-later
+/// @author Modified from Solady (https://github.com/vectorized/solady/blob/main/src/utils/Multicallable.sol)
+/// License-Identifier: MIT
 abstract contract Multicall {
     function multicall(bytes[] calldata data) public payable returns (bytes[] memory results) {
-        results = new bytes[](data.length);
-        
-        for (uint256 i; i < data.length;) {
-            (bool success, bytes memory result) = address(this).delegatecall(data[i]);
+        assembly {
+            if data.length {
+                results := mload(0x40) // Point `results` to start of free memory.
+                mstore(results, data.length) // Store `data.length` into `results`.
+                results := add(results, 0x20)
 
-            if (!success) {
-                // Next 5 lines from https://ethereum.stackexchange.com/a/83577
-                if (result.length < 68) revert();
-                assembly {
-                    result := add(result, 0x04)
+                // `shl` 5 is equivalent to multiplying by 0x20.
+                let end := shl(5, data.length)
+                // Copy the offsets from calldata into memory.
+                calldatacopy(results, data.offset, end)
+                // Pointer to the top of the memory (i.e. start of the free memory).
+                let memPtr := add(results, end)
+                end := add(results, end)
+
+                // prettier-ignore
+                for {} 1 {} {
+                    // The offset of the current bytes in the calldata.
+                    let o := add(data.offset, mload(results))
+                    // Copy the current bytes from calldata to the memory.
+                    calldatacopy(
+                        memPtr,
+                        add(o, 0x20), // The offset of the current bytes' bytes.
+                        calldataload(o) // The length of the current bytes.
+                    )
+                    if iszero(delegatecall(gas(), address(), memPtr, calldataload(o), 0x00, 0x00)) {
+                        // Bubble up the revert if the delegatecall reverts.
+                        returndatacopy(0x00, 0x00, returndatasize())
+                        revert(0x00, returndatasize())
+                    }
+                    // Append the current `memPtr` into `results`.
+                    mstore(results, memPtr)
+                    results := add(results, 0x20)
+                    // Append the `returndatasize()`, and the return data.
+                    mstore(memPtr, returndatasize())
+                    returndatacopy(add(memPtr, 0x20), 0x00, returndatasize())
+                    // Advance the `memPtr` by `returndatasize() + 0x20`,
+                    // rounded up to the next multiple of 32.
+                    memPtr := and(add(add(memPtr, returndatasize()), 0x3f), 0xffffffffffffffe0)
+                    // prettier-ignore
+                    if iszero(lt(results, end)) { break }
                 }
-                revert(abi.decode(result, (string)));
-            }
-
-            results[i] = result;
-
-            // cannot realistically overflow on human timescales
-            unchecked {
-                ++i;
+                // Restore `results` and allocate memory for it.
+                results := mload(0x40)
+                mstore(0x40, memPtr)
             }
         }
     }
