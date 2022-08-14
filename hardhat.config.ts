@@ -294,6 +294,13 @@ const config: HardhatUserConfig = {
       live: true,
       saveDeployments: true,
     },
+    metis: {
+      url: "https://andromeda.metis.io/?owner=1088	",
+      accounts,
+      chainId: 1088,
+      live: true,
+      saveDeployments: true,
+    },
   },
   paths: {
     artifacts: "artifacts",
