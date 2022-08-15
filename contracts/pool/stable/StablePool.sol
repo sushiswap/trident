@@ -27,8 +27,8 @@ error PoolUninitialized();
 contract StablePool is IPool, ERC20, ReentrancyGuard {
     using RebaseLibrary for Rebase;
 
-    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient, uint256 liquidity);
-    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient, uint256 liquidity);
+    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
+    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Sync(uint256 reserve0, uint256 reserve1);
 
     uint256 internal constant MINIMUM_LIQUIDITY = 1000;
@@ -116,8 +116,7 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         _updateReserves();
 
         kLast = newLiq;
-        uint256 liquidityForEvent = liquidity;
-        emit Mint(msg.sender, amount0, amount1, recipient, liquidityForEvent);
+        emit Mint(msg.sender, amount0, amount1, recipient);
     }
 
     /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
@@ -143,7 +142,7 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
 
         kLast = _computeLiquidity(balance0 - amount0, balance1 - amount1);
 
-        emit Burn(msg.sender, amount0, amount1, recipient, liquidity);
+        emit Burn(msg.sender, amount0, amount1, recipient);
     }
 
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
