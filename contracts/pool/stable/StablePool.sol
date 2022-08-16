@@ -21,7 +21,6 @@ error InsufficientLiquidityMinted();
 error InvalidAmounts();
 error InvalidInputToken();
 error PoolUninitialized();
-error InvalidOutputToken();
 
 /// @notice Trident exchange pool template with stable swap (solidly exchange) for swapping between tightly correlated assets
 
@@ -142,47 +141,6 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         withdrawnAmounts[1] = TokenAmount({token: token1, amount: amount1});
 
         kLast = _computeLiquidity(balance0 - amount0, balance1 - amount1);
-
-        emit Burn(msg.sender, amount0, amount1, recipient);
-    }
-
-    function burnSingle(bytes calldata data) public override nonReentrant returns (uint256 amountOut) {
-        (address tokenOut, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
-        (uint256 _reserve0, uint256 _reserve1) = _getReserves();
-        (uint256 balance0, uint256 balance1) = _balance();
-        uint256 liquidity = balanceOf[address(this)];
-
-        (uint256 _totalSupply, ) = _mintFee(balance0, balance1);
-
-        uint256 amount0 = (liquidity * balance0) / _totalSupply;
-        uint256 amount1 = (liquidity * balance1) / _totalSupply;
-
-        kLast = _computeLiquidity(balance0 - amount0, balance1 - amount1);
-
-        _burn(address(this), liquidity);
-        address tokenIn;
-        uint256 amountIn;
-
-        if (tokenOut == token1) {
-            amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1, true);
-            _transfer(token1, amount1, recipient, unwrapBento);
-            tokenIn = token0;
-            amountIn = amount0;
-            amountOut = amount1;
-            amount0 = 0;
-        } else {
-            if (tokenOut != token0) revert InvalidOutputToken();
-            amount0 += _getAmountOut(amount1, _reserve0 - amount0, _reserve1 - amount1, false);
-            _transfer(token0, amount0, recipient, unwrapBento);
-            tokenIn = token1;
-            amountIn = amount1;
-            amountOut = amount0;
-            amount1 = 0;
-        }
-
-        _updateReserves();
-
-        emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
 
         emit Burn(msg.sender, amount0, amount1, recipient);
     }
@@ -403,6 +361,10 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
 
     function _getReserves() internal view returns (uint256 _reserve0, uint256 _reserve1) {
         (_reserve0, _reserve1) = (reserve0, reserve1);
+    }
+
+    function burnSingle(bytes calldata) external pure override returns (uint256) {
+        revert();
     }
 
     function flashSwap(bytes calldata) external pure override returns (uint256) {
