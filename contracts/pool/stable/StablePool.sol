@@ -364,9 +364,7 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
     }
 
     function getReserves() public view returns (uint256 _reserve0, uint256 _reserve1) {
-        (_reserve0, _reserve1) = _getReserves();
-        _reserve0 = bento.toShare(token0, _reserve0, false);
-        _reserve1 = bento.toShare(token0, _reserve1, false);
+        return _getReserves();
     }
 
     function getNativeReserves() public view returns (uint256 _nativeReserve0, uint256 _nativeReserve1) {
