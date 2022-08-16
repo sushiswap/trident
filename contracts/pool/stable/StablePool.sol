@@ -160,21 +160,29 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         kLast = _computeLiquidity(balance0 - amount0, balance1 - amount1);
 
         _burn(address(this), liquidity);
+        address tokenIn;
+        uint256 amountIn;
 
         if (tokenOut == token1) {
             amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1, true);
             _transfer(token1, amount1, recipient, unwrapBento);
+            tokenIn = token0;
+            amountIn = amount0;
             amountOut = amount1;
             amount0 = 0;
         } else {
             if (tokenOut != token0) revert InvalidOutputToken();
             amount0 += _getAmountOut(amount1, _reserve0 - amount0, _reserve1 - amount1, false);
             _transfer(token0, amount0, recipient, unwrapBento);
+            tokenIn = token1;
+            amountIn = amount1;
             amountOut = amount0;
             amount1 = 0;
         }
 
         _updateReserves();
+
+        emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
 
         emit Burn(msg.sender, amount0, amount1, recipient);
     }
