@@ -36,7 +36,7 @@ const deployFunction: DeployFunction = async function ({
     from: deployer,
     args: [barFee, barFeeTo, bentoBox ? bentoBox.address : BENTOBOX_ADDRESS[chainId]],
     deterministicDeployment: false,
-    waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 10 : undefined,
+    waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 20 : undefined,
   });
 
   if (newlyDeployed && process.env.VERIFY_ON_DEPLOY === "true") {

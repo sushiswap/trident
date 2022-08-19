@@ -7,6 +7,7 @@ import "@tenderly/hardhat-tenderly";
 import "@typechain/hardhat";
 import "hardhat-contract-sizer";
 import "hardhat-deploy";
+// import "hardhat-deploy-ethers";
 import "hardhat-docgen";
 import "hardhat-gas-reporter";
 import "hardhat-interface-generator";

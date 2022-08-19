@@ -18,7 +18,7 @@ const deployFunction: DeployFunction = async function ({
     from: deployer,
     deterministicDeployment: false,
     args: [masterDeployer.address],
-    waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 10 : undefined,
+    waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 20 : undefined,
   });
 
   if (!(await masterDeployer.whitelistedFactories(address))) {
