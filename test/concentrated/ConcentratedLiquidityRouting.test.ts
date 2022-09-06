@@ -18,6 +18,18 @@ const helper = new LinkedListHelper(-887272);
 const step = 10800;
 let snapshotId: string;
 
+export function closeValues(a: number, b: number, accuracy: number, logInfoIfFalse = ""): boolean {
+  if (accuracy === 0) return a === b;
+  if (Math.abs(a) < 1 / accuracy) return Math.abs(a - b) <= 10;
+  if (Math.abs(b) < 1 / accuracy) return Math.abs(a - b) <= 10;
+  const res = Math.abs(a / b - 1) < accuracy;
+  if (!res) {
+    console.log("Expected close: ", a, b, accuracy, logInfoIfFalse);
+    // debugger
+  }
+  return res;
+}
+
 describe("Concentrated Pool Routing", async () => {
   before(async () => {
     trident = await Trident.Instance.init();
@@ -74,9 +86,7 @@ describe("Concentrated Pool Routing", async () => {
       });
 
       const out = parseInt(swapTx.output.toString());
-      // console.log("0 in", maxDx.toString(), 'out', out, "pred", predictedOutput[0],
-      //   Math.abs(out/predictedOutput[0]-1));
-      expect(Math.abs(out / predictedOutput.out - 1)).lessThan(1e-12);
+      expect(closeValues(out, predictedOutput.out, 1e-12)).equal(true);
 
       const routePool2 = await createCLRPool(pool);
       const predictedOutput2 = routePool2.calcOutByIn(parseInt(swapTx.output.toString()), false);
@@ -90,9 +100,7 @@ describe("Concentrated Pool Routing", async () => {
       });
 
       const out2 = parseInt(swapTx2.output.toString());
-      // console.log("1 in", swapTx.output.toString(), 'out', out2, "pred", predictedOutput2[0],
-      //   Math.abs(out2/predictedOutput2[0]-1));
-      expect(Math.abs(out2 / predictedOutput2.out - 1)).lessThan(1e-12);
+      expect(closeValues(out2, predictedOutput2.out, 1e-12)).equal(true);
     }
   });
 
@@ -140,9 +148,7 @@ describe("Concentrated Pool Routing", async () => {
       });
 
       const out = parseInt(swapTx.output.toString());
-      // console.log("0 in", maxDx.toString(), 'out', out, "pred", predictedOutput[0],
-      //   Math.abs(out/predictedOutput[0]-1));
-      expect(Math.abs(out / predictedOutput.out - 1)).lessThan(1e-12);
+      expect(closeValues(out, predictedOutput.out, 1e-12)).equal(true);
 
       const routePool2 = await createCLRPool(pool);
       const predictedOutput2 = routePool2.calcOutByIn(parseInt(swapTx.output.toString()), false);
@@ -156,9 +162,7 @@ describe("Concentrated Pool Routing", async () => {
       });
 
       const out2 = parseInt(swapTx2.output.toString());
-      // console.log("1 in", swapTx.output.toString(), 'out', out2, "pred", predictedOutput2[0],
-      //   Math.abs(out2/predictedOutput2[0]-1));
-      expect(Math.abs(out2 / predictedOutput2.out - 1)).lessThan(1e-12);
+      expect(closeValues(out2, predictedOutput2.out, 1e-12)).equal(true);
     }
   });
 
@@ -217,9 +221,7 @@ describe("Concentrated Pool Routing", async () => {
       });
 
       const out = parseInt(swapTx.output.toString());
-      // console.log("0 in", maxDy.toString(), 'out', out, "pred", predictedOutput[0],
-      //   Math.abs(out/predictedOutput[0]-1));
-      expect(Math.abs(out / predictedOutput.out - 1)).lessThan(1e-12);
+      expect(closeValues(out, predictedOutput.out, 1e-12)).equal(true);
 
       const routePool2 = await createCLRPool(pool);
       const predictedOutput2 = routePool2.calcOutByIn(out, true);
@@ -233,9 +235,7 @@ describe("Concentrated Pool Routing", async () => {
       });
 
       const out2 = parseInt(swapTx2.output.toString());
-      // console.log("1 in", out, 'out', out2, "pred", predictedOutput2[0],
-      //   Math.abs(out2/predictedOutput2[0]-1));
-      expect(Math.abs(out2 / predictedOutput2.out - 1)).lessThan(1e-9);
+      expect(closeValues(out2, predictedOutput2.out, 1e-9)).equal(true);
     }
   });
 
@@ -292,9 +292,7 @@ describe("Concentrated Pool Routing", async () => {
       });
 
       const out = parseInt(swapTx.output.toString());
-      // console.log("0 in", maxDy.toString(), 'out', out, "pred", predictedOutput[0],
-      //   Math.abs(out/predictedOutput[0]-1));
-      expect(Math.abs(out / predictedOutput.out - 1)).lessThan(1e-12);
+      expect(closeValues(out, predictedOutput.out, 1e-12)).equal(true);
 
       const routePool2 = await createCLRPool(pool);
       const predictedOutput2 = routePool2.calcOutByIn(out, true);
@@ -308,9 +306,7 @@ describe("Concentrated Pool Routing", async () => {
       });
 
       const out2 = parseInt(swapTx2.output.toString());
-      // console.log("1 in", out, 'out', out2, "pred", predictedOutput2[0],
-      //   Math.abs(out2/predictedOutput2[0]-1));
-      expect(Math.abs(out2 / predictedOutput2.out - 1)).lessThan(1e-9);
+      expect(closeValues(out2, predictedOutput2.out, 1e-9)).equal(true);
     }
   });
 });

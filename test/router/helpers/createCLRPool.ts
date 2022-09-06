@@ -41,7 +41,7 @@ export async function createCLRPool(pool: ConcentratedLiquidityPool): Promise<CL
     reserve0,
     reserve1,
     liquidity,
-    parseInt(sqrtPrice.toString()) / priceBase,
+    sqrtPrice,
     nearestTick,
     ticks
   );
