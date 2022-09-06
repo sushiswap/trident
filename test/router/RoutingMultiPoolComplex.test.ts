@@ -90,7 +90,7 @@ describe("MultiPool Routing Tests - Random Topologies & Random Swaps", function 
     return [topology.tokens[token0], topology.tokens[token1], topology.tokens[tokenBase]];
   }
 
-  // Temp skip till the issue with amountIn won't be fixed in CLPool
+  // TODO: To add CLPools
   it("Random topology output prediction precision is ok", async function () {
     for (let index = 0; index < 5; index++) {
       const topology = await topologyFactory.getRandomTopology(5, 0.4, this.rnd);

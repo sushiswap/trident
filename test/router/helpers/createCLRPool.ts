@@ -10,14 +10,16 @@ export async function createCLRPool(pool: ConcentratedLiquidityPool): Promise<CL
   const token0 = {
     name: _token0,
     address: _token0,
+    symbol: _token0,
   };
   const token1 = {
     name: _token1,
     address: _token1,
+    symbol: _token1,
   };
   const [reserve0, reserve1] = await pool.getReserves();
   const [sqrtPrice, nearestTickIndex] = await pool.getPriceAndNearestTicks();
-  const liquidity = parseInt((await pool.liquidity()).toString());
+  const liquidity = await pool.liquidity();
 
   const ticks: CLTick[] = [];
   let tickIndex = -887272;
@@ -25,7 +27,7 @@ export async function createCLRPool(pool: ConcentratedLiquidityPool): Promise<CL
   while (1) {
     if (tickIndex === nearestTickIndex) nearestTick = ticks.length;
     const tick = await pool.ticks(tickIndex);
-    ticks.push({ index: tickIndex, DLiquidity: parseInt(tick.liquidity.toString()) });
+    ticks.push({ index: tickIndex, DLiquidity: tick.liquidity });
     if (tickIndex === tick.nextTick) break;
     tickIndex = tick.nextTick;
   }
