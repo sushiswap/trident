@@ -92,7 +92,7 @@
     "@sushiswap/core-sdk": "1.0.0-canary.121",
     "@sushiswap/prettier-config": "^0.1.0",
     "@sushiswap/sdk": "5.0.0-canary.116",
-    "@sushiswap/tines": "1.0.0-canary.120",
+    "@sushiswap/tines": "1.0.0-canary.121",
     "@tenderly/hardhat-tenderly": "^1.0.13",
     "@typechain/ethers-v5": "^8.0.5",
     "@typechain/hardhat": "^3.1.0",
