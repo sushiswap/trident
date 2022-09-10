@@ -76,7 +76,7 @@ export class TopologyFactory {
     let tokenContracts: Contract[] = [];
 
     for (var i = 0; i < 5; ++i) {
-      tokens.push({ name: `Token${i}`, address: "" + i });
+      tokens.push({ name: `Token${i}`, address: "" + i, symbol: `Token${i}` });
       prices.push(1);
     }
 
@@ -151,7 +151,7 @@ export class TopologyFactory {
     const pools: RPool[] = [];
 
     for (var i = 0; i < tokenCount; ++i) {
-      tokens.push({ name: `Token${i}`, address: "" + i });
+      tokens.push({ name: `Token${i}`, address: "" + i, symbol: `Token${i}` });
       prices.push(this.getTokenPrice(rnd));
     }
 
@@ -221,7 +221,7 @@ export class TopologyFactory {
     const poolCount = tokenCount - 1;
 
     for (var i = 0; i < tokenCount; ++i) {
-      topology.tokens.push({ name: `Token${i}`, address: "" + i });
+      topology.tokens.push({ name: `Token${i}`, address: "" + i, symbol: `Token${i}` });
       topology.prices.push(this.getTokenPrice(rnd));
     }
 
@@ -265,8 +265,8 @@ export class TopologyFactory {
   async getTopologyParallel(rnd: () => number): Promise<Topology> {
     const topology: Topology = {
       tokens: [
-        { name: "Token0", address: "0" },
-        { name: "Token1", address: "1" },
+        { name: "Token0", address: "0", symbol: "0" },
+        { name: "Token1", address: "1", symbol: "1" },
       ],
       prices: [3, 3.5],
       pools: [],
@@ -315,11 +315,11 @@ export class TopologyFactory {
   async getTopologySerial(rnd: () => number): Promise<Topology> {
     const topology: Topology = {
       tokens: [
-        { name: "Token0", address: "0" },
-        { name: "Token1", address: "1" },
-        { name: "Token2", address: "2" },
-        { name: "Token3", address: "3" },
-        { name: "Token4", address: "4" },
+        { name: "Token0", address: "0", symbol: "Token0" },
+        { name: "Token1", address: "1", symbol: "Token1" },
+        { name: "Token2", address: "2", symbol: "Token2" },
+        { name: "Token3", address: "3", symbol: "Token3" },
+        { name: "Token4", address: "4", symbol: "Token4" },
       ],
       prices: [
         this.getTokenPrice(rnd),

@@ -10,7 +10,7 @@ import {
 } from "../harness/Concentrated";
 import { getBigNumber } from "../utilities";
 import { Trident } from "../harness/Trident";
-import { createCLRPool } from "../router/helpers/createCLRPool";
+import { createCLRPoolFast } from "../router/helpers/createCLRPool";
 
 let trident: Trident;
 let defaultAddress: string;
@@ -74,7 +74,7 @@ describe("Concentrated Pool Routing", async () => {
       const currentPrice = (await pool.getPriceAndNearestTicks())._price;
       const maxDx = (await getDx(await pool.liquidity(), lowerPrice, currentPrice, false)).mul(9).div(10);
 
-      const routePool = await createCLRPool(pool);
+      const routePool = await createCLRPoolFast(pool, trident.concentratedPoolHelper);
       const predictedOutput = routePool.calcOutByIn(parseInt(maxDx.toString()), true);
 
       const swapTx = await swapViaRouter({
@@ -88,7 +88,7 @@ describe("Concentrated Pool Routing", async () => {
       const out = parseInt(swapTx.output.toString());
       expect(closeValues(out, predictedOutput.out, 1e-12)).equal(true);
 
-      const routePool2 = await createCLRPool(pool);
+      const routePool2 = await createCLRPoolFast(pool, trident.concentratedPoolHelper);
       const predictedOutput2 = routePool2.calcOutByIn(parseInt(swapTx.output.toString()), false);
 
       const swapTx2 = await swapViaRouter({
@@ -136,7 +136,7 @@ describe("Concentrated Pool Routing", async () => {
       const currentPrice = (await pool.getPriceAndNearestTicks())._price;
       const maxDx = await getDx(await pool.liquidity(), lowerPrice, currentPrice, false);
 
-      const routePool = await createCLRPool(pool);
+      const routePool = await createCLRPoolFast(pool, trident.concentratedPoolHelper);
       const predictedOutput = routePool.calcOutByIn(parseInt(maxDx.toString()), true);
 
       const swapTx = await swapViaRouter({
@@ -150,7 +150,7 @@ describe("Concentrated Pool Routing", async () => {
       const out = parseInt(swapTx.output.toString());
       expect(closeValues(out, predictedOutput.out, 1e-12)).equal(true);
 
-      const routePool2 = await createCLRPool(pool);
+      const routePool2 = await createCLRPoolFast(pool, trident.concentratedPoolHelper);
       const predictedOutput2 = routePool2.calcOutByIn(parseInt(swapTx.output.toString()), false);
 
       const swapTx2 = await swapViaRouter({
@@ -209,7 +209,7 @@ describe("Concentrated Pool Routing", async () => {
       const upperPrice = await trident.tickMath.getSqrtRatioAtTick(upper);
       const maxDy = await getDy(await pool.liquidity(), currentPrice, upperPrice, false).mul(2);
 
-      const routePool = await createCLRPool(pool);
+      const routePool = await createCLRPoolFast(pool, trident.concentratedPoolHelper);
       const predictedOutput = routePool.calcOutByIn(parseInt(maxDy.toString()), false);
 
       const swapTx = await swapViaRouter({
@@ -223,7 +223,7 @@ describe("Concentrated Pool Routing", async () => {
       const out = parseInt(swapTx.output.toString());
       expect(closeValues(out, predictedOutput.out, 1e-12)).equal(true);
 
-      const routePool2 = await createCLRPool(pool);
+      const routePool2 = await createCLRPoolFast(pool, trident.concentratedPoolHelper);
       const predictedOutput2 = routePool2.calcOutByIn(out, true);
 
       const swapTx2 = await swapViaRouter({
@@ -280,7 +280,7 @@ describe("Concentrated Pool Routing", async () => {
       const upperPrice = await trident.tickMath.getSqrtRatioAtTick(upper);
       const maxDy = await getDy(await pool.liquidity(), currentPrice, upperPrice, false).mul(2);
 
-      const routePool = await createCLRPool(pool);
+      const routePool = await createCLRPoolFast(pool, trident.concentratedPoolHelper);
       const predictedOutput = routePool.calcOutByIn(parseInt(maxDy.toString()), false);
 
       const swapTx = await swapViaRouter({
@@ -294,7 +294,7 @@ describe("Concentrated Pool Routing", async () => {
       const out = parseInt(swapTx.output.toString());
       expect(closeValues(out, predictedOutput.out, 1e-12)).equal(true);
 
-      const routePool2 = await createCLRPool(pool);
+      const routePool2 = await createCLRPoolFast(pool, trident.concentratedPoolHelper);
       const predictedOutput2 = routePool2.calcOutByIn(out, true);
 
       const swapTx2 = await swapViaRouter({

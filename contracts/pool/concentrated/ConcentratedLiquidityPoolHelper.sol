@@ -13,8 +13,21 @@ contract ConcentratedLiquidityPoolHelper {
         uint128 liquidity;
     }
 
-    function getTickState(IConcentratedLiquidityPool pool, uint24 tickCount) external view returns (SimpleTick[] memory) {
-        SimpleTick[] memory ticks = new SimpleTick[](tickCount); // todo save tickCount in the core contract
+    function getTickCount(IConcentratedLiquidityPool pool) public view returns (uint256 tickCount) {
+        tickCount = 1;
+        int24 current = TickMath.MIN_TICK;
+        IConcentratedLiquidityPool.Tick memory tick;
+
+        while (current != TickMath.MAX_TICK) {
+            tick = pool.ticks(current);
+            ++tickCount;
+            current = tick.nextTick;
+        }
+    }
+
+    function getTickState(IConcentratedLiquidityPool pool) external view returns (SimpleTick[] memory) {
+        uint256 tickCount = getTickCount(pool);
+        SimpleTick[] memory ticks = new SimpleTick[](tickCount);
 
         IConcentratedLiquidityPool.Tick memory tick;
         uint24 i;
