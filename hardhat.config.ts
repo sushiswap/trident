@@ -7,6 +7,7 @@ import "@tenderly/hardhat-tenderly";
 import "@typechain/hardhat";
 import "hardhat-contract-sizer";
 import "hardhat-deploy";
+// import "hardhat-deploy-ethers";
 import "hardhat-docgen";
 import "hardhat-gas-reporter";
 import "hardhat-interface-generator";
@@ -28,6 +29,16 @@ const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY,
+    customChains: [
+      {
+        network: "kava",
+        chainId: 2222,
+        urls: {
+          apiURL: "https://explorer.kava.io/api",
+          browserURL: "https://explorer.kava.io",
+        },
+      },
+    ],
   },
   gasReporter: {
     coinmarketcap: process.env.COINMARKETCAP_API_KEY,
@@ -284,6 +295,20 @@ const config: HardhatUserConfig = {
       url: "https://mainnet.optimism.io",
       accounts,
       chainId: 10,
+      live: true,
+      saveDeployments: true,
+    },
+    kava: {
+      url: "https://evm.kava.io",
+      accounts,
+      chainId: 2222,
+      live: true,
+      saveDeployments: true,
+    },
+    metis: {
+      url: "https://andromeda.metis.io/?owner=1088	",
+      accounts,
+      chainId: 1088,
       live: true,
       saveDeployments: true,
     },

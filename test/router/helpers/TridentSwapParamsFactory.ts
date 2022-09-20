@@ -1,10 +1,26 @@
 import { ethers } from "hardhat";
 import { BigNumber } from "@ethersproject/bignumber";
 
-import { CLRPool, ConstantProductRPool, getBigNumber, HybridRPool, MultiRoute, RPool } from "@sushiswap/tines";
+import {
+  CLRPool,
+  ConstantProductRPool,
+  getBigNumber,
+  HybridRPool,
+  MultiRoute,
+  RPool,
+  StableSwapRPool,
+} from "@sushiswap/tines";
 
 import { TridentPoolFactory } from "./TridentPoolFactory";
-import { ComplexPathParams, ExactInputParams, ExactInputSingleParams, InitialPath, Output, Path, PercentagePath } from "./interfaces";
+import {
+  ComplexPathParams,
+  ExactInputParams,
+  ExactInputSingleParams,
+  InitialPath,
+  Output,
+  Path,
+  PercentagePath,
+} from "./interfaces";
 import { RouteType } from "./RouteType";
 
 export class TridentSwapParamsFactory {
@@ -70,12 +86,19 @@ export class TridentSwapParamsFactory {
     return params;
   }
 
-  private getExactInputParams(multiRoute: MultiRoute, senderAddress: string, slippage: number, pools: RPool[]): ExactInputParams {
+  private getExactInputParams(
+    multiRoute: MultiRoute,
+    senderAddress: string,
+    slippage: number,
+    pools: RPool[]
+  ): ExactInputParams {
     const routeLegs = multiRoute.legs.length;
     let paths: Path[] = [];
 
     for (let legIndex = 0; legIndex < routeLegs; ++legIndex) {
-      const recipentAddress = this.isLastLeg(legIndex, multiRoute) ? senderAddress : multiRoute.legs[legIndex + 1].poolAddress;
+      const recipentAddress = this.isLastLeg(legIndex, multiRoute)
+        ? senderAddress
+        : multiRoute.legs[legIndex + 1].poolAddress;
 
       const pool = pools.find((p) => p.address === multiRoute.legs[legIndex].poolAddress);
 
@@ -125,7 +148,9 @@ export class TridentSwapParamsFactory {
     let outputs: Output[] = [];
 
     const routeLegs = multiRoute.legs.length;
-    const initialPathCount = multiRoute.legs.filter((leg) => leg.tokenFrom.address === multiRoute.fromToken.address).length;
+    const initialPathCount = multiRoute.legs.filter(
+      (leg) => leg.tokenFrom.address === multiRoute.fromToken.address
+    ).length;
 
     const output: Output = {
       token: multiRoute.toToken.address,
@@ -201,7 +226,12 @@ export class TridentSwapParamsFactory {
     return "unknown";
   }
 
-  private getInitialPathAmount(legIndex: number, multiRoute: MultiRoute, initialPaths: InitialPath[], initialPathCount: number): BigNumber {
+  private getInitialPathAmount(
+    legIndex: number,
+    multiRoute: MultiRoute,
+    initialPaths: InitialPath[],
+    initialPathCount: number
+  ): BigNumber {
     let amount;
 
     if (initialPathCount > 1 && legIndex === initialPathCount - 1) {
@@ -218,15 +248,26 @@ export class TridentSwapParamsFactory {
     return amount;
   }
 
-  private getSwapDataForPool(pool: RPool, multiRoute: MultiRoute, legIndex: number, recipent: string, unwrapBento: boolean): string {
+  private getSwapDataForPool(
+    pool: RPool,
+    multiRoute: MultiRoute,
+    legIndex: number,
+    recipent: string,
+    unwrapBento: boolean
+  ): string {
     let data: string = "";
     const leg = multiRoute.legs[legIndex];
 
-    if (pool instanceof HybridRPool || pool instanceof ConstantProductRPool) {
-      data = ethers.utils.defaultAbiCoder.encode(["address", "address", "bool"], [leg.tokenFrom.address, recipent, unwrapBento]);
+    if (pool instanceof HybridRPool || pool instanceof ConstantProductRPool || pool instanceof StableSwapRPool) {
+      data = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [leg.tokenFrom.address, recipent, unwrapBento]
+      );
     } else if (pool instanceof CLRPool) {
       const zeroForOne = pool.token0.address === leg.tokenFrom.address;
       data = ethers.utils.defaultAbiCoder.encode(["bool", "address", "bool"], [zeroForOne, recipent, unwrapBento]);
+    } else {
+      throw "Unknown pool type !!!";
     }
 
     return data;

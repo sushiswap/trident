@@ -11,7 +11,7 @@ const deployFunction: DeployFunction = async function ({
   getChainId,
   run,
 }: HardhatRuntimeEnvironment) {
-  console.debug("Running MasterDeployer deploy script");
+  //console.debug("Running MasterDeployer deploy script");
   const { deploy } = deployments;
 
   const barFee = 1667; // 1667/10000 ≈ 1/6
@@ -36,7 +36,7 @@ const deployFunction: DeployFunction = async function ({
     from: deployer,
     args: [barFee, barFeeTo, bentoBox ? bentoBox.address : BENTOBOX_ADDRESS[chainId]],
     deterministicDeployment: false,
-    waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 10 : undefined,
+    waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 20 : undefined,
   });
 
   if (newlyDeployed && process.env.VERIFY_ON_DEPLOY === "true") {

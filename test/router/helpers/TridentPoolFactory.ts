@@ -6,26 +6,31 @@ import {
   ConcentratedLiquidityPoolManager,
   ConstantProductPool,
   ConstantProductPoolFactory,
+  StablePoolFactory,
+  StablePool,
   HybridPool,
   HybridPoolFactory,
   MasterDeployer,
   TickMathMock,
   TridentRouter,
+  ERC20,
 } from "../../../types";
 
-import { choice, getRandom } from "../../utilities/random";
+import { choice, getRandom, getLogRandom } from "../../utilities/random";
 import { ethers } from "hardhat";
 import { ContractFactory } from "@ethersproject/contracts";
-import { ConstantProductRPool, getBigNumber, HybridRPool, RPool } from "@sushiswap/tines";
+import { ConstantProductRPool, getBigNumber, HybridRPool, RPool, StableSwapRPool } from "@sushiswap/tines";
 import { RToken } from "@sushiswap/sdk";
 import { BigNumber } from "ethers";
 import { createCLRPool } from "./createCLRPool";
 import { getLiquidityForAmount, getMintData, LinkedListHelper } from "../../harness/Concentrated";
+import { STABLE_TOKEN_PRICE, TopologyFactory } from "./TopologyFactory";
 
 export class TridentPoolFactory {
   private ConcentratedLiquidityPool!: ContractFactory;
   private HybridPool!: ContractFactory;
   private ConstantProductPool!: ContractFactory;
+  private StablePool!: ContractFactory;
 
   private MasterDeployer!: MasterDeployer;
   private Bento!: BentoBoxV1;
@@ -34,6 +39,7 @@ export class TridentPoolFactory {
 
   private HybridPoolFactory!: HybridPoolFactory;
   private ConstantPoolFactory!: ConstantProductPoolFactory;
+  private StablePoolFactory!: StablePoolFactory;
 
   private ConcentratedPoolFactory!: ConcentratedLiquidityPoolFactory;
   private ConcentratedPoolManager!: ConcentratedLiquidityPoolManager;
@@ -41,6 +47,8 @@ export class TridentPoolFactory {
 
   private MIN_POOL_RESERVE = 1e12;
   private MAX_POOL_RESERVE = 1e23;
+  private STABLE_MIN_POOL_RESERVE = 1e20;
+  private STABLE_MAX_POOL_RESERVE = 1e30;
   private MIN_POOL_IMBALANCE = 1 / (1 + 1e-3);
   private MAX_POOL_IMBALANCE = 1 + 1e-3;
 
@@ -61,9 +69,12 @@ export class TridentPoolFactory {
   }
 
   public async getRandomPool(t0: RToken, t1: RToken, price: number, rnd: () => number, fee: number): Promise<RPool> {
-    return rnd() > 0.5
-      ? await this.getCLPool(t0, t1, price, rnd, fee, 60, 1e20)
-      : await this.getCPPool(t0, t1, price, rnd, fee);
+    if (price == STABLE_TOKEN_PRICE) {
+      return rnd() > 0.3
+        ? await this.getStablePool(t0, 18, t1, 18, price, rnd, fee)
+        : await this.getCPPool(t0, t1, price, rnd, fee);
+    }
+    return await this.getCPPool(t0, t1, price, rnd, fee);
   }
 
   public async getCPPool(
@@ -105,6 +116,17 @@ export class TridentPoolFactory {
 
     const constantProductPool = this.ConstantProductPool.attach(poolAddress) as ConstantProductPool;
 
+    const token0Address = await constantProductPool.token0();
+    if (token0Address !== t0.address) {
+      // tokens could be swapped in the factory
+      const t = t0;
+      t0 = t1;
+      t1 = t;
+      const r = reserve0;
+      reserve0 = reserve1;
+      reserve1 = r;
+    }
+
     await this.Bento.transfer(t0.address, this.Signer.address, constantProductPool.address, getBigNumber(reserve0));
     await this.Bento.transfer(t1.address, this.Signer.address, constantProductPool.address, getBigNumber(reserve1));
 
@@ -117,6 +139,81 @@ export class TridentPoolFactory {
       fee,
       getBigNumber(reserve0),
       getBigNumber(reserve1)
+    );
+  }
+
+  public async getStablePool(
+    t0: RToken,
+    decimals0: number,
+    t1: RToken,
+    decimals1: number,
+    price: number,
+    rnd: () => number,
+    fee: number = 0.003,
+    reserve: number = 0
+  ): Promise<StableSwapRPool> {
+    const feeContract = Math.round(fee * 10_000);
+    const imbalance = this.getPoolImbalance(rnd);
+
+    let reserve1;
+    let reserve0;
+
+    if (reserve === 0) {
+      reserve1 = this.getStablePoolReserve(rnd);
+      reserve0 = reserve1 * price * imbalance;
+    } else {
+      reserve0 = reserve;
+      reserve1 = Math.round(reserve / price);
+    }
+
+    const deployData = ethers.utils.defaultAbiCoder.encode(
+      ["address", "address", "uint256"],
+      [t0.address, t1.address, feeContract]
+    );
+
+    let deployResult = await (await this.MasterDeployer.deployPool(this.StablePoolFactory.address, deployData)).wait();
+
+    let poolAddress;
+
+    if (deployResult.events !== undefined) {
+      poolAddress = deployResult.events[0].args == undefined ? "" : deployResult.events[0].args[1];
+    }
+
+    const stablePool = this.StablePool.attach(poolAddress) as StablePool;
+
+    const token0Address = await stablePool.token0();
+    if (token0Address !== t0.address) {
+      // tokens could be swapped in the factory
+      const t = t0;
+      t0 = t1;
+      t1 = t;
+      const r = reserve0;
+      reserve0 = reserve1;
+      reserve1 = r;
+      const d = decimals0;
+      decimals0 = decimals1;
+      decimals1 = d;
+    }
+
+    await this.Bento.transfer(t0.address, this.Signer.address, stablePool.address, getBigNumber(reserve0));
+    await this.Bento.transfer(t1.address, this.Signer.address, stablePool.address, getBigNumber(reserve1));
+
+    await stablePool.mint(ethers.utils.defaultAbiCoder.encode(["address"], [this.Signer.address]));
+
+    const total0 = await this.Bento.totals(t0.address);
+    const total1 = await this.Bento.totals(t1.address);
+
+    return new StableSwapRPool(
+      stablePool.address,
+      t0,
+      t1,
+      fee,
+      getBigNumber(reserve0),
+      getBigNumber(reserve1),
+      decimals0,
+      decimals1,
+      total0,
+      total1
     );
   }
 
@@ -178,7 +275,7 @@ export class TridentPoolFactory {
     tickIncrement = 60,
     reserve: number = 1e25
   ) {
-    const flipped = t0.address > t1.address;
+    const flipped = t0.address.toLowerCase() > t1.address.toLowerCase();
     if (flipped) {
       const t = t0;
       t0 = t1;
@@ -319,6 +416,9 @@ export class TridentPoolFactory {
     const constantPoolFactory = await ethers.getContractFactory("ConstantProductPoolFactory");
     this.ConstantProductPool = await ethers.getContractFactory("ConstantProductPool");
 
+    const stablePoolFactory = await ethers.getContractFactory("StablePoolFactory");
+    this.StablePool = await ethers.getContractFactory("StablePool");
+
     const tickLibrary = await ticksContractFactory.deploy();
     const dyDxLibrary = await dyDxMath.deploy();
     const clpLibs = {};
@@ -348,6 +448,9 @@ export class TridentPoolFactory {
     )) as ConstantProductPoolFactory;
     await this.ConstantPoolFactory.deployed();
 
+    this.StablePoolFactory = (await stablePoolFactory.deploy(this.MasterDeployer.address)) as StablePoolFactory;
+    await this.ConstantPoolFactory.deployed();
+
     await this.whitelistFactories();
 
     const accounts = await ethers.getSigners();
@@ -366,6 +469,7 @@ export class TridentPoolFactory {
     await this.MasterDeployer.addToWhitelist(this.ConcentratedPoolFactory.address);
     await this.MasterDeployer.addToWhitelist(this.HybridPoolFactory.address);
     await this.MasterDeployer.addToWhitelist(this.ConstantPoolFactory.address);
+    await this.MasterDeployer.addToWhitelist(this.StablePoolFactory.address);
   }
 
   private getPoolImbalance(rnd: () => number) {
@@ -374,6 +478,10 @@ export class TridentPoolFactory {
 
   private getPoolReserve(rnd: () => number) {
     return getRandom(rnd, this.MIN_POOL_RESERVE, this.MAX_POOL_RESERVE);
+  }
+
+  private getStablePoolReserve(rnd: () => number) {
+    return getLogRandom(rnd, this.STABLE_MIN_POOL_RESERVE, this.STABLE_MAX_POOL_RESERVE);
   }
 
   private getPoolFee(rnd: () => number) {
