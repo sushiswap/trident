@@ -89,40 +89,20 @@ export async function collectFees(params: {
   return { dx: token0expected, dy: token0expected };
 }
 
-export async function swapViaRouter(params: {
-  pool: ConcentratedLiquidityPool;
-  zeroForOne: boolean; // true => we are moving left
-  inAmount: BigNumber;
-  recipient: string;
-  unwrapBento: boolean;
-}): Promise<{ output: BigNumber; tx: ContractTransaction }> {
-  const { pool, zeroForOne, inAmount, recipient, unwrapBento } = params;
-  const immutables = await pool.getImmutables();
+async function calcOutput(pool: ConcentratedLiquidityPool, zeroForOne: boolean, input: BigNumber) {
   const nearest = (await pool.getPriceAndNearestTicks())._nearestTick;
-  const oldSplData = await pool.getSecondsGrowthAndLastObservation();
   let nextTickToCross = zeroForOne ? nearest : (await pool.ticks(nearest)).nextTick;
   let currentPrice = (await pool.getPriceAndNearestTicks())._price;
   let currentLiquidity = await pool.liquidity();
-  let input = inAmount;
-  let output = BigNumber.from(0);
-  let feeGrowthGlobalIncrease = BigNumber.from(0);
-  let crossCount = 0;
-  let totalFees = BigNumber.from(0);
-  let protocolFeeIncrease = BigNumber.from(0);
-
-  const oldPrice = currentPrice;
-  const tokens = [immutables._token0, immutables._token1];
+  const immutables = await pool.getImmutables();
   const swapFee = immutables._swapFee;
   const tickSpacing = immutables._tickSpacing;
+  let totalFees = BigNumber.from(0);
   const barFee = await pool.barFee();
-  const feeGrowthGlobalOld = await (zeroForOne ? pool.feeGrowthGlobal1() : pool.feeGrowthGlobal0());
-  const _oldProtocolFees = await pool.getTokenProtocolFees();
-  const oldProtocolFees = zeroForOne ? _oldProtocolFees._token1ProtocolFee : _oldProtocolFees._token0ProtocolFee;
-  const oldPoolBalances = await Trident.Instance.getTokenBalance(tokens, pool.address, false);
-  const reserve = await pool.getReserves();
-  const oldReserve0 = reserve._reserve0;
-  const oldReserve1 = reserve._reserve1;
-  const startingLiquidity = currentLiquidity;
+  let protocolFeeIncrease = BigNumber.from(0);
+  let feeGrowthGlobalIncrease = BigNumber.from(0);
+  let output = BigNumber.from(0);
+  let crossCount = 0;
 
   while (input.gt(0)) {
     const nextTickPrice = await getTickPrice(nextTickToCross);
@@ -194,10 +174,50 @@ export async function swapViaRouter(params: {
       }
     }
   }
+  return { output, protocolFeeIncrease, feeGrowthGlobalIncrease, currentLiquidity, crossCount };
+}
+
+export async function swapViaRouter(params: {
+  pool: ConcentratedLiquidityPool;
+  zeroForOne: boolean; // true => we are moving left
+  inAmount: BigNumber;
+  recipient: string;
+  unwrapBento: boolean;
+}): Promise<{ output: BigNumber; tx: ContractTransaction }> {
+  const { pool, zeroForOne, inAmount, recipient, unwrapBento } = params;
+  const immutables = await pool.getImmutables();
+  const nearest = (await pool.getPriceAndNearestTicks())._nearestTick;
+  const oldSplData = await pool.getSecondsGrowthAndLastObservation();
+  let currentPrice = (await pool.getPriceAndNearestTicks())._price;
+  const oldPrice = currentPrice;
+  const tokens = [immutables._token0, immutables._token1];
+  const feeGrowthGlobalOld = await (zeroForOne ? pool.feeGrowthGlobal1() : pool.feeGrowthGlobal0());
+  const _oldProtocolFees = await pool.getTokenProtocolFees();
+  const oldProtocolFees = zeroForOne ? _oldProtocolFees._token1ProtocolFee : _oldProtocolFees._token0ProtocolFee;
+  const oldPoolBalances = await Trident.Instance.getTokenBalance(tokens, pool.address, false);
+  const reserve = await pool.getReserves();
+  const oldReserve0 = reserve._reserve0;
+  const oldReserve1 = reserve._reserve1;
+  const startingLiquidity = await pool.liquidity();
+
+  const { output, protocolFeeIncrease, feeGrowthGlobalIncrease, currentLiquidity, crossCount } = await calcOutput(
+    pool,
+    zeroForOne,
+    inAmount
+  );
+
+  // Checking getAmountIn
+  const getInData = ethers.utils.defaultAbiCoder.encode(
+    ["address", "uint256"],
+    [zeroForOne ? tokens[1] : tokens[0], output]
+  );
+  const getAmountIn = await pool.getAmountIn(getInData);
+  const { output: outputAlt } = await calcOutput(pool, zeroForOne, getAmountIn);
+  expect(output).equals(outputAlt); // Rather strong check. Can be changed to outputAlt >= output in the future
 
   const swapData = getSwapData({ zeroForOne, inAmount, recipient, unwrapBento });
   const routerData = {
-    amountIn: inAmount,
+    amountIn: inAmount, //getAmountIn
     amountOutMinimum: output,
     pool: pool.address,
     tokenIn: zeroForOne ? tokens[0] : tokens[1],
