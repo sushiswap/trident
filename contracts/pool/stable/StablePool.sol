@@ -4,12 +4,11 @@ pragma solidity >=0.8.0;
 
 import {ERC20} from "@rari-capital/solmate/src/tokens/ERC20.sol";
 import {ReentrancyGuard} from "@rari-capital/solmate/src/utils/ReentrancyGuard.sol";
-
 import {IBentoBoxMinimal} from "../../interfaces/IBentoBoxMinimal.sol";
 import {IMasterDeployer} from "../../interfaces/IMasterDeployer.sol";
 import {IPool} from "../../interfaces/IPool.sol";
 import {IStablePoolFactory} from "../../interfaces/IStablePoolFactory.sol";
-
+import {IERC20, SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {TridentMath} from "../../libraries/TridentMath.sol";
 import "../../libraries/RebaseLibrary.sol";
 
@@ -21,14 +20,16 @@ error InsufficientLiquidityMinted();
 error InvalidAmounts();
 error InvalidInputToken();
 error PoolUninitialized();
+error InvalidOutputToken();
 
 /// @notice Trident exchange pool template with stable swap (solidly exchange) for swapping between tightly correlated assets
 
 contract StablePool is IPool, ERC20, ReentrancyGuard {
     using RebaseLibrary for Rebase;
+    using SafeERC20 for IERC20;
 
-    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient, uint256 liquidity);
-    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient, uint256 liquidity);
+    event Mint(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
+    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed recipient);
     event Sync(uint256 reserve0, uint256 reserve1);
 
     uint256 internal constant MINIMUM_LIQUIDITY = 1000;
@@ -116,8 +117,7 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         _updateReserves();
 
         kLast = newLiq;
-        uint256 liquidityForEvent = liquidity;
-        emit Mint(msg.sender, amount0, amount1, recipient, liquidityForEvent);
+        emit Mint(msg.sender, amount0, amount1, recipient);
     }
 
     /// @dev Burns LP tokens sent to this contract. The router must ensure that the user gets sufficient output tokens.
@@ -143,7 +143,41 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
 
         kLast = _computeLiquidity(balance0 - amount0, balance1 - amount1);
 
-        emit Burn(msg.sender, amount0, amount1, recipient, liquidity);
+        emit Burn(msg.sender, amount0, amount1, recipient);
+    }
+
+    function burnSingle(bytes calldata data) public override nonReentrant returns (uint256 amountOut) {
+        (address tokenOut, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
+        (uint256 _reserve0, uint256 _reserve1) = _getReserves();
+        (uint256 balance0, uint256 balance1) = _balance();
+        uint256 liquidity = balanceOf[address(this)];
+
+        (uint256 _totalSupply, ) = _mintFee(balance0, balance1);
+
+        uint256 amount0 = (liquidity * balance0) / _totalSupply;
+        uint256 amount1 = (liquidity * balance1) / _totalSupply;
+
+        kLast = _computeLiquidity(balance0 - amount0, balance1 - amount1);
+        _burn(address(this), liquidity);
+
+        unchecked {
+            if (tokenOut == token1) {
+                amount1 += _getAmountOut(amount0, _reserve0 - amount0, _reserve1 - amount1, true);
+                _transfer(token1, amount1, recipient, unwrapBento);
+                amountOut = amount1;
+                amount0 = 0;
+            } else {
+                if (tokenOut != token0) revert InvalidOutputToken();
+                amount0 += _getAmountOut(amount1, _reserve0 - amount0, _reserve1 - amount1, false);
+                _transfer(token0, amount0, recipient, unwrapBento);
+                amountOut = amount0;
+                amount1 = 0;
+            }
+        }
+
+        _updateReserves();
+
+        emit Burn(msg.sender, amount0, amount1, recipient);
     }
 
     /// @dev Swaps one token for another. The router must prefund this contract and ensure there isn't too much slippage.
@@ -360,12 +394,24 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
         assets[1] = token1;
     }
 
+    function skim() public nonReentrant {
+        address _token0 = token0;
+        address _token1 = token1;
+        address receiver = masterDeployer.owner();
+        IERC20(_token0).safeTransfer(receiver, IERC20(_token0).balanceOf(address(this)));
+        IERC20(_token1).safeTransfer(receiver, IERC20(_token1).balanceOf(address(this)));
+    }
+
     function _getReserves() internal view returns (uint256 _reserve0, uint256 _reserve1) {
         (_reserve0, _reserve1) = (reserve0, reserve1);
     }
 
-    function burnSingle(bytes calldata) external pure override returns (uint256) {
-        revert();
+    function getReserves() public view returns (uint256 _reserve0, uint256 _reserve1) {
+        return _getReserves();
+    }
+
+    function getNativeReserves() public view returns (uint256 _nativeReserve0, uint256 _nativeReserve1) {
+        return _getReserves();
     }
 
     function flashSwap(bytes calldata) external pure override returns (uint256) {
