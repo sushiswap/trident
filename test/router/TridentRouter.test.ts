@@ -311,9 +311,10 @@ describe("Router", function () {
       const carol = await ethers.getNamedSigner("carol");
       const balance = await carol.getBalance();
 
-      // Gifting 1 unit and sweeping it back
+      // Gifting 100 unit and sweeping it back
       await router.sweep(ADDRESS_ZERO, carol.address, false, { value: 100 });
-      // Balance should be plus 1, since the deployer gifted 1 unit and carol sweeped it
+      // Balance should be plus 99, since the deployer gifted 100 unit and carol sweeped it
+      // but 1 unit is kept inside router to avoid cold storage
       expect(await carol.getBalance()).equal(balance.add(99));
     });
     it("Allows sweeps of regular erc20 token", async () => {
@@ -321,11 +322,11 @@ describe("Router", function () {
       const weth9 = await ethers.getContract<WETH9>("WETH9");
       const deployer = await ethers.getNamedSigner("deployer");
       const balance = await weth9.balanceOf(deployer.address);
-      // Gifting 1 unit of WETH
+      // Gifting 10 unit of WETH
       await weth9.transfer(router.address, 10);
       // Sweeping it back
       await router.sweep(weth9.address, deployer.address, false);
-      // Balance should remain the same
+      // Balance should remain the same, minus 1
       expect(await weth9.balanceOf(deployer.address)).equal(balance.sub(1));
     });
   });
