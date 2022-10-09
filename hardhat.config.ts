@@ -91,7 +91,7 @@ const config: HardhatUserConfig = {
   networks: {
     localhost: {
       live: false,
-      saveDeployments: true,
+      saveDeployments: false,
       tags: ["local"],
     },
     hardhat: {
@@ -102,7 +102,7 @@ const config: HardhatUserConfig = {
       },
       allowUnlimitedContractSize: true,
       live: false,
-      saveDeployments: true,
+      saveDeployments: false,
       tags: ["test", "local"],
       // Solidity-coverage overrides gasPrice to 1 which is not compatible with EIP1559
       hardfork: process.env.CODE_COVERAGE ? "berlin" : "london",

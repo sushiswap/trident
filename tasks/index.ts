@@ -9,3 +9,4 @@ import "./strategy";
 import "./cpp-stable-pools";
 import "./whitelist-factory";
 import "./whitelist-router";
+import "./stable-verify";
