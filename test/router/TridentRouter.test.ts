@@ -313,9 +313,8 @@ describe("Router", function () {
 
       // Gifting 100 unit and sweeping it back
       await router.sweep(ADDRESS_ZERO, carol.address, false, { value: 100 });
-      // Balance should be plus 99, since the deployer gifted 100 unit and carol sweeped it
-      // but 1 unit is kept inside router to avoid cold storage
-      expect(await carol.getBalance()).equal(balance.add(99));
+      // Balance should be plus 100, since the deployer gifted 100 unit and carol sweeped it
+      expect(await carol.getBalance()).equal(balance.add(100));
     });
     it("Allows sweeps of regular erc20 token", async () => {
       const router = await ethers.getContract<TridentRouter>("TridentRouter");

@@ -228,7 +228,7 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
             uint256 shares = bento.balanceOf(token, address(this));
             bento.transfer(token, address(this), recipient, shares);
         } else {
-            uint256 amount = (token == USE_NATIVE ? address(this).balance : IERC20(token).balanceOf(address(this))) - 1;
+            uint256 amount = token == USE_NATIVE ? address(this).balance : (IERC20(token).balanceOf(address(this)) - 1);
             token == USE_NATIVE ? recipient.safeTransferETH(amount) : token.safeTransfer(recipient, amount);
         }
     }
