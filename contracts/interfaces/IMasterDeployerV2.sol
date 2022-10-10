@@ -2,8 +2,10 @@
 
 pragma solidity >=0.8.0;
 
+import "./IMasterDeployer.sol";
+
 /// @notice Trident pool deployer interface.
-interface IMasterDeployer {
+interface IMasterDeployerV2 is IMasterDeployer {
     function barFee() external view returns (uint256);
 
     function barFeeTo() external view returns (address);
@@ -15,4 +17,6 @@ interface IMasterDeployer {
     function pools(address pool) external view returns (bool);
 
     function deployPool(address factory, bytes calldata deployData) external returns (address);
+
+    function owner() external returns (address);
 }

@@ -5,7 +5,7 @@ pragma solidity >=0.8.0;
 import {PoolDeployer} from "../../abstract/PoolDeployer.sol";
 import {StablePool} from "./StablePool.sol";
 import {IStablePoolFactory} from "../../interfaces/IStablePoolFactory.sol";
-import {IMasterDeployer} from "../../interfaces/IMasterDeployer.sol";
+import {IMasterDeployerV2} from "../../interfaces/IMasterDeployerV2.sol";
 
 contract StablePoolFactory is IStablePoolFactory, PoolDeployer {
     bytes32 public constant bytecodeHash = keccak256(type(StablePool).creationCode);
@@ -40,8 +40,8 @@ contract StablePoolFactory is IStablePoolFactory, PoolDeployer {
     }
 
     // This called in the StablePool constructor.
-    function getDeployData() external view override returns (bytes memory, IMasterDeployer) {
-        return (cachedDeployData, IMasterDeployer(masterDeployer));
+    function getDeployData() external view override returns (bytes memory, IMasterDeployerV2) {
+        return (cachedDeployData, IMasterDeployerV2(masterDeployer));
     }
 
     function calculatePoolAddress(
