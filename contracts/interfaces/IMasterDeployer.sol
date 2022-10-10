@@ -15,6 +15,4 @@ interface IMasterDeployer {
     function pools(address pool) external view returns (bool);
 
     function deployPool(address factory, bytes calldata deployData) external returns (address);
-
-    function owner() external returns (address);
 }
