@@ -10,6 +10,7 @@ import {IMasterDeployer} from "./interfaces/IMasterDeployer.sol";
 import {IPool} from "./interfaces/IPool.sol";
 import {ITridentRouter} from "./interfaces/ITridentRouter.sol";
 import {IWETH9} from "./interfaces/IWETH9.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @dev Custom Errors
 error NotWethSender();
@@ -220,14 +221,15 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
     /// @notice Recover mistakenly sent tokens.
     function sweep(
         address token,
-        uint256 amount,
         address recipient,
         bool fromBento
     ) external payable {
         if (fromBento) {
-            bento.transfer(token, address(this), recipient, amount);
+            uint256 shares = bento.balanceOf(token, address(this));
+            bento.transfer(token, address(this), recipient, shares);
         } else {
-            token == USE_NATIVE ? recipient.safeTransferETH(address(this).balance) : token.safeTransfer(recipient, amount);
+            uint256 amount = token == USE_NATIVE ? address(this).balance : (IERC20(token).balanceOf(address(this)) - 1);
+            token == USE_NATIVE ? recipient.safeTransferETH(amount) : token.safeTransfer(recipient, amount);
         }
     }
 
