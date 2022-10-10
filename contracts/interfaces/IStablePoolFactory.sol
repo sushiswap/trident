@@ -2,8 +2,8 @@
 
 pragma solidity >=0.8.0;
 
-import "./IMasterDeployer.sol";
+import "./IMasterDeployerV2.sol";
 
 interface IStablePoolFactory {
-    function getDeployData() external view returns (bytes memory, IMasterDeployer);
+    function getDeployData() external view returns (bytes memory, IMasterDeployerV2);
 }
