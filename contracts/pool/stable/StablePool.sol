@@ -397,9 +397,9 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
     function skim() public nonReentrant {
         address _token0 = token0;
         address _token1 = token1;
-        // address receiver = masterDeployer.owner();
-        // IERC20(_token0).safeTransfer(receiver, IERC20(_token0).balanceOf(address(this)));
-        // IERC20(_token1).safeTransfer(receiver, IERC20(_token1).balanceOf(address(this)));
+        address receiver = masterDeployer.owner();
+        IERC20(_token0).safeTransfer(receiver, IERC20(_token0).balanceOf(address(this)));
+        IERC20(_token1).safeTransfer(receiver, IERC20(_token1).balanceOf(address(this)));
     }
 
     function _getReserves() internal view returns (uint256 _reserve0, uint256 _reserve1) {
