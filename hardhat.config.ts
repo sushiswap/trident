@@ -330,9 +330,6 @@ const config: HardhatUserConfig = {
       {
         version: "0.8.10",
         settings: {
-          // metadata: {
-          //   bytecodeHash: "none",
-          // },
           optimizer: {
             enabled: true,
             runs: 999999,
