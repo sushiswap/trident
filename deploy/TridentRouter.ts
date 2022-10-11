@@ -66,6 +66,6 @@ const deployFunction: DeployFunction = async function ({
 
 export default deployFunction;
 
-deployFunction.dependencies = ["ConstantProductPoolFactory"];
+// deployFunction.dependencies = ["ConstantProductPoolFactory"];
 
 deployFunction.tags = ["TridentRouter"];
