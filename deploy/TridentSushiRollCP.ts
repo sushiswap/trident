@@ -22,11 +22,11 @@ const deployFunction: DeployFunction = async function ({
 
   const wnative = await ethers.getContractOrNull<WETH9>("WETH9");
 
-  if (!bentoBox && !(chainId in BENTOBOX_ADDRESS)) {
+  if (!bentoBox && !(chainId in BENTOBOX_ADDRESS) && !process.env.BENTOBOX_ADDRESS) {
     throw Error(`No BENTOBOX on chain #${chainId}!`);
   }
 
-  if (!wnative && !(chainId in WNATIVE_ADDRESS)) {
+  if (!wnative && !(chainId in WNATIVE_ADDRESS) && !process.env.WNATIVE_ADDRESS) {
     throw Error(`No WNATIVE on chain #${chainId}!`);
   }
 
@@ -36,7 +36,11 @@ const deployFunction: DeployFunction = async function ({
   const { address, newlyDeployed } = await deploy("TridentSushiRollCP", {
     from: deployer,
     args: [
-      bentoBox ? bentoBox.address : BENTOBOX_ADDRESS[chainId],
+      bentoBox
+        ? bentoBox.address
+        : chainId in BENTOBOX_ADDRESS
+        ? BENTOBOX_ADDRESS[chainId]
+        : process.env.BENTOBOX_ADDRESS,
       constantProductPoolFactory.address,
       masterDeployer.address,
     ],

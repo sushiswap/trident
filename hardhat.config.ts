@@ -312,6 +312,13 @@ const config: HardhatUserConfig = {
       live: true,
       saveDeployments: true,
     },
+    bttc: {
+      url: "https://rpc.bittorrentchain.io",
+      accounts,
+      chainId: 199,
+      live: true,
+      saveDeployments: true,
+    },
   },
   paths: {
     artifacts: "artifacts",
