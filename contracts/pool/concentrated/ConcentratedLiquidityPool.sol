@@ -141,6 +141,21 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
 
         _updateSecondsPerLiquidity(uint256(liquidity));
 
+        /// @dev insert() is called before _updatePosition() as _updatePosition() requires the latest tick growth outside data including that for newly initialised ticks
+        nearestTick = Ticks.insert(
+            ticks,
+            feeGrowthGlobal0,
+            feeGrowthGlobal1,
+            secondsGrowthGlobal,
+            mintParams.lowerOld,
+            mintParams.lower,
+            mintParams.upperOld,
+            mintParams.upper,
+            uint128(liquidityMinted),
+            nearestTick,
+            uint160(currentPrice)
+        );
+
         unchecked {
             (uint256 amount0Fees, uint256 amount1Fees) = _updatePosition(
                 msg.sender,
@@ -159,20 +174,6 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
 
             if (priceLower <= currentPrice && currentPrice < priceUpper) liquidity += uint128(liquidityMinted);
         }
-
-        nearestTick = Ticks.insert(
-            ticks,
-            feeGrowthGlobal0,
-            feeGrowthGlobal1,
-            secondsGrowthGlobal,
-            mintParams.lowerOld,
-            mintParams.lower,
-            mintParams.upperOld,
-            mintParams.upper,
-            uint128(liquidityMinted),
-            nearestTick,
-            uint160(currentPrice)
-        );
 
         (uint128 amount0Actual, uint128 amount1Actual) = DyDxMath.getAmountsForLiquidity(
             priceLower,
@@ -278,6 +279,8 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
 
         uint256 inAmount = _balance(zeroForOne ? token0 : token1) - (zeroForOne ? reserve0 : reserve1);
 
+        int24 _nearestTick = nearestTick; // gas savings
+
         SwapCache memory cache = SwapCache({
             feeAmount: 0,
             totalFeeAmount: 0,
@@ -287,7 +290,7 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
             currentPrice: uint256(price),
             currentLiquidity: uint256(liquidity),
             input: inAmount,
-            nextTickToCross: zeroForOne ? nearestTick : ticks[nearestTick].nextTick
+            nextTickToCross: zeroForOne ? _nearestTick : ticks[_nearestTick].nextTick
         });
 
         _updateSecondsPerLiquidity(cache.currentLiquidity);
@@ -398,7 +401,7 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
 
         int24 newNearestTick = zeroForOne ? cache.nextTickToCross : ticks[cache.nextTickToCross].previousTick;
 
-        if (nearestTick != newNearestTick) {
+        if (_nearestTick != newNearestTick) {
             nearestTick = newNearestTick;
             liquidity = uint128(cache.currentLiquidity);
         }
@@ -517,10 +520,15 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
     }
 
     function _ensureTickSpacing(int24 lower, int24 upper) internal view {
-        if (lower % int24(tickSpacing) != 0) revert InvalidTick();
-        if ((lower / int24(tickSpacing)) % 2 != 0) revert LowerEven();
-        if (upper % int24(tickSpacing) != 0) revert InvalidTick();
-        if ((upper / int24(tickSpacing)) % 2 == 0) revert UpperOdd();
+        if (lower != TickMath.MIN_TICK) {
+            if (lower % int24(tickSpacing) != 0) revert InvalidTick();
+            if ((lower / int24(tickSpacing)) % 2 != 0) revert LowerEven();
+        }
+
+        if (upper != TickMath.MAX_TICK) {
+            if (upper % int24(tickSpacing) != 0) revert InvalidTick();
+            if ((upper / int24(tickSpacing)) % 2 == 0) revert UpperOdd();
+        }
     }
 
     function _updateReserves(
@@ -569,32 +577,44 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
     ) internal returns (uint256 amount0Fees, uint256 amount1Fees) {
         Position storage position = positions[owner][lower][upper];
 
+        uint128 positionLiquidity = position.liquidity; // gas savings
+
         (uint256 rangeFeeGrowth0, uint256 rangeFeeGrowth1) = rangeFeeGrowth(lower, upper);
 
         amount0Fees = FullMath.mulDiv(
             rangeFeeGrowth0 - position.feeGrowthInside0Last,
-            position.liquidity,
+            positionLiquidity,
             0x100000000000000000000000000000000
         );
 
         amount1Fees = FullMath.mulDiv(
             rangeFeeGrowth1 - position.feeGrowthInside1Last,
-            position.liquidity,
+            positionLiquidity,
             0x100000000000000000000000000000000
         );
 
         if (amount < 0) {
-            position.liquidity -= uint128(-amount);
+            positionLiquidity -= uint128(-amount);
+            position.liquidity = positionLiquidity;
         }
 
         if (amount > 0) {
-            position.liquidity += uint128(amount);
+            positionLiquidity += uint128(amount);
+            position.liquidity = positionLiquidity;
             // Prevents a global liquidity overflow in even if all ticks are initialised.
-            if (position.liquidity > MAX_TICK_LIQUIDITY) revert LiquidityOverflow();
+            if (positionLiquidity > MAX_TICK_LIQUIDITY) revert LiquidityOverflow();
         }
 
-        position.feeGrowthInside0Last = rangeFeeGrowth0;
-        position.feeGrowthInside1Last = rangeFeeGrowth1;
+        /// @dev feeGrowthInside{0,1}Last should be nulled if this position is the last position on lower&upper resulting in ticks[lower] & ticks[upper] being deleted??
+        /// if the above statement is true then the conditional should instead be:
+        /// if (amount < 0 && (ticks[lower].liquidity - uint128(-amount)) == 0 && (ticks[upper].liquidity - uint128(-amount)) == 0)
+        if (positionLiquidity == 0) {
+            position.feeGrowthInside0Last = 0;
+            position.feeGrowthInside1Last = 0;
+        } else {
+            position.feeGrowthInside0Last = rangeFeeGrowth0;
+            position.feeGrowthInside1Last = rangeFeeGrowth1;
+        }
     }
 
     function _balance(address token) internal view returns (uint256 balance) {
@@ -638,7 +658,7 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
     /// @notice Calculates the fee growth inside a range (per unit of liquidity).
     /// @dev Multiply `rangeFeeGrowth` delta by the provided liquidity to get accrued fees for some period.
     function rangeFeeGrowth(int24 lowerTick, int24 upperTick) public view returns (uint256 feeGrowthInside0, uint256 feeGrowthInside1) {
-        int24 currentTick = nearestTick;
+        int24 currentTick = TickMath.getTickAtSqrtRatio(price);
 
         Tick storage lower = ticks[lowerTick];
         Tick storage upper = ticks[upperTick];
