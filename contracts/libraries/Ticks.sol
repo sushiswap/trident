@@ -177,18 +177,8 @@ library Ticks {
 
             delete ticks[lower];
         } else {
-            uint128 currentLiquidity = current.liquidity; // gas savings
-
             unchecked {
-                currentLiquidity -= amount;
-                current.liquidity = currentLiquidity;
-            }
-
-            if (lower == TickMath.MIN_TICK && currentLiquidity == 0) {
-                // TODO; compress all 3 into single write or alternatively not since it's not very common for this conditional to be true
-                current.feeGrowthOutside0 = 0;
-                current.feeGrowthOutside1 = 0;
-                current.secondsGrowthOutside = 0;
+                current.liquidity -= amount;
             }
         }
 
