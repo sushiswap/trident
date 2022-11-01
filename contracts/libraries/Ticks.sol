@@ -52,11 +52,10 @@ library Ticks {
         return (currentLiquidity, nextTickToCross);
     }
 
-    /// @dev currentLiquidity is used to track BOTH ticks[lower].liquidity & ticks[upper].liquidity;
-    /// initially the former and then the latter
     struct InsertCache {
         int24 tickAtPrice;
-        uint128 currentLiquidity;
+        uint128 currentLowerLiquidity;
+        uint128 currentUpperLiquidity;
     }
 
     function insert(
@@ -79,17 +78,18 @@ library Ticks {
         /// @dev InsertCache is used to avoid stack too deep error
         InsertCache memory insertCache = InsertCache({
             tickAtPrice: TickMath.getTickAtSqrtRatio(currentPrice),
-            currentLiquidity: ticks[lower].liquidity
+            currentLowerLiquidity: ticks[lower].liquidity,
+            currentUpperLiquidity: ticks[upper].liquidity
         });
 
         {
             // Stack overflow.
-            if (insertCache.currentLiquidity != 0 || lower == TickMath.MIN_TICK) {
+            if (insertCache.currentLowerLiquidity != 0 || lower == TickMath.MIN_TICK) {
                 // We are adding liquidity to an existing tick.
-                ticks[lower].liquidity = insertCache.currentLiquidity + amount;
+                ticks[lower].liquidity = insertCache.currentLowerLiquidity + amount;
 
                 /// @dev newly initialised MIN_TICK; since it's a given that (insertParams.lower <= currentTick) == true check is not done
-                if (lower == TickMath.MIN_TICK && insertCache.currentLiquidity == 0) {
+                if (lower == TickMath.MIN_TICK && insertCache.currentLowerLiquidity == 0) {
                     ticks[lower].feeGrowthOutside0 = feeGrowthGlobal0;
                     ticks[lower].feeGrowthOutside1 = feeGrowthGlobal1;
                     ticks[lower].secondsGrowthOutside = secondsGrowthGlobal;
@@ -119,10 +119,9 @@ library Ticks {
             }
         }
 
-        insertCache.currentLiquidity = ticks[upper].liquidity;
-        if (insertCache.currentLiquidity != 0 || upper == TickMath.MAX_TICK) {
+        if (insertCache.currentUpperLiquidity != 0 || upper == TickMath.MAX_TICK) {
             // We are adding liquidity to an existing tick.
-            ticks[upper].liquidity = insertCache.currentLiquidity + amount;
+            ticks[upper].liquidity = insertCache.currentUpperLiquidity + amount;
 
             /// @dev since it's a given that in the case of a newly initialised MAX_TICK (insertParams.upper <= currentTick) == false no need to update MAX_TICK's growth outside data; defaults of 0 is correct
         } else {
