@@ -608,7 +608,7 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
         /// @dev feeGrowthInside{0,1}Last should be nulled if this position is the last position on lower&upper resulting in ticks[lower] & ticks[upper] being deleted??
         /// if the above statement is true then the conditional should instead be:
         /// if (amount < 0 && (ticks[lower].liquidity - uint128(-amount)) == 0 && (ticks[upper].liquidity - uint128(-amount)) == 0)
-        if (positionLiquidity == 0) {
+        if (amount < 0 && positionLiquidity == 0) {
             position.feeGrowthInside0Last = 0;
             position.feeGrowthInside1Last = 0;
         } else {
