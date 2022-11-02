@@ -605,9 +605,7 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
             if (positionLiquidity > MAX_TICK_LIQUIDITY) revert LiquidityOverflow();
         }
 
-        /// @dev feeGrowthInside{0,1}Last should be nulled if this position is the last position on lower&upper resulting in ticks[lower] & ticks[upper] being deleted??
-        /// if the above statement is true then the conditional should instead be:
-        /// if (amount < 0 && (ticks[lower].liquidity - uint128(-amount)) == 0 && (ticks[upper].liquidity - uint128(-amount)) == 0)
+        /// @dev feeGrowthInside{0,1}Last should be nulled if this position no longer has any liquidity such that on future mints that take position liquidity back above 0 no underflow occurs from rangeFeeGrowth{0,1} - position.feeGrowthInside{0,1}Last
         if (amount < 0 && positionLiquidity == 0) {
             position.feeGrowthInside0Last = 0;
             position.feeGrowthInside1Last = 0;
