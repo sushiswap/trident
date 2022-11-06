@@ -606,7 +606,7 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
         }
 
         /// @dev feeGrowthInside{0,1}Last should be nulled if this position no longer has any liquidity such that on future mints that take position liquidity back above 0 no underflow occurs from rangeFeeGrowth{0,1} - position.feeGrowthInside{0,1}Last
-        if (amount < 0 && positionLiquidity == 0) {
+        if (amount <= 0 && positionLiquidity == 0) {
             position.feeGrowthInside0Last = 0;
             position.feeGrowthInside1Last = 0;
         } else {
