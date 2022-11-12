@@ -135,7 +135,7 @@ contract ConcentratedLiquidityPoolStaker {
     function getReward(uint256 positionId, uint256 incentiveId) public view returns (uint256 rewards, uint256 secondsInside) {
         IPoolManager.Position memory position = poolManager.positions(positionId);
         IConcentratedLiquidityPool pool = position.pool;
-        Incentive memory incentive = incentives[pool][positionId];
+        Incentive memory incentive = incentives[pool][incentiveId];
         Stake memory stake = stakes[positionId][incentiveId];
         if (stake.timestamp > 0) {
             uint256 secondsGrowth = rangeSecondsInside(pool, position.lower, position.upper) - stake.secondsGrowthInsideLast;
