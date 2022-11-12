@@ -180,9 +180,9 @@ contract ConcentratedLiquidityPoolStaker {
 
     function getLatestSecondsGrowthGlobal(IConcentratedLiquidityPool pool) internal view returns (uint256 latestSecondsGrowthGlobal) {
         (uint256 secondsGrowthGlobal, uint32 lastObservation) = pool.getSecondsGrowthAndLastObservation();
-        uint128 liquidity = pool.liquidity();
 
         if (block.timestamp != lastObservation) {
+            uint128 liquidity = pool.liquidity();
             uint32 delta = _blockTimestamp() - lastObservation;
             latestSecondsGrowthGlobal = secondsGrowthGlobal + ((uint160(delta) << 128) / (liquidity > 0 ? liquidity : 1));
         } else {
