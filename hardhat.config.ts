@@ -3,6 +3,7 @@ import "@nomiclabs/hardhat-etherscan";
 import "@nomiclabs/hardhat-solhint";
 import "@nomiclabs/hardhat-waffle";
 import "@nomiclabs/hardhat-ethers";
+import "@nomicfoundation/hardhat-chai-matchers";
 import "@tenderly/hardhat-tenderly";
 import "@typechain/hardhat";
 import "hardhat-contract-sizer";

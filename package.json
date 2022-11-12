@@ -85,6 +85,7 @@
     "@codechecks/client": "^0.1.12",
     "@ethersproject/address": "^5.0.0",
     "@ethersproject/solidity": "^5.0.0",
+    "@nomicfoundation/hardhat-chai-matchers": "^1.0.4",
     "@nomiclabs/hardhat-ethers": "npm:hardhat-deploy-ethers",
     "@nomiclabs/hardhat-etherscan": "^3.1.0",
     "@nomiclabs/hardhat-solhint": "^2.0.0",
