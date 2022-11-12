@@ -13,7 +13,7 @@ import {
 import { getBigNumber } from "../utilities";
 import { Trident } from "../harness/Trident";
 
-describe("Concentrated Liquidity Product Pool", function () {
+describe("Concentrated Liquidity Pool Staker", function () {
   let _snapshotId: string;
   let snapshotId: string;
   let trident: Trident;

@@ -158,7 +158,8 @@ contract ConcentratedLiquidityPoolStaker {
         IConcentratedLiquidityPool.Tick memory upper = IConcentratedLiquidityPool(pool).ticks(upperTick);
         IConcentratedLiquidityPool.Tick memory lower = IConcentratedLiquidityPool(pool).ticks(lowerTick);
 
-        (uint256 secondsGrowthGlobal, ) = pool.getSecondsGrowthAndLastObservation();
+        uint256 secondsGrowthGlobal = getLatestSecondsGrowthGlobal(pool);
+
         uint256 secondsBelow;
         uint256 secondsAbove;
 
@@ -175,6 +176,23 @@ contract ConcentratedLiquidityPoolStaker {
         }
 
         secondsInside = secondsGrowthGlobal - secondsBelow - secondsAbove;
+    }
+
+    function getLatestSecondsGrowthGlobal(IConcentratedLiquidityPool pool) internal view returns (uint256 latestSecondsGrowthGlobal) {
+        (uint256 secondsGrowthGlobal, uint32 lastObservation) = pool.getSecondsGrowthAndLastObservation();
+        uint128 liquidity = pool.liquidity();
+
+        if (block.timestamp != lastObservation) {
+            uint32 delta = _blockTimestamp() - lastObservation;
+            latestSecondsGrowthGlobal = secondsGrowthGlobal + ((uint160(delta) << 128) / (liquidity > 0 ? liquidity : 1));
+        } else {
+            latestSecondsGrowthGlobal = secondsGrowthGlobal;
+        }
+    }
+
+    /// @dev Returns the block timestamp truncated to 32 bits, i.e. mod 2**32. This method is overridden in tests.
+    function _blockTimestamp() internal view virtual returns (uint32) {
+        return uint32(block.timestamp); // truncation is desired
     }
 
     function _transfer(

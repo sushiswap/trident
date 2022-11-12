@@ -59,6 +59,8 @@ interface IConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
 
     function feeGrowthGlobal1() external view returns (uint256);
 
+    function liquidity() external view returns (uint128);
+
     function rangeFeeGrowth(int24 lowerTick, int24 upperTick) external view returns (uint256 feeGrowthInside0, uint256 feeGrowthInside1);
 
     function setPrice(uint160 price) external;
