@@ -53,6 +53,7 @@
     "arbitrum:export": "hardhat --network arbitrum export --export exports/arbitrum.json",
     "test": "hardhat test test/_/*.ts test/abstract/*.test.ts test/constant-product/*.test.ts test/deployer/*.test.ts test/library/*.test.ts test/router/*.test.ts",
     "test:clp": "hardhat test test/concentrated/*.test.ts",
+    "test:clps": "hardhat test test/concentrated/ConcentratedLiquidityPoolStaker.test.ts",
     "testTines": "hardhat test test/constant-product/ConstantProductRouting.test.ts test/stable-pool/StablePoolRouting.test.ts test/router/RoutingMultiPool.test.ts test/router/RoutingMultiPoolComplex.test.ts test/router/TridentRouter.test.ts",
     "testOnly": "hardhat test",
     "test:debug": "mocha --inspect-brk",
