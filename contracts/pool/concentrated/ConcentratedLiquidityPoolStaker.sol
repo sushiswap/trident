@@ -84,7 +84,12 @@ contract ConcentratedLiquidityPoolStaker {
         for (uint256 i; i < incentiveId.length; i++) {
             Incentive memory incentive = incentives[pool][incentiveId[i]];
             Stake storage stake = stakes[positionId][incentiveId[i]];
-            require(stake.secondsGrowthInsideLast == 0, "SUBSCRIBED");
+
+            /// @dev allow both initial subscribes(stake.timestamp == 0) and re-subscribes(stake.timestamp > 0 && position.latestAddition > stake.timestamp);
+            /// Additionally prevents re-subscribes if stake.timestamp >= position.latestAddition as user has no need to re-subscribe
+            /// if a user has decreased their position's liquidity they don't have to resubscribed as rewards will be calculated based of the reduced liquidity
+            /// to maximise a user's rewards they should always claimRewards before decreasing/increasing their liquidity
+            require(position.latestAddition > stake.timestamp, "SUBSCRIBED");
             require(block.timestamp >= incentive.startTime && block.timestamp < incentive.endTime, "INACTIVE_INCENTIVE");
             stakes[positionId][incentiveId[i]] = stakeData;
             emit Subscribe(positionId, incentiveId[i]);
