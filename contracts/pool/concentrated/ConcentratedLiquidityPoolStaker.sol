@@ -9,7 +9,7 @@ import {IConcentratedLiquidityPoolManager as IPoolManager} from "../../interface
 
 /// @notice Trident Concentrated Liquidity Pool periphery contract that combines non-fungible position management and staking.
 contract ConcentratedLiquidityPoolStaker {
-    event AddIncentive(IConcentratedLiquidityPool indexed pool, uint256 indexed incentiveId, address indexed rewardToken);
+    event AddIncentive(IConcentratedLiquidityPool indexed pool, uint256 indexed incentiveCount, address indexed rewardToken);
     event Subscribe(uint256 indexed positionId, uint256 indexed incentiveId);
     event ClaimReward(uint256 indexed positionId, uint256 indexed incentiveId, address indexed recipient, uint96 amount);
     event ReclaimIncentive(IConcentratedLiquidityPool indexed pool, uint256 indexed incentiveId, uint256 amount);
