@@ -30,7 +30,7 @@ contract ConcentratedLiquidityPoolStaker {
     }
 
     IBentoBoxMinimal public immutable bento;
-    IPoolManager public poolManager;
+    IPoolManager public immutable poolManager;
 
     mapping(IConcentratedLiquidityPool => uint256) public incentiveCount;
     mapping(IConcentratedLiquidityPool => mapping(uint256 => Incentive)) public incentives;
