@@ -137,6 +137,8 @@ contract ConcentratedLiquidityPoolManager is IConcentratedLiquidityPoolManagerSt
 
         Position memory position = positions[tokenId];
 
+        require(position.liquidity != 0, "NO_LIQUIDITY");
+
         (uint256 token0Fees, uint256 token1Fees, uint256 feeGrowthInside0, uint256 feeGrowthInside1) = positionFees(tokenId);
 
         if (amount < position.liquidity) {
