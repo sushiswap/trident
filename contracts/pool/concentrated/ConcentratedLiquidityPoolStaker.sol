@@ -5,7 +5,7 @@ pragma solidity >=0.8.0;
 import "../../libraries/Ticks.sol";
 import "../../interfaces/IBentoBoxMinimal.sol";
 import "../../interfaces/IConcentratedLiquidityPool.sol";
-import { IConcentratedLiquidityPoolManager as IPoolManager } from "../../interfaces/IConcentratedLiquidityPoolManager.sol";
+import {IConcentratedLiquidityPoolManager as IPoolManager} from "../../interfaces/IConcentratedLiquidityPoolManager.sol";
 
 /// @notice Trident Concentrated Liquidity Pool periphery contract that combines non-fungible position management and staking.
 contract ConcentratedLiquidityPoolStaker {
@@ -102,6 +102,7 @@ contract ConcentratedLiquidityPoolStaker {
         IPoolManager.Position memory position = poolManager.positions(positionId);
         IConcentratedLiquidityPool pool = position.pool;
 
+        require(position.liquidity != 0, "NO_LIQUIDITY");
         uint256 currentSecondsGrowth = rangeSecondsInside(pool, position.lower, position.upper);
 
         for (uint256 i = 0; i < incentiveIds.length; i++) {
