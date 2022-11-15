@@ -9,7 +9,7 @@ import {IConcentratedLiquidityPoolManager as IPoolManager} from "../../interface
 
 /// @notice Trident Concentrated Liquidity Pool periphery contract that combines non-fungible position management and staking.
 contract ConcentratedLiquidityPoolStaker {
-    event AddIncentive(IConcentratedLiquidityPool indexed pool, uint256 indexed incentiveId, address indexed rewardToken);
+    event AddIncentive(IConcentratedLiquidityPool indexed pool, uint256 indexed incentiveCount, address indexed rewardToken);
     event Subscribe(uint256 indexed positionId, uint256 indexed incentiveId);
     event ClaimReward(uint256 indexed positionId, uint256 indexed incentiveId, address indexed recipient, uint96 amount);
     event ReclaimIncentive(IConcentratedLiquidityPool indexed pool, uint256 indexed incentiveId, uint256 amount);
@@ -30,7 +30,7 @@ contract ConcentratedLiquidityPoolStaker {
     }
 
     IBentoBoxMinimal public immutable bento;
-    IPoolManager public poolManager;
+    IPoolManager public immutable poolManager;
 
     mapping(IConcentratedLiquidityPool => uint256) public incentiveCount;
     mapping(IConcentratedLiquidityPool => mapping(uint256 => Incentive)) public incentives;
@@ -84,7 +84,12 @@ contract ConcentratedLiquidityPoolStaker {
         for (uint256 i; i < incentiveId.length; i++) {
             Incentive memory incentive = incentives[pool][incentiveId[i]];
             Stake storage stake = stakes[positionId][incentiveId[i]];
-            require(stake.secondsGrowthInsideLast == 0, "SUBSCRIBED");
+
+            /// @dev allow both initial subscribes(stake.timestamp == 0) and re-subscribes(stake.timestamp > 0 && position.latestAddition > stake.timestamp);
+            /// Additionally prevents re-subscribes if stake.timestamp >= position.latestAddition as user has no need to re-subscribe
+            /// if a user has decreased their position's liquidity they don't have to resubscribed as rewards will be calculated based of the reduced liquidity
+            /// to maximise a user's rewards they should always claimRewards before decreasing/increasing their liquidity
+            require(position.latestAddition > stake.timestamp, "SUBSCRIBED");
             require(block.timestamp >= incentive.startTime && block.timestamp < incentive.endTime, "INACTIVE_INCENTIVE");
             stakes[positionId][incentiveId[i]] = stakeData;
             emit Subscribe(positionId, incentiveId[i]);
@@ -136,7 +141,7 @@ contract ConcentratedLiquidityPoolStaker {
     function getReward(uint256 positionId, uint256 incentiveId) public view returns (uint256 rewards, uint256 secondsInside) {
         IPoolManager.Position memory position = poolManager.positions(positionId);
         IConcentratedLiquidityPool pool = position.pool;
-        Incentive memory incentive = incentives[pool][positionId];
+        Incentive memory incentive = incentives[pool][incentiveId];
         Stake memory stake = stakes[positionId][incentiveId];
         if (stake.timestamp > 0) {
             uint256 secondsGrowth = rangeSecondsInside(pool, position.lower, position.upper) - stake.secondsGrowthInsideLast;
@@ -153,12 +158,14 @@ contract ConcentratedLiquidityPoolStaker {
         int24 lowerTick,
         int24 upperTick
     ) public view returns (uint256 secondsInside) {
-        (, int24 currentTick) = pool.getPriceAndNearestTicks();
+        (uint160 price, ) = pool.getPriceAndNearestTicks();
+        int24 currentTick = TickMath.getTickAtSqrtRatio(price);
 
         IConcentratedLiquidityPool.Tick memory upper = IConcentratedLiquidityPool(pool).ticks(upperTick);
         IConcentratedLiquidityPool.Tick memory lower = IConcentratedLiquidityPool(pool).ticks(lowerTick);
 
-        (uint256 secondsGrowthGlobal, ) = pool.getSecondsGrowthAndLastObservation();
+        uint256 secondsGrowthGlobal = getLatestSecondsGrowthGlobal(pool);
+
         uint256 secondsBelow;
         uint256 secondsAbove;
 
@@ -175,6 +182,23 @@ contract ConcentratedLiquidityPoolStaker {
         }
 
         secondsInside = secondsGrowthGlobal - secondsBelow - secondsAbove;
+    }
+
+    function getLatestSecondsGrowthGlobal(IConcentratedLiquidityPool pool) internal view returns (uint256 latestSecondsGrowthGlobal) {
+        (uint256 secondsGrowthGlobal, uint32 lastObservation) = pool.getSecondsGrowthAndLastObservation();
+
+        if (block.timestamp != lastObservation) {
+            uint128 liquidity = pool.liquidity();
+            uint32 delta = _blockTimestamp() - lastObservation;
+            latestSecondsGrowthGlobal = secondsGrowthGlobal + ((uint160(delta) << 128) / (liquidity > 0 ? liquidity : 1));
+        } else {
+            latestSecondsGrowthGlobal = secondsGrowthGlobal;
+        }
+    }
+
+    /// @dev Returns the block timestamp truncated to 32 bits, i.e. mod 2**32. This method is overridden in tests.
+    function _blockTimestamp() internal view virtual returns (uint32) {
+        return uint32(block.timestamp); // truncation is desired
     }
 
     function _transfer(

@@ -5,7 +5,7 @@ pragma solidity >=0.8.0;
 import {ERC20} from "@rari-capital/solmate/src/tokens/ERC20.sol";
 import {ReentrancyGuard} from "@rari-capital/solmate/src/utils/ReentrancyGuard.sol";
 import {IBentoBoxMinimal} from "../../interfaces/IBentoBoxMinimal.sol";
-import {IMasterDeployer} from "../../interfaces/IMasterDeployer.sol";
+import {IMasterDeployerV2} from "../../interfaces/IMasterDeployerV2.sol";
 import {IPool} from "../../interfaces/IPool.sol";
 import {IStablePoolFactory} from "../../interfaces/IStablePoolFactory.sol";
 import {IERC20, SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -39,7 +39,7 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
     uint256 internal immutable MAX_FEE_MINUS_SWAP_FEE;
 
     IBentoBoxMinimal public immutable bento;
-    IMasterDeployer public immutable masterDeployer;
+    IMasterDeployerV2 public immutable masterDeployer;
     address public immutable token0;
     address public immutable token1;
 
@@ -56,7 +56,7 @@ contract StablePool is IPool, ERC20, ReentrancyGuard {
     bytes32 public constant poolIdentifier = "Trident:StablePool";
 
     constructor() ERC20("Sushi Stable LP Token", "SSLP", 18) {
-        (bytes memory _deployData, IMasterDeployer _masterDeployer) = IStablePoolFactory(msg.sender).getDeployData();
+        (bytes memory _deployData, IMasterDeployerV2 _masterDeployer) = IStablePoolFactory(msg.sender).getDeployData();
 
         (address _token0, address _token1, uint256 _swapFee) = abi.decode(_deployData, (address, address, uint256));
 

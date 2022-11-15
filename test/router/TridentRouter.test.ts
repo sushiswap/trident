@@ -303,29 +303,30 @@ describe("Router", function () {
       const deployer = await ethers.getNamedSigner("deployer");
       await weth9.approve(bentoBox.address, 1);
       await bentoBox.deposit(weth9.address, deployer.address, router.address, 0, 1);
-      await router.sweep(weth9.address, 1, deployer.address, true);
+      await router.sweep(weth9.address, deployer.address, true);
       expect(await bentoBox.balanceOf(weth9.address, deployer.address)).equal(1);
     });
     it("Allows sweep of native eth", async () => {
       const router = await ethers.getContract<TridentRouter>("TridentRouter");
       const carol = await ethers.getNamedSigner("carol");
       const balance = await carol.getBalance();
-      // Gifting 1 unit and sweeping it back
-      await router.sweep(ADDRESS_ZERO, 1, carol.address, false, { value: 1 });
-      // Balance should be plus 1, since the deployer gifted 1 unit and carol sweeped it
-      expect(await carol.getBalance()).equal(balance.add(1));
+
+      // Gifting 100 unit and sweeping it back
+      await router.sweep(ADDRESS_ZERO, carol.address, false, { value: 100 });
+      // Balance should be plus 100, since the deployer gifted 100 unit and carol sweeped it
+      expect(await carol.getBalance()).equal(balance.add(100));
     });
     it("Allows sweeps of regular erc20 token", async () => {
       const router = await ethers.getContract<TridentRouter>("TridentRouter");
       const weth9 = await ethers.getContract<WETH9>("WETH9");
       const deployer = await ethers.getNamedSigner("deployer");
       const balance = await weth9.balanceOf(deployer.address);
-      // Gifting 1 unit of WETH
-      await weth9.transfer(router.address, 1);
+      // Gifting 10 unit of WETH
+      await weth9.transfer(router.address, 10);
       // Sweeping it back
-      await router.sweep(weth9.address, 1, deployer.address, false);
-      // Balance should remain the same
-      expect(await weth9.balanceOf(deployer.address)).equal(balance);
+      await router.sweep(weth9.address, deployer.address, false);
+      // Balance should remain the same, minus 1
+      expect(await weth9.balanceOf(deployer.address)).equal(balance.sub(1));
     });
   });
 

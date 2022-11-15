@@ -22,19 +22,27 @@ const deployFunction: DeployFunction = async function ({
 
   const bentoBox = await ethers.getContractOrNull<BentoBoxV1>("BentoBoxV1");
 
-  const wnative = await ethers.getContractOrNull<WETH9>("WETH9");
+  // const wnative = await ethers.getContractOrNull<WETH9>("WETH9");
 
-  if (!bentoBox && !(chainId in BENTOBOX_ADDRESS)) {
+  if (!bentoBox && !(chainId in BENTOBOX_ADDRESS) && !process.env.BENTOBOX_ADDRESS) {
     throw Error(`No BENTOBOX on chain #${chainId}!`);
   }
 
-  if (!wnative && !(chainId in WNATIVE_ADDRESS)) {
-    throw Error(`No WNATIVE on chain #${chainId}!`);
-  }
+  // if (!wnative && !(chainId in WNATIVE_ADDRESS)) {
+  //   throw Error(`No WNATIVE on chain #${chainId}!`);
+  // }
 
   const { address, newlyDeployed } = await deploy("MasterDeployer", {
     from: deployer,
-    args: [barFee, barFeeTo, bentoBox ? bentoBox.address : BENTOBOX_ADDRESS[chainId]],
+    args: [
+      barFee,
+      barFeeTo,
+      bentoBox
+        ? bentoBox.address
+        : chainId in BENTOBOX_ADDRESS
+        ? BENTOBOX_ADDRESS[chainId]
+        : process.env.BENTOBOX_ADDRESS,
+    ],
     deterministicDeployment: false,
     waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 20 : undefined,
   });

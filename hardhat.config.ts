@@ -3,6 +3,7 @@ import "@nomiclabs/hardhat-etherscan";
 import "@nomiclabs/hardhat-solhint";
 import "@nomiclabs/hardhat-waffle";
 import "@nomiclabs/hardhat-ethers";
+import "@nomicfoundation/hardhat-chai-matchers";
 import "@tenderly/hardhat-tenderly";
 import "@typechain/hardhat";
 import "hardhat-contract-sizer";
@@ -91,7 +92,7 @@ const config: HardhatUserConfig = {
   networks: {
     localhost: {
       live: false,
-      saveDeployments: true,
+      saveDeployments: false,
       tags: ["local"],
     },
     hardhat: {
@@ -102,7 +103,7 @@ const config: HardhatUserConfig = {
       },
       allowUnlimitedContractSize: true,
       live: false,
-      saveDeployments: true,
+      saveDeployments: false,
       tags: ["test", "local"],
       // Solidity-coverage overrides gasPrice to 1 which is not compatible with EIP1559
       hardfork: process.env.CODE_COVERAGE ? "berlin" : "london",
@@ -309,6 +310,13 @@ const config: HardhatUserConfig = {
       url: "https://andromeda.metis.io/?owner=1088	",
       accounts,
       chainId: 1088,
+      live: true,
+      saveDeployments: true,
+    },
+    bttc: {
+      url: "https://rpc.bittorrentchain.io",
+      accounts,
+      chainId: 199,
       live: true,
       saveDeployments: true,
     },

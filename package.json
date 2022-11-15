@@ -1,6 +1,6 @@
 {
   "name": "@sushiswap/trident",
-  "version": "1.0.0-canary.40",
+  "version": "1.0.0-canary.51",
   "description": "Trident",
   "keywords": [
     "trident",
@@ -52,6 +52,8 @@
     "arbitrum:deploy": "hardhat --network arbitrum deploy",
     "arbitrum:export": "hardhat --network arbitrum export --export exports/arbitrum.json",
     "test": "hardhat test test/_/*.ts test/abstract/*.test.ts test/constant-product/*.test.ts test/deployer/*.test.ts test/library/*.test.ts test/router/*.test.ts",
+    "test:clp": "hardhat test test/concentrated/*.test.ts",
+    "test:clps": "hardhat test test/concentrated/ConcentratedLiquidityPoolStaker.test.ts",
     "testTines": "hardhat test test/constant-product/ConstantProductRouting.test.ts test/stable-pool/StablePoolRouting.test.ts test/router/RoutingMultiPool.test.ts test/router/RoutingMultiPoolComplex.test.ts test/router/TridentRouter.test.ts",
     "testOnly": "hardhat test",
     "test:debug": "mocha --inspect-brk",
@@ -83,6 +85,7 @@
     "@codechecks/client": "^0.1.12",
     "@ethersproject/address": "^5.0.0",
     "@ethersproject/solidity": "^5.0.0",
+    "@nomicfoundation/hardhat-chai-matchers": "^1.0.4",
     "@nomiclabs/hardhat-ethers": "npm:hardhat-deploy-ethers",
     "@nomiclabs/hardhat-etherscan": "^3.1.0",
     "@nomiclabs/hardhat-solhint": "^2.0.0",

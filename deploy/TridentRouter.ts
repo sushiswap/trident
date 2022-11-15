@@ -21,11 +21,11 @@ const deployFunction: DeployFunction = async function ({
 
   const wnative = await ethers.getContractOrNull<WETH9>("WETH9");
 
-  if (!bentoBox && !(chainId in BENTOBOX_ADDRESS)) {
+  if (!bentoBox && !(chainId in BENTOBOX_ADDRESS) && !process.env.BENTOBOX_ADDRESS) {
     throw Error(`No BENTOBOX on chain #${chainId}!`);
   }
 
-  if (!wnative && !(chainId in WNATIVE_ADDRESS)) {
+  if (!wnative && !(chainId in WNATIVE_ADDRESS) && !process.env.WNATIVE_ADDRESS) {
     throw Error(`No WNATIVE on chain #${chainId}!`);
   }
 
@@ -34,9 +34,13 @@ const deployFunction: DeployFunction = async function ({
   const { address, newlyDeployed } = await deploy("TridentRouter", {
     from: deployer,
     args: [
-      bentoBox ? bentoBox.address : BENTOBOX_ADDRESS[chainId],
+      bentoBox
+        ? bentoBox.address
+        : chainId in BENTOBOX_ADDRESS
+        ? BENTOBOX_ADDRESS[chainId]
+        : process.env.BENTOBOX_ADDRESS,
       masterDeployer.address,
-      wnative ? wnative.address : WNATIVE_ADDRESS[chainId],
+      wnative ? wnative.address : chainId in WNATIVE_ADDRESS ? WNATIVE_ADDRESS[chainId] : process.env.WNATIVE_ADDRESS,
     ],
     deterministicDeployment: false,
     waitConfirmations: process.env.VERIFY_ON_DEPLOY === "true" ? 10 : undefined,
@@ -66,6 +70,6 @@ const deployFunction: DeployFunction = async function ({
 
 export default deployFunction;
 
-deployFunction.dependencies = ["ConstantProductPoolFactory"];
+// deployFunction.dependencies = ["ConstantProductPoolFactory"];
 
 deployFunction.tags = ["TridentRouter"];

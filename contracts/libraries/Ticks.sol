@@ -52,6 +52,12 @@ library Ticks {
         return (currentLiquidity, nextTickToCross);
     }
 
+    struct InsertCache {
+        int24 tickAtPrice;
+        uint128 currentLowerLiquidity;
+        uint128 currentUpperLiquidity;
+    }
+
     function insert(
         mapping(int24 => IConcentratedLiquidityPoolStruct.Tick) storage ticks,
         uint256 feeGrowthGlobal0,
@@ -69,12 +75,25 @@ library Ticks {
         require(TickMath.MIN_TICK <= lower, "LOWER_RANGE");
         require(upper <= TickMath.MAX_TICK, "UPPER_RANGE");
 
+        /// @dev InsertCache is used to avoid stack too deep error
+        InsertCache memory insertCache = InsertCache({
+            tickAtPrice: TickMath.getTickAtSqrtRatio(currentPrice),
+            currentLowerLiquidity: ticks[lower].liquidity,
+            currentUpperLiquidity: ticks[upper].liquidity
+        });
+
         {
             // Stack overflow.
-            uint128 currentLowerLiquidity = ticks[lower].liquidity;
-            if (currentLowerLiquidity != 0 || lower == TickMath.MIN_TICK) {
+            if (insertCache.currentLowerLiquidity != 0 || lower == TickMath.MIN_TICK) {
                 // We are adding liquidity to an existing tick.
-                ticks[lower].liquidity = currentLowerLiquidity + amount;
+                ticks[lower].liquidity = insertCache.currentLowerLiquidity + amount;
+
+                /// @dev newly initialised MIN_TICK; since it's a given that (insertParams.lower <= currentTick) == true check is not done
+                if (lower == TickMath.MIN_TICK && insertCache.currentLowerLiquidity == 0) {
+                    ticks[lower].feeGrowthOutside0 = feeGrowthGlobal0;
+                    ticks[lower].feeGrowthOutside1 = feeGrowthGlobal1;
+                    ticks[lower].secondsGrowthOutside = secondsGrowthGlobal;
+                }
             } else {
                 // We are inserting a new tick.
                 IConcentratedLiquidityPoolStruct.Tick storage old = ticks[lowerOld];
@@ -82,7 +101,7 @@ library Ticks {
 
                 require((old.liquidity != 0 || lowerOld == TickMath.MIN_TICK) && lowerOld < lower && lower < oldNextTick, "LOWER_ORDER");
 
-                if (lower <= nearestTick) {
+                if (lower <= insertCache.tickAtPrice) {
                     ticks[lower] = IConcentratedLiquidityPoolStruct.Tick(
                         lowerOld,
                         oldNextTick,
@@ -100,10 +119,11 @@ library Ticks {
             }
         }
 
-        uint128 currentUpperLiquidity = ticks[upper].liquidity;
-        if (currentUpperLiquidity != 0 || upper == TickMath.MAX_TICK) {
+        if (insertCache.currentUpperLiquidity != 0 || upper == TickMath.MAX_TICK) {
             // We are adding liquidity to an existing tick.
-            ticks[upper].liquidity = currentUpperLiquidity + amount;
+            ticks[upper].liquidity = insertCache.currentUpperLiquidity + amount;
+
+            /// @dev since it's a given that in the case of a newly initialised MAX_TICK (insertParams.upper <= currentTick) == false no need to update MAX_TICK's growth outside data; defaults of 0 is correct
         } else {
             // Inserting a new tick.
             IConcentratedLiquidityPoolStruct.Tick storage old = ticks[upperOld];
@@ -111,7 +131,7 @@ library Ticks {
 
             require(old.liquidity != 0 && oldNextTick > upper && upperOld < upper, "UPPER_ORDER");
 
-            if (upper <= nearestTick) {
+            if (upper <= insertCache.tickAtPrice) {
                 ticks[upper] = IConcentratedLiquidityPoolStruct.Tick(
                     upperOld,
                     oldNextTick,
@@ -127,11 +147,9 @@ library Ticks {
             ticks[oldNextTick].previousTick = upper;
         }
 
-        int24 tickAtPrice = TickMath.getTickAtSqrtRatio(currentPrice);
-
-        if (nearestTick < upper && upper <= tickAtPrice) {
+        if (nearestTick < upper && upper <= insertCache.tickAtPrice) {
             nearestTick = upper;
-        } else if (nearestTick < lower && lower <= tickAtPrice) {
+        } else if (nearestTick < lower && lower <= insertCache.tickAtPrice) {
             nearestTick = lower;
         }
 
