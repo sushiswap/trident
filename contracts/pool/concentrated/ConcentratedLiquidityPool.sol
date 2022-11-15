@@ -517,10 +517,15 @@ contract ConcentratedLiquidityPool is IConcentratedLiquidityPoolStruct {
     }
 
     function _ensureTickSpacing(int24 lower, int24 upper) internal view {
-        if (lower % int24(tickSpacing) != 0) revert InvalidTick();
-        if ((lower / int24(tickSpacing)) % 2 != 0) revert LowerEven();
-        if (upper % int24(tickSpacing) != 0) revert InvalidTick();
-        if ((upper / int24(tickSpacing)) % 2 == 0) revert UpperOdd();
+        if (lower != TickMath.MIN_TICK) {
+            if (lower % int24(tickSpacing) != 0) revert InvalidTick();
+            if ((lower / int24(tickSpacing)) % 2 != 0) revert LowerEven();
+        }
+
+        if (upper != TickMath.MAX_TICK) {
+            if (upper % int24(tickSpacing) != 0) revert InvalidTick();
+            if ((upper / int24(tickSpacing)) % 2 == 0) revert UpperOdd();
+        }
     }
 
     function _updateReserves(
