@@ -194,26 +194,24 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
         (address tokenIn, address recipient, bool unwrapBento) = abi.decode(data, (address, address, bool));
         (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) = _getReserves();
         if (_reserve0 == 0) revert PoolUninitialized();
-        (uint256 balance0, uint256 balance1) = _balance();
-        uint256 amountIn;
-        address tokenOut;
         unchecked {
             if (tokenIn == token0) {
-                tokenOut = token1;
-                amountIn = balance0 - _reserve0;
+                uint256 balance0 = _balance0();
+                uint256 amountIn = balance0 - _reserve0;
                 amountOut = _getAmountOut(amountIn, _reserve0, _reserve1);
-                balance1 -= amountOut;
+                _transfer(token1, amountOut, recipient, unwrapBento);
+                _update(balance0, _reserve1 - amountOut, _reserve0, _reserve1, _blockTimestampLast);
+                emit Swap(recipient, tokenIn, token1, amountIn, amountOut);
             } else {
                 if (tokenIn != token1) revert InvalidInputToken();
-                tokenOut = token0;
-                amountIn = balance1 - reserve1;
+                uint256 balance1 = _balance1();
+                uint256 amountIn = balance1 - _reserve1;
                 amountOut = _getAmountOut(amountIn, _reserve1, _reserve0);
-                balance0 -= amountOut;
+                _transfer(token0, amountOut, recipient, unwrapBento);
+                _update(_reserve0 - amountOut, balance1, _reserve0, _reserve1, _blockTimestampLast);
+                emit Swap(recipient, tokenIn, token0, amountIn, amountOut);
             }
         }
-        _transfer(tokenOut, amountOut, recipient, unwrapBento);
-        _update(balance0, balance1, _reserve0, _reserve1, _blockTimestampLast);
-        emit Swap(recipient, tokenIn, tokenOut, amountIn, amountOut);
     }
 
     /// @dev Swaps one token for another. The router must support swap callbacks and ensure there isn't too much slippage.
@@ -268,6 +266,14 @@ contract ConstantProductPool is IPool, ERC20, ReentrancyGuard {
 
     function _balance() internal view returns (uint256 balance0, uint256 balance1) {
         balance0 = bento.balanceOf(token0, address(this));
+        balance1 = bento.balanceOf(token1, address(this));
+    }
+
+    function _balance0() internal view returns (uint256 balance0) {
+        balance0 = bento.balanceOf(token0, address(this));
+    }
+
+    function _balance1() internal view returns (uint256 balance1) {
         balance1 = bento.balanceOf(token1, address(this));
     }
 
