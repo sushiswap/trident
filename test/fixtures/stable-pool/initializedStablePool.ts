@@ -20,8 +20,8 @@ export const initializedStablePool = deployments.createFixture(
     },
     options?: {
       fee?: number;
-      token0?: string;
-      token1?: string;
+      token0Decimals?: number;
+      token1Decimals?: number;
     }
   ) => {
     options = {
@@ -35,18 +35,30 @@ export const initializedStablePool = deployments.createFixture(
     const ERC20 = await ethers.getContractFactory<ERC20Mock__factory>("ERC20Mock");
 
     let token0, token1;
-    if (options.token0 === undefined) {
+    if (options.token0Decimals === undefined) {
       token0 = await ERC20.deploy("Token 0", "TOKEN0", ethers.constants.MaxUint256);
       await token0.deployed();
     } else {
-      token0 = await ethers.getContract<ERC20Mock>(options.token0 as string);
+      token0 = await ERC20.deploy(
+        `Token0-${options.token0Decimals}`,
+        `TOKEN0-${options.token0Decimals}`,
+        ethers.constants.MaxUint256
+      );
+      token0.setDecimals(options.token0Decimals);
+      await token0.deployed();
     }
 
-    if (options.token1 === undefined) {
+    if (options.token1Decimals === undefined) {
       token1 = await ERC20.deploy("Token 1", "TOKEN1", ethers.constants.MaxUint256);
       await token1.deployed();
     } else {
-      token1 = await ethers.getContract<ERC20Mock>(options.token1 as string);
+      token1 = await ERC20.deploy(
+        `Token1-${options.token1Decimals}`,
+        `TOKEN1-${options.token1Decimals}`,
+        ethers.constants.MaxUint256
+      );
+      token1.setDecimals(options.token1Decimals);
+      await token0.deployed();
     }
 
     const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
