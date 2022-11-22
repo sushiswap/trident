@@ -1,13 +1,7 @@
 import { ethers, deployments } from "hardhat";
-import {
-  BentoBoxV1,
-  ConstantProductPoolFactory,
-  ConstantProductPool__factory,
-  ERC20Mock__factory,
-  MasterDeployer,
-} from "../../types";
+import { BentoBoxV1, StablePoolFactory, StablePool__factory, ERC20Mock__factory, MasterDeployer } from "../../../types";
 
-export const initializedConstantProductPool = deployments.createFixture(
+export const vanillaInitializedStablePool = deployments.createFixture(
   async (
     {
       deployments,
@@ -18,7 +12,7 @@ export const initializedConstantProductPool = deployments.createFixture(
     },
     options
   ) => {
-    await deployments.fixture(["ConstantProductPoolFactory"], { keepExistingDeployments: true }); // ensure you start from a fresh deployments
+    await deployments.fixture(["StablePoolFactory"], { keepExistingDeployments: true }); // ensure you start from a fresh deployments
     const { deployer } = await getNamedSigners();
 
     const ERC20 = await ethers.getContractFactory<ERC20Mock__factory>("ERC20Mock");
@@ -31,17 +25,15 @@ export const initializedConstantProductPool = deployments.createFixture(
 
     const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
 
-    const constantProductPoolFactory = await ethers.getContract<ConstantProductPoolFactory>(
-      "ConstantProductPoolFactory"
-    );
+    const stablePoolFactory = await ethers.getContract<StablePoolFactory>("StablePoolFactory");
 
     const deployData = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint256", "bool"],
-      [token0.address, token1.address, 0, false]
+      ["address", "address", "uint256"],
+      [token0.address, token1.address, 0]
     );
 
     const contractReceipt = await masterDeployer
-      .deployPool(constantProductPoolFactory.address, deployData)
+      .deployPool(stablePoolFactory.address, deployData)
       .then((tx) => tx.wait());
 
     const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
@@ -76,11 +68,10 @@ export const initializedConstantProductPool = deployments.createFixture(
       .then((tx) => tx.wait());
 
     await bento
-
       .transfer(token1.address, deployer.address, contractReceipt.events?.[0].args?.pool, "1000000000000000000")
       .then((tx) => tx.wait());
 
-    const Pool = await ethers.getContractFactory<ConstantProductPool__factory>("ConstantProductPool");
+    const Pool = await ethers.getContractFactory<StablePool__factory>("StablePool");
 
     const pool = Pool.attach(contractReceipt.events?.[0].args?.pool);
 
@@ -88,5 +79,5 @@ export const initializedConstantProductPool = deployments.createFixture(
 
     return pool;
   },
-  "initializedConstantProductPool"
+  "vanillaInitializedStablePool"
 );

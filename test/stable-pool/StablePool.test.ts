@@ -1,4 +1,4 @@
-import { expect, util } from "chai";
+import { expect } from "chai";
 import { BigNumber } from "ethers";
 import { deployments, ethers, getNamedAccounts } from "hardhat";
 
@@ -12,11 +12,8 @@ import {
   FlashSwapMock,
   FlashSwapMock__factory,
   MasterDeployer,
-  StablePool,
 } from "../../types";
-import { initializedStablePool, uninitializedStablePool } from "../fixtures";
-import { initialize } from "../harness/ConstantProduct";
-import { ADDRESS_ZERO } from "../utilities";
+import { initializedStablePool, uninitializedStablePool, vanillaInitializedStablePool } from "../fixtures";
 
 describe("Stable Pool", () => {
   before(async () => {
@@ -104,7 +101,7 @@ describe("Stable Pool", () => {
 
     it("reverts if insufficient liquidity minted", async () => {
       const deployer = await ethers.getNamedSigner("deployer");
-      const pool = await initializedStablePool();
+      const pool = await vanillaInitializedStablePool();
       const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
       const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
       await token0.transfer(pool.address, 1);
@@ -266,7 +263,7 @@ describe("Stable Pool", () => {
   describe("#flashSwap", function () {
     it("reverts on call", async () => {
       // flashSwap not supported on StablePool
-      const pool = await initializedStablePool();
+      const pool = await vanillaInitializedStablePool();
       const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
       const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
       const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
@@ -327,7 +324,7 @@ describe("Stable Pool", () => {
 
   describe("#updateBarParameters", function () {
     it("mutates bar fee if changed on master deployer", async () => {
-      const pool = await initializedStablePool();
+      const pool = await vanillaInitializedStablePool();
 
       const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
 
@@ -368,24 +365,23 @@ describe("Stable Pool", () => {
   describe("#getAmountOut", function () {
     it("returns 1000000000 given input of token0 in 1e18:1e18 pool, with bar fee 0 & swap fee 0", async () => {
       const bentoBox = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
-      const pool = await initializedStablePool({ fee: 0 });
+      const pool = await vanillaInitializedStablePool();
       const shareIn = await bentoBox.toShare(await pool.token0(), 1000000000, false);
       const shareOut = await pool.getAmountOut(
         ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token0(), shareIn])
       );
-      expect(await bentoBox.toAmount(await pool.token1(), shareOut, false)).to.equal("1000000000");
+      expect(await bentoBox.toAmount(await pool.token1(), shareOut, false)).to.equal("999000000");
     });
 
     it("returns 1000000000 given input of token1 in 1e18:1e18 pool, with bar fee 0 & swap fee 0", async () => {
       //todo: need to rework the fixture for these
       const bentoBox = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
-      const pool = await initializedStablePool({ fee: 0 });
-      console.log(await pool.getReserves());
+      const pool = await vanillaInitializedStablePool();
       const shareIn = await bentoBox.toShare(await pool.token1(), 1000000000, false);
       const shareOut = await pool.getAmountOut(
         ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token1(), shareIn])
       );
-      expect(await bentoBox.toAmount(await pool.token0(), shareOut, false)).to.equal("1000000000");
+      expect(await bentoBox.toAmount(await pool.token0(), shareOut, false)).to.equal("999000000");
     });
 
     it("reverts if tokenIn is not equal to token0 and token1", async () => {
@@ -399,7 +395,6 @@ describe("Stable Pool", () => {
         ["address", "address", "uint256"],
         [token0.address, token1.address, 30]
       );
-      await masterDeployer.deployPool(stableFactory.address, deployData);
 
       if (token0.address > token1.address) {
         const saveToken = token0;
@@ -414,14 +409,14 @@ describe("Stable Pool", () => {
         ["address", "uint256"],
         ["0x0000000000000000000000000000000000000003", 0]
       );
-      await expect(stablePool.getAmountIn(data)).to.be.revertedWith("InvalidInputToken()");
+      expect(stablePool.getAmountIn(data)).to.be.revertedWith("InvalidInputToken()");
     });
   });
 
   describe("#getAmountIn", function () {
     it("reverts on call", async () => {
       // getAmountIn not supported on StablePool
-      const pool = await initializedStablePool();
+      const pool = await vanillaInitializedStablePool();
 
       const data = ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [await pool.token0(), "1000000000"]);
       await expect(pool.getAmountIn(data)).to.be.reverted;
@@ -431,7 +426,7 @@ describe("Stable Pool", () => {
   describe("#getReserves", function () {
     it("returns expected values for initiliazedStablePool", async () => {
       // same imp as getReserves()
-      const pool = await initializedStablePool();
+      const pool = await vanillaInitializedStablePool();
       const [reserve0, reserve1] = await pool.getNativeReserves();
       //todo: currently reserve0 is set to 909090909090909090, maybe fix this?
       expect(reserve0).equal("1000000000000000000");
@@ -442,7 +437,7 @@ describe("Stable Pool", () => {
   describe("#getNativeReserves", function () {
     it("returns expected values for initiliazedStablePool", async () => {
       // same imp as getReserves()
-      const pool = await initializedStablePool();
+      const pool = await vanillaInitializedStablePool();
       const [reserve0, reserve1] = await pool.getNativeReserves();
       //todo: currently reserve0 is set to 909090909090909090, maybe fix this?
       expect(reserve0).equal("1000000000000000000");

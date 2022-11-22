@@ -4,7 +4,7 @@ import {
   ConstantProductPool__factory,
   ERC20Mock__factory,
   MasterDeployer,
-} from "../../types";
+} from "../../../types";
 
 export const uninitializedConstantProductPool = deployments.createFixture(async ({ deployments, ethers }, options) => {
   await deployments.fixture(["ConstantProductPoolFactory"]); // ensure you start from a fresh deployments
