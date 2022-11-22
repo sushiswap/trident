@@ -14,6 +14,7 @@ import {
   MasterDeployer,
 } from "../../types";
 import { initializedStablePool, uninitializedStablePool } from "../fixtures";
+import { ADDRESS_ZERO } from "../utilities";
 
 describe("Stable Pool", () => {
   before(async () => {
@@ -294,25 +295,22 @@ describe("Stable Pool", () => {
       const stableFactory = await ethers.getContract<StablePoolFactory>("StablePoolFactory");
       const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
       const ERC20 = await ethers.getContractFactory<ERC20Mock__factory>("ERC20Mock");
-      const token0 = await ERC20.deploy("Token 0", "TOKEN0", ethers.constants.MaxUint256);
-      const token1 = await ERC20.deploy("Token 1", "TOKEN1", ethers.constants.MaxUint256);
+      let token0 = await ERC20.deploy("Token 0", "TOKEN0", ethers.constants.MaxUint256);
+      let token1 = await ERC20.deploy("Token 1", "TOKEN1", ethers.constants.MaxUint256);
       const deployData = ethers.utils.defaultAbiCoder.encode(
         ["address", "address", "uint256"],
         [token0.address, token1.address, 30]
       );
-      console.log(token0.address);
-      console.log(token1.address);
       await masterDeployer.deployPool(stableFactory.address, deployData);
-      const addy = await stableFactory.calculatePoolAddress(token0.address, token1.address, 30);
 
-      console.log("stable pool factory");
-      console.log(stableFactory.address);
-      console.log(masterDeployer.address);
+      if (token0 > token1) {
+        const saveToken = token0;
+        token0 = token1;
+        token1 = saveToken;
+      }
 
+      const addy = await stableFactory.calculatePoolAddress(token1.address, token0.address, 30);
       const stablePool = StablePool.attach(addy);
-      console.log(addy);
-      console.log(stablePool.address);
-
       const assets = await stablePool.getAssets();
 
       await expect(assets[0], token0.address);
