@@ -12,6 +12,7 @@ import {
   FlashSwapMock,
   FlashSwapMock__factory,
   MasterDeployer,
+  PoolDeployerMock__factory,
 } from "../../types";
 import { initializedStablePool, uninitializedStablePool, vanillaInitializedStablePool } from "../fixtures";
 
@@ -319,7 +320,42 @@ describe("Stable Pool", () => {
   });
 
   describe("#skim", function () {
-    //todo: do this one
+    it("skims extra 1000000000 token0 on pool", async () => {
+      const pool = await vanillaInitializedStablePool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+
+      await token0.transfer(pool.address, 1000000000);
+      expect(await token0.balanceOf(pool.address)).to.equal(1000000000);
+
+      await pool.skim();
+      expect(await token0.balanceOf(pool.address)).to.equal(0);
+    });
+
+    it("skims extra 1000000000 token1 on pool", async () => {
+      const pool = await vanillaInitializedStablePool();
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+
+      await token1.transfer(pool.address, 1000000000);
+      expect(await token1.balanceOf(pool.address)).to.equal(1000000000);
+
+      await pool.skim();
+      expect(await token1.balanceOf(pool.address)).to.equal(0);
+    });
+
+    it("skims extra 1000000000 token1 & token0 on pool", async () => {
+      const pool = await vanillaInitializedStablePool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+
+      await token0.transfer(pool.address, 1000000000);
+      await token1.transfer(pool.address, 1000000000);
+      expect(await token0.balanceOf(pool.address)).to.equal(1000000000);
+      expect(await token1.balanceOf(pool.address)).to.equal(1000000000);
+
+      await pool.skim();
+      expect(await token0.balanceOf(pool.address)).to.equal(0);
+      expect(await token1.balanceOf(pool.address)).to.equal(0);
+    });
   });
 
   describe("#updateBarParameters", function () {
@@ -408,7 +444,7 @@ describe("Stable Pool", () => {
     it("returns expected values for initiliazedStablePool", async () => {
       // same imp as getReserves()
       const pool = await vanillaInitializedStablePool();
-      const [reserve0, reserve1] = await pool.getNativeReserves();
+      const [reserve0, reserve1] = await pool.getReserves();
       //todo: currently reserve0 is set to 909090909090909090, maybe fix this?
       expect(reserve0).equal("1000000000000000000");
       expect(reserve1).equal("1000000000000000000");
