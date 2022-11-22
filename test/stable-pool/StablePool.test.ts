@@ -309,7 +309,7 @@ describe("Stable Pool", () => {
         token1 = saveToken;
       }
 
-      const addy = await stableFactory.calculatePoolAddress(token1.address, token0.address, 30);
+      const addy = await stableFactory.calculatePoolAddress(token0.address, token1.address, 30);
       const stablePool = StablePool.attach(addy);
       const assets = await stablePool.getAssets();
 
