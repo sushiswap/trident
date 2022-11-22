@@ -51,7 +51,7 @@
     "moonbase:export": "hardhat --network moonbase export --export exports/moonbase.json",
     "arbitrum:deploy": "hardhat --network arbitrum deploy",
     "arbitrum:export": "hardhat --network arbitrum export --export exports/arbitrum.json",
-    "test": "hardhat test test/_/*.ts test/abstract/*.test.ts test/constant-product/*.test.ts test/deployer/*.test.ts test/library/*.test.ts test/router/*.test.ts",
+    "test": "hardhat test test/_/*.ts test/abstract/*.test.ts test/constant-product/*.test.ts test/stable-pool/*.test.ts test/deployer/*.test.ts test/library/*.test.ts test/router/*.test.ts",
     "testTines": "hardhat test test/constant-product/ConstantProductRouting.test.ts test/stable-pool/StablePoolRouting.test.ts test/router/RoutingMultiPool.test.ts test/router/RoutingMultiPoolComplex.test.ts test/router/TridentRouter.test.ts",
     "testOnly": "hardhat test",
     "test:debug": "mocha --inspect-brk",

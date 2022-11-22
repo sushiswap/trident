@@ -36,7 +36,7 @@ describe("Constant Product Pool", () => {
       await expect(cppFactory.deployPool(deployData)).to.be.revertedWith("ZeroAddress()");
     });
 
-    it("deploys if token1 is zero", async () => {
+    it("reverts if token1 is zero", async () => {
       const cppFactory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
       const deployData = ethers.utils.defaultAbiCoder.encode(
         ["address", "address", "uint256", "bool"],
@@ -153,7 +153,7 @@ describe("Constant Product Pool", () => {
       await expect(pool.flashSwap(data)).to.be.revertedWith("InvalidInputToken()");
     });
 
-    it("reverts on insuffiecient amount in token 0", async () => {
+    it("reverts on insufficient amount in token 0", async () => {
       const pool = await initializedConstantProductPool();
       const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
       const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
