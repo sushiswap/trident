@@ -385,31 +385,12 @@ describe("Stable Pool", () => {
     });
 
     it("reverts if tokenIn is not equal to token0 and token1", async () => {
-      const StablePool = await ethers.getContractFactory<StablePool__factory>("StablePool");
-      const stableFactory = await ethers.getContract<StablePoolFactory>("StablePoolFactory");
-      const masterDeployer = await ethers.getContract<MasterDeployer>("MasterDeployer");
-      const ERC20 = await ethers.getContractFactory<ERC20Mock__factory>("ERC20Mock");
-      let token0 = await ERC20.deploy("Token 0", "TOKEN0", ethers.constants.MaxUint256);
-      let token1 = await ERC20.deploy("Token 1", "TOKEN1", ethers.constants.MaxUint256);
-      const deployData = ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "uint256"],
-        [token0.address, token1.address, 30]
-      );
-
-      if (token0.address > token1.address) {
-        const saveToken = token0;
-        token0 = token1;
-        token1 = saveToken;
-      }
-
-      const addy = await stableFactory.calculatePoolAddress(token0.address, token1.address, 30);
-      const stablePool = StablePool.attach(addy);
-
       const data = ethers.utils.defaultAbiCoder.encode(
         ["address", "uint256"],
         ["0x0000000000000000000000000000000000000003", 0]
       );
-      expect(stablePool.getAmountIn(data)).to.be.revertedWith("InvalidInputToken()");
+      const pool = await vanillaInitializedStablePool();
+      expect(pool.getAmountOut(data)).to.be.revertedWith("InvalidInputToken()");
     });
   });
 
