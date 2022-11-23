@@ -157,21 +157,20 @@ describe("Stable Pool", () => {
   });
 
   describe("#burn", function () {
-    it("burns all of the LP tokens in deployer and leaves 1 of each token in bento", async () => {
-      // todo: need to finish implementing this out
-
+    it("burns all liquidity to token0 and token1 balances", async () => {
       const deployer = await ethers.getNamedSigner("deployer");
-      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+      const bob = await ethers.getNamedSigner("bob");
       const pool = await vanillaInitializedStablePool();
       const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
       const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
 
       await pool.transfer(pool.address, await pool.balanceOf(deployer.address));
-      const burnData = ethers.utils.defaultAbiCoder.encode(["address", "bool"], [deployer.address, false]);
+      const burnData = ethers.utils.defaultAbiCoder.encode(["address", "bool"], [bob.address, true]);
       await pool.burn(burnData);
 
-      //console.log(await bento.balanceOf(token0.address, deployer.address));
-      //console.log(await bento.balanceOf(token1.address, deployer.address));
+      expect(await token0.balanceOf(bob.address)).to.be.above(0);
+
+      expect(await token1.balanceOf(bob.address)).to.be.above(0);
     });
 
     it("simple removes liquidity", async () => {
@@ -211,12 +210,98 @@ describe("Stable Pool", () => {
   });
 
   describe("#burnSingle", function () {
-    //todo: do this one
+    it("removes liquidity all in token0", async () => {
+      const deployer = await ethers.getNamedSigner("deployer");
+      const bob = await ethers.getNamedSigner("bob");
+      const pool = await vanillaInitializedStablePool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+
+      await pool.transfer(pool.address, await pool.balanceOf(deployer.address));
+      const burnData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [token0.address, bob.address, true]
+      );
+      await pool.burnSingle(burnData);
+
+      expect(await token0.balanceOf(bob.address)).to.be.above(0);
+    });
+
+    it("removes liquidity all in token1", async () => {
+      const deployer = await ethers.getNamedSigner("deployer");
+      const bob = await ethers.getNamedSigner("bob");
+      const pool = await vanillaInitializedStablePool();
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+
+      await pool.transfer(pool.address, await pool.balanceOf(deployer.address));
+      const burnData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [token1.address, bob.address, true]
+      );
+      await pool.burnSingle(burnData);
+
+      expect(await token1.balanceOf(bob.address)).to.be.above(0);
+    });
+
+    it("reverts if tokenOut is not equal to token0 or token1", async () => {
+      const deployer = await ethers.getNamedSigner("deployer");
+      const pool = await vanillaInitializedStablePool();
+      await pool.transfer(pool.address, await pool.balanceOf(deployer.address));
+      const burnData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        ["0x0000000000000000000000000000000000000003", deployer.address, true]
+      );
+
+      expect(pool.burnSingle(burnData)).to.be.revertedWith("InvalidOutputToken()");
+    });
   });
 
   describe("#swap", function () {
-    it("reverts on uninitialized", async () => {
-      // event not in stable pool
+    it("reverts if tokenOut is not equal to token0 or token1", async () => {
+      const deployer = await ethers.getNamedSigner("deployer");
+      const pool = await vanillaInitializedStablePool();
+
+      const swapData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        ["0x0000000000000000000000000000000000000003", deployer.address, true]
+      );
+
+      expect(pool.swap(swapData)).to.be.revertedWith("InvalidInputToken()");
+    });
+
+    it("swaps token0 to token1", async () => {
+      const bob = await ethers.getNamedSigner("bob");
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+      const pool = await vanillaInitializedStablePool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+
+      await token0.transfer(bento.address, "10000000");
+      await bento.deposit(token0.address, bento.address, pool.address, "10000000", 0);
+      const swapData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [token0.address, bob.address, true]
+      );
+      await pool.swap(swapData);
+
+      expect(await token1.balanceOf(bob.address)).to.be.above(0);
+    });
+
+    it("simple swap token1 to token0", async () => {
+      const bob = await ethers.getNamedSigner("bob");
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+      const pool = await vanillaInitializedStablePool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+
+      await token1.transfer(bento.address, "10000000");
+      await bento.deposit(token1.address, bento.address, pool.address, "10000000", 0);
+      const swapData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [token1.address, bob.address, true]
+      );
+      await pool.swap(swapData);
+
+      expect(await token0.balanceOf(bob.address)).to.be.above(0);
     });
 
     it("performs simple swap", async () => {
