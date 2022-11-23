@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { BigNumber } from "ethers";
+import { BigNumber, utils } from "ethers";
 import { deployments, ethers, getNamedAccounts } from "hardhat";
 
 import {
@@ -111,8 +111,7 @@ describe("Stable Pool", () => {
       await expect(pool.mint(mintData)).to.be.revertedWith("InsufficientLiquidityMinted()");
     });
 
-    // todo: maybe wanna move these tests into proper spots
-    it("adds more liquidity", async () => {
+    it("simple adds more liquidity", async () => {
       const deployer = await ethers.getNamedSigner("deployer");
       const pool = await initializedStablePool();
       const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
@@ -140,7 +139,7 @@ describe("Stable Pool", () => {
       // console.log(ethers.utils.formatUnits(await pool.getAmountOut(getAmountOutData), '18'));
     });
 
-    it.skip("adds small quantity of liqudity", async () => {
+    it.skip("simple adds small quantity of liqudity", async () => {
       const deployer = await ethers.getNamedSigner("deployer");
       const pool = await initializedStablePool();
       const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
@@ -155,8 +154,27 @@ describe("Stable Pool", () => {
       // const getAmountOutData = ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [token0.address, ethers.utils.parseUnits("100", '18')]);
       // console.log(ethers.utils.formatUnits(await pool.getAmountOut(getAmountOutData), '18'));
     });
+  });
 
-    it("removes liquidity", async () => {
+  describe("#burn", function () {
+    it("burns all of the LP tokens in deployer and leaves 1 of each token in bento", async () => {
+      // todo: need to finish implementing this out
+
+      const deployer = await ethers.getNamedSigner("deployer");
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+      const pool = await vanillaInitializedStablePool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+
+      await pool.transfer(pool.address, await pool.balanceOf(deployer.address));
+      const burnData = ethers.utils.defaultAbiCoder.encode(["address", "bool"], [deployer.address, false]);
+      await pool.burn(burnData);
+
+      //console.log(await bento.balanceOf(token0.address, deployer.address));
+      //console.log(await bento.balanceOf(token1.address, deployer.address));
+    });
+
+    it("simple removes liquidity", async () => {
       const deployer = await ethers.getNamedSigner("deployer");
       const bob = await ethers.getNamedSigner("bob");
       const pool = await initializedStablePool();
@@ -190,8 +208,18 @@ describe("Stable Pool", () => {
       // console.log(bal3.sub(bal1).toString());
       // console.log(bal4.sub(bal2).toString());
     });
+  });
 
-    it("swap", async () => {
+  describe("#burnSingle", function () {
+    //todo: do this one
+  });
+
+  describe("#swap", function () {
+    it("reverts on uninitialized", async () => {
+      // event not in stable pool
+    });
+
+    it("performs simple swap", async () => {
       const deployer = await ethers.getNamedSigner("deployer");
       const alice = await ethers.getNamedSigner("alice");
       const feeTo = await ethers.getNamedSigner("barFeeTo");
@@ -246,21 +274,6 @@ describe("Stable Pool", () => {
     });
   });
 
-  describe("#burn", function () {
-    //todo: do this one
-  });
-
-  describe("#burnSingle", function () {
-    //todo: do this one
-  });
-
-  describe("#swap", function () {
-    //todo: do this one
-    it("reverts on uninitialized", async () => {
-      // event not in stable pool
-    });
-  });
-
   describe("#flashSwap", function () {
     it("reverts on call", async () => {
       // flashSwap not supported on StablePool
@@ -288,6 +301,10 @@ describe("Stable Pool", () => {
 
   describe("#poolIdentifier", function () {
     // todo: do this one
+    it("returns correct identifier for Stable Pools", async () => {
+      const pool = await vanillaInitializedStablePool();
+      expect(await (await pool.poolIdentifier()).toString()).to.equal(utils.formatBytes32String("Trident:StablePool"));
+    });
   });
 
   describe("#getAssets", function () {
