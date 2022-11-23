@@ -6,13 +6,9 @@ import {
   BentoBoxV1,
   StablePoolFactory,
   StablePool__factory,
-  StablePoolFactory__factory,
   ERC20Mock,
   ERC20Mock__factory,
-  FlashSwapMock,
-  FlashSwapMock__factory,
   MasterDeployer,
-  PoolDeployerMock__factory,
 } from "../../types";
 import { initializedStablePool, uninitializedStablePool, vanillaInitializedStablePool } from "../fixtures";
 
@@ -363,29 +359,11 @@ describe("Stable Pool", () => {
     it("reverts on call", async () => {
       // flashSwap not supported on StablePool
       const pool = await vanillaInitializedStablePool();
-      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
-      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
-      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
-
-      const FlashSwapMock = await ethers.getContractFactory<FlashSwapMock__factory>("FlashSwapMock");
-      const flashSwapMock = await FlashSwapMock.deploy(bento.address);
-      await flashSwapMock.deployed();
-      await token0.transfer(flashSwapMock.address, 100);
-
-      const flashSwapData = ethers.utils.defaultAbiCoder.encode(
-        ["bool", "address", "bool"],
-        [true, token0.address, false]
-      );
-      const data = ethers.utils.defaultAbiCoder.encode(
-        ["address", "address", "bool", "uint256", "bytes"],
-        [token0.address, flashSwapMock.address, true, 100, flashSwapData]
-      );
-      await expect(flashSwapMock.testFlashSwap(pool.address, data)).to.be.reverted;
+      await expect(pool.flashSwap("0x0000000000000000000000000000000000000001")).to.be.reverted;
     });
   });
 
   describe("#poolIdentifier", function () {
-    // todo: do this one
     it("returns correct identifier for Stable Pools", async () => {
       const pool = await vanillaInitializedStablePool();
       expect(await (await pool.poolIdentifier()).toString()).to.equal(utils.formatBytes32String("Trident:StablePool"));
@@ -544,10 +522,8 @@ describe("Stable Pool", () => {
 
   describe("#getReserves", function () {
     it("returns expected values for initiliazedStablePool", async () => {
-      // same imp as getReserves()
       const pool = await vanillaInitializedStablePool();
       const [reserve0, reserve1] = await pool.getReserves();
-      //todo: currently reserve0 is set to 909090909090909090, maybe fix this?
       expect(reserve0).equal("1000000000000000000");
       expect(reserve1).equal("1000000000000000000");
     });
@@ -555,10 +531,8 @@ describe("Stable Pool", () => {
 
   describe("#getNativeReserves", function () {
     it("returns expected values for initiliazedStablePool", async () => {
-      // same imp as getReserves()
       const pool = await vanillaInitializedStablePool();
       const [reserve0, reserve1] = await pool.getNativeReserves();
-      //todo: currently reserve0 is set to 909090909090909090, maybe fix this?
       expect(reserve0).equal("1000000000000000000");
       expect(reserve1).equal("1000000000000000000");
     });
