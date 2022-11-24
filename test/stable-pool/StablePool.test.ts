@@ -135,7 +135,7 @@ describe("Stable Pool", () => {
       // console.log(ethers.utils.formatUnits(await pool.getAmountOut(getAmountOutData), '18'));
     });
 
-    it.skip("simple adds small quantity of liqudity", async () => {
+    it.skip("simple adds small quantity of liquidity", async () => {
       const deployer = await ethers.getNamedSigner("deployer");
       const pool = await initializedStablePool();
       const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());

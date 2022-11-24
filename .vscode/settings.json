@@ -1,5 +1,5 @@
 {
-  "mochaExplorer.files": ["test/stable-pool/*.test.ts"],
+  "mochaExplorer.files": ["test/constant-product/*.test.ts", "test/stable-pool/*test.ts"],
   "mochaExplorer.fullTrace": true,
   "mochaExplorer.exit": true,
   "solidity.compileUsingRemoteVersion": "v0.8.7+commit.e28d00a7",
