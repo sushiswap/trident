@@ -490,7 +490,6 @@ describe("Stable Pool", () => {
     });
 
     it("returns 1000000000 given input of token1 in 1e18:1e18 pool, with bar fee 0 & swap fee 0", async () => {
-      //todo: need to rework the fixture for these
       const bentoBox = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
       const pool = await vanillaInitializedStablePool();
       const shareIn = await bentoBox.toShare(await pool.token1(), 1000000000, false);
