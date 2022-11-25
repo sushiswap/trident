@@ -200,7 +200,7 @@ describe("Constant Product Pool", () => {
       expect(await token1.balanceOf(bob.address)).to.be.above(0);
     });
 
-    it("simple swap token1 to token0", async () => {
+    it("swaps token1 to token0", async () => {
       const bob = await ethers.getNamedSigner("bob");
       const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
       const pool = await initializedConstantProductPool();
