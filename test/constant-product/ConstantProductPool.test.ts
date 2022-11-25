@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { BigNumber } from "ethers";
+import { BigNumber, utils } from "ethers";
 import { deployments, ethers, getNamedAccounts } from "hardhat";
 
 import {
@@ -36,7 +36,7 @@ describe("Constant Product Pool", () => {
       await expect(cppFactory.deployPool(deployData)).to.be.revertedWith("ZeroAddress()");
     });
 
-    it("deploys if token1 is zero", async () => {
+    it("reverts if token1 is zero", async () => {
       const cppFactory = await ethers.getContract<ConstantProductPoolFactory>("ConstantProductPoolFactory");
       const deployData = ethers.utils.defaultAbiCoder.encode(
         ["address", "address", "uint256", "bool"],
@@ -111,11 +111,65 @@ describe("Constant Product Pool", () => {
   });
 
   describe("#burn", function () {
-    //
+    it("burns all liquidity to token0 and token1 balances", async () => {
+      const deployer = await ethers.getNamedSigner("deployer");
+      const bob = await ethers.getNamedSigner("bob");
+      const pool = await initializedConstantProductPool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+
+      await pool.transfer(pool.address, await pool.balanceOf(deployer.address));
+      const burnData = ethers.utils.defaultAbiCoder.encode(["address", "bool"], [bob.address, true]);
+      await pool.burn(burnData);
+
+      expect(await token0.balanceOf(bob.address)).to.be.above(0);
+
+      expect(await token1.balanceOf(bob.address)).to.be.above(0);
+    });
   });
 
   describe("#burnSingle", function () {
-    //
+    it("removes liquidity all in token0", async () => {
+      const bob = await ethers.getNamedSigner("bob");
+      const pool = await initializedConstantProductPool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+
+      await pool.transfer(pool.address, await "1000");
+      const burnData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [token0.address, bob.address, true]
+      );
+      await pool.burnSingle(burnData);
+
+      expect(await token0.balanceOf(bob.address)).to.be.above(0);
+    });
+
+    it("removes liquidity all in token1", async () => {
+      const bob = await ethers.getNamedSigner("bob");
+      const pool = await initializedConstantProductPool();
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+
+      await pool.transfer(pool.address, await "1000");
+      const burnData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [token1.address, bob.address, true]
+      );
+      await pool.burnSingle(burnData);
+
+      expect(await token1.balanceOf(bob.address)).to.be.above(0);
+    });
+
+    it("reverts if tokenOut is not equal to token0 or token1", async () => {
+      const deployer = await ethers.getNamedSigner("deployer");
+      const pool = await initializedConstantProductPool();
+      await pool.transfer(pool.address, await pool.balanceOf(deployer.address));
+      const burnData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        ["0x0000000000000000000000000000000000000003", deployer.address, true]
+      );
+
+      expect(pool.burnSingle(burnData)).to.be.revertedWith("InvalidOutputToken()");
+    });
   });
 
   describe("#swap", function () {
@@ -126,6 +180,54 @@ describe("Constant Product Pool", () => {
         [await pool.token0(), "0x0000000000000000000000000000000000000000", false]
       );
       await expect(pool.swap(data)).to.be.revertedWith("PoolUninitialized()");
+    });
+
+    it("swaps token0 to token1", async () => {
+      const bob = await ethers.getNamedSigner("bob");
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+      const pool = await initializedConstantProductPool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+
+      await token0.transfer(bento.address, "10000000");
+      await bento.deposit(token0.address, bento.address, pool.address, "10000000", 0);
+      const swapData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [token0.address, bob.address, true]
+      );
+      await pool.swap(swapData);
+
+      expect(await token1.balanceOf(bob.address)).to.be.above(0);
+    });
+
+    it("swaps token1 to token0", async () => {
+      const bob = await ethers.getNamedSigner("bob");
+      const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
+      const pool = await initializedConstantProductPool();
+      const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
+      const token1 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token1());
+
+      await token1.transfer(bento.address, "10000000");
+      await bento.deposit(token1.address, bento.address, pool.address, "10000000", 0);
+      const swapData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        [token1.address, bob.address, true]
+      );
+      await pool.swap(swapData);
+
+      expect(await token0.balanceOf(bob.address)).to.be.above(0);
+    });
+
+    it("reverts if tokenOut is not equal to token0 or token1", async () => {
+      const deployer = await ethers.getNamedSigner("deployer");
+      const pool = await initializedConstantProductPool();
+
+      const swapData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "bool"],
+        ["0x0000000000000000000000000000000000000003", deployer.address, true]
+      );
+
+      expect(pool.swap(swapData)).to.be.revertedWith("InvalidInputToken()");
     });
   });
 
@@ -153,7 +255,7 @@ describe("Constant Product Pool", () => {
       await expect(pool.flashSwap(data)).to.be.revertedWith("InvalidInputToken()");
     });
 
-    it("reverts on insuffiecient amount in token 0", async () => {
+    it("reverts on insufficient amount in token 0", async () => {
       const pool = await initializedConstantProductPool();
       const token0 = await ethers.getContractAt<ERC20Mock>("ERC20Mock", await pool.token0());
       const bento = await ethers.getContract<BentoBoxV1>("BentoBoxV1");
@@ -290,7 +392,12 @@ describe("Constant Product Pool", () => {
   });
 
   describe("#poolIdentifier", function () {
-    //
+    it("returns correct identifier for Constant Product Pools", async () => {
+      const pool = await initializedConstantProductPool();
+      expect(await (await pool.poolIdentifier()).toString()).to.equal(
+        utils.formatBytes32String("Trident:ConstantProduct")
+      );
+    });
   });
 
   describe("#getAssets", function () {
