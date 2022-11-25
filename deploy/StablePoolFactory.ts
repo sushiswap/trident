@@ -61,6 +61,6 @@ const deployFunction: DeployFunction = async function ({
 
 export default deployFunction;
 
-//deployFunction.dependencies = ["MasterDeployer"];
+// deployFunction.dependencies = ["MasterDeployer"];
 
 deployFunction.tags = ["StablePoolFactory"];
