@@ -89,31 +89,38 @@ const config: HardhatUserConfig = {
     },
   },
   networks: {
-    localhost: {
-      live: false,
-      saveDeployments: false,
-      tags: ["local"],
-    },
-    hardhat: {
-      forking: {
-        enabled: process.env.FORKING === "true",
-        url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
-        blockNumber: 13000000,
-      },
-      allowUnlimitedContractSize: true,
-      live: false,
-      saveDeployments: false,
-      tags: ["test", "local"],
-      // Solidity-coverage overrides gasPrice to 1 which is not compatible with EIP1559
-      hardfork: process.env.CODE_COVERAGE ? "berlin" : "london",
-    },
+    // localhost: {
+    //   live: false,
+    //   saveDeployments: false,
+    //   tags: ["local"],
+    // },
+    // hardhat: {
+    //   forking: {
+    //     enabled: process.env.FORKING === "true",
+    //     url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
+    //     blockNumber: 13000000,
+    //   },
+    //   allowUnlimitedContractSize: true,
+    //   live: false,
+    //   saveDeployments: false,
+    //   tags: ["test", "local"],
+    //   // Solidity-coverage overrides gasPrice to 1 which is not compatible with EIP1559
+    //   hardfork: process.env.CODE_COVERAGE ? "berlin" : "london",
+    // },
+    // ethereum: {
+    //   url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
+    //   live: true,
+    //   chainId: 1,
+    //   saveDeployments: true,
+    //   tags: ["mainnet"],
+    //   hardfork: process.env.CODE_COVERAGE ? "berlin" : "london",
+    // },
     ethereum: {
       url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
-      live: true,
+      accounts,
       chainId: 1,
+      live: true,
       saveDeployments: true,
-      tags: ["mainnet"],
-      hardfork: process.env.CODE_COVERAGE ? "berlin" : "london",
     },
     ropsten: {
       url: `https://ropsten.infura.io/v3/${process.env.INFURA_API_KEY}`,
@@ -161,7 +168,6 @@ const config: HardhatUserConfig = {
       chainId: 250,
       live: true,
       saveDeployments: true,
-      gasPrice: 22000000000,
     },
     polygon: {
       url: `https://polygon-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
@@ -179,8 +185,8 @@ const config: HardhatUserConfig = {
       tags: ["staging"],
       gasMultiplier: 2,
     },
-    xdai: {
-      url: "https://rpc.xdaichain.com",
+    gnosis: {
+      url: "https://rpc.ankr.com/gnosis",
       accounts,
       chainId: 100,
       live: true,
