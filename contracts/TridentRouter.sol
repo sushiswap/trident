@@ -270,6 +270,35 @@ contract TridentRouter is ITridentRouter, SelfPermit, Multicall {
         bento.deposit{value: token == USE_NATIVE ? amount : 0}(token, msg.sender, recipient, amount, 0);
     }
 
+    function safeWithdraw(address token, address to) external {
+        // (-1) edgecase when withdraw all
+        uint256 amount = bento.toAmount(token, bento.balanceOf(token, address(this)), false) - 1;
+        uint256 bentoBalance = IERC20(token).balanceOf(address(bento));
+
+        if (amount <= bentoBalance) {
+            bento.withdraw(token, address(this), to, amount, 0);
+            return;
+        }
+
+        bento.withdraw(token, address(this), to, bentoBalance, 0);
+
+        uint256 amountToWithdraw = amount - bentoBalance;
+
+        while (amountToWithdraw > 0) {
+            bento.harvest(token, true, amountToWithdraw);
+            // lazy balance check, can be optimized by fetch strategy data
+            bentoBalance = IERC20(token).balanceOf(address(bento));
+
+            if (amountToWithdraw <= bentoBalance) {
+                bento.withdraw(token, address(this), to, amountToWithdraw, 0);
+                return;
+            }
+
+            amountToWithdraw -= bentoBalance;
+            bento.withdraw(token, address(this), to, bentoBalance, 0);
+        }
+    }
+
     function _increment(uint256 i) internal pure returns (uint256) {
         unchecked {
             return i + 1;
