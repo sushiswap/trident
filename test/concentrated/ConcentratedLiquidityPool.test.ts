@@ -314,7 +314,7 @@ describe("Concentrated Liquidity Product Pool", function () {
 
         const lp = await addLiquidityViaManager(addLiquidityParams);
 
-        // swap accross the range and back
+        // swap across the range and back
         //                       ▼ - - - - - - -> ▼
         // ----------------|xxxxxxxxxxx|-------------------------------
         // ----|xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx|-----
@@ -337,7 +337,7 @@ describe("Concentrated Liquidity Product Pool", function () {
           inAmount: swapTx.output,
           recipient: defaultAddress,
         });
-        // swap accross the range and back
+        // swap across the range and back
         //                       ▼ - - - - - - -> ▼
         // ----------------|xxxxxxxxxxx|-----|xxxxxxxxxx|--------
         // ------------------------------------------------------
@@ -402,7 +402,7 @@ describe("Concentrated Liquidity Product Pool", function () {
         addLiquidityParams = helper.setTicks(lower + 3 * step, upper + 3 * step, addLiquidityParams);
         await addLiquidityViaManager(addLiquidityParams);
 
-        // swap accross a zero liquidity range and back
+        // swap across a zero liquidity range and back
         //                       ▼ - - - - - - - - - -> ▼
         // ----|----|-------|xxxxxxxxxxxx|-------|xxxxxxxxxxx|-----
 
